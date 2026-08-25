@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Career Kickoff — Soccer Career</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+
+  <header id="topbar">
+    <div class="name-row">
+      <span id="hdrAvatar"></span>
+      <div>
+        <div class="name" id="hdrName">—</div>
+        <div class="stat" id="hdrClub">—</div>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div class="stat" id="hdrAge">Age —</div>
+      <div class="stat" id="hdrWage">— / wk</div>
+    </div>
+  </header>
+
+  <!-- CREATE SCREEN -->
+  <section id="screen-create" class="screen">
+    <div class="card" id="createStepProfile">
+      <h1>⚽ Career Kickoff</h1>
+      <p class="muted">Start your journey as a 16-year-old academy graduate and build a soccer career from the bottom up.</p>
+
+      <label for="playerName">Player name</label>
+      <input type="text" id="playerName" maxlength="24" placeholder="e.g. Alex Rivera">
+
+      <label>Position</label>
+      <div class="pos-grid" id="posGrid"></div>
+
+      <label for="nationSelect">Nation</label>
+      <select id="nationSelect"></select>
+
+      <label>Hair color</label>
+      <div class="swatch-grid" id="hairGrid"></div>
+
+      <label>Jersey — primary color</label>
+      <div class="swatch-grid" id="jerseyPrimaryGrid"></div>
+
+      <label>Jersey — secondary color</label>
+      <div class="swatch-grid" id="jerseySecondaryGrid"></div>
+
+      <div class="avatar-preview" id="avatarPreview"></div>
+
+      <div id="scoutPreview" class="muted" style="margin-top:10px; min-height:18px;"></div>
+
+      <button class="primary" id="btnToClubChoice" style="margin-top:16px; width:100%;">Choose Your Club →</button>
+    </div>
+
+    <div class="card" id="createStepClub" style="display:none;">
+      <h2>Pick Your Starting Club</h2>
+      <p class="muted">Three Development League sides will give a raw 16-year-old a chance. Where do you begin?</p>
+      <div id="clubChoiceList"></div>
+      <button id="btnBackToProfile" style="margin-top:10px;">← Back</button>
+    </div>
+  </section>
+
+  <!-- HUB SCREEN -->
+  <section id="screen-hub" class="screen">
+    <div class="card">
+      <div class="flex-between">
+        <h2 id="hubWeekTitle">Week 1</h2>
+        <span class="muted" id="hubSeasonLabel">Season 1</span>
+      </div>
+      <div id="hubStatus"></div>
+
+      <div id="hubAttrs"></div>
+
+      <h3>This week</h3>
+      <p class="muted" id="hubActionsHint"></p>
+      <div class="train-grid" id="trainGrid"></div>
+      <button id="btnRest" style="margin-top:8px;">😴 Rest (recover fitness &amp; morale)</button>
+      <div class="button-row" style="margin-top:14px;">
+        <button class="primary" id="btnPlayMatch">▶ Play Match</button>
+        <button class="secondary" id="btnSimMatch">⏭ Sim Match</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>League Table</h3>
+      <div style="overflow-x:auto;">
+        <table id="leagueTable"></table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="flex-between">
+        <h3 style="margin:0;">Career</h3>
+        <button id="btnNewCareer" class="danger">Retire &amp; Start New Career</button>
+      </div>
+      <div id="careerSummaryMini" class="muted"></div>
+    </div>
+  </section>
+
+  <!-- MATCH SCREEN (live playback, used for both league and cup matches) -->
+  <section id="screen-match" class="screen">
+    <div class="card">
+      <h2 id="matchTitle">Match Day</h2>
+      <div class="matchup" id="matchupRow"></div>
+      <ul id="matchLog"></ul>
+      <div id="matchRatingBox" class="muted"></div>
+      <button id="btnSkipToFullTime" style="width:100%; margin-top:10px;">⏭ Skip to Full Time</button>
+      <button class="primary" id="btnContinueAfterMatch" style="width:100%; margin-top:10px; display:none;">Continue</button>
+    </div>
+  </section>
+
+  <!-- CUP INTRO SCREEN (Champions League / World Cup) -->
+  <section id="screen-cup-intro" class="screen">
+    <div class="card">
+      <h2 id="cupIntroTitle">Champions League</h2>
+      <div class="muted" id="cupIntroStage" style="text-align:center; margin-bottom:6px;"></div>
+      <div class="matchup" id="cupIntroMatchup"></div>
+      <div class="button-row" style="margin-top:14px;">
+        <button class="primary" id="btnCupPlay">▶ Play Match</button>
+        <button class="secondary" id="btnCupSim">⏭ Sim Match</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CUP RESULT SCREEN -->
+  <section id="screen-cup-result" class="screen">
+    <div class="card">
+      <h1 id="cupResultTitle">Result</h1>
+      <div id="cupResultBody"></div>
+      <button class="primary" id="btnCupResultContinue" style="width:100%; margin-top:14px;">Continue</button>
+    </div>
+  </section>
+
+  <!-- SEASON END SCREEN -->
+  <section id="screen-season-end" class="screen">
+    <div class="card">
+      <h2>Season Complete</h2>
+      <div id="seasonSummary"></div>
+      <h3>Final Table</h3>
+      <div style="overflow-x:auto;">
+        <table id="finalTable"></table>
+      </div>
+    </div>
+    <div class="card" id="transferCard">
+      <h3>Transfer Window</h3>
+      <div id="offersList"></div>
+      <button id="btnStayAtClub" style="width:100%; margin-top:8px;">Stay at current club</button>
+    </div>
+    <div class="card">
+      <button class="primary" id="btnStartNextSeason" style="width:100%;">Begin Next Season</button>
+    </div>
+  </section>
+
+  <!-- RETIREMENT SCREEN -->
+  <section id="screen-retire" class="screen">
+    <div class="card">
+      <h1>🏆 Career Over</h1>
+      <p id="retireReason" class="muted"></p>
+      <div id="retireSummary"></div>
+      <button class="primary" id="btnNewCareerAfterRetire" style="width:100%; margin-top:14px;">Start New Career</button>
+    </div>
+  </section>
+
+  <footer>Career Kickoff — a browser soccer career sim. Progress autosaves to this browser.</footer>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
