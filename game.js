@@ -150,6 +150,60 @@ function allClubsFlat() {
   })));
 }
 
+/* ---------- Club crests (generated, not real club artwork) ---------- */
+// Every club gets a small original shield badge — a deterministic color and
+// initials derived from its name — so real and fictional clubs alike get a
+// visual identity without reproducing any actual team's logo.
+
+function hashStr(str) {
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+const CREST_SHORT_PREFIXES = new Set(['FC', 'AC', 'AS', 'SC', 'RB', 'RC', 'VfB', 'VfL', 'US', 'SSC']);
+
+function clubInitials(name) {
+  let words = name.replace(/[^A-Za-z0-9' ]/g, ' ').split(/\s+/).filter(Boolean);
+  const withoutPrefix = words.filter(w => !CREST_SHORT_PREFIXES.has(w));
+  if (withoutPrefix.length > 0) words = withoutPrefix;
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  return words.slice(0, 3).map(w => w[0]).join('').toUpperCase();
+}
+
+let crestIdCounter = 0;
+
+function clubCrestSvg(name, size) {
+  size = size || 40;
+  const h = hashStr(name);
+  const hue = h % 360;
+  const hue2 = (hue + 34) % 360;
+  const initials = clubInitials(name);
+  // A fresh id per call (not just per club) avoids duplicate-id gradient
+  // resolution bugs when the same club's crest is rendered in more than
+  // one place at once (e.g. a hidden screen still in the DOM).
+  const gid = 'crest' + (crestIdCounter++) + '_' + (h % 997);
+  const fontSize = initials.length >= 3 ? 27 : 34;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" role="img" aria-label="${initials} crest">
+    <defs>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="hsl(${hue},58%,28%)" />
+        <stop offset="100%" stop-color="hsl(${hue2},62%,44%)" />
+      </linearGradient>
+    </defs>
+    <path d="M50 4 L92 18 L92 50 C92 77 74 92 50 97 C26 92 8 77 8 50 L8 18 Z" fill="url(#${gid})" stroke="rgba(255,255,255,0.55)" stroke-width="2.5"/>
+    <text x="50" y="59" text-anchor="middle" font-family="Oswald, sans-serif" font-weight="700" font-size="${fontSize}" fill="#fff" style="letter-spacing:0.5px">${initials}</text>
+  </svg>`;
+}
+
+function crestPlainHtml(name, size) {
+  return `<span class="crest-plain">${clubCrestSvg(name, size)}</span>`;
+}
+
+function crestWithRatingHtml(name, strength, size) {
+  return `<span class="crest-wrap" style="width:${size}px;height:${size}px;">${clubCrestSvg(name, size)}<span class="rating-chip">${Math.round(strength)}</span></span>`;
+}
+
 /* ---------- State ---------- */
 
 let state = null;
@@ -363,6 +417,8 @@ function playMatchDay() {
       title: `${club.name} vs ${opp.name}`,
       home: isHome ? club.name : opp.name,
       away: isHome ? opp.name : club.name,
+      homeStrength: isHome ? club.strength : opp.strength,
+      awayStrength: isHome ? opp.strength : club.strength,
       scoreHome: isHome ? scoreClub : scoreOpp,
       scoreAway: isHome ? scoreOpp : scoreClub,
       log, played: false, rating: null, goals: 0, assists: 0
@@ -440,6 +496,8 @@ function playMatchDay() {
     title: `${isHome ? club.name : opp.name} vs ${isHome ? opp.name : club.name}`,
     home: isHome ? club.name : opp.name,
     away: isHome ? opp.name : club.name,
+    homeStrength: isHome ? club.strength : opp.strength,
+    awayStrength: isHome ? opp.strength : club.strength,
     scoreHome: isHome ? scoreClub : scoreOpp,
     scoreAway: isHome ? scoreOpp : scoreClub,
     log, played: true, rating, goals, assists, injured
@@ -510,7 +568,7 @@ function generateTransferOffers() {
     const idx = randi(0, pool.length - 1);
     const c = pool.splice(idx, 1)[0];
     const wage = Math.round((300 + overall * 25 + c.tier * 250) * rand(0.9, 1.25) / 10) * 10;
-    offers.push({ id: `${c.leagueId}:${c.name}`, clubName: c.name, leagueId: c.leagueId, leagueName: c.leagueName, tier: c.tier, wage });
+    offers.push({ id: `${c.leagueId}:${c.name}`, clubName: c.name, leagueId: c.leagueId, leagueName: c.leagueName, tier: c.tier, strength: c.strength, wage });
   }
   return offers.sort((a, b) => b.wage - a.wage);
 }
@@ -639,7 +697,7 @@ function renderHub() {
   const overall = computeOverall(p);
   document.getElementById('hubStatus').innerHTML = `
     ${lastMatchMiniHtml()}
-    <div class="muted">${state.clubs[p.clubIndex].name} · ${currentLeague().name} · Overall Rating: <strong>${overall}</strong> · Contract: ${p.contractYearsLeft} yr(s) left</div>
+    <div class="muted club-line">${crestPlainHtml(state.clubs[p.clubIndex].name, 22)}${state.clubs[p.clubIndex].name} · ${currentLeague().name} · Overall Rating: <strong>${overall}</strong> · Contract: ${p.contractYearsLeft} yr(s) left</div>
     <div class="bar-row"><span class="label">Fitness</span><div class="bar-track"><div class="bar-fill fitness" style="width:${p.fitness}%"></div></div><span class="bar-val">${Math.round(p.fitness)}</span></div>
     <div class="bar-row"><span class="label">Morale</span><div class="bar-track"><div class="bar-fill morale" style="width:${p.morale}%"></div></div><span class="bar-val">${Math.round(p.morale)}</span></div>
   `;
@@ -694,7 +752,7 @@ function renderLeagueTable(elId, highlightPlayer) {
     <tbody>
       ${rows.map((r, i) => `
         <tr class="${highlightPlayer && r.clubIndex === p.clubIndex ? 'you' : ''}">
-          <td>${i + 1}</td><td>${r.name}</td><td class="num">${r.played}</td><td class="num">${r.won}</td>
+          <td>${i + 1}</td><td class="club-cell">${crestPlainHtml(r.name, 20)}${r.name}</td><td class="num">${r.played}</td><td class="num">${r.won}</td>
           <td class="num">${r.drawn}</td><td class="num">${r.lost}</td><td class="num">${r.gf - r.ga}</td><td class="num">${r.pts}</td>
         </tr>`).join('')}
     </tbody>`;
@@ -723,8 +781,17 @@ function renderCareerSummaryMini() {
 function renderMatchScreen() {
   const r = lastMatchResult;
   document.getElementById('matchTitle').textContent = r.title;
-  document.getElementById('matchScore').textContent = `${r.scoreHome} - ${r.scoreAway}`;
-  document.getElementById('matchTeams').textContent = `${r.home} (H)  vs  ${r.away} (A)`;
+  document.getElementById('matchupRow').innerHTML = `
+    <div class="team-side">
+      ${crestWithRatingHtml(r.home, r.homeStrength, 56)}
+      <div class="team-name">${r.home} <span class="muted">(H)</span></div>
+    </div>
+    <div class="score-banner">${r.scoreHome} - ${r.scoreAway}</div>
+    <div class="team-side">
+      ${crestWithRatingHtml(r.away, r.awayStrength, 56)}
+      <div class="team-name">${r.away} <span class="muted">(A)</span></div>
+    </div>
+  `;
   document.getElementById('matchLog').innerHTML = r.log.map(line =>
     `<li class="${/GOAL|Full time/.test(line) ? 'big' : ''}">${line}</li>`
   ).join('');
@@ -748,7 +815,7 @@ function renderSeasonEndScreen() {
   const p = state.player;
   const h = state.history[state.history.length - 1];
   document.getElementById('seasonSummary').innerHTML = `
-    <p><strong>${state.clubs[p.clubIndex].name}</strong> (${h.league}) finished <strong>#${h.finish}</strong> this season.</p>
+    <p class="club-line">${crestPlainHtml(state.clubs[p.clubIndex].name, 26)}<strong>${state.clubs[p.clubIndex].name}</strong> (${h.league}) finished <strong>#${h.finish}</strong> this season.</p>
     <p>${p.name}: ${h.apps} apps · ${h.goals} goals · ${h.assists} assists · avg rating ${h.avgRating || '—'}</p>
     ${h.trophy ? `<span class="trophy">🏆 ${h.trophy}</span>` : ''}
   `;
@@ -763,9 +830,12 @@ function renderSeasonEndScreen() {
   } else {
     offersList.innerHTML = state.pendingOffers.map(o => `
       <div class="offer-card">
-        <div>
-          <strong>${o.clubName}</strong>
-          <div class="info">${o.leagueName} · Wage offer: $${o.wage}/wk</div>
+        <div class="offer-card-main">
+          ${crestWithRatingHtml(o.clubName, o.strength, 44)}
+          <div>
+            <strong>${o.clubName}</strong>
+            <div class="info">${o.leagueName} · Wage offer: $${o.wage}/wk</div>
+          </div>
         </div>
         <button data-offer="${o.id}" class="primary offer-btn">Sign</button>
       </div>
