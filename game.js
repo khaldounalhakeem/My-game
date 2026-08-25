@@ -22,15 +22,106 @@ const POSITION_WEIGHTS = {
   FWD: { shooting: 0.35, pace: 0.25, dribbling: 0.20, physical: 0.10, passing: 0.10 }
 };
 
-// Trainable attrs per position (goalkeeping only for GK, kept out of others' training list)
 function trainableAttrs(position) {
   if (position === 'GK') return ['goalkeeping', 'pace', 'passing', 'physical'];
   return ['pace', 'shooting', 'passing', 'dribbling', 'defending', 'physical'];
 }
 
-const CLUB_NAMES = [
-  'Riverside FC', 'Oakdale United', 'Port Albion', 'Grange Rovers', 'Millbrook Town',
-  'Eastwick Athletic', 'Stonebridge FC', 'Hartley Rangers', 'Kingswell City', 'Ashford Dynamo'
+// Six 10-club divisions: one fictional starter league (where every career
+// begins) and five real top-flight European leagues you get scouted into
+// as your rating climbs. Every division has exactly 10 clubs so they all
+// share the same 18-week double round-robin season length.
+const LEAGUES = [
+  {
+    id: 'dev', name: 'Development League', tier: 1,
+    clubs: [
+      { name: 'Riverside FC', strength: 44 },
+      { name: 'Oakdale United', strength: 40 },
+      { name: 'Port Albion', strength: 42 },
+      { name: 'Grange Rovers', strength: 38 },
+      { name: 'Millbrook Town', strength: 46 },
+      { name: 'Eastwick Athletic', strength: 41 },
+      { name: 'Stonebridge FC', strength: 39 },
+      { name: 'Hartley Rangers', strength: 45 },
+      { name: 'Kingswell City', strength: 43 },
+      { name: 'Ashford Dynamo', strength: 48 }
+    ]
+  },
+  {
+    id: 'ligue1', name: 'Ligue 1', tier: 2,
+    clubs: [
+      { name: 'Paris Saint-Germain', strength: 90 },
+      { name: 'Marseille', strength: 78 },
+      { name: 'Monaco', strength: 77 },
+      { name: 'Lyon', strength: 74 },
+      { name: 'Lille', strength: 73 },
+      { name: 'Nice', strength: 71 },
+      { name: 'Rennes', strength: 72 },
+      { name: 'Lens', strength: 70 },
+      { name: 'Nantes', strength: 66 },
+      { name: 'Strasbourg', strength: 65 }
+    ]
+  },
+  {
+    id: 'bundesliga', name: 'Bundesliga', tier: 3,
+    clubs: [
+      { name: 'Bayern Munich', strength: 92 },
+      { name: 'Borussia Dortmund', strength: 84 },
+      { name: 'Bayer Leverkusen', strength: 83 },
+      { name: 'RB Leipzig', strength: 82 },
+      { name: 'Eintracht Frankfurt', strength: 75 },
+      { name: 'VfB Stuttgart', strength: 74 },
+      { name: 'VfL Wolfsburg', strength: 73 },
+      { name: "Borussia Monchengladbach", strength: 72 },
+      { name: 'SC Freiburg', strength: 71 },
+      { name: 'Union Berlin', strength: 70 }
+    ]
+  },
+  {
+    id: 'seriea', name: 'Serie A', tier: 4,
+    clubs: [
+      { name: 'Inter Milan', strength: 87 },
+      { name: 'Juventus', strength: 85 },
+      { name: 'AC Milan', strength: 84 },
+      { name: 'Napoli', strength: 83 },
+      { name: 'Atalanta', strength: 80 },
+      { name: 'AS Roma', strength: 79 },
+      { name: 'Lazio', strength: 77 },
+      { name: 'Fiorentina', strength: 75 },
+      { name: 'Bologna', strength: 72 },
+      { name: 'Torino', strength: 70 }
+    ]
+  },
+  {
+    id: 'laliga', name: 'La Liga', tier: 5,
+    clubs: [
+      { name: 'Real Madrid', strength: 94 },
+      { name: 'FC Barcelona', strength: 91 },
+      { name: 'Atletico Madrid', strength: 85 },
+      { name: 'Athletic Bilbao', strength: 77 },
+      { name: 'Real Sociedad', strength: 78 },
+      { name: 'Villarreal', strength: 76 },
+      { name: 'Real Betis', strength: 75 },
+      { name: 'Sevilla', strength: 76 },
+      { name: 'Valencia', strength: 72 },
+      { name: 'Celta Vigo', strength: 68 }
+    ]
+  },
+  {
+    id: 'premier', name: 'Premier League', tier: 5,
+    clubs: [
+      { name: 'Manchester City', strength: 93 },
+      { name: 'Liverpool', strength: 89 },
+      { name: 'Arsenal', strength: 88 },
+      { name: 'Chelsea', strength: 83 },
+      { name: 'Manchester United', strength: 82 },
+      { name: 'Tottenham Hotspur', strength: 81 },
+      { name: 'Newcastle United', strength: 79 },
+      { name: 'Aston Villa', strength: 78 },
+      { name: 'West Ham United', strength: 74 },
+      { name: 'Everton', strength: 70 }
+    ]
+  }
 ];
 
 const SEASON_LENGTH = 18; // double round robin across 10 clubs
@@ -41,7 +132,6 @@ const RETIREMENT_AGE = 35;
 
 function rand(min, max) { return Math.random() * (max - min) + min; }
 function randi(min, max) { return Math.floor(rand(min, max + 1)); }
-function choice(arr) { return arr[randi(0, arr.length - 1)]; }
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 function computeOverall(player) {
@@ -51,23 +141,26 @@ function computeOverall(player) {
   return Math.round(total);
 }
 
-function starRating(potentialAvg) {
-  // potentialAvg roughly 55-95 -> 1-5 stars
-  const stars = Math.round(clamp((potentialAvg - 55) / 40, 0, 1) * 4) + 1;
-  return clamp(stars, 1, 5);
+function findLeague(leagueId) { return LEAGUES.find(l => l.id === leagueId); }
+function currentLeague() { return findLeague(state.leagueId); }
+
+function allClubsFlat() {
+  return LEAGUES.flatMap(l => l.clubs.map(c => ({
+    name: c.name, strength: c.strength, leagueId: l.id, leagueName: l.name, tier: l.tier
+  })));
 }
 
 /* ---------- State ---------- */
 
 let state = null;
 
-function freshClubs() {
-  // tier: relative strength 1 (weak) - 5 (elite), base strength 38-92
-  return CLUB_NAMES.map((name, i) => {
-    const tier = i < 4 ? 1 : i < 7 ? 2 : i < 9 ? 3 : 4;
-    const base = { 1: 42, 2: 58, 3: 72, 4: 85 }[tier] + randi(-4, 4);
-    return { name, tier, strength: base };
-  });
+function instantiateLeagueClubs(leagueId) {
+  const league = findLeague(leagueId);
+  return league.clubs.map(c => ({
+    name: c.name,
+    tier: league.tier,
+    strength: leagueId === 'dev' ? clamp(c.strength + randi(-3, 3), 30, 60) : c.strength
+  }));
 }
 
 function newPlayer(name, position) {
@@ -121,14 +214,13 @@ function newLeagueTable(clubs) {
 }
 
 function startNewCareer(name, position) {
-  const clubs = freshClubs();
   const player = newPlayer(name, position);
-  // Start at a weak club (tier 1) chosen randomly among tier-1 clubs.
-  const tier1 = clubs.map((c, i) => i).filter(i => clubs[i].tier === 1);
-  player.clubIndex = choice(tier1);
+  const clubs = instantiateLeagueClubs('dev');
+  player.clubIndex = randi(0, clubs.length - 1);
 
   state = {
     player,
+    leagueId: 'dev',
     clubs,
     season: 1,
     week: 1,
@@ -137,7 +229,8 @@ function startNewCareer(name, position) {
     fixtures: buildFixtures(clubs.length),
     table: newLeagueTable(clubs),
     history: [],
-    pendingOffers: []
+    pendingOffers: [],
+    pendingTransfer: null
   };
   save();
 }
@@ -365,24 +458,23 @@ function isSeasonOver() { return state.week > SEASON_LENGTH; }
 function finishSeason() {
   const p = state.player;
   const table = sortedTable();
-  const clubRow = table.find(r => r.clubIndex === p.clubIndex);
   const finishPosition = table.findIndex(r => r.clubIndex === p.clubIndex) + 1;
 
   let trophy = null;
   if (finishPosition === 1) {
-    trophy = `League Champion (S${state.season})`;
+    trophy = `${currentLeague().name} Champion (S${state.season})`;
     p.careerStats.trophies.push(trophy);
   }
 
   const avgRating = p.seasonStats.ratingCount ? p.seasonStats.ratingSum / p.seasonStats.ratingCount : 0;
   if (avgRating >= 7.6 && computeOverall(p) >= 82) {
-    const capTrophy = `International Call-up (S${state.season})`;
-    p.careerStats.trophies.push(capTrophy);
+    p.careerStats.trophies.push(`International Call-up (S${state.season})`);
   }
 
   state.history.push({
     season: state.season,
     club: state.clubs[p.clubIndex].name,
+    league: currentLeague().name,
     apps: p.seasonStats.matches,
     goals: p.seasonStats.goals,
     assists: p.seasonStats.assists,
@@ -399,38 +491,35 @@ function generateTransferOffers() {
   const p = state.player;
   const overall = computeOverall(p);
   const avgRating = p.seasonStats.ratingCount ? p.seasonStats.ratingSum / p.seasonStats.ratingCount : 6;
-  const currentTier = state.clubs[p.clubIndex].tier;
+  const currentTier = currentLeague().tier;
   if (avgRating < 6.2 && overall < 55) return [];
 
-  const offers = [];
-  const numOffers = avgRating >= 7.5 ? randi(1, 3) : randi(0, 2);
-  const candidateIdx = state.clubs
-    .map((c, i) => i)
-    .filter(i => i !== p.clubIndex && c_tierEligible(state.clubs[i].tier, currentTier, overall));
-
-  function c_tierEligible(tier, curTier, ov) {
-    if (tier <= curTier) return tier >= curTier - 1;
-    const needed = { 2: 55, 3: 68, 4: 80 }[tier] || 40;
+  function tierEligible(tier, curTier, ov) {
+    if (tier < curTier) return avgRating < 6.8; // dip in form: a step down is plausible
+    if (tier === curTier) return true; // lateral moves always plausible
+    const needed = { 2: 50, 3: 60, 4: 70, 5: 83 }[tier] || 40;
     return ov >= needed - 8;
   }
 
-  for (let i = 0; i < numOffers && candidateIdx.length; i++) {
-    const idx = candidateIdx.splice(randi(0, candidateIdx.length - 1), 1)[0];
-    const club = state.clubs[idx];
-    const wage = Math.round((300 + overall * 25 + club.tier * 250) * rand(0.9, 1.25) / 10) * 10;
-    offers.push({ clubIndex: idx, name: club.name, tier: club.tier, wage });
+  const currentClubName = state.clubs[p.clubIndex].name;
+  const pool = allClubsFlat().filter(c => c.name !== currentClubName && tierEligible(c.tier, currentTier, overall));
+
+  const numOffers = avgRating >= 7.5 ? randi(1, 3) : randi(0, 2);
+  const offers = [];
+  for (let i = 0; i < numOffers && pool.length; i++) {
+    const idx = randi(0, pool.length - 1);
+    const c = pool.splice(idx, 1)[0];
+    const wage = Math.round((300 + overall * 25 + c.tier * 250) * rand(0.9, 1.25) / 10) * 10;
+    offers.push({ id: `${c.leagueId}:${c.name}`, clubName: c.name, leagueId: c.leagueId, leagueName: c.leagueName, tier: c.tier, wage });
   }
   return offers.sort((a, b) => b.wage - a.wage);
 }
 
-function acceptOffer(clubIndex) {
-  const p = state.player;
-  const offer = state.pendingOffers.find(o => o.clubIndex === clubIndex);
+function acceptOffer(offerId) {
+  const offer = state.pendingOffers.find(o => o.id === offerId);
   if (!offer) return;
-  p.clubIndex = clubIndex;
-  p.wage = offer.wage;
-  p.contractYearsLeft = randi(2, 4);
-  p.morale = clamp(p.morale + 10, 0, 100);
+  state.pendingTransfer = { leagueId: offer.leagueId, clubName: offer.clubName, wage: offer.wage };
+  state.player.morale = clamp(state.player.morale + 10, 0, 100);
   state.pendingOffers = [];
   save();
 }
@@ -439,6 +528,7 @@ function stayAtClub() {
   const p = state.player;
   p.contractYearsLeft = Math.max(1, p.contractYearsLeft - 1);
   if (p.contractYearsLeft <= 1) p.wage = Math.round(p.wage * rand(1.03, 1.15) / 10) * 10;
+  state.pendingTransfer = null;
   state.pendingOffers = [];
   save();
 }
@@ -459,6 +549,17 @@ function beginNextSeason() {
   state.week = 1;
   state.trainingLeft = TRAINING_SESSIONS_PER_WEEK;
   state.trainedThisWeek = [];
+
+  if (state.pendingTransfer) {
+    const t = state.pendingTransfer;
+    state.leagueId = t.leagueId;
+    state.clubs = instantiateLeagueClubs(t.leagueId);
+    p.clubIndex = state.clubs.findIndex(c => c.name === t.clubName);
+    p.wage = t.wage;
+    p.contractYearsLeft = randi(2, 4);
+    state.pendingTransfer = null;
+  }
+
   state.fixtures = buildFixtures(state.clubs.length);
   state.table = newLeagueTable(state.clubs);
   save();
@@ -479,7 +580,7 @@ function renderTopbar() {
   if (!state) return;
   const p = state.player;
   document.getElementById('hdrName').textContent = `${p.name} (${p.position})`;
-  document.getElementById('hdrClub').textContent = state.clubs[p.clubIndex].name;
+  document.getElementById('hdrClub').textContent = `${state.clubs[p.clubIndex].name} — ${currentLeague().name}`;
   document.getElementById('hdrAge').textContent = `Age ${p.age}`;
   document.getElementById('hdrWage').textContent = `$${p.wage}/wk`;
 }
@@ -507,7 +608,7 @@ function renderCreateScreen() {
       selectedPos = btn.dataset.pos;
       posGrid.querySelectorAll('.pos-btn').forEach(b => b.classList.toggle('selected', b === btn));
       document.getElementById('scoutPreview').innerHTML =
-        `Position: <strong>${selectedPos}</strong> — a raw 16-year-old academy graduate. Scout says: hidden potential, only football will tell.`;
+        `Position: <strong>${selectedPos}</strong> — a raw 16-year-old academy graduate starting in the Development League. Scout says: hidden potential, only football will tell. Impress, and the big five leagues will come calling.`;
     });
   });
 
@@ -521,6 +622,14 @@ function renderCreateScreen() {
   };
 }
 
+function lastMatchMiniHtml() {
+  const r = lastMatchResult;
+  if (!r) return '';
+  const resultLine = `${r.home} ${r.scoreHome} - ${r.scoreAway} ${r.away}`;
+  const perf = r.played ? ` · You rated ${r.rating.toFixed(1)}${r.goals ? ` · ${r.goals} goal${r.goals > 1 ? 's' : ''}` : ''}${r.assists ? ` · ${r.assists} assist${r.assists > 1 ? 's' : ''}` : ''}` : ' · You did not play (injured)';
+  return `<div class="muted" id="lastMatchMini">Last match: ${resultLine}${perf}</div>`;
+}
+
 function renderHub() {
   const p = state.player;
   document.getElementById('hubWeekTitle').textContent =
@@ -529,7 +638,8 @@ function renderHub() {
 
   const overall = computeOverall(p);
   document.getElementById('hubStatus').innerHTML = `
-    <div class="muted">${state.clubs[p.clubIndex].name} · Overall Rating: <strong>${overall}</strong> · Contract: ${p.contractYearsLeft} yr(s) left</div>
+    ${lastMatchMiniHtml()}
+    <div class="muted">${state.clubs[p.clubIndex].name} · ${currentLeague().name} · Overall Rating: <strong>${overall}</strong> · Contract: ${p.contractYearsLeft} yr(s) left</div>
     <div class="bar-row"><span class="label">Fitness</span><div class="bar-track"><div class="bar-fill fitness" style="width:${p.fitness}%"></div></div><span class="bar-val">${Math.round(p.fitness)}</span></div>
     <div class="bar-row"><span class="label">Morale</span><div class="bar-track"><div class="bar-fill morale" style="width:${p.morale}%"></div></div><span class="bar-val">${Math.round(p.morale)}</span></div>
   `;
@@ -558,6 +668,17 @@ function renderHub() {
     playMatchDay();
     renderMatchScreen();
     showScreen('match');
+  };
+
+  document.getElementById('btnSimMatch').onclick = () => {
+    playMatchDay();
+    if (isSeasonOver()) {
+      finishSeason();
+      renderSeasonEndScreen();
+      showScreen('season-end');
+    } else {
+      renderHub();
+    }
   };
 
   renderLeagueTable('leagueTable', true);
@@ -593,6 +714,7 @@ function renderCareerSummaryMini() {
     if (confirm('This ends your current career permanently and starts a new one. Continue?')) {
       clearSave();
       state = null;
+      lastMatchResult = null;
       showScreen('create');
     }
   };
@@ -626,33 +748,37 @@ function renderSeasonEndScreen() {
   const p = state.player;
   const h = state.history[state.history.length - 1];
   document.getElementById('seasonSummary').innerHTML = `
-    <p><strong>${state.clubs[p.clubIndex].name}</strong> finished <strong>#${h.finish}</strong> this season.</p>
+    <p><strong>${state.clubs[p.clubIndex].name}</strong> (${h.league}) finished <strong>#${h.finish}</strong> this season.</p>
     <p>${p.name}: ${h.apps} apps · ${h.goals} goals · ${h.assists} assists · avg rating ${h.avgRating || '—'}</p>
     ${h.trophy ? `<span class="trophy">🏆 ${h.trophy}</span>` : ''}
   `;
   renderLeagueTable('finalTable', true);
 
   const offersList = document.getElementById('offersList');
-  if (state.pendingOffers.length === 0) {
+  if (state.pendingTransfer) {
+    const t = state.pendingTransfer;
+    offersList.innerHTML = `<p>You've agreed to join <strong>${t.clubName}</strong> (${findLeague(t.leagueId).name}) for $${t.wage}/wk — it kicks in next season.</p>`;
+  } else if (state.pendingOffers.length === 0) {
     offersList.innerHTML = `<p class="muted">No transfer offers this window.</p>`;
   } else {
     offersList.innerHTML = state.pendingOffers.map(o => `
       <div class="offer-card">
         <div>
-          <strong>${o.name}</strong> (Tier ${o.tier})
-          <div class="info">Wage offer: $${o.wage}/wk</div>
+          <strong>${o.clubName}</strong>
+          <div class="info">${o.leagueName} · Wage offer: $${o.wage}/wk</div>
         </div>
-        <button data-club="${o.clubIndex}" class="primary offer-btn">Sign</button>
+        <button data-offer="${o.id}" class="primary offer-btn">Sign</button>
       </div>
     `).join('');
     offersList.querySelectorAll('.offer-btn').forEach(btn => {
       btn.onclick = () => {
-        acceptOffer(Number(btn.dataset.club));
+        acceptOffer(btn.dataset.offer);
         renderSeasonEndScreen();
       };
     });
   }
 
+  document.getElementById('btnStayAtClub').disabled = !!state.pendingTransfer;
   document.getElementById('btnStayAtClub').onclick = () => {
     stayAtClub();
     renderSeasonEndScreen();
@@ -679,7 +805,7 @@ function renderRetireScreen(reason) {
     : '<span class="muted">No trophies won.</span>';
 
   const historyRows = state.history.map(h =>
-    `<tr><td>${h.season}</td><td>${h.club}</td><td class="num">${h.apps}</td><td class="num">${h.goals}</td><td class="num">${h.assists}</td><td class="num">${h.avgRating || '—'}</td><td class="num">#${h.finish}</td></tr>`
+    `<tr><td>${h.season}</td><td>${h.club}</td><td>${h.league}</td><td class="num">${h.apps}</td><td class="num">${h.goals}</td><td class="num">${h.assists}</td><td class="num">${h.avgRating || '—'}</td><td class="num">#${h.finish}</td></tr>`
   ).join('');
 
   document.getElementById('retireSummary').innerHTML = `
@@ -689,7 +815,7 @@ function renderRetireScreen(reason) {
     <p>${trophiesHtml}</p>
     <h3>Season by season</h3>
     <div style="overflow-x:auto;"><table>
-      <thead><tr><th>S</th><th>Club</th><th class="num">Apps</th><th class="num">G</th><th class="num">A</th><th class="num">Avg</th><th class="num">Finish</th></tr></thead>
+      <thead><tr><th>S</th><th>Club</th><th>League</th><th class="num">Apps</th><th class="num">G</th><th class="num">A</th><th class="num">Avg</th><th class="num">Finish</th></tr></thead>
       <tbody>${historyRows}</tbody>
     </table></div>
   `;
@@ -697,6 +823,7 @@ function renderRetireScreen(reason) {
   document.getElementById('btnNewCareerAfterRetire').onclick = () => {
     clearSave();
     state = null;
+    lastMatchResult = null;
     showScreen('create');
   };
 }

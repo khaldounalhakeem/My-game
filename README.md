@@ -1,8 +1,14 @@
 # Career Kickoff ⚽
 
-A browser-based soccer career sim. Start as a 16-year-old academy graduate,
-train your attributes, play matches, climb the league table, earn transfer
-offers, and play out a full career to retirement.
+A browser-based soccer career sim. Start as a 16-year-old academy graduate
+in the fictional Development League, train your attributes, and climb your
+way into the real Ligue 1, Bundesliga, Serie A, La Liga, and Premier League
+(50 real clubs across those five, plus 10 fictional starter clubs) via
+end-of-season transfer offers, all the way to retirement.
+
+Each match day you choose: **Play Match** to watch it unfold with live
+commentary, or **Sim Match** to instantly resolve it and jump straight to
+next week — handy once you're up against a side you know you'll beat.
 
 ## How to play
 

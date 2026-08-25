@@ -91,7 +91,12 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 button.primary { background: var(--gold); color: var(--ink); }
 button.primary:hover:not(:disabled) { background: #e2bb63; }
 button.danger { background: var(--red); }
+button.secondary { background: var(--paper-dim, #ddd6c4); color: var(--ink); border: 1px solid var(--pitch); }
+button.secondary:hover:not(:disabled) { background: #ded6bd; }
 button.pos-btn.selected, button.train-btn.selected { outline: 3px solid var(--gold); }
+.button-row { display: flex; gap: 8px; }
+.button-row .primary { flex: 2; }
+.button-row .secondary { flex: 1; }
 
 .bar-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; font-size: 13px; }
 .bar-row .label { width: 90px; flex-shrink: 0; }
