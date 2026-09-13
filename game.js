@@ -1003,6 +1003,20 @@ const CROWD_DOTS = Array.from({ length: 70 }, (_, i) => ({
   shade: i % 3
 }));
 
+// You still only directly control one player, but the pitch is populated
+// like a real match rather than a 1v1: a few supporting teammates near you,
+// an opposing back line in front of the marker you actually duel, and a
+// keeper in goal who factors into your shots. Offsets are relative to a
+// moving reference point (your own position / the goal mouth).
+const TEAMMATE_OFFSETS = [
+  { dx: -95, dy: -15 }, { dx: 95, dy: -15 },
+  { dx: -50, dy: 55 }, { dx: 50, dy: 55 }
+];
+const OPP_BACKLINE_OFFSETS = [
+  { dx: -115, dy: 55 }, { dx: -38, dy: 62 },
+  { dx: 38, dy: 62 }, { dx: 115, dy: 55 }
+];
+
 function startInteractiveMatch(myName, oppName, oppStrength, onFinish) {
   const p = state.player;
   const oppHue = hashStr(oppName) % 360;
@@ -1026,12 +1040,19 @@ function startInteractiveMatch(myName, oppName, oppStrength, onFinish) {
       skin: SKIN_TONES[hashStr(oppName + 's') % SKIN_TONES.length],
       hair: HAIR_COLORS[hashStr(oppName + 'h') % HAIR_COLORS.length].hex
     },
+    gkKit: {
+      shirt: '#cddc39', shorts: '#1c1c1c',
+      skin: SKIN_TONES[hashStr(oppName + 'gk') % SKIN_TONES.length],
+      hair: HAIR_COLORS[hashStr(oppName + 'gkh') % HAIR_COLORS.length].hex
+    },
     animPhase: 0, oppAnimPhase: 0,
+    teammates: [], oppBackline: [], gk: { x: PITCH_W / 2, y: GOAL_LINE_TOP + 8 },
     tackleCooldown: 0, passCooldown: 0, shotCooldown: 0,
     bannerTimeout: null,
     stats: { goals: 0, oppGoals: 0, tackles: 0, passesCompleted: 0, passesAttempted: 0, shotsTaken: 0, shotsOnTarget: 0, staminaUsed: 0 },
     ended: false
   };
+  resetFormation();
   attachPlayControls();
   showScreen('play');
   showPlayBanner(`Kickoff! ${myName} vs ${oppName}`);
@@ -1106,6 +1127,23 @@ function flashBanner(text) {
   playSession.bannerTimeout = setTimeout(() => { el.textContent = ''; }, 1100);
 }
 
+// (Re)places the supporting cast — teammates, the opposing back line, and
+// the keeper — around wherever play is restarting from.
+function resetFormation() {
+  const s = playSession;
+  s.teammates = TEAMMATE_OFFSETS.map(o => ({
+    x: clamp(PITCH_W / 2 + o.dx, 20, PITCH_W - 20),
+    y: clamp(s.player.y + o.dy, GOAL_LINE_TOP + 10, GOAL_LINE_BOTTOM - 10),
+    animPhase: rand(0, 6)
+  }));
+  s.oppBackline = OPP_BACKLINE_OFFSETS.map(o => ({
+    x: clamp(PITCH_W / 2 + o.dx, 20, PITCH_W - 20),
+    y: clamp(GOAL_LINE_TOP + 55 + o.dy * 0.3, GOAL_LINE_TOP + 15, GOAL_LINE_TOP + 130),
+    animPhase: rand(0, 6)
+  }));
+  s.gk = { x: PITCH_W / 2, y: GOAL_LINE_TOP + 8 };
+}
+
 function resetKickoff(possessionSide) {
   const s = playSession;
   s.possession = possessionSide;
@@ -1120,6 +1158,7 @@ function resetKickoff(possessionSide) {
     s.opp.y = PITCH_H / 2;
     s.ball.x = s.opp.x; s.ball.y = s.opp.y + 8;
   }
+  resetFormation();
 }
 
 function doPlayAction(type) {
@@ -1153,7 +1192,8 @@ function doPlayAction(type) {
     s.stats.shotsTaken++;
     const distToOpp = Math.hypot(s.opp.x - s.player.x, s.opp.y - s.player.y);
     const pressure = distToOpp < 50 ? 0.15 : 0;
-    const chance = clamp(0.3 + p.attrs.shooting / 230 - pressure, 0.12, 0.85);
+    const keeperCover = clamp(1 - Math.abs(s.player.x - s.gk.x) / 75, 0, 1);
+    const chance = clamp(0.4 + p.attrs.shooting / 230 - pressure - keeperCover * 0.3, 0.1, 0.88);
     if (Math.random() < chance) {
       s.stats.shotsOnTarget++;
       s.stats.goals++;
@@ -1161,7 +1201,7 @@ function doPlayAction(type) {
       flashBanner('⚽ GOAL!!!');
       resetKickoff('opp');
     } else {
-      flashBanner('Off target!');
+      flashBanner(keeperCover > 0.45 ? 'Saved by the keeper!' : 'Off target!');
       s.possession = 'opp';
       s.opp.x = s.player.x;
       s.opp.y = clamp(s.player.y + 40, GOAL_LINE_TOP + 10, GOAL_LINE_BOTTOM - 10);
@@ -1243,7 +1283,40 @@ function updatePlaySim(dt) {
     }
   }
 
+  updateSupportCast(dt);
   renderPlayHud();
+}
+
+// Moves the purely-ambient part of the cast — your teammates, the opposing
+// back line, and their keeper — so the pitch reads as two full teams even
+// though only one marker per side is actually interactive. Teammates push
+// forward around your position when you have the ball and drop off when you
+// don't; the back line holds a loose defensive shape in front of their
+// goal; the keeper shadows the ball horizontally along the goal line.
+function updateSupportCast(dt) {
+  const s = playSession;
+  const follow = Math.min(1, dt * 2.2);
+
+  TEAMMATE_OFFSETS.forEach((o, i) => {
+    const t = s.teammates[i];
+    const push = s.possession === 'me' ? -18 : 12;
+    const targetX = clamp(PITCH_W / 2 + o.dx * 0.85 + (s.player.x - PITCH_W / 2) * 0.3, 20, PITCH_W - 20);
+    const targetY = clamp(s.player.y + o.dy + push, GOAL_LINE_TOP + 10, GOAL_LINE_BOTTOM - 10);
+    t.x += (targetX - t.x) * follow;
+    t.y += (targetY - t.y) * follow;
+    t.animPhase += dt * 6;
+  });
+
+  OPP_BACKLINE_OFFSETS.forEach((o, i) => {
+    const d = s.oppBackline[i];
+    const targetX = clamp(PITCH_W / 2 + o.dx * 0.85 + (s.ball.x - PITCH_W / 2) * 0.25, 20, PITCH_W - 20);
+    const targetY = clamp(GOAL_LINE_TOP + 55 + o.dy * 0.3, GOAL_LINE_TOP + 15, GOAL_LINE_TOP + 130);
+    d.x += (targetX - d.x) * follow;
+    d.y += (targetY - d.y) * follow;
+    d.animPhase += dt * 6;
+  });
+
+  s.gk.x += (clamp(s.ball.x, PITCH_W / 2 - 36, PITCH_W / 2 + 36) - s.gk.x) * Math.min(1, dt * 3.5);
 }
 
 // Draws a small running humanoid — legs and arms swinging on a sine cycle,
@@ -1399,19 +1472,19 @@ function drawPlayCanvas() {
     ctx.fill();
   }
 
-  // People, farthest to nearest, so closer figures correctly overlap.
+  // The full cast, farthest to nearest, so closer figures correctly overlap:
+  // your teammates, their back line + keeper, the marker you actually duel,
+  // you, and the ball. This is what sells 11-a-side instead of 1v1.
+  const moving = s.dirs.up || s.dirs.down || s.dirs.left || s.dirs.right;
   const entities = [
-    { kind: 'opp', y: s.opp.y },
-    { kind: 'player', y: s.player.y },
-    { kind: 'ball', y: s.ball.y }
+    { y: s.gk.y, draw: () => drawHumanoid(ctx, projectPoint(s.gk.x, s.gk.y), s.gkKit, 0, false) },
+    ...s.oppBackline.map(d => ({ y: d.y, draw: () => drawHumanoid(ctx, projectPoint(d.x, d.y), s.oppKit, d.animPhase, true) })),
+    ...s.teammates.map(t => ({ y: t.y, draw: () => drawHumanoid(ctx, projectPoint(t.x, t.y), s.myKit, t.animPhase, true) })),
+    { y: s.opp.y, draw: () => drawHumanoid(ctx, projectPoint(s.opp.x, s.opp.y), s.oppKit, s.oppAnimPhase, true) },
+    { y: s.player.y, draw: () => drawHumanoid(ctx, projectPoint(s.player.x, s.player.y), s.myKit, s.animPhase, moving) },
+    { y: s.ball.y, draw: () => drawBall(ctx, projectPoint(s.ball.x, s.ball.y)) }
   ].sort((a, b) => a.y - b.y);
-  for (const e of entities) {
-    if (e.kind === 'opp') drawHumanoid(ctx, projectPoint(s.opp.x, s.opp.y), s.oppKit, s.oppAnimPhase, true);
-    else if (e.kind === 'player') {
-      const moving = s.dirs.up || s.dirs.down || s.dirs.left || s.dirs.right;
-      drawHumanoid(ctx, projectPoint(s.player.x, s.player.y), s.myKit, s.animPhase, moving);
-    } else drawBall(ctx, projectPoint(s.ball.x, s.ball.y));
-  }
+  for (const e of entities) e.draw();
 
   if (s.possession === 'me' && s.player.y <= SHOOT_RANGE_Y) {
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
