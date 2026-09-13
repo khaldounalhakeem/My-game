@@ -84,8 +84,11 @@
     </div>
 
     <div class="card">
-      <h3>League Table</h3>
-      <div style="overflow-x:auto;">
+      <div class="flex-between">
+        <h3 style="margin:0;">League Table</h3>
+        <button type="button" class="secondary" id="btnToggleTable">📊 Show League Table</button>
+      </div>
+      <div style="overflow-x:auto; display:none;" id="leagueTableWrap">
         <table id="leagueTable"></table>
       </div>
     </div>
@@ -108,6 +111,39 @@
       <div id="matchRatingBox" class="muted"></div>
       <button id="btnSkipToFullTime" style="width:100%; margin-top:10px;">⏭ Skip to Full Time</button>
       <button class="primary" id="btnContinueAfterMatch" style="width:100%; margin-top:10px; display:none;">Continue</button>
+    </div>
+  </section>
+
+  <!-- PLAY SCREEN (interactive first-person playable match) -->
+  <section id="screen-play" class="screen">
+    <div class="play-card">
+      <div class="play-hud">
+        <div class="play-score" id="playScore">0 - 0</div>
+        <div class="play-clock" id="playClock">1st Half · 30s</div>
+        <div class="play-stamina-wrap">
+          <div class="play-stamina-label">Stamina</div>
+          <div class="bar-track"><div class="bar-fill" id="playStaminaBar" style="width:100%"></div></div>
+        </div>
+      </div>
+      <div class="play-canvas-wrap">
+        <canvas id="playCanvas" width="480" height="360"></canvas>
+        <div class="play-banner" id="playBanner"></div>
+      </div>
+      <div class="play-controls">
+        <div class="play-dpad" id="playDpad">
+          <button type="button" data-dir="up" class="dpad-btn dpad-up">▲</button>
+          <button type="button" data-dir="left" class="dpad-btn dpad-left">◀</button>
+          <button type="button" data-dir="right" class="dpad-btn dpad-right">▶</button>
+          <button type="button" data-dir="down" class="dpad-btn dpad-down">▼</button>
+        </div>
+        <div class="play-actions">
+          <button type="button" class="action-btn act-pass" id="btnActPass">PASS</button>
+          <button type="button" class="action-btn act-shoot" id="btnActShoot">SHOOT</button>
+          <button type="button" class="action-btn act-sprint" id="btnActSprint">SPRINT</button>
+          <button type="button" class="action-btn act-tackle" id="btnActTackle">TACKLE</button>
+        </div>
+      </div>
+      <p class="muted play-hint">Move: Arrow keys · Pass: A · Shoot: S · Tackle: D · Sprint: hold Shift</p>
     </div>
   </section>
 

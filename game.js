@@ -127,7 +127,42 @@ const LEAGUES = [
 const SEASON_LENGTH = 18; // double round robin across 10 clubs
 const TRAINING_SESSIONS_PER_WEEK = 2;
 const RETIREMENT_AGE = 35;
-const WORLD_CUP_INTERVAL = 4; // a World Cup every 4 in-game seasons, same as real life
+const WORLD_CUP_INTERVAL = 2; // a World Cup every 2 in-game seasons; the Champions League is contested every season for qualified players
+
+// Pitch dimensions and layout for the interactive playable match (a simplified
+// first-person/behind-the-player view). Y runs from the far (opponent) goal
+// line at the top to your own goal line at the bottom.
+const HALF_SECONDS = 30; // 30s first half + 30s second half = a 1-minute match
+const PITCH_W = 480, PITCH_H = 360;
+const GOAL_LINE_TOP = 30;
+const GOAL_LINE_BOTTOM = PITCH_H - 30;
+const SHOOT_RANGE_Y = 140; // must be at/above this y (close to the far goal) to shoot
+const OPP_SHOOT_RANGE_Y = PITCH_H - 140;
+
+// FIFA-style card tiers, driven purely by current overall rating.
+const CARD_TIERS = [
+  { min: 0, name: 'Bronze', cls: 'bronze' },
+  { min: 65, name: 'Silver', cls: 'silver' },
+  { min: 75, name: 'Gold', cls: 'gold' },
+  { min: 85, name: 'Team of the Season', cls: 'tots' },
+  { min: 92, name: 'Icon', cls: 'icon' }
+];
+function cardTier(overall) {
+  let tier = CARD_TIERS[0];
+  for (const t of CARD_TIERS) if (overall >= t.min) tier = t;
+  return tier;
+}
+function playerCardBadgeHtml(overall) {
+  const tier = cardTier(overall);
+  return `<span class="card-badge card-${tier.cls}">${tier.name}</span>`;
+}
+function tierChangeHtml(beforeName, afterName) {
+  const beforeIdx = CARD_TIERS.findIndex(t => t.name === beforeName);
+  const afterIdx = CARD_TIERS.findIndex(t => t.name === afterName);
+  return afterIdx > beforeIdx
+    ? `<p class="trophy">🌟 Card upgraded to ${afterName}!</p>`
+    : `<p class="attr-delta down" style="display:inline-block;">📉 Card dropped to ${afterName}.</p>`;
+}
 
 const NATIONS = [
   { name: 'Brazil', strength: 90 }, { name: 'Argentina', strength: 89 },
@@ -261,6 +296,7 @@ function playerAvatarSvg(hairHex, primaryHex, secondaryHex, size) {
 
 let state = null;
 let lastMatchResult = null;
+let leagueTableExpanded = false;
 
 function instantiateLeagueClubs(leagueId) {
   const league = findLeague(leagueId);
@@ -331,6 +367,7 @@ function pickStartingClubChoices() {
 }
 
 function startNewCareer(name, position, nation, hair, jerseyPrimary, jerseySecondary, chosenClub) {
+  leagueTableExpanded = false;
   const player = newPlayer(name, position, nation, hair, jerseyPrimary, jerseySecondary);
   const clubs = instantiateLeagueClubs('dev');
   let idx = clubs.findIndex(c => c.name === chosenClub.name);
@@ -406,6 +443,47 @@ function restWeek() {
   state.trainingLeft = 0;
   save();
   renderHub();
+}
+
+/* ---------- Automatic season-end progression (performance-driven) ---------- */
+// On top of weekly training, the player's card grows or declines on its own
+// at the end of every season based on how they actually performed: goals,
+// assists, clean sheets and average match rating relative to their position's
+// key attributes. A breakout season pushes attributes up (and can bump the
+// card tier); a poor one — especially for an aging player already in
+// decline — can knock them back down.
+
+function computeSeasonPerformanceScore(p) {
+  const ss = p.seasonStats;
+  if (!ss.matches) return 0;
+  const avgRating = ss.ratingCount ? ss.ratingSum / ss.ratingCount : 6;
+  const perApp = (ss.goals + ss.assists) / ss.matches;
+  let score = (avgRating - 6.3) * 0.7 + perApp * 0.8;
+  if (p.position === 'GK' || p.position === 'DEF') score += (ss.cleanSheets / ss.matches) * 1.1;
+  return clamp(score, -1.6, 3);
+}
+
+function applySeasonProgression() {
+  const p = state.player;
+  const perfScore = computeSeasonPerformanceScore(p);
+  const gf = growthFactor(p.age);
+  const focusKeys = Object.keys(POSITION_WEIGHTS[p.position]);
+  const deltas = {};
+  for (const key of focusKeys) {
+    const room = p.potential[key] - p.attrs[key];
+    let gain;
+    if (gf >= 0) {
+      gain = perfScore * rand(0.6, 1.1) * clamp(room / 20, 0.2, 1.3) * (0.5 + gf * 0.5);
+    } else {
+      gain = gf * rand(0.8, 1.6) + perfScore * 0.3; // veteran decline, form can soften or worsen it
+    }
+    gain = Math.round(gain * 10) / 10;
+    if (Math.abs(gain) < 0.1) continue;
+    const newVal = clamp(Math.round((p.attrs[key] + gain) * 10) / 10, 1, 99);
+    const actualDelta = Math.round((newVal - p.attrs[key]) * 10) / 10;
+    if (actualDelta !== 0) { deltas[key] = actualDelta; p.attrs[key] = newVal; }
+  }
+  return { deltas, perfScore };
 }
 
 /* ---------- Core match simulation (shared by league + cup matches) ---------- */
@@ -512,6 +590,82 @@ function simulatePlayerMatch(myTeamName, myTeamStrengthBase, oppName, oppStrengt
   };
 }
 
+// Resolves a match from the outcome of the interactive playable minigame
+// instead of pure RNG. Everything the user did at the controls — goals,
+// shots, tackles, the goals conceded — becomes the actual result; this
+// mirrors simulatePlayerMatch's bookkeeping (career/season stats, fitness,
+// morale, injury risk) so both paths feed the rest of the game identically.
+function resolveInteractiveMatch(myTeamName, myTeamStrengthBase, oppName, oppStrength, trackSeasonStats, s) {
+  const p = state.player;
+  const log = [];
+
+  if (p.injuredWeeksLeft > 0) {
+    if (trackSeasonStats) p.injuredWeeksLeft--;
+    const [sh, sa] = simQuickScore(myTeamStrengthBase, oppStrength);
+    log.push(`${p.name} is sidelined with injury and misses the match.`);
+    p.fitness = clamp(p.fitness + 10, 0, 100);
+    return {
+      myTeamName, oppName, scoreMine: sh, scoreOpp: sa,
+      myStrength: myTeamStrengthBase, oppStrength,
+      log, played: false, rating: null, goals: 0, assists: 0, injured: false
+    };
+  }
+
+  const goals = clamp(Math.round(s.goals || 0), 0, 10);
+  const oppGoals = clamp(Math.round(s.oppGoals || 0), 0, 10);
+  const assists = clamp(Math.round(s.assists || 0), 0, 5);
+  const tackles = s.tackles || 0;
+  const shotsTaken = s.shotsTaken || 0;
+  const shotsOnTarget = s.shotsOnTarget || 0;
+  const shotAccuracy = shotsTaken ? shotsOnTarget / shotsTaken : 0.5;
+
+  const cleanSheet = oppGoals === 0;
+  if (cleanSheet && (p.position === 'GK' || p.position === 'DEF')) {
+    p.careerStats.cleanSheets++;
+    if (trackSeasonStats) p.seasonStats.cleanSheets++;
+  }
+
+  let rating = 6.0;
+  rating += goals * 0.9 + assists * 0.5;
+  rating += (shotAccuracy - 0.5) * 1.0;
+  rating += tackles * 0.2;
+  if (p.position === 'GK' || p.position === 'DEF') rating += cleanSheet ? 0.8 : (oppGoals >= 3 ? -0.6 : 0);
+  rating += rand(-0.3, 0.3);
+  rating = clamp(Math.round(rating * 10) / 10, 2.0, 10.0);
+
+  log.push(`Kickoff: ${myTeamName} vs ${oppName}.`);
+  if (goals > 0) log.push(`⚽ GOAL! ${p.name} scores${goals > 1 ? ` (x${goals})` : ''}!`);
+  if (assists > 0) log.push(`🎯 ${p.name} sets up a goal with a great pass${assists > 1 ? ` (x${assists})` : ''}.`);
+  if (tackles > 0) log.push(`🛡️ ${p.name} won the ball back ${tackles} time${tackles > 1 ? 's' : ''}.`);
+  if (cleanSheet && (p.position === 'GK' || p.position === 'DEF')) log.push(`🧤 Clean sheet held!`);
+  log.push(`Full time: ${myTeamName} ${goals} - ${oppGoals} ${oppName}.`);
+  log.push(`${p.name} rated ${rating.toFixed(1)} for the match.`);
+
+  const injuryChance = clamp(0.02 + (100 - p.fitness) / 500, 0.01, 0.1);
+  let injured = false;
+  if (Math.random() < injuryChance) {
+    injured = true;
+    p.injuredWeeksLeft = randi(2, 5);
+    log.push(`⚠️ ${p.name} picked up an injury and will be out for ${p.injuredWeeksLeft} weeks.`);
+  }
+
+  const staminaUsed = s.staminaUsed != null ? s.staminaUsed : 50;
+  p.fitness = clamp(p.fitness - Math.round(10 + staminaUsed / 6), 0, 100);
+  p.morale = clamp(p.morale + (rating >= 7 ? randi(3, 8) : rating <= 5 ? -randi(3, 8) : randi(-2, 2)), 0, 100);
+
+  p.careerStats.matches++; p.careerStats.goals += goals; p.careerStats.assists += assists;
+  if (trackSeasonStats) {
+    const ss = p.seasonStats;
+    ss.matches++; ss.goals += goals; ss.assists += assists; ss.ratingSum += rating; ss.ratingCount++;
+  }
+
+  return {
+    myTeamName, oppName, scoreMine: goals, scoreOpp: oppGoals,
+    myStrength: myTeamStrengthBase, oppStrength,
+    log, played: true, rating, goals, assists, injured
+  };
+}
+
 /* ---------- Domestic league matches ---------- */
 
 function currentRound() {
@@ -537,7 +691,7 @@ function sortedTable() {
   return [...state.table].sort((a, b) => (b.pts - a.pts) || ((b.gf - b.ga) - (a.gf - a.ga)) || (b.gf - a.gf));
 }
 
-function playDomesticMatchDay() {
+function playDomesticMatchDay(interactiveStats) {
   const round = currentRound();
   const playerFixture = findPlayerFixture(round);
   const p = state.player;
@@ -555,7 +709,9 @@ function playDomesticMatchDay() {
   const oppIdx = isHome ? awayIdx : homeIdx;
   const opp = state.clubs[oppIdx];
 
-  const result = simulatePlayerMatch(club.name, club.strength, opp.name, opp.strength, true);
+  const result = interactiveStats
+    ? resolveInteractiveMatch(club.name, club.strength, opp.name, opp.strength, true, interactiveStats)
+    : simulatePlayerMatch(club.name, club.strength, opp.name, opp.strength, true);
 
   const scoreClub = result.scoreMine, scoreOpp = result.scoreOpp;
   if (isHome) updateTable(p.clubIndex, oppIdx, scoreClub, scoreOpp);
@@ -640,12 +796,14 @@ function advanceCup(won) {
   save();
 }
 
-function playCupMatch() {
+function playCupMatch(interactiveStats) {
   const p = state.player;
   const cup = state.cup;
   const myName = cup.type === 'ucl' ? state.clubs[p.clubIndex].name : p.nation;
   const myStrength = cup.type === 'ucl' ? state.clubs[p.clubIndex].strength : nationStrength(p.nation);
-  const result = simulatePlayerMatch(myName, myStrength, cup.opponentName, cup.opponentStrength, false);
+  const result = interactiveStats
+    ? resolveInteractiveMatch(myName, myStrength, cup.opponentName, cup.opponentStrength, false, interactiveStats)
+    : simulatePlayerMatch(myName, myStrength, cup.opponentName, cup.opponentStrength, false);
 
   let scoreMine = result.scoreMine, scoreOpp = result.scoreOpp;
   if (scoreMine === scoreOpp) {
@@ -689,6 +847,12 @@ function finishSeason() {
 
   const avgRating = p.seasonStats.ratingCount ? p.seasonStats.ratingSum / p.seasonStats.ratingCount : 0;
 
+  const overallBefore = computeOverall(p);
+  const tierBefore = cardTier(overallBefore);
+  const progression = applySeasonProgression();
+  const overallAfter = computeOverall(p);
+  const tierAfter = cardTier(overallAfter);
+
   state.history.push({
     season: state.season,
     club: state.clubs[p.clubIndex].name,
@@ -698,7 +862,12 @@ function finishSeason() {
     assists: p.seasonStats.assists,
     avgRating: Math.round(avgRating * 10) / 10,
     finish: finishPosition,
-    trophy
+    trophy,
+    progression: {
+      deltas: progression.deltas,
+      overallBefore, overallAfter,
+      tierBefore: tierBefore.name, tierAfter: tierAfter.name
+    }
   });
 
   state.pendingOffers = generateTransferOffers();
@@ -790,6 +959,372 @@ function beginNextSeason() {
 
   save();
   return { retired: false, worldCup };
+}
+
+/* ---------- Interactive playable match (first-person view) ---------- */
+// A short arcade-style minigame: a pseudo-first-person pitch view (the
+// camera looks up the pitch from behind the player, like a broadcast tunnel
+// cam) that the user actually controls — move, pass, shoot, sprint and
+// tackle — for a 30-second first half and a 30-second second half. Whatever
+// happens on the pitch (goals scored/conceded, tackles won, shot accuracy)
+// becomes the real match result via resolveInteractiveMatch above.
+
+let playSession = null;
+
+function projectPoint(x, y) {
+  const t = clamp((y - GOAL_LINE_TOP) / (GOAL_LINE_BOTTOM - GOAL_LINE_TOP), 0, 1); // 0 = far goal, 1 = near
+  const topW = PITCH_W * 0.38, bottomW = PITCH_W * 1.05;
+  const w = topW + (bottomW - topW) * t;
+  const cx = PITCH_W / 2;
+  const relX = (x - cx) / (PITCH_W / 2);
+  return {
+    x: cx + relX * (w / 2),
+    y: 34 + t * (PITCH_H - 60),
+    scale: 0.5 + t * 0.95
+  };
+}
+
+function startInteractiveMatch(myName, oppName, oppStrength, onFinish) {
+  playSession = {
+    onFinish, myName, oppName,
+    half: 1,
+    timeLeft: HALF_SECONDS,
+    scoreMine: 0, scoreOpp: 0,
+    stamina: 100,
+    sprintHeld: false,
+    dirs: { up: false, down: false, left: false, right: false },
+    possession: 'me',
+    player: { x: PITCH_W / 2, y: PITCH_H - 60 },
+    ball: { x: PITCH_W / 2, y: PITCH_H - 68 },
+    opp: { x: PITCH_W / 2, y: PITCH_H / 2 },
+    oppSpeed: clamp(0.85 + (oppStrength - 60) / 120, 0.6, 1.6),
+    oppSkill: clamp(oppStrength / 100, 0.3, 0.95),
+    tackleCooldown: 0, passCooldown: 0, shotCooldown: 0,
+    bannerTimeout: null,
+    stats: { goals: 0, oppGoals: 0, tackles: 0, passesCompleted: 0, passesAttempted: 0, shotsTaken: 0, shotsOnTarget: 0, staminaUsed: 0 },
+    ended: false
+  };
+  attachPlayControls();
+  showScreen('play');
+  showPlayBanner(`Kickoff! ${myName} vs ${oppName}`);
+  renderPlayHud();
+  playSession.lastFrame = performance.now();
+  playSession.raf = requestAnimationFrame(playFrame);
+  playSession.timerId = setInterval(playTick, 1000);
+}
+
+function attachPlayControls() {
+  document.addEventListener('keydown', onPlayKeyDown);
+  document.addEventListener('keyup', onPlayKeyUp);
+  document.querySelectorAll('#playDpad .dpad-btn').forEach(btn => {
+    const dir = btn.dataset.dir;
+    const set = (v) => { if (playSession) playSession.dirs[dir] = v; };
+    btn.onpointerdown = (e) => { e.preventDefault(); set(true); };
+    btn.onpointerup = () => set(false);
+    btn.onpointerleave = () => set(false);
+    btn.onpointercancel = () => set(false);
+  });
+  document.getElementById('btnActPass').onclick = () => doPlayAction('pass');
+  document.getElementById('btnActShoot').onclick = () => doPlayAction('shoot');
+  document.getElementById('btnActTackle').onclick = () => doPlayAction('tackle');
+  const sprintBtn = document.getElementById('btnActSprint');
+  sprintBtn.onpointerdown = () => { if (playSession) playSession.sprintHeld = true; };
+  sprintBtn.onpointerup = () => { if (playSession) playSession.sprintHeld = false; };
+  sprintBtn.onpointerleave = () => { if (playSession) playSession.sprintHeld = false; };
+}
+
+function detachPlayControls() {
+  document.removeEventListener('keydown', onPlayKeyDown);
+  document.removeEventListener('keyup', onPlayKeyUp);
+}
+
+function onPlayKeyDown(e) {
+  if (!playSession) return;
+  switch (e.key) {
+    case 'ArrowUp': playSession.dirs.up = true; break;
+    case 'ArrowDown': playSession.dirs.down = true; break;
+    case 'ArrowLeft': playSession.dirs.left = true; break;
+    case 'ArrowRight': playSession.dirs.right = true; break;
+    case 'Shift': playSession.sprintHeld = true; break;
+    case 'a': case 'A': doPlayAction('pass'); break;
+    case 's': case 'S': doPlayAction('shoot'); break;
+    case 'd': case 'D': doPlayAction('tackle'); break;
+    default: return;
+  }
+  e.preventDefault();
+}
+
+function onPlayKeyUp(e) {
+  if (!playSession) return;
+  switch (e.key) {
+    case 'ArrowUp': playSession.dirs.up = false; break;
+    case 'ArrowDown': playSession.dirs.down = false; break;
+    case 'ArrowLeft': playSession.dirs.left = false; break;
+    case 'ArrowRight': playSession.dirs.right = false; break;
+    case 'Shift': playSession.sprintHeld = false; break;
+  }
+}
+
+function showPlayBanner(text) {
+  const el = document.getElementById('playBanner');
+  if (el) el.textContent = text;
+}
+
+function flashBanner(text) {
+  const el = document.getElementById('playBanner');
+  if (!el || !playSession) return;
+  el.textContent = text;
+  clearTimeout(playSession.bannerTimeout);
+  playSession.bannerTimeout = setTimeout(() => { el.textContent = ''; }, 1100);
+}
+
+function resetKickoff(possessionSide) {
+  const s = playSession;
+  s.possession = possessionSide;
+  s.player.x = PITCH_W / 2;
+  s.opp.x = PITCH_W / 2 + rand(-10, 10);
+  if (possessionSide === 'me') {
+    s.player.y = PITCH_H - 60;
+    s.opp.y = PITCH_H / 2;
+    s.ball.x = s.player.x; s.ball.y = s.player.y - 8;
+  } else {
+    s.player.y = PITCH_H - 90;
+    s.opp.y = PITCH_H / 2;
+    s.ball.x = s.opp.x; s.ball.y = s.opp.y + 8;
+  }
+}
+
+function doPlayAction(type) {
+  const s = playSession;
+  if (!s || s.ended) return;
+  const p = state.player;
+  const now = performance.now();
+
+  if (type === 'pass') {
+    if (s.possession !== 'me' || s.passCooldown > now) return;
+    s.passCooldown = now + 550;
+    s.stats.passesAttempted++;
+    const distToOpp = Math.hypot(s.opp.x - s.player.x, s.opp.y - s.player.y);
+    const pressure = distToOpp < 60 ? 0.25 : 0;
+    const chance = clamp(0.55 + p.attrs.passing / 220 - pressure, 0.35, 0.95);
+    if (Math.random() < chance) {
+      s.stats.passesCompleted++;
+      s.player.y = clamp(s.player.y - 70, GOAL_LINE_TOP + 10, GOAL_LINE_BOTTOM - 10);
+      s.player.x = clamp(s.player.x + rand(-40, 40), 24, PITCH_W - 24);
+      s.ball.x = s.player.x; s.ball.y = s.player.y - 8;
+      flashBanner('Nice pass!');
+    } else {
+      s.possession = 'opp';
+      s.opp.x = s.player.x; s.opp.y = s.player.y;
+      flashBanner('Pass intercepted!');
+    }
+  } else if (type === 'shoot') {
+    if (s.possession !== 'me' || s.shotCooldown > now) return;
+    if (s.player.y > SHOOT_RANGE_Y) { flashBanner('Get closer to shoot!'); return; }
+    s.shotCooldown = now + 900;
+    s.stats.shotsTaken++;
+    const distToOpp = Math.hypot(s.opp.x - s.player.x, s.opp.y - s.player.y);
+    const pressure = distToOpp < 50 ? 0.15 : 0;
+    const chance = clamp(0.3 + p.attrs.shooting / 230 - pressure, 0.12, 0.85);
+    if (Math.random() < chance) {
+      s.stats.shotsOnTarget++;
+      s.stats.goals++;
+      s.scoreMine++;
+      flashBanner('⚽ GOAL!!!');
+      resetKickoff('opp');
+    } else {
+      flashBanner('Off target!');
+      s.possession = 'opp';
+      s.opp.x = s.player.x;
+      s.opp.y = clamp(s.player.y + 40, GOAL_LINE_TOP + 10, GOAL_LINE_BOTTOM - 10);
+    }
+  } else if (type === 'tackle') {
+    if (s.possession === 'me' || s.tackleCooldown > now) return;
+    s.tackleCooldown = now + 650;
+    const dist = Math.hypot(s.opp.x - s.player.x, s.opp.y - s.player.y);
+    if (dist > 45) { flashBanner('Too far to tackle!'); return; }
+    const chance = clamp(0.4 + p.attrs.defending / 220, 0.2, 0.85);
+    if (Math.random() < chance) {
+      s.stats.tackles++;
+      s.possession = 'me';
+      s.player.x = s.opp.x; s.player.y = s.opp.y;
+      s.ball.x = s.player.x; s.ball.y = s.player.y - 8;
+      flashBanner('Tackle won!');
+    } else {
+      flashBanner('Tackle missed!');
+    }
+  }
+}
+
+function updatePlaySim(dt) {
+  const s = playSession;
+  const p = state.player;
+
+  let vx = 0, vy = 0;
+  if (s.dirs.up) vy -= 1;
+  if (s.dirs.down) vy += 1;
+  if (s.dirs.left) vx -= 1;
+  if (s.dirs.right) vx += 1;
+  const len = Math.hypot(vx, vy) || 1;
+  vx /= len; vy /= len;
+
+  const moving = vx !== 0 || vy !== 0;
+  const sprinting = s.sprintHeld && s.stamina > 0 && moving;
+  const baseSpeed = 140 + p.attrs.pace * 0.6;
+  const speed = sprinting ? baseSpeed * 1.6 : baseSpeed;
+  s.player.x = clamp(s.player.x + vx * speed * dt, 20, PITCH_W - 20);
+  s.player.y = clamp(s.player.y + vy * speed * dt, GOAL_LINE_TOP + 8, GOAL_LINE_BOTTOM - 8);
+
+  if (sprinting) { s.stamina = clamp(s.stamina - 30 * dt, 0, 100); s.stats.staminaUsed += 30 * dt; }
+  else s.stamina = clamp(s.stamina + 16 * dt, 0, 100);
+
+  if (s.possession === 'me') {
+    s.ball.x = s.player.x; s.ball.y = s.player.y - 8;
+    const dx = s.player.x - s.opp.x, dy = s.player.y - s.opp.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const oppSpeedPx = 95 * s.oppSpeed;
+    s.opp.x = clamp(s.opp.x + (dx / d) * oppSpeedPx * dt, 20, PITCH_W - 20);
+    s.opp.y = clamp(s.opp.y + (dy / d) * oppSpeedPx * dt, GOAL_LINE_TOP + 8, GOAL_LINE_BOTTOM - 8);
+    if (d < 26) {
+      const pressureChance = clamp(0.45 * (1 - p.attrs.dribbling / 140) * s.oppSkill, 0.05, 0.55);
+      if (Math.random() < pressureChance * dt) {
+        s.possession = 'opp';
+        flashBanner('Dispossessed!');
+      }
+    }
+  } else if (s.possession === 'opp') {
+    const dxo = (s.player.x - s.opp.x) * 0.4;
+    s.opp.x = clamp(s.opp.x + dxo * dt, 20, PITCH_W - 20);
+    s.opp.y = clamp(s.opp.y + 62 * s.oppSpeed * dt, GOAL_LINE_TOP + 8, GOAL_LINE_BOTTOM - 8);
+    s.ball.x = s.opp.x; s.ball.y = s.opp.y + 8;
+    if (s.opp.y > OPP_SHOOT_RANGE_Y) {
+      const shotProb = 0.5; // per second, once in range
+      if (Math.random() < shotProb * dt) {
+        const chance = clamp(0.3 + (s.oppSkill - 0.5) * 0.6 - p.attrs.defending / 260, 0.1, 0.7);
+        if (Math.random() < chance) {
+          s.stats.oppGoals++; s.scoreOpp++;
+          flashBanner('Opponent scores!');
+        } else {
+          flashBanner('Saved! Ball comes back to you.');
+        }
+        resetKickoff('me');
+      }
+    }
+  }
+
+  renderPlayHud();
+}
+
+function drawPlayCanvas() {
+  const s = playSession;
+  const canvas = document.getElementById('playCanvas');
+  if (!s || !canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  ctx.fillStyle = '#0e2a12';
+  ctx.fillRect(0, 0, W, H);
+
+  const topL = projectPoint(0, GOAL_LINE_TOP), topR = projectPoint(PITCH_W, GOAL_LINE_TOP);
+  const botL = projectPoint(0, GOAL_LINE_BOTTOM), botR = projectPoint(PITCH_W, GOAL_LINE_BOTTOM);
+  ctx.fillStyle = '#1e6b2e';
+  ctx.beginPath();
+  ctx.moveTo(topL.x, topL.y); ctx.lineTo(topR.x, topR.y);
+  ctx.lineTo(botR.x, botR.y); ctx.lineTo(botL.x, botL.y);
+  ctx.closePath(); ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
+  ctx.lineWidth = 1.5;
+  for (let i = 1; i < 8; i++) {
+    const y = GOAL_LINE_TOP + (GOAL_LINE_BOTTOM - GOAL_LINE_TOP) * i / 8;
+    const a = projectPoint(0, y), b = projectPoint(PITCH_W, y);
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  const gl = projectPoint(PITCH_W / 2 - 40, GOAL_LINE_TOP), gr = projectPoint(PITCH_W / 2 + 40, GOAL_LINE_TOP);
+  ctx.beginPath();
+  ctx.moveTo(gl.x, gl.y - 16); ctx.lineTo(gl.x, gl.y); ctx.lineTo(gr.x, gr.y); ctx.lineTo(gr.x, gr.y - 16);
+  ctx.stroke();
+
+  function drawDot(pt, color, radius) {
+    ctx.beginPath();
+    ctx.fillStyle = color;
+    ctx.arc(pt.x, pt.y, radius * pt.scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  const entities = [
+    { pt: projectPoint(s.opp.x, s.opp.y), color: '#c23b3b', r: 12, y: s.opp.y },
+    { pt: projectPoint(s.player.x, s.player.y), color: state.player.jerseyPrimary, r: 13, y: s.player.y },
+    { pt: projectPoint(s.ball.x, s.ball.y), color: '#fff', r: 6, y: s.ball.y }
+  ].sort((a, b) => a.y - b.y);
+  for (const e of entities) drawDot(e.pt, e.color, e.r);
+
+  if (s.possession === 'me' && s.player.y <= SHOOT_RANGE_Y) {
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.font = '14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('SHOOTING RANGE', W / 2, 22);
+  }
+}
+
+function renderPlayHud() {
+  const s = playSession;
+  if (!s) return;
+  document.getElementById('playScore').textContent = `${s.scoreMine} - ${s.scoreOpp}`;
+  document.getElementById('playClock').textContent = `${s.half === 1 ? '1st' : '2nd'} Half · ${s.timeLeft}s`;
+  document.getElementById('playStaminaBar').style.width = `${Math.round(s.stamina)}%`;
+}
+
+function playFrame(now) {
+  const s = playSession;
+  if (!s || s.ended) return;
+  const dt = Math.min(0.05, (now - s.lastFrame) / 1000);
+  s.lastFrame = now;
+  updatePlaySim(dt);
+  drawPlayCanvas();
+  s.raf = requestAnimationFrame(playFrame);
+}
+
+function playTick() {
+  const s = playSession;
+  if (!s || s.ended) return;
+  s.timeLeft -= 1;
+  if (s.timeLeft <= 0) {
+    if (s.half === 1) {
+      s.half = 2;
+      s.timeLeft = HALF_SECONDS;
+      resetKickoff('me');
+      showPlayBanner('Half Time');
+    } else {
+      finishInteractiveMatch();
+      return;
+    }
+  }
+  renderPlayHud();
+}
+
+function finishInteractiveMatch() {
+  const s = playSession;
+  if (!s || s.ended) return;
+  s.ended = true;
+  cancelAnimationFrame(s.raf);
+  clearInterval(s.timerId);
+  clearTimeout(s.bannerTimeout);
+  detachPlayControls();
+  const stats = {
+    goals: s.stats.goals, oppGoals: s.stats.oppGoals, assists: 0,
+    tackles: s.stats.tackles, shotsTaken: s.stats.shotsTaken,
+    shotsOnTarget: s.stats.shotsOnTarget, staminaUsed: s.stats.staminaUsed
+  };
+  const onFinish = s.onFinish;
+  playSession = null;
+  onFinish(stats);
 }
 
 /* ---------- Live match playback ---------- */
@@ -922,7 +1457,7 @@ function startLivePlayback(r, events, totalMs, onDone) {
 
 /* ---------- Rendering ---------- */
 
-const screens = ['create', 'hub', 'match', 'cup-intro', 'cup-result', 'season-end', 'retire'];
+const screens = ['create', 'hub', 'match', 'play', 'cup-intro', 'cup-result', 'season-end', 'retire'];
 function showScreen(id) {
   for (const s of screens) {
     document.getElementById(`screen-${s}`).classList.toggle('active', s === id);
@@ -933,8 +1468,12 @@ function showScreen(id) {
 function renderTopbar() {
   if (!state) return;
   const p = state.player;
-  document.getElementById('hdrAvatar').innerHTML = playerAvatarSvg(p.hair, p.jerseyPrimary, p.jerseySecondary, 34);
-  document.getElementById('hdrName').textContent = `${p.name} (${p.position})`;
+  const overall = computeOverall(p);
+  const tier = cardTier(overall);
+  const avatarEl = document.getElementById('hdrAvatar');
+  avatarEl.innerHTML = playerAvatarSvg(p.hair, p.jerseyPrimary, p.jerseySecondary, 34);
+  avatarEl.className = `card-ring card-${tier.cls}`;
+  document.getElementById('hdrName').innerHTML = `${p.name} (${p.position}) ${playerCardBadgeHtml(overall)}`;
   document.getElementById('hdrClub').textContent = `${state.clubs[p.clubIndex].name} — ${currentLeague().name}`;
   document.getElementById('hdrAge').textContent = `Age ${p.age}`;
   document.getElementById('hdrWage').textContent = `$${p.wage}/wk`;
@@ -1060,7 +1599,7 @@ function renderHub() {
   const overall = computeOverall(p);
   document.getElementById('hubStatus').innerHTML = `
     ${lastMatchMiniHtml()}
-    <div class="muted club-line">${crestPlainHtml(state.clubs[p.clubIndex].name, 22)}${state.clubs[p.clubIndex].name} · ${currentLeague().name} · Overall Rating: <strong>${overall}</strong> · Contract: ${p.contractYearsLeft} yr(s) left</div>
+    <div class="muted club-line">${crestPlainHtml(state.clubs[p.clubIndex].name, 22)}${state.clubs[p.clubIndex].name} · ${currentLeague().name} · Overall Rating: <strong>${overall}</strong> ${playerCardBadgeHtml(overall)} · Contract: ${p.contractYearsLeft} yr(s) left</div>
     <div class="bar-row"><span class="label">Fitness</span><div class="bar-track"><div class="bar-fill fitness" style="width:${p.fitness}%"></div></div><span class="bar-val">${Math.round(p.fitness)}</span></div>
     <div class="bar-row"><span class="label">Morale</span><div class="bar-track"><div class="bar-fill morale" style="width:${p.morale}%"></div></div><span class="bar-val">${Math.round(p.morale)}</span></div>
   `;
@@ -1086,9 +1625,8 @@ function renderHub() {
     : `Training sessions left this week: ${state.trainingLeft} / ${TRAINING_SESSIONS_PER_WEEK}`;
 
   document.getElementById('btnPlayMatch').onclick = () => {
-    playDomesticMatchDay();
-    renderMatchScreen();
-    showScreen('match');
+    if (p.injuredWeeksLeft > 0) { alert("You're injured and can't play this week — sim it instead."); return; }
+    launchDomesticInteractiveMatch();
   };
 
   document.getElementById('btnSimMatch').onclick = () => {
@@ -1096,9 +1634,33 @@ function renderHub() {
     proceedAfterMatch();
   };
 
+  const tableWrap = document.getElementById('leagueTableWrap');
+  const toggleBtn = document.getElementById('btnToggleTable');
+  tableWrap.style.display = leagueTableExpanded ? 'block' : 'none';
+  toggleBtn.textContent = leagueTableExpanded ? 'Hide Table' : '📊 Show League Table';
+  toggleBtn.onclick = () => { leagueTableExpanded = !leagueTableExpanded; renderHub(); };
+
   renderLeagueTable('leagueTable', true);
   renderCareerSummaryMini();
   renderTopbar();
+}
+
+// Kicks off the interactive playable match for the current domestic fixture,
+// then feeds the resulting on-pitch stats into the normal match-resolution
+// pipeline exactly as if they'd come from the RNG simulator.
+function launchDomesticInteractiveMatch() {
+  const p = state.player;
+  const club = state.clubs[p.clubIndex];
+  const round = currentRound();
+  const [homeIdx, awayIdx] = findPlayerFixture(round);
+  const isHome = homeIdx === p.clubIndex;
+  const oppIdx = isHome ? awayIdx : homeIdx;
+  const opp = state.clubs[oppIdx];
+  startInteractiveMatch(club.name, opp.name, opp.strength, (stats) => {
+    playDomesticMatchDay(stats);
+    renderMatchScreen(true);
+    showScreen('match');
+  });
 }
 
 function renderLeagueTable(elId, highlightPlayer) {
@@ -1137,7 +1699,10 @@ function renderCareerSummaryMini() {
 
 /* ---- Match screen (live playback for both league and cup matches) ---- */
 
-function renderMatchScreen() {
+// When `interactive` is true, the result already came from the playable
+// minigame the user just finished, so this shows the final report instantly
+// instead of replaying the usual ~2-minute simulated live broadcast.
+function renderMatchScreen(interactive) {
   const r = lastMatchResult;
   document.getElementById('matchTitle').textContent = r.context || 'Match Day';
   document.getElementById('matchupRow').innerHTML = `
@@ -1160,8 +1725,20 @@ function renderMatchScreen() {
     else proceedAfterMatch();
   };
 
-  const events = buildMatchTimeline(r);
-  startLivePlayback(r, events, 120000, () => {});
+  if (interactive) {
+    clearLivePlayback();
+    document.getElementById('liveClock').textContent = 'FT';
+    document.getElementById('liveScore').textContent = `${r.scoreHome} - ${r.scoreAway}`;
+    document.getElementById('matchLog').innerHTML = r.log.map(t => `<li class="big">${t}</li>`).join('');
+    document.getElementById('btnSkipToFullTime').style.display = 'none';
+    document.getElementById('btnContinueAfterMatch').style.display = 'block';
+    document.getElementById('matchRatingBox').textContent = r.played
+      ? `Match rating: ${r.rating.toFixed(1)} · Goals: ${r.goals} · Assists: ${r.assists}`
+      : `Did not play this match.`;
+  } else {
+    const events = buildMatchTimeline(r);
+    startLivePlayback(r, events, 120000, () => {});
+  }
 }
 
 // Shared next-step routing after a domestic league match finishes.
@@ -1199,9 +1776,11 @@ function renderCupIntroScreen() {
   `;
 
   document.getElementById('btnCupPlay').onclick = () => {
-    playCupMatch();
-    renderMatchScreen();
-    showScreen('match');
+    startInteractiveMatch(myName, cup.opponentName, cup.opponentStrength, (stats) => {
+      playCupMatch(stats);
+      renderMatchScreen(true);
+      showScreen('match');
+    });
   };
   document.getElementById('btnCupSim').onclick = () => {
     playCupMatch();
@@ -1248,10 +1827,19 @@ function renderCupResultScreen() {
 function renderSeasonEndScreen() {
   const p = state.player;
   const h = state.history[state.history.length - 1];
+  const prog = h.progression;
+  const deltaEntries = prog ? Object.entries(prog.deltas) : [];
+  const deltaHtml = deltaEntries.length
+    ? `<div class="attr-deltas">${deltaEntries.map(([key, v]) => `<span class="attr-delta ${v > 0 ? 'up' : 'down'}">${ATTR_LABELS[key]} ${v > 0 ? '+' : ''}${v}</span>`).join('')}</div>`
+    : `<p class="muted">No attribute growth this season.</p>`;
   document.getElementById('seasonSummary').innerHTML = `
     <p class="club-line">${crestPlainHtml(state.clubs[p.clubIndex].name, 26)}<strong>${state.clubs[p.clubIndex].name}</strong> (${h.league}) finished <strong>#${h.finish}</strong> this season.</p>
     <p>${p.name}: ${h.apps} apps · ${h.goals} goals · ${h.assists} assists · avg rating ${h.avgRating || '—'}</p>
     ${h.trophy ? `<span class="trophy">🏆 ${h.trophy}</span>` : ''}
+    <h3>Player Development</h3>
+    <p>Overall Rating: ${prog ? prog.overallBefore : '—'} → <strong>${prog ? prog.overallAfter : computeOverall(p)}</strong> ${playerCardBadgeHtml(prog ? prog.overallAfter : computeOverall(p))}</p>
+    ${prog && prog.tierBefore !== prog.tierAfter ? tierChangeHtml(prog.tierBefore, prog.tierAfter) : ''}
+    ${deltaHtml}
   `;
   renderLeagueTable('finalTable', true);
 
@@ -1317,7 +1905,7 @@ function renderRetireScreen(reason) {
 
   document.getElementById('retireSummary').innerHTML = `
     <div class="club-line">${playerAvatarSvg(p.hair, p.jerseyPrimary, p.jerseySecondary, 48)}<h3 style="margin:0;">${p.name} — ${p.position} — ${p.nation}</h3></div>
-    <p>Final overall rating: <strong>${computeOverall(p)}</strong></p>
+    <p>Final overall rating: <strong>${computeOverall(p)}</strong> ${playerCardBadgeHtml(computeOverall(p))}</p>
     <p>Career totals: ${cs.matches} apps · ${cs.goals} goals · ${cs.assists} assists · ${cs.cleanSheets} clean sheets</p>
     <p>${trophiesHtml}</p>
     <h3>Season by season</h3>
