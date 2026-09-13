@@ -186,6 +186,11 @@ const HAIR_COLORS = [
   { name: 'Platinum', hex: '#e8e4d8' }, { name: 'Dyed Blue', hex: '#3a5fae' }
 ];
 
+// Skin tones used to give AI opponents in the interactive match some visual
+// variety (the user's own avatar always uses the same tone as their
+// character-creation preview, matched via playerAvatarSvg).
+const SKIN_TONES = ['#e0ac69', '#c98a55', '#8d5a34', '#f0c8a0', '#6b4226', '#a56a3a'];
+
 const JERSEY_COLORS = [
   { name: 'Red', hex: '#c23b3b' }, { name: 'Blue', hex: '#2b5faa' },
   { name: 'Sky Blue', hex: '#4fa8d8' }, { name: 'Green', hex: '#2f8f4e' },
@@ -971,20 +976,36 @@ function beginNextSeason() {
 
 let playSession = null;
 
+// Horizon sits well down the canvas so there's real sky/stand above it —
+// the whole point is that this reads as standing on the pitch looking
+// upfield over your own player's shoulder, not a map viewed from above.
+const HORIZON_Y = 92;
+const NEAR_Y = PITCH_H - 18;
+
 function projectPoint(x, y) {
-  const t = clamp((y - GOAL_LINE_TOP) / (GOAL_LINE_BOTTOM - GOAL_LINE_TOP), 0, 1); // 0 = far goal, 1 = near
-  const topW = PITCH_W * 0.38, bottomW = PITCH_W * 1.05;
+  const t = clamp((y - GOAL_LINE_TOP) / (GOAL_LINE_BOTTOM - GOAL_LINE_TOP), 0, 1); // 0 = far goal, 1 = near (camera)
+  const topW = PITCH_W * 0.3, bottomW = PITCH_W * 1.2;
   const w = topW + (bottomW - topW) * t;
   const cx = PITCH_W / 2;
   const relX = (x - cx) / (PITCH_W / 2);
   return {
     x: cx + relX * (w / 2),
-    y: 34 + t * (PITCH_H - 60),
-    scale: 0.5 + t * 0.95
+    y: HORIZON_Y + t * (NEAR_Y - HORIZON_Y),
+    scale: 0.42 + t * 1.25
   };
 }
 
+// A fixed (non-random-per-frame) crowd pattern so the stands behind the
+// horizon look textured but don't flicker every animation frame.
+const CROWD_DOTS = Array.from({ length: 70 }, (_, i) => ({
+  xt: (i + 0.5) / 70,
+  h: 3 + ((i * 37) % 6),
+  shade: i % 3
+}));
+
 function startInteractiveMatch(myName, oppName, oppStrength, onFinish) {
+  const p = state.player;
+  const oppHue = hashStr(oppName) % 360;
   playSession = {
     onFinish, myName, oppName,
     half: 1,
@@ -999,6 +1020,13 @@ function startInteractiveMatch(myName, oppName, oppStrength, onFinish) {
     opp: { x: PITCH_W / 2, y: PITCH_H / 2 },
     oppSpeed: clamp(0.85 + (oppStrength - 60) / 120, 0.6, 1.6),
     oppSkill: clamp(oppStrength / 100, 0.3, 0.95),
+    myKit: { shirt: p.jerseyPrimary, shorts: p.jerseySecondary, skin: '#e0ac69', hair: p.hair },
+    oppKit: {
+      shirt: `hsl(${oppHue}, 52%, 40%)`, shorts: `hsl(${oppHue}, 45%, 18%)`,
+      skin: SKIN_TONES[hashStr(oppName + 's') % SKIN_TONES.length],
+      hair: HAIR_COLORS[hashStr(oppName + 'h') % HAIR_COLORS.length].hex
+    },
+    animPhase: 0, oppAnimPhase: 0,
     tackleCooldown: 0, passCooldown: 0, shotCooldown: 0,
     bannerTimeout: null,
     stats: { goals: 0, oppGoals: 0, tackles: 0, passesCompleted: 0, passesAttempted: 0, shotsTaken: 0, shotsOnTarget: 0, staminaUsed: 0 },
@@ -1178,6 +1206,9 @@ function updatePlaySim(dt) {
   if (sprinting) { s.stamina = clamp(s.stamina - 30 * dt, 0, 100); s.stats.staminaUsed += 30 * dt; }
   else s.stamina = clamp(s.stamina + 16 * dt, 0, 100);
 
+  s.animPhase += dt * (moving ? (sprinting ? 16 : 10) : 3);
+  s.oppAnimPhase += dt * 9;
+
   if (s.possession === 'me') {
     s.ball.x = s.player.x; s.ball.y = s.player.y - 8;
     const dx = s.player.x - s.opp.x, dy = s.player.y - s.opp.y;
@@ -1215,6 +1246,71 @@ function updatePlaySim(dt) {
   renderPlayHud();
 }
 
+// Draws a small running humanoid — legs and arms swinging on a sine cycle,
+// shorts/shirt in the given kit colors, hair on top — instead of a flat dot,
+// so the pitch reads as people rather than markers on a map.
+function drawHumanoid(ctx, pt, kit, animPhase, moving) {
+  const s = pt.scale;
+  const gx = pt.x, gy = pt.y;
+  const h = 30 * s;
+  const swingAmt = moving ? 7 : 1.4;
+  const swing = Math.sin(animPhase) * swingAmt * s;
+  const counterSwing = Math.sin(animPhase + Math.PI) * swingAmt * s;
+
+  ctx.beginPath();
+  ctx.ellipse(gx, gy, 8 * s, 2.6 * s, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.35)';
+  ctx.fill();
+
+  const hipY = gy - h * 0.44;
+  const shoulderY = gy - h * 0.82;
+  const headY = gy - h * 0.98;
+  const headR = 4.6 * s;
+
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = kit.skin;
+  ctx.lineWidth = Math.max(1, 3.2 * s);
+  ctx.beginPath(); ctx.moveTo(gx - 2.4 * s, hipY); ctx.lineTo(gx - 2.4 * s + counterSwing, gy); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(gx + 2.4 * s, hipY); ctx.lineTo(gx + 2.4 * s + swing, gy); ctx.stroke();
+
+  ctx.fillStyle = kit.shorts;
+  ctx.fillRect(gx - 5.5 * s, hipY - 5 * s, 11 * s, 6 * s);
+
+  ctx.fillStyle = kit.shirt;
+  ctx.beginPath();
+  ctx.moveTo(gx - 6.5 * s, hipY - 5 * s);
+  ctx.lineTo(gx - 7.5 * s, shoulderY);
+  ctx.lineTo(gx + 7.5 * s, shoulderY);
+  ctx.lineTo(gx + 6.5 * s, hipY - 5 * s);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = kit.shirt;
+  ctx.lineWidth = Math.max(1, 2.6 * s);
+  ctx.beginPath(); ctx.moveTo(gx - 7.5 * s, shoulderY + 1.5 * s); ctx.lineTo(gx - 7.5 * s - counterSwing * 0.5, hipY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(gx + 7.5 * s, shoulderY + 1.5 * s); ctx.lineTo(gx + 7.5 * s - swing * 0.5, hipY); ctx.stroke();
+
+  ctx.fillStyle = kit.skin;
+  ctx.beginPath(); ctx.arc(gx, headY, headR, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = kit.hair;
+  ctx.beginPath(); ctx.arc(gx, headY - headR * 0.25, headR * 1.05, Math.PI, 0); ctx.fill();
+}
+
+function drawBall(ctx, pt) {
+  const s = pt.scale;
+  ctx.beginPath();
+  ctx.ellipse(pt.x, pt.y + 2 * s, 4 * s, 1.4 * s, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(pt.x, pt.y, Math.max(1.5, 3.4 * s), 0, Math.PI * 2);
+  ctx.fillStyle = '#f5f5f0';
+  ctx.fill();
+  ctx.strokeStyle = '#2a2a2a';
+  ctx.lineWidth = Math.max(0.6, 0.8 * s);
+  ctx.stroke();
+}
+
 function drawPlayCanvas() {
   const s = playSession;
   const canvas = document.getElementById('playCanvas');
@@ -1222,54 +1318,106 @@ function drawPlayCanvas() {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#0e2a12';
-  ctx.fillRect(0, 0, W, H);
 
-  const topL = projectPoint(0, GOAL_LINE_TOP), topR = projectPoint(PITCH_W, GOAL_LINE_TOP);
-  const botL = projectPoint(0, GOAL_LINE_BOTTOM), botR = projectPoint(PITCH_W, GOAL_LINE_BOTTOM);
-  ctx.fillStyle = '#1e6b2e';
-  ctx.beginPath();
-  ctx.moveTo(topL.x, topL.y); ctx.lineTo(topR.x, topR.y);
-  ctx.lineTo(botR.x, botR.y); ctx.lineTo(botL.x, botL.y);
-  ctx.closePath(); ctx.fill();
+  // Sky + floodlit stadium bowl above the horizon, so the camera reads as
+  // standing on the pitch looking upfield, not looking down at a map.
+  const sky = ctx.createLinearGradient(0, 0, 0, HORIZON_Y);
+  sky.addColorStop(0, '#050b14');
+  sky.addColorStop(1, '#1c3a4f');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, W, HORIZON_Y);
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.14)';
-  ctx.lineWidth = 1.5;
-  for (let i = 1; i < 8; i++) {
-    const y = GOAL_LINE_TOP + (GOAL_LINE_BOTTOM - GOAL_LINE_TOP) * i / 8;
-    const a = projectPoint(0, y), b = projectPoint(PITCH_W, y);
-    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  const standTop = HORIZON_Y - 34;
+  ctx.fillStyle = '#0a1620';
+  ctx.fillRect(0, standTop, W, HORIZON_Y - standTop);
+  for (const d of CROWD_DOTS) {
+    ctx.fillStyle = d.shade === 0 ? 'rgba(230,210,170,0.5)' : d.shade === 1 ? 'rgba(180,190,210,0.35)' : 'rgba(140,150,170,0.25)';
+    ctx.fillRect(d.xt * W - 1.5, HORIZON_Y - 6 - d.h, 3, d.h);
+  }
+  ctx.fillStyle = 'rgba(255,244,214,0.55)';
+  ctx.beginPath(); ctx.arc(W * 0.12, standTop - 6, 3, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.arc(W * 0.88, standTop - 6, 3, 0, Math.PI * 2); ctx.fill();
+
+  // Grass, drawn as alternating perspective-correct mow stripes.
+  const stripeCount = 8;
+  for (let i = 0; i < stripeCount; i++) {
+    const y0 = GOAL_LINE_TOP + (GOAL_LINE_BOTTOM - GOAL_LINE_TOP) * i / stripeCount;
+    const y1 = GOAL_LINE_TOP + (GOAL_LINE_BOTTOM - GOAL_LINE_TOP) * (i + 1) / stripeCount;
+    const a = projectPoint(0, y0), b = projectPoint(PITCH_W, y0);
+    const c = projectPoint(PITCH_W, y1), d = projectPoint(0, y1);
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.lineTo(c.x, c.y); ctx.lineTo(d.x, d.y);
+    ctx.closePath();
+    ctx.fillStyle = i % 2 === 0 ? '#1c6b30' : '#227938';
+    ctx.fill();
   }
 
-  ctx.strokeStyle = '#fff';
-  ctx.lineWidth = 3;
-  const gl = projectPoint(PITCH_W / 2 - 40, GOAL_LINE_TOP), gr = projectPoint(PITCH_W / 2 + 40, GOAL_LINE_TOP);
+  // Pitch markings: halfway line, far penalty box, goal frame + net.
+  ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+  ctx.lineWidth = 2;
+  const halfY = (GOAL_LINE_TOP + GOAL_LINE_BOTTOM) / 2;
+  const hl = projectPoint(0, halfY), hr = projectPoint(PITCH_W, halfY);
+  ctx.beginPath(); ctx.moveTo(hl.x, hl.y); ctx.lineTo(hr.x, hr.y); ctx.stroke();
+
+  const boxY = GOAL_LINE_TOP + (GOAL_LINE_BOTTOM - GOAL_LINE_TOP) * 0.22;
+  const boxL0 = projectPoint(PITCH_W / 2 - 90, GOAL_LINE_TOP), boxR0 = projectPoint(PITCH_W / 2 + 90, GOAL_LINE_TOP);
+  const boxL1 = projectPoint(PITCH_W / 2 - 90, boxY), boxR1 = projectPoint(PITCH_W / 2 + 90, boxY);
   ctx.beginPath();
-  ctx.moveTo(gl.x, gl.y - 16); ctx.lineTo(gl.x, gl.y); ctx.lineTo(gr.x, gr.y); ctx.lineTo(gr.x, gr.y - 16);
+  ctx.moveTo(boxL0.x, boxL0.y); ctx.lineTo(boxL1.x, boxL1.y);
+  ctx.lineTo(boxR1.x, boxR1.y); ctx.lineTo(boxR0.x, boxR0.y);
   ctx.stroke();
 
-  function drawDot(pt, color, radius) {
-    ctx.beginPath();
-    ctx.fillStyle = color;
-    ctx.arc(pt.x, pt.y, radius * pt.scale, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
+  const gl = projectPoint(PITCH_W / 2 - 40, GOAL_LINE_TOP), gr = projectPoint(PITCH_W / 2 + 40, GOAL_LINE_TOP);
+  const postH = 18 * gl.scale;
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(gl.x, gl.y - postH); ctx.lineTo(gl.x, gl.y);
+  ctx.lineTo(gr.x, gr.y); ctx.lineTo(gr.x, gr.y - postH);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1;
+  const netRows = 4, netCols = 8;
+  for (let i = 1; i < netCols; i++) {
+    const x = gl.x + (gr.x - gl.x) * (i / netCols);
+    ctx.beginPath(); ctx.moveTo(x, gl.y - postH); ctx.lineTo(x, gl.y); ctx.stroke();
+  }
+  for (let i = 1; i < netRows; i++) {
+    const y = gl.y - postH + (postH * i / netRows);
+    ctx.beginPath(); ctx.moveTo(gl.x, y); ctx.lineTo(gr.x, y); ctx.stroke();
   }
 
+  // Shooting-range highlight, only relevant while you're on the ball.
+  if (s.possession === 'me') {
+    const rangeY = SHOOT_RANGE_Y;
+    const rl0 = projectPoint(0, GOAL_LINE_TOP), rr0 = projectPoint(PITCH_W, GOAL_LINE_TOP);
+    const rl1 = projectPoint(0, rangeY), rr1 = projectPoint(PITCH_W, rangeY);
+    ctx.beginPath();
+    ctx.moveTo(rl0.x, rl0.y); ctx.lineTo(rr0.x, rr0.y); ctx.lineTo(rr1.x, rr1.y); ctx.lineTo(rl1.x, rl1.y);
+    ctx.closePath();
+    ctx.fillStyle = s.player.y <= SHOOT_RANGE_Y ? 'rgba(212,169,76,0.16)' : 'rgba(212,169,76,0.06)';
+    ctx.fill();
+  }
+
+  // People, farthest to nearest, so closer figures correctly overlap.
   const entities = [
-    { pt: projectPoint(s.opp.x, s.opp.y), color: '#c23b3b', r: 12, y: s.opp.y },
-    { pt: projectPoint(s.player.x, s.player.y), color: state.player.jerseyPrimary, r: 13, y: s.player.y },
-    { pt: projectPoint(s.ball.x, s.ball.y), color: '#fff', r: 6, y: s.ball.y }
+    { kind: 'opp', y: s.opp.y },
+    { kind: 'player', y: s.player.y },
+    { kind: 'ball', y: s.ball.y }
   ].sort((a, b) => a.y - b.y);
-  for (const e of entities) drawDot(e.pt, e.color, e.r);
+  for (const e of entities) {
+    if (e.kind === 'opp') drawHumanoid(ctx, projectPoint(s.opp.x, s.opp.y), s.oppKit, s.oppAnimPhase, true);
+    else if (e.kind === 'player') {
+      const moving = s.dirs.up || s.dirs.down || s.dirs.left || s.dirs.right;
+      drawHumanoid(ctx, projectPoint(s.player.x, s.player.y), s.myKit, s.animPhase, moving);
+    } else drawBall(ctx, projectPoint(s.ball.x, s.ball.y));
+  }
 
   if (s.possession === 'me' && s.player.y <= SHOOT_RANGE_Y) {
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.font = '14px sans-serif';
+    ctx.font = '13px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('SHOOTING RANGE', W / 2, 22);
+    ctx.fillText('SHOOTING RANGE', W / 2, HORIZON_Y - 8);
   }
 }
 
