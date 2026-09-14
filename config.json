@@ -1,0 +1,120 @@
+{
+  "game": {
+    "title": "FIFA 27",
+    "version": "1.0.0",
+    "description": "Ultimate Football Management and Simulation Game"
+  },
+  "startingResources": {
+    "coins": 100000,
+    "futPoints": 5000
+  },
+  "difficulty": {
+    "easy": {
+      "name": "Easy",
+      "modifier": 0.7,
+      "description": "Forgiving gameplay with more chances to score"
+    },
+    "normal": {
+      "name": "Normal",
+      "modifier": 0.5,
+      "description": "Balanced challenge for all players"
+    },
+    "hard": {
+      "name": "Hard",
+      "modifier": 0.3,
+      "description": "Competitive challenge for experienced players"
+    },
+    "legendary": {
+      "name": "Legendary",
+      "modifier": 0.1,
+      "description": "Extreme difficulty - Ultimate test of skill"
+    }
+  },
+  "packs": {
+    "bronze": {
+      "cost": 400,
+      "players": 3,
+      "name": "Bronze Pack"
+    },
+    "silver": {
+      "cost": 1500,
+      "players": 5,
+      "name": "Silver Pack"
+    },
+    "gold": {
+      "cost": 5000,
+      "players": 12,
+      "name": "Gold Pack"
+    },
+    "elite": {
+      "cost": 15000,
+      "players": 20,
+      "name": "Elite Pack"
+    },
+    "premium": {
+      "cost": 50000,
+      "players": 30,
+      "name": "Premium Pack"
+    }
+  },
+  "divisions": {
+    "maxDivisions": 10,
+    "minDivisions": 1,
+    "pointsForWin": 3,
+    "pointsForDraw": 1,
+    "pointsForLoss": 0
+  },
+  "rewards": {
+    "match": {
+      "win": {
+        "coins": 1500,
+        "xp": 500,
+        "multipliers": {
+          "squadRating": 10,
+          "goalDifference": 100
+        }
+      },
+      "draw": {
+        "coins": 1000,
+        "xp": 350,
+        "multipliers": {}
+      },
+      "loss": {
+        "coins": 500,
+        "xp": 150,
+        "multipliers": {}
+      }
+    }
+  },
+  "formations": [
+    {
+      "name": "4-3-3",
+      "description": "Balanced attacking",
+      "positions": ["GK", "CB", "CB", "CB", "LB", "CM", "CM", "CM", "RB", "ST", "ST", "ST"]
+    },
+    {
+      "name": "4-4-2",
+      "description": "Classic setup",
+      "positions": ["GK", "CB", "CB", "CB", "LB", "CM", "CM", "CM", "RB", "ST", "ST"]
+    },
+    {
+      "name": "3-5-2",
+      "description": "Attacking midfield focus",
+      "positions": ["GK", "CB", "CB", "CB", "LM", "CM", "CM", "RM", "ST", "ST"]
+    },
+    {
+      "name": "5-4-1",
+      "description": "Defensive strength",
+      "positions": ["GK", "CB", "CB", "CB", "CB", "CB", "CM", "CM", "ST"]
+    }
+  ],
+  "chemistry": {
+    "nationalityBonus": 2,
+    "clubBonus": 1,
+    "maxChemistry": 10
+  },
+  "autosave": {
+    "enabled": true,
+    "interval": 30000
+  }
+}

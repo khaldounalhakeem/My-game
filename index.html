@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FIFA 27</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="root">
+        <div id="mainMenu" class="screen active">
+            <div class="menu-container">
+                <h1 class="game-title">FIFA 27</h1>
+                <div class="menu-buttons">
+                    <button class="menu-btn" onclick="startGame('ultimateTeam')">
+                        <div class="btn-icon">🏆</div>
+                        <div class="btn-text">Ultimate Team</div>
+                    </button>
+                    <button class="menu-btn" onclick="startGame('worldCup')">
+                        <div class="btn-icon">🌍</div>
+                        <div class="btn-text">World Cup</div>
+                    </button>
+                    <button class="menu-btn" onclick="startGame('championsLeague')">
+                        <div class="btn-icon">⭐</div>
+                        <div class="btn-text">Champions League</div>
+                    </button>
+                    <button class="menu-btn" onclick="startGame('careerMode')">
+                        <div class="btn-icon">📊</div>
+                        <div class="btn-text">Career Mode</div>
+                    </button>
+                    <button class="menu-btn" onclick="openSettings()">
+                        <div class="btn-icon">⚙️</div>
+                        <div class="btn-text">Settings</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ultimate Team Screen -->
+        <div id="ultimateTeamScreen" class="screen">
+            <div class="top-bar">
+                <h2>Ultimate Team</h2>
+                <div class="currency-display">
+                    <span>💰 Coins: <span id="coins">100000</span></span>
+                    <span>⭐ FUT Points: <span id="futPoints">5000</span></span>
+                </div>
+                <button class="back-btn" onclick="backToMenu()">← Back</button>
+            </div>
+
+            <div class="content">
+                <div class="ut-navigation">
+                    <button class="nav-btn active" onclick="switchUTTab('squad')">Squad</button>
+                    <button class="nav-btn" onclick="switchUTTab('market')">Market</button>
+                    <button class="nav-btn" onclick="switchUTTab('packs')">Packs</button>
+                    <button class="nav-btn" onclick="switchUTTab('division')">Divisions</button>
+                </div>
+
+                <!-- Squad Tab -->
+                <div id="squadTab" class="ut-tab active">
+                    <div class="squad-container">
+                        <div class="formation-selector">
+                            <label>Formation:</label>
+                            <select id="formationSelect" onchange="changeFormation()">
+                                <option value="433">4-3-3</option>
+                                <option value="442">4-4-2</option>
+                                <option value="352">3-5-2</option>
+                                <option value="541">5-4-1</option>
+                            </select>
+                        </div>
+                        <div id="squadDisplay" class="squad-display">
+                            <!-- Squad positions will be rendered here -->
+                        </div>
+                        <div class="squad-bench">
+                            <h3>Bench</h3>
+                            <div id="benchDisplay" class="bench-display"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Market Tab -->
+                <div id="marketTab" class="ut-tab">
+                    <div class="market-container">
+                        <div class="market-filters">
+                            <input type="text" id="playerSearch" placeholder="Search players..." onkeyup="searchPlayers()">
+                            <select id="positionFilter" onchange="filterMarket()">
+                                <option value="">All Positions</option>
+                                <option value="ST">Striker</option>
+                                <option value="CM">Midfielder</option>
+                                <option value="CB">Defender</option>
+                                <option value="GK">Goalkeeper</option>
+                            </select>
+                            <select id="ratingFilter" onchange="filterMarket()">
+                                <option value="">All Ratings</option>
+                                <option value="90+">90+</option>
+                                <option value="85-89">85-89</option>
+                                <option value="80-84">80-84</option>
+                            </select>
+                        </div>
+                        <div id="marketList" class="market-list">
+                            <!-- Market listings will appear here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Packs Tab -->
+                <div id="packsTab" class="ut-tab">
+                    <div class="packs-container">
+                        <h3>Open Packs</h3>
+                        <div class="pack-options">
+                            <div class="pack-card" onclick="openPack('bronze', 400)">
+                                <div class="pack-name">Bronze Pack</div>
+                                <div class="pack-price">400 Coins</div>
+                                <div class="pack-desc">3 Players</div>
+                            </div>
+                            <div class="pack-card" onclick="openPack('silver', 1500)">
+                                <div class="pack-name">Silver Pack</div>
+                                <div class="pack-price">1,500 Coins</div>
+                                <div class="pack-desc">5 Players</div>
+                            </div>
+                            <div class="pack-card" onclick="openPack('gold', 5000)">
+                                <div class="pack-name">Gold Pack</div>
+                                <div class="pack-price">5,000 Coins</div>
+                                <div class="pack-desc">12 Players</div>
+                            </div>
+                            <div class="pack-card" onclick="openPack('elite', 15000)">
+                                <div class="pack-name">Elite Pack</div>
+                                <div class="pack-price">15,000 Coins</div>
+                                <div class="pack-desc">20 Players + Rare</div>
+                            </div>
+                            <div class="pack-card" onclick="openPack('premium', 50000)">
+                                <div class="pack-name">Premium Pack</div>
+                                <div class="pack-price">50,000 Coins</div>
+                                <div class="pack-desc">30 Players + Guaranteed Rare</div>
+                            </div>
+                        </div>
+                        <div id="packOpening" style="display:none;" class="pack-opening">
+                            <h3>Pack Contents</h3>
+                            <div id="packContents" class="pack-contents"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Division Tab -->
+                <div id="divisionTab" class="ut-tab">
+                    <div class="division-container">
+                        <h3>Online Divisions</h3>
+                        <div class="division-info">
+                            <div class="current-division">
+                                <h4>Current Division: <span id="currentDivision">10</span></h4>
+                                <p>Wins: <span id="divisionWins">0</span> / 10</p>
+                                <p>Points: <span id="divisionPoints">0</span></p>
+                            </div>
+                            <button class="play-btn" onclick="playMatch()">Play Match</button>
+                        </div>
+                        <div class="division-rewards">
+                            <h4>Current Rewards</h4>
+                            <div id="rewardsDisplay"></div>
+                        </div>
+                        <div class="division-leaderboard">
+                            <h4>Leaderboard</h4>
+                            <div id="leaderboardList" class="leaderboard-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- World Cup Screen -->
+        <div id="worldCupScreen" class="screen">
+            <div class="top-bar">
+                <h2>World Cup 2026</h2>
+                <button class="back-btn" onclick="backToMenu()">← Back</button>
+            </div>
+
+            <div class="content">
+                <div class="tournament-container">
+                    <div class="group-stage">
+                        <h3>Group Stage</h3>
+                        <div id="groupsDisplay"></div>
+                    </div>
+                    <div class="knockout-stage">
+                        <h3>Knockout Stage</h3>
+                        <button class="play-btn" onclick="playWorldCupMatch()">Play Next Match</button>
+                        <div id="knockoutDisplay" class="knockout-bracket"></div>
+                    </div>
+                    <div class="tournament-stats">
+                        <h4>Tournament Stats</h4>
+                        <p>Matches Played: <span id="wcMatches">0</span></p>
+                        <p>Wins: <span id="wcWins">0</span></p>
+                        <p>Goals Scored: <span id="wcGoals">0</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Champions League Screen -->
+        <div id="championsLeagueScreen" class="screen">
+            <div class="top-bar">
+                <h2>Champions League</h2>
+                <button class="back-btn" onclick="backToMenu()">← Back</button>
+            </div>
+
+            <div class="content">
+                <div class="tournament-container">
+                    <div class="group-stage">
+                        <h3>Group Stage</h3>
+                        <div id="clGroupsDisplay"></div>
+                    </div>
+                    <div class="knockout-stage">
+                        <h3>Knockout Round</h3>
+                        <button class="play-btn" onclick="playClMatch()">Play Next Match</button>
+                        <div id="clKnockoutDisplay" class="knockout-bracket"></div>
+                    </div>
+                    <div class="tournament-stats">
+                        <h4>Tournament Stats</h4>
+                        <p>Matches Played: <span id="clMatches">0</span></p>
+                        <p>Wins: <span id="clWins">0</span></p>
+                        <p>Goals Scored: <span id="clGoals">0</span></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Career Mode Screen -->
+        <div id="careerModeScreen" class="screen">
+            <div class="top-bar">
+                <h2>Career Mode</h2>
+                <button class="back-btn" onclick="backToMenu()">← Back</button>
+            </div>
+
+            <div class="content">
+                <div class="career-container">
+                    <div class="career-navigation">
+                        <button class="nav-btn active" onclick="switchCareerTab('overview')">Overview</button>
+                        <button class="nav-btn" onclick="switchCareerTab('squad')">Squad</button>
+                        <button class="nav-btn" onclick="switchCareerTab('fixtures')">Fixtures</button>
+                        <button class="nav-btn" onclick="switchCareerTab('transfers')">Transfers</button>
+                    </div>
+
+                    <!-- Overview Tab -->
+                    <div id="overviewTab" class="career-tab active">
+                        <div class="career-info">
+                            <div class="team-info">
+                                <h3 id="teamName">Select a Team</h3>
+                                <p>Season: <span id="currentSeason">2026</span></p>
+                                <p>League Position: <span id="leaguePosition">-</span></p>
+                                <p>Points: <span id="leaguePoints">0</span></p>
+                            </div>
+                            <div class="budget-info">
+                                <h4>Transfer Budget</h4>
+                                <p>Available: $<span id="transferBudget">0</span>M</p>
+                            </div>
+                            <button class="play-btn" onclick="playCareerMatch()">Play Next Match</button>
+                        </div>
+                    </div>
+
+                    <!-- Squad Tab -->
+                    <div id="squadCareerTab" class="career-tab">
+                        <div id="careerSquadDisplay"></div>
+                    </div>
+
+                    <!-- Fixtures Tab -->
+                    <div id="fixturesTab" class="career-tab">
+                        <div id="fixturesDisplay"></div>
+                    </div>
+
+                    <!-- Transfers Tab -->
+                    <div id="transfersTab" class="career-tab">
+                        <div class="transfer-market">
+                            <h4>Available Transfers</h4>
+                            <div id="transferList"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Match Screen -->
+        <div id="matchScreen" class="screen">
+            <div class="match-container">
+                <div class="match-header">
+                    <div class="team-info">
+                        <h3 id="homeTeam">Team A</h3>
+                        <div id="homeScore">0</div>
+                    </div>
+                    <div class="match-timer">
+                        <div id="matchTime">0:00</div>
+                        <div id="matchPeriod">1st Half</div>
+                    </div>
+                    <div class="team-info">
+                        <div id="awayScore">0</div>
+                        <h3 id="awayTeam">Team B</h3>
+                    </div>
+                </div>
+
+                <div class="match-events">
+                    <div id="eventsList" class="events-list"></div>
+                </div>
+
+                <div class="match-controls">
+                    <button class="action-btn" onclick="performAction('shoot')">⚽ Shoot</button>
+                    <button class="action-btn" onclick="performAction('pass')">→ Pass</button>
+                    <button class="action-btn" onclick="performAction('defend')">🛡️ Defend</button>
+                    <button class="action-btn" onclick="skipMatch()">⏭️ Skip</button>
+                </div>
+
+                <div class="match-stats">
+                    <h4>Match Stats</h4>
+                    <div class="stats-grid">
+                        <div>Possession: <span id="possession">50%</span></div>
+                        <div>Shots: <span id="shots">0 - 0</span></div>
+                        <div>Passes: <span id="passes">0 - 0</span></div>
+                        <div>Fouls: <span id="fouls">0 - 0</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Match Result Screen -->
+        <div id="resultScreen" class="screen">
+            <div class="result-container">
+                <h2 id="resultTitle">Match Result</h2>
+                <div class="result-score">
+                    <div class="team-result">
+                        <h3 id="resultHomeTeam">Team A</h3>
+                        <div class="score" id="resultHomeScore">0</div>
+                    </div>
+                    <div class="vs">VS</div>
+                    <div class="team-result">
+                        <div class="score" id="resultAwayScore">0</div>
+                        <h3 id="resultAwayTeam">Team B</h3>
+                    </div>
+                </div>
+
+                <div class="result-details">
+                    <h4>Rewards</h4>
+                    <p>Coins Earned: <span id="coinsEarned">0</span></p>
+                    <p>XP Earned: <span id="xpEarned">0</span></p>
+                    <div id="playerRewards"></div>
+                </div>
+
+                <button class="menu-btn" onclick="backToMenu()">Back to Menu</button>
+            </div>
+        </div>
+
+        <!-- Settings Screen -->
+        <div id="settingsScreen" class="screen">
+            <div class="settings-container">
+                <h2>Settings</h2>
+                <div class="settings-options">
+                    <div class="setting">
+                        <label>Music Volume:</label>
+                        <input type="range" min="0" max="100" value="100" id="musicVolume">
+                    </div>
+                    <div class="setting">
+                        <label>SFX Volume:</label>
+                        <input type="range" min="0" max="100" value="100" id="sfxVolume">
+                    </div>
+                    <div class="setting">
+                        <label>Difficulty:</label>
+                        <select id="difficulty">
+                            <option value="easy">Easy</option>
+                            <option value="normal" selected>Normal</option>
+                            <option value="hard">Hard</option>
+                            <option value="legendary">Legendary</option>
+                        </select>
+                    </div>
+                    <div class="setting">
+                        <label>
+                            <input type="checkbox" id="autoSave"> Auto Save
+                        </label>
+                    </div>
+                </div>
+                <button class="menu-btn" onclick="backToMenu()">Back to Menu</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
