@@ -163,13 +163,27 @@ function saveGameState() {
 
 function generateStartingSquad() {
     if (gameState.player.squad.length === 0) {
-        const startingPlayers = playerDatabase.slice(0, 11);
+        // Start with a basic affordable squad
+        const startingPlayers = [
+            playerDatabase[27], // Goalkeeper
+            playerDatabase[25], // Defender
+            playerDatabase[26], // Defender
+            playerDatabase[11], // Defender
+            playerDatabase[24], // Defender
+            playerDatabase[6],  // Midfielder
+            playerDatabase[15], // Midfielder
+            playerDatabase[21], // Midfielder
+            playerDatabase[8],  // Midfielder
+            playerDatabase[4],  // Forward
+            playerDatabase[5],  // Forward
+        ];
         gameState.player.squad = startingPlayers.map(p => ({...p}));
         gameState.player.ultimateTeamPlayers = [...playerDatabase].map((p, i) => ({
             ...p,
-            cardType: i < 5 ? 'legendary' : i < 15 ? 'rare' : 'common',
-            owned: i < 3,
-            marketPrice: p.rating * 500 + Math.random() * 1000
+            cardType: p.rating >= 90 ? 'legendary' : p.rating >= 85 ? 'rare' : 'common',
+            owned: i < 11,
+            listedPrice: Math.round(p.rating * 500 + Math.random() * 5000),
+            marketPrice: Math.round(p.rating * 500 + Math.random() * 5000 * (1 + (Math.random() - 0.5)))
         }));
     }
 }
@@ -190,6 +204,9 @@ function displayScreen(screenName) {
     if (screen) {
         screen.classList.add('active');
         gameState.currentScreen = screenName;
+
+        // Scroll to top when switching screens
+        document.querySelector('.content')?.scrollTo(0, 0);
     }
 }
 
@@ -639,33 +656,48 @@ function performAction(action) {
             if (Math.random() < shootChance) {
                 match.homeScore++;
                 const goalTypes = [
-                    '⚽ GOOOAL! Beautiful finish into the top corner!',
-                    '⚽ GOOOAL! Header from close range!',
-                    '⚽ GOOOAL! Long-range thunderbolt!',
-                    '⚽ GOOOAL! Tap-in from the rebound!',
+                    '⚽ GOOOAL! Beautiful finish into the top corner! Unstoppable!',
+                    '⚽ GOOOAL! Powerful header from close range! Classic!',
+                    '⚽ GOOOAL! Long-range thunderbolt! Incredible!',
+                    '⚽ GOOOAL! Tap-in from the rebound! Poacher\'s finish!',
+                    '⚽ GOOOAL! Curling shot! Bending it like Beckham!',
+                    '⚽ GOOOAL! Bicycle kick! What a goal!',
                 ];
                 event = goalTypes[Math.floor(Math.random() * goalTypes.length)];
             } else {
                 const missTypes = [
-                    '❌ Missed! Shot went wide of the goal',
-                    '❌ Saved! Goalkeeper makes a great save',
-                    '❌ Blocked! Defender steps in at the last moment',
-                    '❌ Over the bar! Close call',
+                    '❌ Missed! Shot went wide of the goal by inches',
+                    '❌ Saved! Goalkeeper makes an acrobatic save',
+                    '❌ Blocked! Defender throws himself in front of the shot',
+                    '❌ Over the bar! So close! Almost a screamer!',
+                    '❌ Post! The crossbar denies us!',
+                    '❌ Saved with confidence! Great stop by the keeper!',
                 ];
                 event = missTypes[Math.floor(Math.random() * missTypes.length)];
             }
             break;
         case 'pass':
             match.stats.homePasses++;
-            event = '✓ Good pass completed • Building up play';
+            const passTypes = [
+                '✓ Perfect pass completed • Moving forward',
+                '✓ Crisp pass • Building momentum',
+                '✓ Excellent delivery • Creating chances',
+                '✓ Quick exchange • Slick movement',
+            ];
+            event = passTypes[Math.floor(Math.random() * passTypes.length)];
             match.stats.homePossession = Math.min(100, match.stats.homePossession + 3);
             break;
         case 'defend':
-            match.stats.homeFouls++;
-            if (Math.random() < 0.15) {
-                event = '🟨 Yellow card! Referee warns the player';
-            } else {
-                event = '🛡️ Solid defensive block • Possession retained';
+            const defenseTypes = [
+                '🛡️ Solid tackle • Winning possession',
+                '🛡️ Defensive masterclass • Stopping the attack',
+                '🛡️ Interception • Quick thinking',
+                '🛡️ Clean clearance • Safe hands',
+            ];
+            event = defenseTypes[Math.floor(Math.random() * defenseTypes.length)];
+
+            if (Math.random() < 0.08) {
+                event = '🟨 Yellow card issued! Cautious approach needed';
             }
             break;
     }
