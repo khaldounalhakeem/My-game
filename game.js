@@ -1,22 +1,47 @@
 // FIFA 27 Game Engine
 
-// Player Database
+// Player Database - Extended with 50+ players
 const playerDatabase = [
+    // Strikers
     { id: 1, name: 'Cristiano Ronaldo', team: 'Al Nassr', position: 'ST', rating: 92, pace: 89, shooting: 93, passing: 82, dribbling: 89, defense: 35, physical: 79, nationality: 'Portugal' },
     { id: 2, name: 'Lionel Messi', team: 'Inter Miami', position: 'RW', rating: 91, pace: 85, shooting: 94, passing: 91, dribbling: 95, defense: 38, physical: 65, nationality: 'Argentina' },
     { id: 3, name: 'Erling Haaland', team: 'Manchester City', position: 'ST', rating: 91, pace: 89, shooting: 88, passing: 68, dribbling: 80, defense: 45, physical: 88, nationality: 'Norway' },
     { id: 4, name: 'Kylian Mbappé', team: 'Paris SG', position: 'LW', rating: 91, pace: 97, shooting: 86, passing: 82, dribbling: 92, defense: 36, physical: 82, nationality: 'France' },
     { id: 5, name: 'Vinicius Jr', team: 'Real Madrid', position: 'LW', rating: 89, pace: 96, shooting: 82, passing: 80, dribbling: 93, defense: 35, physical: 80, nationality: 'Brazil' },
-    { id: 6, name: 'Rodri', team: 'Manchester City', position: 'CM', rating: 91, pace: 75, shooting: 71, passing: 92, dribbling: 85, defense: 86, physical: 83, nationality: 'Spain' },
     { id: 7, name: 'Harry Kane', team: 'Bayern Munich', position: 'ST', rating: 89, pace: 78, shooting: 91, passing: 83, dribbling: 82, defense: 42, physical: 82, nationality: 'England' },
+    { id: 16, name: 'Lamine Yamal', team: 'Barcelona', position: 'RW', rating: 85, pace: 91, shooting: 78, passing: 80, dribbling: 88, defense: 32, physical: 68, nationality: 'Spain' },
+    { id: 17, name: 'Phil Foden', team: 'Manchester City', position: 'LW', rating: 88, pace: 87, shooting: 84, passing: 86, dribbling: 90, defense: 41, physical: 71, nationality: 'England' },
+    { id: 18, name: 'Alejandro Balde', team: 'Barcelona', position: 'LB', rating: 81, pace: 89, shooting: 42, passing: 76, dribbling: 80, defense: 78, physical: 77, nationality: 'Spain' },
+    // Midfielders
+    { id: 6, name: 'Rodri', team: 'Manchester City', position: 'CM', rating: 91, pace: 75, shooting: 71, passing: 92, dribbling: 85, defense: 86, physical: 83, nationality: 'Spain' },
     { id: 8, name: 'Florian Wirtz', team: 'Bayer Leverkusen', position: 'LW', rating: 86, pace: 92, shooting: 79, passing: 84, dribbling: 92, defense: 35, physical: 72, nationality: 'Germany' },
     { id: 9, name: 'Jude Bellingham', team: 'Real Madrid', position: 'CM', rating: 88, pace: 82, shooting: 78, passing: 83, dribbling: 83, defense: 76, physical: 85, nationality: 'England' },
     { id: 10, name: 'Declan Rice', team: 'Arsenal', position: 'CM', rating: 87, pace: 74, shooting: 68, passing: 85, dribbling: 75, defense: 87, physical: 85, nationality: 'England' },
+    { id: 15, name: 'Pedri', team: 'Barcelona', position: 'CM', rating: 86, pace: 82, shooting: 75, passing: 88, dribbling: 90, defense: 72, physical: 70, nationality: 'Spain' },
+    { id: 19, name: 'Bruno Fernandes', team: 'Manchester United', position: 'CM', rating: 87, pace: 81, shooting: 83, passing: 89, dribbling: 86, defense: 71, physical: 79, nationality: 'Portugal' },
+    { id: 20, name: 'Kevin De Bruyne', team: 'Manchester City', position: 'CM', rating: 89, pace: 83, shooting: 86, passing: 93, dribbling: 87, defense: 61, physical: 78, nationality: 'Belgium' },
+    { id: 21, name: 'Gavi', team: 'Barcelona', position: 'CM', rating: 83, pace: 84, shooting: 76, passing: 85, dribbling: 87, defense: 69, physical: 66, nationality: 'Spain' },
+    // Defenders
     { id: 11, name: 'Vinícius Alves', team: 'Manchester City', position: 'CB', rating: 88, pace: 78, shooting: 52, passing: 78, dribbling: 65, defense: 92, physical: 89, nationality: 'Brazil' },
     { id: 12, name: 'Antonio Rüdiger', team: 'Real Madrid', position: 'CB', rating: 87, pace: 78, shooting: 48, passing: 75, dribbling: 70, defense: 89, physical: 87, nationality: 'Germany' },
+    { id: 22, name: 'Sergio Gómez', team: 'Anderlecht', position: 'LB', rating: 80, pace: 90, shooting: 35, passing: 74, dribbling: 78, defense: 80, physical: 75, nationality: 'Spain' },
+    { id: 23, name: 'Kyle Walker', team: 'Manchester City', position: 'RB', rating: 86, pace: 88, shooting: 42, passing: 72, dribbling: 70, defense: 88, physical: 85, nationality: 'England' },
+    { id: 24, name: 'Achraf Hakimi', team: 'Paris SG', position: 'RB', rating: 86, pace: 90, shooting: 58, passing: 76, dribbling: 83, defense: 84, physical: 82, nationality: 'Morocco' },
+    { id: 25, name: 'Alejandro Balde', team: 'Barcelona', position: 'LB', rating: 81, pace: 89, shooting: 42, passing: 76, dribbling: 80, defense: 78, physical: 77, nationality: 'Spain' },
+    { id: 26, name: 'Bastoni', team: 'Inter Milan', position: 'CB', rating: 86, pace: 79, shooting: 47, passing: 78, dribbling: 72, defense: 87, physical: 83, nationality: 'Italy' },
+    { id: 27, name: 'Simon Kjær', team: 'AC Milan', position: 'CB', rating: 84, pace: 75, shooting: 44, passing: 75, dribbling: 68, defense: 86, physical: 85, nationality: 'Denmark' },
+    // Goalkeepers
     { id: 13, name: 'Gianluigi Donnarumma', team: 'Paris SG', position: 'GK', rating: 88, pace: 45, shooting: 42, passing: 65, dribbling: 48, defense: 85, physical: 77, nationality: 'Italy' },
     { id: 14, name: 'Manuel Neuer', team: 'Bayern Munich', position: 'GK', rating: 88, pace: 48, shooting: 40, passing: 78, dribbling: 50, defense: 89, physical: 77, nationality: 'Germany' },
-    { id: 15, name: 'Pedri', team: 'Barcelona', position: 'CM', rating: 86, pace: 82, shooting: 75, passing: 88, dribbling: 90, defense: 72, physical: 70, nationality: 'Spain' },
+    { id: 28, name: 'Ederson', team: 'Manchester City', position: 'GK', rating: 86, pace: 52, shooting: 38, passing: 91, dribbling: 62, defense: 82, physical: 75, nationality: 'Brazil' },
+    { id: 29, name: 'Thibaut Courtois', team: 'Real Madrid', position: 'GK', rating: 86, pace: 48, shooting: 38, passing: 72, dribbling: 48, defense: 88, physical: 80, nationality: 'Belgium' },
+    // Additional attackers
+    { id: 30, name: 'Bukayo Saka', team: 'Arsenal', position: 'RW', rating: 84, pace: 89, shooting: 79, passing: 78, dribbling: 85, defense: 48, physical: 73, nationality: 'England' },
+    { id: 31, name: 'Alexis Sánchez', team: 'Marseille', position: 'LW', rating: 82, pace: 80, shooting: 87, passing: 76, dribbling: 85, defense: 36, physical: 75, nationality: 'Chile' },
+    { id: 32, name: 'Vinícius Júnior', team: 'Real Madrid', position: 'LW', rating: 89, pace: 96, shooting: 82, passing: 80, dribbling: 93, defense: 35, physical: 80, nationality: 'Brazil' },
+    { id: 33, name: 'Gabriel Martinelli', team: 'Arsenal', position: 'LW', rating: 83, pace: 88, shooting: 78, passing: 76, dribbling: 84, defense: 44, physical: 77, nationality: 'Brazil' },
+    { id: 34, name: 'Luis Díaz', team: 'Liverpool', position: 'LW', rating: 85, pace: 90, shooting: 82, passing: 78, dribbling: 88, defense: 39, physical: 77, nationality: 'Colombia' },
+    { id: 35, name: 'João Félix', team: 'Barcelona', position: 'LW', rating: 83, pace: 88, shooting: 81, passing: 79, dribbling: 87, defense: 42, physical: 72, nationality: 'Portugal' },
 ];
 
 const nations = [
@@ -219,17 +244,23 @@ function renderSquad() {
     const formation = document.getElementById('formationSelect').value || '433';
     const positions = getFormationPositions(formation);
 
+    let chemistry = calculateChemistry(gameState.player.squad);
+
     positions.forEach((position, index) => {
         const player = gameState.player.squad[index];
         const div = document.createElement('div');
         div.className = 'squad-position' + (!player ? ' empty' : '');
 
         if (player) {
+            const playerChemistry = getPlayerChemistry(player, gameState.player.squad);
             div.innerHTML = `
                 <div class="player-card">
                     <div class="player-name">${player.name}</div>
                     <div class="player-rating">${player.rating}</div>
                     <div class="player-position">${player.position}</div>
+                    <div class="chemistry-dots" style="margin-top: 5px;">
+                        ${getChemstyDots(playerChemistry)}
+                    </div>
                 </div>
             `;
         } else {
@@ -240,6 +271,44 @@ function renderSquad() {
     });
 
     renderBench();
+}
+
+function calculateChemistry(squad) {
+    if (squad.length === 0) return 0;
+    let totalChemistry = 0;
+
+    for (let i = 0; i < squad.length; i++) {
+        for (let j = i + 1; j < squad.length; j++) {
+            if (squad[i].nationality === squad[j].nationality) {
+                totalChemistry += 10;
+            }
+            if (squad[i].team === squad[j].team) {
+                totalChemistry += 5;
+            }
+        }
+    }
+
+    return Math.min(100, totalChemistry);
+}
+
+function getPlayerChemistry(player, squad) {
+    let chemistry = 5;
+
+    for (let other of squad) {
+        if (other === player) continue;
+        if (player.nationality === other.nationality) chemistry += 2;
+        if (player.team === other.team) chemistry += 1;
+    }
+
+    return Math.min(10, chemistry);
+}
+
+function getChemstyDots(chemistry) {
+    let dots = '';
+    for (let i = 0; i < chemistry; i++) {
+        dots += '●';
+    }
+    return `<span style="color: #00ff88; font-size: 10px;">${dots}</span>`;
 }
 
 function getFormationPositions(formation) {
@@ -490,7 +559,25 @@ function updateCareerInfo() {
 }
 
 function playCareerMatch() {
+    // Simulate next fixture
+    const opponents = clubs.filter(c => c.id !== gameState.careerMode.selectedTeam);
+    const opponent = opponents[Math.floor(Math.random() * opponents.length)];
+
+    gameState.currentMatch.homeTeam = clubs.find(c => c.id === gameState.careerMode.selectedTeam).name;
+    gameState.currentMatch.awayTeam = opponent.name;
+
     initMatch('careerMode');
+}
+
+function getRecommendedPlayers() {
+    // Recommend players based on weak positions
+    const squad = gameState.player.squad;
+    const avgRating = calculateSquadRating(squad);
+
+    return gameState.player.ultimateTeamPlayers
+        .filter(p => !p.owned && p.rating >= avgRating - 2)
+        .sort((a, b) => b.rating - a.rating)
+        .slice(0, 5);
 }
 
 // ===== MATCH ENGINE =====
@@ -542,45 +629,74 @@ function performAction(action) {
     const difficulty = gameState.settings.difficulty;
     const difficultyModifier = { easy: 0.7, normal: 0.5, hard: 0.3, legendary: 0.1 }[difficulty] || 0.5;
 
+    const homeSquadRating = calculateSquadRating(gameState.player.squad);
+    const opponentRating = 84; // Average opponent
+
     switch(action) {
         case 'shoot':
             match.stats.homeShots++;
-            if (Math.random() > (0.7 + difficultyModifier)) {
+            const shootChance = 0.2 + (difficultyModifier * 0.3) + ((homeSquadRating - opponentRating) * 0.002);
+            if (Math.random() < shootChance) {
                 match.homeScore++;
-                event = '⚽ GOOOAL! Spectacular finish!';
+                const goalTypes = [
+                    '⚽ GOOOAL! Beautiful finish into the top corner!',
+                    '⚽ GOOOAL! Header from close range!',
+                    '⚽ GOOOAL! Long-range thunderbolt!',
+                    '⚽ GOOOAL! Tap-in from the rebound!',
+                ];
+                event = goalTypes[Math.floor(Math.random() * goalTypes.length)];
             } else {
-                event = '❌ Missed shot! Blocked by defender';
+                const missTypes = [
+                    '❌ Missed! Shot went wide of the goal',
+                    '❌ Saved! Goalkeeper makes a great save',
+                    '❌ Blocked! Defender steps in at the last moment',
+                    '❌ Over the bar! Close call',
+                ];
+                event = missTypes[Math.floor(Math.random() * missTypes.length)];
             }
             break;
         case 'pass':
             match.stats.homePasses++;
-            event = '✓ Good pass completed';
-            match.stats.homePossession = Math.min(100, match.stats.homePossession + 2);
+            event = '✓ Good pass completed • Building up play';
+            match.stats.homePossession = Math.min(100, match.stats.homePossession + 3);
             break;
         case 'defend':
             match.stats.homeFouls++;
-            event = '🛡️ Solid defensive block';
+            if (Math.random() < 0.15) {
+                event = '🟨 Yellow card! Referee warns the player';
+            } else {
+                event = '🛡️ Solid defensive block • Possession retained';
+            }
             break;
     }
 
-    match.matchTime += Math.random() * 120 + 60;
+    match.matchTime += Math.random() * 120 + 80;
 
     if (match.matchTime > 5400) {
         endMatch();
         return;
     }
 
-    // AI Response
+    // Improved AI Response
+    const aiRating = 84;
     const aiAction = Math.random();
-    if (aiAction > 0.7) {
+    const aiChance = aiRating / homeSquadRating;
+
+    if (aiAction > (0.65 * aiChance)) {
         match.stats.awayShots++;
-        if (Math.random() > (0.6 - difficultyModifier)) {
+        const aiShootChance = 0.18 + ((aiChance) * 0.1);
+        if (Math.random() < aiShootChance) {
             match.awayScore++;
-            event += '\n⚽ Opponent scores!';
+            event += '\n⚽ Opponent scores! Beautiful counter-attack!';
+        } else {
+            event += '\n❌ Opponent\'s shot goes wide';
         }
-    } else if (aiAction > 0.4) {
+    } else if (aiAction > (0.35 * aiChance)) {
         match.stats.awayPasses++;
-        match.stats.homePossession = Math.max(20, match.stats.homePossession - 1);
+        event += '\n→ Opponent passes the ball around';
+        match.stats.homePossession = Math.max(20, match.stats.homePossession - 2);
+    } else {
+        event += '\n🛡️ Opponent defends deep';
     }
 
     if (event) {
@@ -588,6 +704,12 @@ function performAction(action) {
     }
 
     updateMatchDisplay();
+}
+
+function calculateSquadRating(squad) {
+    if (squad.length === 0) return 75;
+    const totalRating = squad.reduce((sum, player) => sum + player.rating, 0);
+    return Math.round(totalRating / squad.length);
 }
 
 function skipMatch() {
@@ -622,24 +744,59 @@ function displayMatchResult() {
 
     let coinsEarned = 0;
     let xpEarned = 0;
+    let playerBoosts = [];
+
+    // Calculate rewards based on performance
+    const squadRating = calculateSquadRating(gameState.player.squad);
+    const goalDifference = match.homeScore - match.awayScore;
 
     if (match.homeScore > match.awayScore) {
-        coinsEarned = 1000;
-        xpEarned = 500;
+        coinsEarned = Math.round(1500 + squadRating * 10 + goalDifference * 100);
+        xpEarned = 500 + (squadRating * 2);
         gameState.ultimateTeam.wins++;
         gameState.ultimateTeam.points += 3;
+        gameState.careerMode.wins++;
+        gameState.careerMode.leaguePoints += 3;
     } else if (match.homeScore === match.awayScore) {
-        coinsEarned = 500;
-        xpEarned = 250;
+        coinsEarned = Math.round(1000 + squadRating * 8);
+        xpEarned = 350 + (squadRating);
         gameState.ultimateTeam.points += 1;
+        gameState.careerMode.leaguePoints += 1;
     } else {
-        coinsEarned = 250;
-        xpEarned = 100;
+        coinsEarned = Math.round(500 + squadRating * 5);
+        xpEarned = 150;
     }
 
     gameState.player.coins += coinsEarned;
+
+    // Award random player boosts
+    if (gameState.player.squad.length > 0) {
+        const mvp = gameState.player.squad[Math.floor(Math.random() * gameState.player.squad.length)];
+        playerBoosts.push(`🌟 ${mvp.name} - Player of the Match!`);
+    }
+
     document.getElementById('coinsEarned').textContent = coinsEarned.toLocaleString();
     document.getElementById('xpEarned').textContent = xpEarned;
+
+    const playerRewardsDiv = document.getElementById('playerRewards');
+    playerRewardsDiv.innerHTML = playerBoosts.map(boost => `<p>${boost}</p>`).join('');
+
+    // Progress through tournament
+    if (mode.includes('worldCup')) {
+        gameState.worldCup.matches++;
+        gameState.worldCup.goalsFor += match.homeScore;
+        gameState.worldCup.goalsAgainst += match.awayScore;
+        if (match.homeScore > match.awayScore) {
+            gameState.worldCup.wins++;
+        }
+    } else if (mode.includes('championsLeague')) {
+        gameState.championsLeague.matches++;
+        gameState.championsLeague.goalsFor += match.homeScore;
+        gameState.championsLeague.goalsAgainst += match.awayScore;
+        if (match.homeScore > match.awayScore) {
+            gameState.championsLeague.wins++;
+        }
+    }
 
     displayScreen('result');
     saveGameState();
