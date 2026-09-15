@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>FIFA 27</title>
+    <style>
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; }
+body { background: #0a0e27; color: #fff; font-family: Arial, sans-serif; min-height: 100vh; padding-top: 60px; }
+
+#topbar { position: fixed; top: 0; left: 0; right: 0; background: #000; border-bottom: 3px solid #00d4ff; padding: 15px; display: flex; justify-content: space-between; align-items: center; z-index: 100; height: 60px; }
+#topbar h2 { color: #00d4ff; margin: 0; font-size: 18px; }
+
+.pages { position: relative; }
+.page { position: absolute; top: 60px; left: 0; right: 0; display: none; width: 100%; min-height: calc(100vh - 60px); padding: 20px; }
+.page.on { display: block; position: static; }
+
+.title { font-size: 48px; color: #00d4ff; text-align: center; margin: 40px 0; }
+.menu-btn { display: block; width: 90%; max-width: 300px; margin: 15px auto; padding: 20px; background: linear-gradient(135deg, #1a4d5c, #0d3a47); border: 3px solid #00d4ff; color: #fff; font-size: 18px; border-radius: 12px; cursor: pointer; text-align: center; -webkit-user-select: none; user-select: none; }
+.menu-btn:active { background: #00d4ff; color: #000; }
+
+.back-btn { width: auto; padding: 10px 15px; margin: 0; background: #00d4ff; color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; -webkit-user-select: none; user-select: none; }
+.back-btn:active { background: #0099aa; }
+
+.group { background: rgba(0, 212, 255, 0.1); border: 2px solid #00d4ff; padding: 15px; margin: 10px 0; border-radius: 8px; }
+
+.match-score { font-size: 60px; color: #00d4ff; font-weight: bold; text-align: center; margin: 20px 0; }
+.match-time { font-size: 36px; color: #00d4ff; font-weight: bold; text-align: center; }
+.events { background: rgba(0, 0, 0, 0.5); border: 2px solid #00d4ff; padding: 12px; margin: 15px 0; max-height: 200px; overflow-y: auto; border-radius: 6px; }
+.event { padding: 8px; border-bottom: 1px solid #333; font-size: 13px; }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+.actions .action-btn { display: block; width: 100%; padding: 15px; background: #00d4ff; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; margin: 0; -webkit-user-select: none; user-select: none; }
+.actions .action-btn:active { background: #0099aa; }
+
+.player-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin: 15px 0; }
+.player-card { background: rgba(0, 212, 255, 0.1); border: 2px solid #00d4ff; padding: 10px; border-radius: 6px; text-align: center; font-size: 12px; }
+.rating { background: #00d4ff; color: #000; padding: 4px; margin: 5px 0; border-radius: 4px; font-weight: bold; }
+
+select, input { padding: 10px; width: 100%; margin-top: 10px; background: #1a1a1a; color: #00d4ff; border: 2px solid #00d4ff; border-radius: 4px; font-size: 14px; }
+
+h3 { margin-top: 20px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<div id="topbar">
+    <h2 id="title">⚽ FIFA 27</h2>
+    <button id="backBtn" class="back-btn" style="display:none">← BACK</button>
+</div>
+
+<div class="pages">
+
+<div id="menu" class="page on">
+    <div style="text-align: center; padding-top: 40px;">
+        <div class="title">⚽ FIFA 27</div>
+        <div class="menu-btn" id="btn-ultimate">🏆 Ultimate Team</div>
+        <div class="menu-btn" id="btn-worldcup">🌍 World Cup</div>
+        <div class="menu-btn" id="btn-champions">⭐ Champions League</div>
+        <div class="menu-btn" id="btn-career">📊 Career Mode</div>
+        <div class="menu-btn" id="btn-settings">⚙️ Settings</div>
+    </div>
+</div>
+
+<div id="ultimate" class="page">
+    <h3>Your Squad</h3>
+    <div id="squadDisplay" class="player-grid"></div>
+    <div class="menu-btn" id="btn-play-ultimate">▶️ PLAY MATCH</div>
+</div>
+
+<div id="worldcup" class="page">
+    <h3>GROUP STAGE</h3>
+    <div class="group"><strong>Group A:</strong><br>England 🏴 France 🇫🇷 Spain 🇪🇸 Germany 🇩🇪</div>
+    <div class="group"><strong>Group B:</strong><br>Brazil 🇧🇷 Argentina 🇦🇷 Uruguay 🇺🇾 Mexico 🇲🇽</div>
+    <div class="group"><strong>Group C:</strong><br>Italy 🇮🇹 Netherlands 🇳🇱 Portugal 🇵🇹 Belgium 🇧🇪</div>
+    <div class="group"><strong>Group D:</strong><br>Japan 🇯🇵 South Korea 🇰🇷 Australia 🇦🇺 Poland 🇵🇱</div>
+    <div class="menu-btn" id="btn-play-world">▶️ PLAY MATCH</div>
+</div>
+
+<div id="champions" class="page">
+    <h3>GROUP STAGE</h3>
+    <div class="group"><strong>Group A:</strong><br>Real Madrid ⚪ Bayern Munich 🔴 Man City 🔵 PSG 🔴</div>
+    <div class="group"><strong>Group B:</strong><br>Barcelona 🔴 Liverpool 🔴 Inter Milan ⚫ Ajax ⚪</div>
+    <div class="group"><strong>Group C:</strong><br>Arsenal 🔴 Dortmund 🟡 AC Milan ⚫ RB Leipzig 🔴</div>
+    <div class="group"><strong>Group D:</strong><br>Man United 🔴 Atletico 🔴 Benfica 🔴 Celtic ⚪</div>
+    <div class="menu-btn" id="btn-play-champ">▶️ PLAY MATCH</div>
+</div>
+
+<div id="career" class="page">
+    <div class="group">
+        <div><strong>Team:</strong> Man City</div>
+        <div><strong>Season:</strong> 2026</div>
+    </div>
+    <div class="menu-btn" id="btn-play-career">▶️ PLAY MATCH</div>
+</div>
+
+<div id="settings" class="page">
+    <h3>Settings</h3>
+    <div style="margin: 20px 0;">
+        <label><strong>Difficulty:</strong></label>
+        <select id="difficulty">
+            <option>Easy</option>
+            <option selected>Normal</option>
+            <option>Hard</option>
+            <option>Legendary</option>
+        </select>
+    </div>
+    <div style="margin: 20px 0;">
+        <label><strong>Half Time (minutes):</strong></label>
+        <input type="number" id="halfTime" value="45" min="10" max="90">
+    </div>
+</div>
+
+<div id="match" class="page">
+    <div style="display: flex; justify-content: space-around; align-items: center; margin: 20px 0;">
+        <div><div style="font-size: 14px;">Your Team</div><div class="match-score" id="homeScore">0</div></div>
+        <div style="font-size: 20px; color: #666;">VS</div>
+        <div><div style="font-size: 14px;">Opponent</div><div class="match-score" id="awayScore">0</div></div>
+    </div>
+    <div class="match-time" id="matchTime">0:00</div>
+    <div style="font-size: 12px; color: #888; text-align: center; margin-top: 5px;" id="period">1st Half</div>
+    <div id="events" class="events"></div>
+    <div class="actions">
+        <div class="action-btn" id="btn-shoot">⚽ SHOOT</div>
+        <div class="action-btn" id="btn-pass">→ PASS</div>
+        <div class="action-btn" id="btn-defend">🛡️ DEFEND</div>
+        <div class="action-btn" id="btn-skip">⏭️ SKIP</div>
+    </div>
+</div>
+
+</div>
+
+<script>
+const g = {
+    players: [{name: 'Ronaldo', rating: 92}, {name: 'Messi', rating: 91}, {name: 'Haaland', rating: 91}, {name: 'Mbappé', rating: 91}, {name: 'Vinicius Jr', rating: 89}, {name: 'Rodri', rating: 91}, {name: 'Harry Kane', rating: 89}, {name: 'Phil Foden', rating: 88}, {name: 'Bellingham', rating: 88}, {name: 'De Bruyne', rating: 89}],
+    s: {time: 0, home: 0, away: 0, events: [], ht: 45, diff: 'Normal'},
+
+    go: function(id) {
+        var pages = document.querySelectorAll('.page');
+        for (var i = 0; i < pages.length; i++) pages[i].classList.remove('on');
+        document.getElementById(id).classList.add('on');
+        var titles = {menu: '⚽ FIFA 27', ultimate: '🏆 ULTIMATE TEAM', worldcup: '🌍 WORLD CUP', champions: '⭐ CHAMPIONS', career: '📊 CAREER', settings: '⚙️ SETTINGS', match: '⚽ LIVE MATCH'};
+        document.getElementById('title').textContent = titles[id] || '⚽ FIFA 27';
+        document.getElementById('backBtn').style.display = id === 'menu' ? 'none' : 'block';
+        if (id === 'ultimate') this.squad();
+    },
+
+    squad: function() {
+        var html = '';
+        for (var p of this.players) html += '<div class="player-card"><div>' + p.name + '</div><div class="rating">' + p.rating + '</div></div>';
+        document.getElementById('squadDisplay').innerHTML = html;
+    },
+
+    start: function() {
+        this.s.time = 0; this.s.home = 0; this.s.away = 0; this.s.events = [];
+        this.s.ht = parseInt(document.getElementById('halfTime').value);
+        this.s.diff = document.getElementById('difficulty').value;
+        this.go('match');
+        this.update();
+    },
+
+    update: function() {
+        document.getElementById('homeScore').textContent = this.s.home;
+        document.getElementById('awayScore').textContent = this.s.away;
+        var m = Math.floor(this.s.time / 60);
+        var s = this.s.time % 60;
+        document.getElementById('matchTime').textContent = m + ':' + String(s).padStart(2, '0');
+        document.getElementById('period').textContent = this.s.time < (this.s.ht * 60) ? '1st Half' : '2nd Half';
+        var html = '';
+        for (var e of this.s.events) html += '<div class="event">' + e + '</div>';
+        document.getElementById('events').innerHTML = html;
+    },
+
+    shoot: function() {
+        if (this.s.time > (this.s.ht * 120)) { this.end(); return; }
+        var ch = {Easy: 0.45, Normal: 0.25, Hard: 0.15, Legendary: 0.08};
+        if (Math.random() < (ch[this.s.diff] || 0.25)) {
+            this.s.home++;
+            this.s.events.push('⚽ GOAL!');
+        } else {
+            this.s.events.push('❌ Missed');
+        }
+        this.s.time += 90 + Math.floor(Math.random() * 60);
+        if (Math.random() > 0.65 && Math.random() < 0.2) {
+            this.s.away++;
+            this.s.events.push('⚽ Opponent scores!');
+        }
+        if (this.s.time > (this.s.ht * 120)) this.end();
+        this.update();
+    },
+
+    pass: function() {
+        if (this.s.time > (this.s.ht * 120)) { this.end(); return; }
+        this.s.events.push('✓ Pass');
+        this.s.time += 90 + Math.floor(Math.random() * 60);
+        if (this.s.time > (this.s.ht * 120)) this.end();
+        this.update();
+    },
+
+    defend: function() {
+        if (this.s.time > (this.s.ht * 120)) { this.end(); return; }
+        this.s.events.push('🛡️ Defend');
+        this.s.time += 90 + Math.floor(Math.random() * 60);
+        if (this.s.time > (this.s.ht * 120)) this.end();
+        this.update();
+    },
+
+    skip: function() {
+        while (this.s.time < (this.s.ht * 120)) {
+            if (Math.random() < 0.33) this.shoot();
+            else if (Math.random() < 0.66) this.pass();
+            else this.defend();
+        }
+        this.end();
+    },
+
+    end: function() {
+        var r = this.s.home > this.s.away ? 1500 : this.s.home === this.s.away ? 1000 : 500;
+        alert('MATCH OVER!\n' + this.s.home + ' - ' + this.s.away + '\nCoins: +' + r);
+        this.go('menu');
+    }
+};
+
+document.getElementById('btn-ultimate').onclick = () => g.go('ultimate');
+document.getElementById('btn-worldcup').onclick = () => g.go('worldcup');
+document.getElementById('btn-champions').onclick = () => g.go('champions');
+document.getElementById('btn-career').onclick = () => g.go('career');
+document.getElementById('btn-settings').onclick = () => g.go('settings');
+document.getElementById('btn-play-ultimate').onclick = () => g.start();
+document.getElementById('btn-play-world').onclick = () => g.start();
+document.getElementById('btn-play-champ').onclick = () => g.start();
+document.getElementById('btn-play-career').onclick = () => g.start();
+document.getElementById('btn-shoot').onclick = () => g.shoot();
+document.getElementById('btn-pass').onclick = () => g.pass();
+document.getElementById('btn-defend').onclick = () => g.defend();
+document.getElementById('btn-skip').onclick = () => g.skip();
+document.getElementById('backBtn').onclick = () => g.go('menu');
+
+g.squad();
+g.go('menu');
+</script>
+
+</body>
+</html>
