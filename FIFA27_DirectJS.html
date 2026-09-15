@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>FIFA 27</title>
+    <style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; background: #0a0e27; color: #fff; font-family: Arial, sans-serif; overflow: hidden; }
+body { display: flex; flex-direction: column; }
+
+.screen { display: none; width: 100%; height: 100vh; overflow-y: auto; padding-top: 60px; }
+.screen.active { display: block; }
+
+.topbar { position: fixed; top: 0; left: 0; right: 0; background: #000; border-bottom: 3px solid #00d4ff; padding: 15px; display: flex; justify-content: space-between; align-items: center; z-index: 100; height: 60px; }
+.topbar h2 { color: #00d4ff; margin: 0; font-size: 18px; }
+
+.content { padding: 20px; }
+.title { font-size: 48px; color: #00d4ff; text-align: center; margin: 40px 0; }
+
+.menu-btn { display: block; width: 90%; max-width: 300px; margin: 15px auto; padding: 20px; background: linear-gradient(135deg, #1a4d5c, #0d3a47); border: 3px solid #00d4ff; color: #fff; font-size: 18px; border-radius: 12px; cursor: pointer; text-decoration: none; }
+.menu-btn:active { background: #00d4ff; color: #000; }
+
+.back-btn { width: auto; padding: 10px 15px; margin: 0; background: #00d4ff; color: #000; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+.back-btn:active { background: #0099aa; }
+
+.group { background: rgba(0, 212, 255, 0.1); border: 2px solid #00d4ff; padding: 15px; margin: 10px 0; border-radius: 8px; }
+
+.match-score { font-size: 60px; color: #00d4ff; font-weight: bold; text-align: center; margin: 20px 0; }
+.match-info { background: rgba(0, 212, 255, 0.1); border: 2px solid #00d4ff; padding: 15px; margin: 15px 0; border-radius: 8px; text-align: center; }
+.match-time { font-size: 36px; color: #00d4ff; font-weight: bold; }
+
+.events { background: rgba(0, 0, 0, 0.5); border: 2px solid #00d4ff; padding: 12px; margin: 15px 0; max-height: 200px; overflow-y: auto; border-radius: 6px; }
+.event { padding: 8px; border-bottom: 1px solid #333; font-size: 13px; }
+
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+.actions button { display: block; width: 100%; padding: 15px; background: #00d4ff; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; }
+.actions button:active { background: #0099aa; }
+
+.player-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 10px; margin: 15px 0; }
+.player-card { background: rgba(0, 212, 255, 0.1); border: 2px solid #00d4ff; padding: 10px; border-radius: 6px; text-align: center; font-size: 12px; }
+.rating { background: #00d4ff; color: #000; padding: 4px; margin: 5px 0; border-radius: 4px; font-weight: bold; }
+
+select, input { padding: 10px; width: 100%; margin-top: 10px; background: #1a1a1a; color: #00d4ff; border: 2px solid #00d4ff; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div id="menu" class="screen active">
+    <div style="text-align: center; padding-top: 40px;">
+        <div class="title">⚽ FIFA 27</div>
+        <button class="menu-btn" onclick="showScreen('ultimate')">🏆 Ultimate Team</button>
+        <button class="menu-btn" onclick="showScreen('worldcup')">🌍 World Cup</button>
+        <button class="menu-btn" onclick="showScreen('champions')">⭐ Champions League</button>
+        <button class="menu-btn" onclick="showScreen('career')">📊 Career Mode</button>
+        <button class="menu-btn" onclick="showScreen('settings')">⚙️ Settings</button>
+    </div>
+</div>
+
+<div id="ultimate" class="screen">
+    <div class="topbar"><h2>🏆 ULTIMATE TEAM</h2><button class="back-btn" onclick="showScreen('menu')">← BACK</button></div>
+    <div class="content">
+        <h3>Your Squad</h3>
+        <div id="squadDisplay" class="player-grid"></div>
+        <button class="menu-btn" onclick="startMatch('ultimate')" style="width: 90%; margin-top: 20px;">▶️ PLAY MATCH</button>
+    </div>
+</div>
+
+<div id="worldcup" class="screen">
+    <div class="topbar"><h2>🌍 WORLD CUP 2026</h2><button class="back-btn" onclick="showScreen('menu')">← BACK</button></div>
+    <div class="content">
+        <h3>GROUP STAGE</h3>
+        <div class="group"><strong>Group A:</strong><br>England 🏴 France 🇫🇷 Spain 🇪🇸 Germany 🇩🇪</div>
+        <div class="group"><strong>Group B:</strong><br>Brazil 🇧🇷 Argentina 🇦🇷 Uruguay 🇺🇾 Mexico 🇲🇽</div>
+        <div class="group"><strong>Group C:</strong><br>Italy 🇮🇹 Netherlands 🇳🇱 Portugal 🇵🇹 Belgium 🇧🇪</div>
+        <div class="group"><strong>Group D:</strong><br>Japan 🇯🇵 South Korea 🇰🇷 Australia 🇦🇺 Poland 🇵🇱</div>
+        <button class="menu-btn" onclick="startMatch('world')" style="width: 90%; margin-top: 20px;">▶️ PLAY MATCH</button>
+    </div>
+</div>
+
+<div id="champions" class="screen">
+    <div class="topbar"><h2>⭐ CHAMPIONS LEAGUE</h2><button class="back-btn" onclick="showScreen('menu')">← BACK</button></div>
+    <div class="content">
+        <h3>GROUP STAGE</h3>
+        <div class="group"><strong>Group A:</strong><br>Real Madrid ⚪ Bayern Munich 🔴 Man City 🔵 PSG 🔴</div>
+        <div class="group"><strong>Group B:</strong><br>Barcelona 🔴 Liverpool 🔴 Inter Milan ⚫ Ajax ⚪</div>
+        <div class="group"><strong>Group C:</strong><br>Arsenal 🔴 Dortmund 🟡 AC Milan ⚫ RB Leipzig 🔴</div>
+        <div class="group"><strong>Group D:</strong><br>Man United 🔴 Atletico 🔴 Benfica 🔴 Celtic ⚪</div>
+        <button class="menu-btn" onclick="startMatch('champ')" style="width: 90%; margin-top: 20px;">▶️ PLAY MATCH</button>
+    </div>
+</div>
+
+<div id="career" class="screen">
+    <div class="topbar"><h2>📊 CAREER MODE</h2><button class="back-btn" onclick="showScreen('menu')">← BACK</button></div>
+    <div class="content">
+        <div class="group">
+            <div><strong>Team:</strong> Man City</div>
+            <div><strong>Season:</strong> 2026</div>
+        </div>
+        <button class="menu-btn" onclick="startMatch('career')" style="width: 90%; margin-top: 20px;">▶️ PLAY MATCH</button>
+    </div>
+</div>
+
+<div id="settings" class="screen">
+    <div class="topbar"><h2>⚙️ SETTINGS</h2><button class="back-btn" onclick="showScreen('menu')">← BACK</button></div>
+    <div class="content">
+        <div style="margin: 20px 0;">
+            <label><strong>Difficulty:</strong></label>
+            <select id="difficulty">
+                <option>Easy</option>
+                <option selected>Normal</option>
+                <option>Hard</option>
+                <option>Legendary</option>
+            </select>
+        </div>
+        <div style="margin: 20px 0;">
+            <label><strong>Half Time (minutes):</strong></label>
+            <input type="number" id="halfTime" value="45" min="10" max="90">
+        </div>
+    </div>
+</div>
+
+<div id="match" class="screen">
+    <div class="topbar"><h2>⚽ LIVE MATCH</h2><button class="back-btn" onclick="showScreen('menu')">EXIT</button></div>
+    <div class="content">
+        <div style="display: flex; justify-content: space-around; align-items: center; margin: 20px 0;">
+            <div><div style="font-size: 16px;">Your Team</div><div class="match-score" id="homeScore">0</div></div>
+            <div style="font-size: 20px; color: #666;">VS</div>
+            <div><div style="font-size: 16px;">Opponent</div><div class="match-score" id="awayScore">0</div></div>
+        </div>
+        <div class="match-info">
+            <div class="match-time" id="matchTime">0:00</div>
+            <div style="font-size: 14px; color: #888; margin-top: 5px;" id="period">1st Half</div>
+        </div>
+        <div id="events" class="events"></div>
+        <div class="actions">
+            <button onclick="shoot()">⚽ SHOOT</button>
+            <button onclick="pass()">→ PASS</button>
+            <button onclick="defend()">🛡️ DEFEND</button>
+            <button onclick="skipMatch()">⏭️ SKIP</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const players = [
+    {name: 'Ronaldo', rating: 92},
+    {name: 'Messi', rating: 91},
+    {name: 'Haaland', rating: 91},
+    {name: 'Mbappé', rating: 91},
+    {name: 'Vinicius Jr', rating: 89},
+    {name: 'Rodri', rating: 91},
+    {name: 'Harry Kane', rating: 89},
+    {name: 'Phil Foden', rating: 88},
+    {name: 'Bellingham', rating: 88},
+    {name: 'De Bruyne', rating: 89}
+];
+
+let state = {
+    squad: players.slice(0, 10),
+    time: 0,
+    homeScore: 0,
+    awayScore: 0,
+    events: [],
+    halfTime: 45,
+    difficulty: 'Normal'
+};
+
+function showScreen(screenId) {
+    var screens = document.querySelectorAll('.screen');
+    for (var i = 0; i < screens.length; i++) {
+        screens[i].classList.remove('active');
+    }
+    document.getElementById(screenId).classList.add('active');
+    if (screenId === 'ultimate') {
+        renderSquad();
+    }
+}
+
+function renderSquad() {
+    var html = '';
+    for (var p of state.squad) {
+        html += '<div class="player-card"><div>' + p.name + '</div><div class="rating">' + p.rating + '</div></div>';
+    }
+    document.getElementById('squadDisplay').innerHTML = html;
+}
+
+function startMatch(type) {
+    state.time = 0;
+    state.homeScore = 0;
+    state.awayScore = 0;
+    state.events = [];
+    state.halfTime = parseInt(document.getElementById('halfTime').value);
+    state.difficulty = document.getElementById('difficulty').value;
+    showScreen('match');
+    updateMatch();
+}
+
+function updateMatch() {
+    document.getElementById('homeScore').textContent = state.homeScore;
+    document.getElementById('awayScore').textContent = state.awayScore;
+    var mins = Math.floor(state.time / 60);
+    var secs = state.time % 60;
+    document.getElementById('matchTime').textContent = mins + ':' + String(secs).padStart(2, '0');
+    document.getElementById('period').textContent = state.time < (state.halfTime * 60) ? '1st Half' : '2nd Half';
+    var html = '';
+    for (var e of state.events) {
+        html += '<div class="event">' + e + '</div>';
+    }
+    document.getElementById('events').innerHTML = html;
+}
+
+function shoot() {
+    if (state.time > (state.halfTime * 120)) {
+        endMatch();
+        return;
+    }
+    var chances = {Easy: 0.45, Normal: 0.25, Hard: 0.15, Legendary: 0.08};
+    if (Math.random() < (chances[state.difficulty] || 0.25)) {
+        state.homeScore++;
+        state.events.push('⚽ GOAL!');
+    } else {
+        state.events.push('❌ Missed');
+    }
+    state.time += 90 + Math.floor(Math.random() * 60);
+    if (Math.random() > 0.65 && Math.random() < 0.2) {
+        state.awayScore++;
+        state.events.push('⚽ Opponent scores!');
+    }
+    if (state.time > (state.halfTime * 120)) endMatch();
+    updateMatch();
+}
+
+function pass() {
+    if (state.time > (state.halfTime * 120)) {
+        endMatch();
+        return;
+    }
+    state.events.push('✓ Pass');
+    state.time += 90 + Math.floor(Math.random() * 60);
+    if (state.time > (state.halfTime * 120)) endMatch();
+    updateMatch();
+}
+
+function defend() {
+    if (state.time > (state.halfTime * 120)) {
+        endMatch();
+        return;
+    }
+    state.events.push('🛡️ Defend');
+    state.time += 90 + Math.floor(Math.random() * 60);
+    if (state.time > (state.halfTime * 120)) endMatch();
+    updateMatch();
+}
+
+function skipMatch() {
+    while (state.time < (state.halfTime * 120)) {
+        if (Math.random() < 0.33) shoot();
+        else if (Math.random() < 0.66) pass();
+        else defend();
+    }
+    endMatch();
+}
+
+function endMatch() {
+    var reward = state.homeScore > state.awayScore ? 1500 : state.homeScore === state.awayScore ? 1000 : 500;
+    alert('MATCH OVER!\n' + state.homeScore + ' - ' + state.awayScore + '\nCoins: +' + reward);
+    showScreen('menu');
+}
+
+renderSquad();
+</script>
+
+</body>
+</html>

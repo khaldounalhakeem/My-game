@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>FIFA 27</title>
+    <style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; background: #0a0e27; color: #fff; font-family: Arial; }
+
+.page {
+    display: none;
+    width: 100%;
+    min-height: 100vh;
+    padding-top: 60px;
+    overflow-y: auto;
+}
+
+.page:target {
+    display: block;
+}
+
+#menu:target, .page:not(:target):first-child {
+    display: block;
+}
+
+a {
+    display: inline-block;
+    padding: 15px 20px;
+    margin: 10px;
+    background: #00d4ff;
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 16px;
+    text-decoration: none;
+    text-align: center;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+a:active {
+    background: #00a8cc;
+    transform: scale(0.98);
+}
+
+.topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: #000;
+    border-bottom: 3px solid #00d4ff;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 100;
+}
+
+.topbar h2 {
+    color: #00d4ff;
+    margin: 0;
+    font-size: 20px;
+}
+
+.content {
+    padding: 20px;
+}
+
+.title {
+    font-size: 48px;
+    color: #00d4ff;
+    text-align: center;
+    margin: 40px 0;
+    text-shadow: 0 0 20px #00d4ff;
+}
+
+.menu-btn {
+    display: block;
+    width: 90%;
+    max-width: 300px;
+    margin: 15px auto;
+    padding: 20px;
+    background: linear-gradient(135deg, #1a4d5c, #0d3a47);
+    border: 3px solid #00d4ff;
+    color: #fff;
+    font-size: 18px;
+    border-radius: 12px;
+}
+
+.menu-btn:active {
+    background: #00d4ff;
+    color: #000;
+}
+
+.group {
+    background: rgba(0, 212, 255, 0.1);
+    border: 2px solid #00d4ff;
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 8px;
+}
+
+.match-score {
+    font-size: 60px;
+    color: #00d4ff;
+    font-weight: bold;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.match-info {
+    background: rgba(0, 212, 255, 0.1);
+    border: 2px solid #00d4ff;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.match-time {
+    font-size: 36px;
+    color: #00d4ff;
+    font-weight: bold;
+}
+
+.events {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid #00d4ff;
+    padding: 12px;
+    margin: 15px 0;
+    max-height: 200px;
+    overflow-y: auto;
+    border-radius: 6px;
+}
+
+.event {
+    padding: 8px;
+    border-bottom: 1px solid #333;
+    font-size: 13px;
+}
+
+.actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.actions a {
+    display: block;
+    margin: 0;
+}
+
+.player-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.player-card {
+    background: rgba(0, 212, 255, 0.1);
+    border: 2px solid #00d4ff;
+    padding: 10px;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 12px;
+}
+
+.rating {
+    background: #00d4ff;
+    color: #000;
+    padding: 4px;
+    margin: 5px 0;
+    border-radius: 4px;
+    font-weight: bold;
+}
+
+select, input {
+    padding: 10px;
+    width: 100%;
+    margin-top: 10px;
+    background: #1a1a1a;
+    color: #00d4ff;
+    border: 2px solid #00d4ff;
+    border-radius: 4px;
+}
+    </style>
+</head>
+<body>
+
+<!-- MENU -->
+<div id="menu" class="page">
+    <div style="text-align: center; padding-top: 40px;">
+        <div class="title">⚽ FIFA 27</div>
+        <a class="menu-btn" href="#ultimate">🏆 Ultimate Team</a>
+        <a class="menu-btn" href="#worldcup">🌍 World Cup</a>
+        <a class="menu-btn" href="#champions">⭐ Champions League</a>
+        <a class="menu-btn" href="#career">📊 Career Mode</a>
+        <a class="menu-btn" href="#settings">⚙️ Settings</a>
+    </div>
+</div>
+
+<!-- ULTIMATE TEAM -->
+<div id="ultimate" class="page">
+    <div class="topbar">
+        <h2>🏆 ULTIMATE TEAM</h2>
+        <a href="#menu" style="width: auto; padding: 10px 15px; margin: 0;">← BACK</a>
+    </div>
+    <div class="content">
+        <h3>Your Squad</h3>
+        <div id="squadDisplay" class="player-grid"></div>
+        <a href="#match-ultimate" style="width: 90%; margin-top: 20px; display: block;">▶️ PLAY MATCH</a>
+    </div>
+</div>
+
+<!-- WORLD CUP -->
+<div id="worldcup" class="page">
+    <div class="topbar">
+        <h2>🌍 WORLD CUP 2026</h2>
+        <a href="#menu" style="width: auto; padding: 10px 15px; margin: 0;">← BACK</a>
+    </div>
+    <div class="content">
+        <h3>GROUP STAGE</h3>
+        <div class="group"><strong>Group A:</strong><br>England 🏴 France 🇫🇷 Spain 🇪🇸 Germany 🇩🇪</div>
+        <div class="group"><strong>Group B:</strong><br>Brazil 🇧🇷 Argentina 🇦🇷 Uruguay 🇺🇾 Mexico 🇲🇽</div>
+        <div class="group"><strong>Group C:</strong><br>Italy 🇮🇹 Netherlands 🇳🇱 Portugal 🇵🇹 Belgium 🇧🇪</div>
+        <div class="group"><strong>Group D:</strong><br>Japan 🇯🇵 South Korea 🇰🇷 Australia 🇦🇺 Poland 🇵🇱</div>
+        <a href="#match-world" style="width: 90%; margin-top: 20px; display: block;">▶️ PLAY MATCH</a>
+    </div>
+</div>
+
+<!-- CHAMPIONS LEAGUE -->
+<div id="champions" class="page">
+    <div class="topbar">
+        <h2>⭐ CHAMPIONS LEAGUE</h2>
+        <a href="#menu" style="width: auto; padding: 10px 15px; margin: 0;">← BACK</a>
+    </div>
+    <div class="content">
+        <h3>GROUP STAGE</h3>
+        <div class="group"><strong>Group A:</strong><br>Real Madrid ⚪ Bayern Munich 🔴 Man City 🔵 PSG 🔴</div>
+        <div class="group"><strong>Group B:</strong><br>Barcelona 🔴 Liverpool 🔴 Inter Milan ⚫ Ajax ⚪</div>
+        <div class="group"><strong>Group C:</strong><br>Arsenal 🔴 Dortmund 🟡 AC Milan ⚫ RB Leipzig 🔴</div>
+        <div class="group"><strong>Group D:</strong><br>Man United 🔴 Atletico 🔴 Benfica 🔴 Celtic ⚪</div>
+        <a href="#match-champ" style="width: 90%; margin-top: 20px; display: block;">▶️ PLAY MATCH</a>
+    </div>
+</div>
+
+<!-- CAREER MODE -->
+<div id="career" class="page">
+    <div class="topbar">
+        <h2>📊 CAREER MODE</h2>
+        <a href="#menu" style="width: auto; padding: 10px 15px; margin: 0;">← BACK</a>
+    </div>
+    <div class="content">
+        <div class="group">
+            <div><strong>Team:</strong> Man City</div>
+            <div><strong>Season:</strong> 2026</div>
+        </div>
+        <a href="#match-career" style="width: 90%; margin-top: 20px; display: block;">▶️ PLAY MATCH</a>
+    </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings" class="page">
+    <div class="topbar">
+        <h2>⚙️ SETTINGS</h2>
+        <a href="#menu" style="width: auto; padding: 10px 15px; margin: 0;">← BACK</a>
+    </div>
+    <div class="content">
+        <div style="margin: 20px 0;">
+            <label><strong>Difficulty:</strong></label>
+            <select id="difficulty">
+                <option>Easy</option>
+                <option selected>Normal</option>
+                <option>Hard</option>
+                <option>Legendary</option>
+            </select>
+        </div>
+        <div style="margin: 20px 0;">
+            <label><strong>Half Time (minutes):</strong></label>
+            <input type="number" id="halfTime" value="45" min="10" max="90">
+        </div>
+    </div>
+</div>
+
+<!-- MATCH -->
+<div id="match-ultimate" class="page">
+    <div class="topbar">
+        <h2>⚽ LIVE MATCH</h2>
+        <a href="#menu" style="width: auto; padding: 10px 15px; margin: 0;">EXIT</a>
+    </div>
+    <div class="content">
+        <div style="display: flex; justify-content: space-around; align-items: center; margin: 20px 0;">
+            <div>
+                <div style="font-size: 16px;">Your Team</div>
+                <div class="match-score" id="homeScore">0</div>
+            </div>
+            <div style="font-size: 20px; color: #666;">VS</div>
+            <div>
+                <div style="font-size: 16px;">Opponent</div>
+                <div class="match-score" id="awayScore">0</div>
+            </div>
+        </div>
+
+        <div class="match-info">
+            <div class="match-time" id="matchTime">0:00</div>
+            <div style="font-size: 14px; color: #888; margin-top: 5px;" id="period">1st Half</div>
+        </div>
+
+        <div id="events" class="events"></div>
+
+        <div class="actions">
+            <a href="#" onclick="shoot(); return false;">⚽ SHOOT</a>
+            <a href="#" onclick="pass(); return false;">→ PASS</a>
+            <a href="#" onclick="defend(); return false;">🛡️ DEFEND</a>
+            <a href="#" onclick="skipMatch(); return false;">⏭️ SKIP</a>
+        </div>
+    </div>
+</div>
+
+<div id="match-world" class="page">
+    <div class="topbar">
+        <h2>⚽ WORLD CUP MATCH</h2>
+        <a href="#worldcup" style="width: auto; padding: 10px 15px; margin: 0;">← BACK</a>
+    </div>
+    <div class="content">
+        <div style="display: flex; justify-content: space-around; align-items: center; margin: 20px 0;">
+            <div>
+                <div style="font-size: 16px;">Your Nation</div>
+                <div class="match-score" id="homeScore2">0</div>
+            </div>
+            <div style="font-size: 20px; color: #666;">VS</div>
+            <div>
+                <div style="font-size: 16px;">Opponent</div>
+                <div class="match-score" id="awayScore2">0</div>
+            </div>
+        </div>
+
+        <div class="match-info">
+            <div class="match-time" id="matchTime2">0:00</div>
+            <div style="font-size: 14px; color: #888; margin-top: 5px;" id="period2">1st Half</div>
+        </div>
+
+        <div id="events2" class="events"></div>
+
+        <div class="actions">
+            <a href="#" onclick="shoot2(); return false;">⚽ SHOOT</a>
+            <a href="#" onclick="pass2(); return false;">→ PASS</a>
+            <a href="#" onclick="defend2(); return false;">🛡️ DEFEND</a>
+            <a href="#" onclick="skipMatch2(); return false;">⏭️ SKIP</a>
+        </div>
+    </div>
+</div>
+
+<div id="match-champ" class="page">
+    <div class="topbar">
+        <h2>⚽ CHAMPIONS LEAGUE MATCH</h2>
+        <a href="#champions" style="width: auto; padding: 10px 15px; margin: 0;">← BACK</a>
+    </div>
+    <div class="content">
+        <div style="display: flex; justify-content: space-around; align-items: center; margin: 20px 0;">
+            <div>
+                <div style="font-size: 16px;">Your Club</div>
+                <div class="match-score" id="homeScore3">0</div>
+            </div>
+            <div style="font-size: 20px; color: #666;">VS</div>
+            <div>
+                <div style="font-size: 16px;">Opponent</div>
+                <div class="match-score" id="awayScore3">0</div>
+            </div>
+        </div>
+
+        <div class="match-info">
+            <div class="match-time" id="matchTime3">0:00</div>
+            <div style="font-size: 14px; color: #888; margin-top: 5px;" id="period3">1st Half</div>
+        </div>
+
+        <div id="events3" class="events"></div>
+
+        <div class="actions">
+            <a href="#" onclick="shoot3(); return false;">⚽ SHOOT</a>
+            <a href="#" onclick="pass3(); return false;">→ PASS</a>
+            <a href="#" onclick="defend3(); return false;">🛡️ DEFEND</a>
+            <a href="#" onclick="skipMatch3(); return false;">⏭️ SKIP</a>
+        </div>
+    </div>
+</div>
+
+<div id="match-career" class="page">
+    <div class="topbar">
+        <h2>⚽ CAREER MATCH</h2>
+        <a href="#career" style="width: auto; padding: 10px 15px; margin: 0;">← BACK</a>
+    </div>
+    <div class="content">
+        <div style="display: flex; justify-content: space-around; align-items: center; margin: 20px 0;">
+            <div>
+                <div style="font-size: 16px;">Man City</div>
+                <div class="match-score" id="homeScore4">0</div>
+            </div>
+            <div style="font-size: 20px; color: #666;">VS</div>
+            <div>
+                <div style="font-size: 16px;">Opponent</div>
+                <div class="match-score" id="awayScore4">0</div>
+            </div>
+        </div>
+
+        <div class="match-info">
+            <div class="match-time" id="matchTime4">0:00</div>
+            <div style="font-size: 14px; color: #888; margin-top: 5px;" id="period4">1st Half</div>
+        </div>
+
+        <div id="events4" class="events"></div>
+
+        <div class="actions">
+            <a href="#" onclick="shoot4(); return false;">⚽ SHOOT</a>
+            <a href="#" onclick="pass4(); return false;">→ PASS</a>
+            <a href="#" onclick="defend4(); return false;">🛡️ DEFEND</a>
+            <a href="#" onclick="skipMatch4(); return false;">⏭️ SKIP</a>
+        </div>
+    </div>
+</div>
+
+<script>
+const players = [
+    {name: 'Ronaldo', rating: 92},
+    {name: 'Messi', rating: 91},
+    {name: 'Haaland', rating: 91},
+    {name: 'Mbappé', rating: 91},
+    {name: 'Vinicius Jr', rating: 89},
+    {name: 'Rodri', rating: 91},
+    {name: 'Harry Kane', rating: 89},
+    {name: 'Phil Foden', rating: 88},
+    {name: 'Bellingham', rating: 88},
+    {name: 'De Bruyne', rating: 89},
+];
+
+// MATCH 1 STATE
+let match1 = { time: 0, homeScore: 0, awayScore: 0, events: [], halfTime: 45, difficulty: 'Normal' };
+
+function shoot() {
+    if (match1.time > (match1.halfTime * 120)) { endMatch1(); return; }
+    const chances = {Easy: 0.45, Normal: 0.25, Hard: 0.15, Legendary: 0.08};
+    if (Math.random() < (chances[match1.difficulty] || 0.25)) {
+        match1.homeScore++;
+        match1.events.push('⚽ GOAL!');
+    } else {
+        match1.events.push('❌ Missed');
+    }
+    match1.time += 90 + Math.floor(Math.random() * 60);
+    if (Math.random() > 0.65 && Math.random() < 0.2) {
+        match1.awayScore++;
+        match1.events.push('⚽ Opponent scores!');
+    }
+    if (match1.time > (match1.halfTime * 120)) endMatch1();
+    updateMatch1();
+}
+
+function pass() {
+    if (match1.time > (match1.halfTime * 120)) { endMatch1(); return; }
+    match1.events.push('✓ Pass');
+    match1.time += 90 + Math.floor(Math.random() * 60);
+    if (match1.time > (match1.halfTime * 120)) endMatch1();
+    updateMatch1();
+}
+
+function defend() {
+    if (match1.time > (match1.halfTime * 120)) { endMatch1(); return; }
+    match1.events.push('🛡️ Defend');
+    match1.time += 90 + Math.floor(Math.random() * 60);
+    if (match1.time > (match1.halfTime * 120)) endMatch1();
+    updateMatch1();
+}
+
+function skipMatch() {
+    while (match1.time < (match1.halfTime * 120)) {
+        if (Math.random() < 0.33) shoot();
+        else if (Math.random() < 0.66) pass();
+        else defend();
+    }
+}
+
+function updateMatch1() {
+    document.getElementById('homeScore').textContent = match1.homeScore;
+    document.getElementById('awayScore').textContent = match1.awayScore;
+    const mins = Math.floor(match1.time / 60);
+    const secs = match1.time % 60;
+    document.getElementById('matchTime').textContent = mins + ':' + String(secs).padStart(2, '0');
+    document.getElementById('period').textContent = match1.time < (match1.halfTime * 60) ? '1st Half' : '2nd Half';
+    let html = '';
+    for (let e of match1.events) {
+        html += '<div class="event">' + e + '</div>';
+    }
+    document.getElementById('events').innerHTML = html;
+}
+
+function endMatch1() {
+    const reward = match1.homeScore > match1.awayScore ? 1500 : match1.homeScore === match1.awayScore ? 1000 : 500;
+    alert('MATCH OVER!\n' + match1.homeScore + ' - ' + match1.awayScore + '\nCoins: +' + reward);
+    window.location.hash = '#menu';
+    match1 = { time: 0, homeScore: 0, awayScore: 0, events: [], halfTime: 45, difficulty: 'Normal' };
+}
+
+// MATCH 2, 3, 4 (Same pattern - abbreviated for space)
+let match2 = { time: 0, homeScore: 0, awayScore: 0, events: [], halfTime: 45, difficulty: 'Normal' };
+let match3 = { time: 0, homeScore: 0, awayScore: 0, events: [], halfTime: 45, difficulty: 'Normal' };
+let match4 = { time: 0, homeScore: 0, awayScore: 0, events: [], halfTime: 45, difficulty: 'Normal' };
+
+function shoot2() { shoot2Main(match2, 'homeScore2', 'awayScore2', 'matchTime2', 'period2', 'events2', 2); }
+function pass2() { passMain(match2, 'matchTime2', 'period2', 'events2', 2); }
+function defend2() { defendMain(match2, 'matchTime2', 'period2', 'events2', 2); }
+function skipMatch2() { skipMatchMain(match2, 2); }
+function endMatch2() { endMatchMain(match2, 2); }
+
+function shoot2Main(m, hScore, aScore, mTime, period, events, num) {
+    if (m.time > (m.halfTime * 120)) { endMatchMain(m, num); return; }
+    const chances = {Easy: 0.45, Normal: 0.25, Hard: 0.15, Legendary: 0.08};
+    if (Math.random() < (chances[m.difficulty] || 0.25)) {
+        m.homeScore++;
+        m.events.push('⚽ GOAL!');
+    } else {
+        m.events.push('❌ Missed');
+    }
+    m.time += 90 + Math.floor(Math.random() * 60);
+    if (Math.random() > 0.65 && Math.random() < 0.2) {
+        m.awayScore++;
+        m.events.push('⚽ Opponent scores!');
+    }
+    if (m.time > (m.halfTime * 120)) endMatchMain(m, num);
+    updateMatchMain(m, hScore, aScore, mTime, period, events);
+}
+
+function passMain(m, mTime, period, events, num) {
+    if (m.time > (m.halfTime * 120)) { endMatchMain(m, num); return; }
+    m.events.push('✓ Pass');
+    m.time += 90 + Math.floor(Math.random() * 60);
+    if (m.time > (m.halfTime * 120)) endMatchMain(m, num);
+    updateMatchMain(m, 'homeScore' + num, 'awayScore' + num, mTime, period, events);
+}
+
+function defendMain(m, mTime, period, events, num) {
+    if (m.time > (m.halfTime * 120)) { endMatchMain(m, num); return; }
+    m.events.push('🛡️ Defend');
+    m.time += 90 + Math.floor(Math.random() * 60);
+    if (m.time > (m.halfTime * 120)) endMatchMain(m, num);
+    updateMatchMain(m, 'homeScore' + num, 'awayScore' + num, mTime, period, events);
+}
+
+function skipMatchMain(m, num) {
+    while (m.time < (m.halfTime * 120)) {
+        if (Math.random() < 0.33) {
+            const chances = {Easy: 0.45, Normal: 0.25, Hard: 0.15, Legendary: 0.08};
+            if (Math.random() < (chances[m.difficulty] || 0.25)) {
+                m.homeScore++;
+                m.events.push('⚽ GOAL!');
+            } else {
+                m.events.push('❌ Missed');
+            }
+            m.time += 90 + Math.floor(Math.random() * 60);
+            if (Math.random() > 0.65 && Math.random() < 0.2) {
+                m.awayScore++;
+                m.events.push('⚽ Opponent scores!');
+            }
+        } else if (Math.random() < 0.66) {
+            m.events.push('✓ Pass');
+            m.time += 90 + Math.floor(Math.random() * 60);
+        } else {
+            m.events.push('🛡️ Defend');
+            m.time += 90 + Math.floor(Math.random() * 60);
+        }
+    }
+    endMatchMain(m, num);
+}
+
+function updateMatchMain(m, hScore, aScore, mTime, period, events) {
+    document.getElementById(hScore).textContent = m.homeScore;
+    document.getElementById(aScore).textContent = m.awayScore;
+    const mins = Math.floor(m.time / 60);
+    const secs = m.time % 60;
+    document.getElementById(mTime).textContent = mins + ':' + String(secs).padStart(2, '0');
+    document.getElementById(period).textContent = m.time < (m.halfTime * 60) ? '1st Half' : '2nd Half';
+    let html = '';
+    for (let e of m.events) {
+        html += '<div class="event">' + e + '</div>';
+    }
+    document.getElementById(events).innerHTML = html;
+}
+
+function endMatchMain(m, num) {
+    const reward = m.homeScore > m.awayScore ? 1500 : m.homeScore === m.awayScore ? 1000 : 500;
+    alert('MATCH OVER!\n' + m.homeScore + ' - ' + m.awayScore + '\nCoins: +' + reward);
+    if (num === 1) window.location.hash = '#ultimate';
+    else if (num === 2) window.location.hash = '#worldcup';
+    else if (num === 3) window.location.hash = '#champions';
+    else if (num === 4) window.location.hash = '#career';
+}
+
+// Assign remaining functions
+function shoot3() { shoot2Main(match3, 'homeScore3', 'awayScore3', 'matchTime3', 'period3', 'events3', 3); }
+function pass3() { passMain(match3, 'matchTime3', 'period3', 'events3', 3); }
+function defend3() { defendMain(match3, 'matchTime3', 'period3', 'events3', 3); }
+function skipMatch3() { skipMatchMain(match3, 3); }
+
+function shoot4() { shoot2Main(match4, 'homeScore4', 'awayScore4', 'matchTime4', 'period4', 'events4', 4); }
+function pass4() { passMain(match4, 'matchTime4', 'period4', 'events4', 4); }
+function defend4() { defendMain(match4, 'matchTime4', 'period4', 'events4', 4); }
+function skipMatch4() { skipMatchMain(match4, 4); }
+
+// RENDER SQUAD
+function renderSquad() {
+    let html = '';
+    for (let p of players) {
+        html += '<div class="player-card"><div>' + p.name + '</div><div class="rating">' + p.rating + '</div></div>';
+    }
+    document.getElementById('squadDisplay').innerHTML = html;
+}
+
+renderSquad();
+</script>
+
+</body>
+</html>
