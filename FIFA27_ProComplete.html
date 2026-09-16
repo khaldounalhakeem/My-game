@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>FIFA 27</title>
+    <style>
+* { margin: 0; padding: 0; box-sizing: border-box; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+html, body { width: 100%; height: 100%; background: #0a0e27; color: #fff; font-family: 'Arial', sans-serif; overflow: hidden; }
+
+body { display: flex; flex-direction: column; }
+
+.screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; pointer-events: none; transition: opacity 0.3s; overflow-y: auto; }
+.screen.active { opacity: 1; pointer-events: auto; z-index: 10; }
+
+/* SPLASH SCREEN */
+#splash { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); display: flex; flex-direction: column; justify-content: center; align-items: center; }
+.splash-logo { font-size: 72px; margin-bottom: 20px; }
+.splash-title { font-size: 48px; color: #00d4ff; font-weight: bold; margin-bottom: 10px; }
+.splash-subtitle { font-size: 18px; color: #888; margin-bottom: 30px; }
+.splash-player { font-size: 120px; animation: celebration 2s ease-in-out infinite; margin: 20px 0; }
+@keyframes celebration { 0%, 100% { transform: scale(1) rotate(0deg); } 50% { transform: scale(1.1) rotate(5deg); } }
+.splash-start { padding: 15px 40px; background: #00d4ff; color: #000; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 30px; }
+
+/* HEADER */
+.header { position: fixed; top: 0; left: 0; right: 0; background: rgba(0, 0, 0, 0.9); border-bottom: 3px solid #00d4ff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 100; height: 60px; }
+.header-title { font-size: 20px; color: #00d4ff; font-weight: bold; }
+.header-coins { font-size: 16px; color: #00d4ff; display: flex; align-items: center; gap: 8px; }
+.coins-icon { font-size: 20px; }
+
+/* DASHBOARD */
+#dashboard { padding-top: 60px; }
+.dashboard-container { display: flex; flex-direction: column; height: 100vh; }
+.dashboard-header { background: linear-gradient(180deg, rgba(0,212,255,0.1) 0%, transparent 100%); padding: 20px; text-align: center; border-bottom: 2px solid #00d4ff; }
+.dashboard-title { font-size: 36px; color: #00d4ff; font-weight: bold; margin-bottom: 10px; }
+.dashboard-subtitle { font-size: 14px; color: #888; }
+
+.mode-selector { display: flex; gap: 10px; padding: 20px; overflow-x: auto; snap-type: x mandatory; }
+.mode-card { flex-shrink: 0; width: 280px; padding: 20px; background: linear-gradient(135deg, #1a4d5c, #0d3a47); border: 2px solid #00d4ff; border-radius: 12px; cursor: pointer; text-align: center; transition: all 0.3s; snap-align: start; }
+.mode-card:active { background: #00d4ff; color: #000; transform: scale(0.98); }
+.mode-icon { font-size: 48px; margin-bottom: 10px; }
+.mode-name { font-size: 18px; font-weight: bold; color: #fff; }
+.mode-desc { font-size: 12px; color: #aaa; margin-top: 8px; }
+
+/* ULTIMATE TEAM */
+#ultimateTeam { padding-top: 60px; padding-bottom: 20px; }
+.ut-header { background: linear-gradient(180deg, rgba(0,212,255,0.1) 0%, transparent 100%); padding: 20px; border-bottom: 2px solid #00d4ff; }
+.ut-title { font-size: 28px; color: #00d4ff; font-weight: bold; margin-bottom: 15px; }
+
+.ut-tabs { display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding: 0 20px; }
+.ut-tab { padding: 10px 20px; background: rgba(0, 212, 255, 0.1); border: 2px solid #00d4ff; border-radius: 6px; color: #00d4ff; cursor: pointer; white-space: nowrap; }
+.ut-tab.active { background: #00d4ff; color: #000; font-weight: bold; }
+
+.ut-content { padding: 20px; }
+
+.squad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.player-card { background: linear-gradient(135deg, #1a1a2e, #16213e); border: 2px solid #00d4ff; border-radius: 8px; padding: 12px; text-align: center; cursor: pointer; transition: all 0.3s; }
+.player-card:active { transform: scale(1.05); background: #00d4ff; }
+.player-avatar { font-size: 40px; margin-bottom: 8px; }
+.player-name { font-size: 12px; font-weight: bold; color: #00d4ff; margin-bottom: 4px; }
+.player-rating { background: #00d4ff; color: #000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+.player-type { font-size: 10px; color: #888; margin-top: 4px; }
+
+.pack-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; }
+.pack { background: linear-gradient(135deg, #2a1a1a, #1a1a2a); border: 3px solid #00d4ff; border-radius: 8px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.3s; }
+.pack:active { transform: scale(0.95); }
+.pack-icon { font-size: 48px; margin-bottom: 10px; }
+.pack-name { font-size: 14px; font-weight: bold; color: #00d4ff; margin-bottom: 5px; }
+.pack-price { font-size: 12px; color: #888; }
+
+.market-item { background: linear-gradient(135deg, #1a1a2e, #16213e); border: 1px solid #00d4ff; border-radius: 6px; padding: 15px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+.market-player { flex: 1; }
+.market-player-name { font-size: 14px; font-weight: bold; color: #00d4ff; }
+.market-player-rating { font-size: 12px; color: #888; margin-top: 4px; }
+.market-price { font-size: 16px; font-weight: bold; color: #00d4ff; }
+.market-btn { padding: 8px 16px; background: #00d4ff; color: #000; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-left: 10px; }
+
+.action-btn { display: block; width: 100%; padding: 15px; margin-top: 15px; background: #00d4ff; color: #000; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; }
+.action-btn:active { background: #0099aa; }
+
+/* MATCH SCREEN */
+#match { padding-top: 60px; padding: 60px 20px 20px; }
+.match-container { display: flex; flex-direction: column; align-items: center; }
+.match-scoreboard { display: flex; justify-content: space-around; align-items: center; width: 100%; margin-bottom: 30px; padding: 20px; background: rgba(0, 212, 255, 0.1); border: 2px solid #00d4ff; border-radius: 8px; }
+.team { text-align: center; }
+.team-name { font-size: 14px; color: #888; margin-bottom: 10px; }
+.team-score { font-size: 60px; color: #00d4ff; font-weight: bold; }
+.vs { font-size: 18px; color: #666; }
+
+.match-timer { font-size: 48px; color: #00d4ff; font-weight: bold; text-align: center; margin-bottom: 10px; }
+.match-period { font-size: 14px; color: #888; text-align: center; margin-bottom: 20px; }
+
+.events-log { background: rgba(0, 0, 0, 0.5); border: 2px solid #00d4ff; border-radius: 6px; padding: 15px; margin-bottom: 20px; max-height: 150px; overflow-y: auto; min-height: 80px; }
+.event { padding: 8px; border-bottom: 1px solid #333; font-size: 12px; }
+
+.match-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.action-btn { padding: 15px; background: #00d4ff; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 14px; }
+.action-btn:active { background: #0099aa; }
+
+/* BUTTONS & CONTROLS */
+.back-btn { position: fixed; top: 75px; left: 20px; padding: 10px 15px; background: #00d4ff; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 99; }
+.back-btn:active { background: #0099aa; }
+
+.settings-btn { position: fixed; top: 75px; right: 20px; padding: 10px 15px; background: #00d4ff; color: #000; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; z-index: 99; }
+
+/* MODAL */
+.modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 200; justify-content: center; align-items: center; }
+.modal.show { display: flex; }
+.modal-content { background: #1a1a2e; border: 3px solid #00d4ff; border-radius: 12px; padding: 30px; max-width: 400px; text-align: center; }
+.modal-title { font-size: 24px; color: #00d4ff; font-weight: bold; margin-bottom: 20px; }
+.modal-text { font-size: 16px; color: #fff; margin-bottom: 20px; }
+.modal-btn { padding: 12px 24px; background: #00d4ff; color: #000; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; margin: 0 5px; }
+
+.loading { text-align: center; padding: 40px; }
+.spinner { display: inline-block; width: 40px; height: 40px; border: 4px solid #00d4ff; border-top: 4px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+h2, h3 { margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+<!-- SPLASH SCREEN -->
+<div id="splash" class="screen active">
+    <div class="splash-logo">⚽</div>
+    <div class="splash-title">FIFA 27</div>
+    <div class="splash-subtitle">Ultimate Football Experience</div>
+    <div class="splash-player">🎉</div>
+    <button class="splash-start" id="splashStartBtn">START GAME</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="screen">
+    <div class="header">
+        <div class="header-title">FIFA 27</div>
+        <div class="header-coins"><span class="coins-icon">💰</span><span id="coinsDisplay">100000</span></div>
+    </div>
+    <div class="dashboard-container">
+        <div class="dashboard-header">
+            <div class="dashboard-title">Welcome Back</div>
+            <div class="dashboard-subtitle">Choose your game mode</div>
+        </div>
+        <div class="mode-selector" id="modeSelector">
+            <div class="mode-card" data-mode="ultimate">
+                <div class="mode-icon">🏆</div>
+                <div class="mode-name">Ultimate Team</div>
+                <div class="mode-desc">Build your squad</div>
+            </div>
+            <div class="mode-card" data-mode="worldcup">
+                <div class="mode-icon">🌍</div>
+                <div class="mode-name">World Cup</div>
+                <div class="mode-desc">International glory</div>
+            </div>
+            <div class="mode-card" data-mode="champions">
+                <div class="mode-icon">⭐</div>
+                <div class="mode-name">Champions League</div>
+                <div class="mode-desc">Club dominance</div>
+            </div>
+            <div class="mode-card" data-mode="career">
+                <div class="mode-icon">📊</div>
+                <div class="mode-name">Career Mode</div>
+                <div class="mode-desc">Manage Man City</div>
+            </div>
+            <div class="mode-card" data-mode="online">
+                <div class="mode-icon">🎮</div>
+                <div class="mode-name">Online Match</div>
+                <div class="mode-desc">Competitive play</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ULTIMATE TEAM -->
+<div id="ultimateTeam" class="screen">
+    <div class="header">
+        <div class="header-title">🏆 Ultimate Team</div>
+        <div class="header-coins"><span class="coins-icon">💰</span><span id="utCoins">100000</span></div>
+    </div>
+    <button class="back-btn" id="backFromUT">← BACK</button>
+
+    <div class="ut-header">
+        <div class="ut-title">Your Squad</div>
+    </div>
+
+    <div class="ut-tabs" id="utTabs">
+        <div class="ut-tab active" data-tab="squad">Squad</div>
+        <div class="ut-tab" data-tab="packs">Packs</div>
+        <div class="ut-tab" data-tab="market">Transfer Market</div>
+        <div class="ut-tab" data-tab="settings">Settings</div>
+    </div>
+
+    <div class="ut-content">
+        <!-- SQUAD TAB -->
+        <div id="squad-tab" class="tab-content">
+            <div class="squad-grid" id="squadGrid"></div>
+            <button class="action-btn" id="playUTMatch">▶️ PLAY MATCH</button>
+        </div>
+
+        <!-- PACKS TAB -->
+        <div id="packs-tab" class="tab-content" style="display:none;">
+            <h3>Open Packs</h3>
+            <div class="pack-grid" id="packGrid"></div>
+        </div>
+
+        <!-- MARKET TAB -->
+        <div id="market-tab" class="tab-content" style="display:none;">
+            <h3>Transfer Market</h3>
+            <div id="marketList"></div>
+        </div>
+
+        <!-- SETTINGS TAB -->
+        <div id="settings-tab" class="tab-content" style="display:none;">
+            <h3>Game Settings</h3>
+            <div style="padding: 20px 0;">
+                <label style="display:block; margin-bottom:15px;">
+                    <strong>Difficulty:</strong>
+                    <select id="difficulty" style="width:100%; margin-top:5px; padding:8px; background:#1a1a2e; color:#00d4ff; border:2px solid #00d4ff; border-radius:4px;">
+                        <option>Easy</option>
+                        <option selected>Normal</option>
+                        <option>Hard</option>
+                        <option>Legendary</option>
+                    </select>
+                </label>
+                <label style="display:block;">
+                    <strong>Match Duration (minutes):</strong>
+                    <input type="number" id="halfTime" value="45" min="10" max="90" style="width:100%; margin-top:5px; padding:8px; background:#1a1a2e; color:#00d4ff; border:2px solid #00d4ff; border-radius:4px;">
+                </label>
+                <label style="display:block; margin-top:15px;">
+                    <strong>Camera Angle:</strong>
+                    <select id="camera" style="width:100%; margin-top:5px; padding:8px; background:#1a1a2e; color:#00d4ff; border:2px solid #00d4ff; border-radius:4px;">
+                        <option selected>Default</option>
+                        <option>Tele Broadcast</option>
+                        <option>Close</option>
+                        <option>Dynamic</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MATCH SCREEN -->
+<div id="match" class="screen">
+    <div class="header">
+        <div class="header-title">⚽ LIVE MATCH</div>
+    </div>
+    <button class="back-btn" id="exitMatch">EXIT</button>
+
+    <div class="match-container">
+        <div class="match-scoreboard">
+            <div class="team">
+                <div class="team-name">YOUR TEAM</div>
+                <div class="team-score" id="homeScore">0</div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="team">
+                <div class="team-name">OPPONENT</div>
+                <div class="team-score" id="awayScore">0</div>
+            </div>
+        </div>
+
+        <div class="match-timer" id="matchTimer">0:00</div>
+        <div class="match-period" id="matchPeriod">1st Half</div>
+
+        <div class="events-log" id="eventsLog"></div>
+
+        <div class="match-actions">
+            <button class="action-btn" id="shootBtn">⚽ SHOOT</button>
+            <button class="action-btn" id="passBtn">→ PASS</button>
+            <button class="action-btn" id="defendBtn">🛡️ DEFEND</button>
+            <button class="action-btn" id="skipBtn">⏭️ SKIP</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-title" id="modalTitle">Title</div>
+        <div class="modal-text" id="modalText">Text</div>
+        <button class="modal-btn" id="modalConfirm">OK</button>
+    </div>
+</div>
+
+<script>
+const game = {
+    currentScreen: 'splash',
+    coins: 100000,
+    difficulty: 'Normal',
+    halfTime: 45,
+    camera: 'Default',
+
+    players: [
+        {name: 'Ronaldo', rating: 92, type: 'Elite'},
+        {name: 'Messi', rating: 91, type: 'Elite'},
+        {name: 'Haaland', rating: 91, type: 'Elite'},
+        {name: 'Mbappé', rating: 91, type: 'Elite'},
+        {name: 'Vinicius Jr', rating: 89, type: 'Gold'},
+        {name: 'Rodri', rating: 91, type: 'Elite'},
+        {name: 'Harry Kane', rating: 89, type: 'Gold'},
+        {name: 'Phil Foden', rating: 88, type: 'Gold'},
+        {name: 'Bellingham', rating: 88, type: 'Gold'},
+        {name: 'De Bruyne', rating: 89, type: 'Gold'},
+        {name: 'Salah', rating: 89, type: 'Gold'},
+        {name: 'Van Dijk', rating: 89, type: 'Gold'}
+    ],
+
+    marketPlayers: [
+        {name: 'Neymar', rating: 88, type: 'Gold', price: 250000},
+        {name: 'Lewandowski', rating: 89, type: 'Gold', price: 300000},
+        {name: 'Benzema', rating: 87, type: 'Gold', price: 200000},
+        {name: 'Modric', rating: 88, type: 'Gold', price: 280000},
+        {name: 'Kross', rating: 88, type: 'Gold', price: 270000}
+    ],
+
+    packs: [
+        {name: 'Bronze Pack', icon: '🟤', price: 750, players: 3},
+        {name: 'Silver Pack', icon: '⚪', price: 1500, players: 3},
+        {name: 'Gold Pack', icon: '🟡', price: 5000, players: 5},
+        {name: 'Elite Pack', icon: '⭐', price: 10000, players: 7},
+        {name: 'Rare Mega Pack', icon: '💎', price: 25000, players: 12}
+    ],
+
+    matchState: {
+        time: 0,
+        homeScore: 0,
+        awayScore: 0,
+        events: []
+    },
+
+    init: function() {
+        this.setupEventListeners();
+        this.setupControllerInput();
+    },
+
+    setupEventListeners: function() {
+        document.getElementById('splashStartBtn').addEventListener('click', () => this.goToScreen('dashboard'));
+
+        document.querySelectorAll('.mode-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const mode = card.dataset.mode;
+                if (mode === 'ultimate') this.goToScreen('ultimateTeam');
+                else if (mode === 'worldcup') this.showMessage('🌍 World Cup', 'Mode coming soon! Try Ultimate Team.');
+                else if (mode === 'champions') this.showMessage('⭐ Champions League', 'Mode coming soon! Try Ultimate Team.');
+                else if (mode === 'career') this.showMessage('📊 Career', 'Mode coming soon! Try Ultimate Team.');
+                else if (mode === 'online') this.showMessage('🎮 Online', 'Mode coming soon! Try Ultimate Team.');
+            });
+        });
+
+        document.getElementById('backFromUT').addEventListener('click', () => this.goToScreen('dashboard'));
+        document.getElementById('exitMatch').addEventListener('click', () => this.goToScreen('dashboard'));
+
+        document.querySelectorAll('.ut-tab').forEach(tab => {
+            tab.addEventListener('click', () => this.switchUTTab(tab.dataset.tab));
+        });
+
+        document.getElementById('playUTMatch').addEventListener('click', () => this.startMatch());
+        document.getElementById('shootBtn').addEventListener('click', () => this.shoot());
+        document.getElementById('passBtn').addEventListener('click', () => this.pass());
+        document.getElementById('defendBtn').addEventListener('click', () => this.defend());
+        document.getElementById('skipBtn').addEventListener('click', () => this.skipMatch());
+
+        this.populateSquad();
+        this.populatePacks();
+        this.populateMarket();
+    },
+
+    setupControllerInput: function() {
+        window.addEventListener('gamepadconnected', (e) => console.log('Controller connected:', e.gamepad.id));
+        window.addEventListener('gamepaddisconnected', (e) => console.log('Controller disconnected'));
+
+        setInterval(() => {
+            const gamepads = navigator.getGamepads ? navigator.getGamepads() : [];
+            for (let i = 0; i < gamepads.length; i++) {
+                const gp = gamepads[i];
+                if (!gp) continue;
+
+                if (gp.buttons[0].pressed) { // X button
+                    if (this.currentScreen === 'dashboard') {
+                        const activeCard = document.querySelector('.mode-card');
+                        if (activeCard) activeCard.click();
+                    } else if (this.currentScreen === 'match') {
+                        this.shoot();
+                    }
+                }
+                if (gp.buttons[1].pressed) { // O button (Circle)
+                    if (this.currentScreen === 'ultimateTeam') this.goToScreen('dashboard');
+                    else if (this.currentScreen === 'match') this.goToScreen('dashboard');
+                }
+            }
+        }, 100);
+    },
+
+    goToScreen: function(screenName) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(screenName).classList.add('active');
+        this.currentScreen = screenName;
+
+        if (screenName === 'ultimateTeam') {
+            this.populateSquad();
+            this.switchUTTab('squad');
+        }
+    },
+
+    switchUTTab: function(tabName) {
+        document.querySelectorAll('.ut-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(t => t.style.display = 'none');
+
+        document.querySelector(`.ut-tab[data-tab="${tabName}"]`).classList.add('active');
+        document.getElementById(`${tabName}-tab`).style.display = 'block';
+    },
+
+    populateSquad: function() {
+        const grid = document.getElementById('squadGrid');
+        grid.innerHTML = '';
+        this.players.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'player-card';
+            const color = p.type === 'Elite' ? '⭐' : '🟡';
+            card.innerHTML = `
+                <div class="player-avatar">${color}</div>
+                <div class="player-name">${p.name}</div>
+                <div class="player-rating">${p.rating}</div>
+                <div class="player-type">${p.type}</div>
+            `;
+            grid.appendChild(card);
+        });
+    },
+
+    populatePacks: function() {
+        const grid = document.getElementById('packGrid');
+        grid.innerHTML = '';
+        this.packs.forEach(p => {
+            const pack = document.createElement('div');
+            pack.className = 'pack';
+            pack.innerHTML = `
+                <div class="pack-icon">${p.icon}</div>
+                <div class="pack-name">${p.name}</div>
+                <div class="pack-price">${p.price.toLocaleString()} 💰</div>
+            `;
+            pack.addEventListener('click', () => this.openPack(p));
+            grid.appendChild(pack);
+        });
+    },
+
+    openPack: function(pack) {
+        if (this.coins < pack.price) {
+            this.showMessage('💰 Not Enough Coins', 'You need more coins to open this pack!');
+            return;
+        }
+
+        this.coins -= pack.price;
+        document.getElementById('utCoins').textContent = this.coins.toLocaleString();
+
+        let pulls = [];
+        for (let i = 0; i < pack.players; i++) {
+            pulls.push(this.players[Math.floor(Math.random() * this.players.length)].name);
+        }
+
+        this.showMessage('🎉 Pack Opened!', `You got: ${pulls.join(', ')}`);
+    },
+
+    populateMarket: function() {
+        const list = document.getElementById('marketList');
+        list.innerHTML = '';
+        this.marketPlayers.forEach(p => {
+            const item = document.createElement('div');
+            item.className = 'market-item';
+            item.innerHTML = `
+                <div class="market-player">
+                    <div class="market-player-name">${p.name}</div>
+                    <div class="market-player-rating">Rating: ${p.rating}</div>
+                </div>
+                <div class="market-price">${p.price.toLocaleString()}</div>
+                <button class="market-btn" onclick="game.buyPlayer('${p.name}', ${p.price})">BUY</button>
+            `;
+            list.appendChild(item);
+        });
+    },
+
+    buyPlayer: function(name, price) {
+        if (this.coins < price) {
+            this.showMessage('💰 Not Enough', 'Insufficient coins for this purchase!');
+            return;
+        }
+        this.coins -= price;
+        document.getElementById('utCoins').textContent = this.coins.toLocaleString();
+        this.players.push({name: name, rating: 85 + Math.random() * 7, type: 'Gold'});
+        this.showMessage('✅ Purchase Successful', `${name} added to your squad!`);
+        this.populateSquad();
+    },
+
+    startMatch: function() {
+        this.matchState = {time: 0, homeScore: 0, awayScore: 0, events: []};
+        this.difficulty = document.getElementById('difficulty').value;
+        this.halfTime = parseInt(document.getElementById('halfTime').value);
+        this.camera = document.getElementById('camera').value;
+        this.goToScreen('match');
+        this.updateMatch();
+    },
+
+    updateMatch: function() {
+        document.getElementById('homeScore').textContent = this.matchState.homeScore;
+        document.getElementById('awayScore').textContent = this.matchState.awayScore;
+        const mins = Math.floor(this.matchState.time / 60);
+        const secs = this.matchState.time % 60;
+        document.getElementById('matchTimer').textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+        document.getElementById('matchPeriod').textContent = this.matchState.time < (this.halfTime * 60) ? '1st Half' : '2nd Half';
+
+        let html = '';
+        this.matchState.events.forEach(e => html += `<div class="event">${e}</div>`);
+        document.getElementById('eventsLog').innerHTML = html;
+    },
+
+    shoot: function() {
+        if (this.matchState.time > (this.halfTime * 120)) { this.endMatch(); return; }
+        const ch = {Easy: 0.45, Normal: 0.25, Hard: 0.15, Legendary: 0.08};
+        if (Math.random() < (ch[this.difficulty] || 0.25)) {
+            this.matchState.homeScore++;
+            this.matchState.events.push('⚽ GOAL!');
+        } else {
+            this.matchState.events.push('❌ Shot Saved');
+        }
+        this.matchState.time += 90 + Math.floor(Math.random() * 60);
+        if (Math.random() > 0.7) {
+            this.matchState.awayScore++;
+            this.matchState.events.push('⚽ Opponent Goal');
+        }
+        if (this.matchState.time > (this.halfTime * 120)) this.endMatch();
+        this.updateMatch();
+    },
+
+    pass: function() {
+        if (this.matchState.time > (this.halfTime * 120)) { this.endMatch(); return; }
+        this.matchState.events.push('✓ Successful Pass');
+        this.matchState.time += 90 + Math.floor(Math.random() * 60);
+        if (this.matchState.time > (this.halfTime * 120)) this.endMatch();
+        this.updateMatch();
+    },
+
+    defend: function() {
+        if (this.matchState.time > (this.halfTime * 120)) { this.endMatch(); return; }
+        this.matchState.events.push('🛡️ Clearance');
+        this.matchState.time += 90 + Math.floor(Math.random() * 60);
+        if (this.matchState.time > (this.halfTime * 120)) this.endMatch();
+        this.updateMatch();
+    },
+
+    skipMatch: function() {
+        while (this.matchState.time < (this.halfTime * 120)) {
+            if (Math.random() < 0.33) this.shoot();
+            else if (Math.random() < 0.66) this.pass();
+            else this.defend();
+        }
+        this.endMatch();
+    },
+
+    endMatch: function() {
+        const reward = this.matchState.homeScore > this.matchState.awayScore ? 1500 :
+                      this.matchState.homeScore === this.matchState.awayScore ? 1000 : 500;
+        this.coins += reward;
+        this.showMessage('🏁 MATCH OVER', `${this.matchState.homeScore} - ${this.matchState.awayScore}\nCoins Earned: +${reward}`);
+    },
+
+    showMessage: function(title, text) {
+        document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modalText').textContent = text;
+        document.getElementById('modal').classList.add('show');
+
+        document.getElementById('modalConfirm').onclick = () => {
+            document.getElementById('modal').classList.remove('show');
+            if (this.currentScreen === 'match') this.goToScreen('dashboard');
+        };
+    }
+};
+
+game.init();
+</script>
+
+</body>
+</html>
