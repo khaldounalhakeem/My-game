@@ -1279,7 +1279,11 @@ class Game {
     }
 }
 
-const game = new Game();
+let game;
+window.addEventListener('DOMContentLoaded', () => {
+    game = new Game();
+    console.log('Game initialized successfully');
+});
     </script>
 </body>
 </html>
