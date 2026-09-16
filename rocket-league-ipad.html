@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Rocket League - iPad</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(to bottom, #87ceeb 0%, #e0f6ff 100%);
+            border: none;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #87ceeb 0%, #e0f6ff 100%);
+            flex: 1;
+        }
+
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 30px;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+
+        .team {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .score {
+            font-size: 36px;
+            min-width: 70px;
+            text-align: center;
+        }
+
+        .timer {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 28px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        #menu {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            color: white;
+        }
+
+        #menu.hidden {
+            display: none;
+        }
+
+        #menu h1 {
+            font-size: 54px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(0, 168, 255, 0.8);
+        }
+
+        #menu button {
+            padding: 18px 40px;
+            margin: 12px;
+            font-size: 18px;
+            background: linear-gradient(135deg, #00a8ff, #0088cc);
+            color: white;
+            border: 2px solid #00a8ff;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 200px;
+            touch-action: manipulation;
+        }
+
+        #menu button:active {
+            background: linear-gradient(135deg, #00ccff, #00a8ff);
+            box-shadow: 0 0 20px rgba(0, 168, 255, 0.8);
+            transform: scale(0.98);
+        }
+
+        #pauseMenu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border: 3px solid #00a8ff;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 50;
+            color: white;
+            display: none;
+        }
+
+        #pauseMenu.visible {
+            display: flex;
+        }
+
+        #pauseMenu h2 {
+            font-size: 40px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 20px rgba(0, 168, 255, 0.8);
+        }
+
+        #pauseMenu button {
+            padding: 12px 30px;
+            margin: 8px;
+            font-size: 16px;
+            background: linear-gradient(135deg, #00a8ff, #0088cc);
+            color: white;
+            border: 2px solid #00a8ff;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #pauseMenu button:active {
+            background: linear-gradient(135deg, #00ccff, #00a8ff);
+            box-shadow: 0 0 20px rgba(0, 168, 255, 0.8);
+        }
+
+        #gameOver {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95);
+            padding: 40px;
+            border: 3px solid #00a8ff;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 50;
+            color: white;
+            display: none;
+        }
+
+        #gameOver.visible {
+            display: block;
+        }
+
+        #gameOver h2 {
+            font-size: 40px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px rgba(0, 168, 255, 0.8);
+        }
+
+        #gameOver p {
+            font-size: 24px;
+            margin: 15px 0;
+        }
+
+        #gameOver button {
+            padding: 12px 30px;
+            margin-top: 20px;
+            font-size: 16px;
+            background: linear-gradient(135deg, #00a8ff, #0088cc);
+            color: white;
+            border: 2px solid #00a8ff;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        #gameOver button:active {
+            background: linear-gradient(135deg, #00ccff, #00a8ff);
+            box-shadow: 0 0 20px rgba(0, 168, 255, 0.8);
+        }
+
+        .stat-display {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 12px;
+            border: 2px solid #00a8ff;
+            border-radius: 5px;
+            color: #00a8ff;
+            font-size: 12px;
+            font-family: monospace;
+            z-index: 15;
+        }
+
+        /* Touch Controls */
+        #touchControls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            padding: 20px;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .control-group {
+            pointer-events: all;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-group.left {
+            align-items: flex-start;
+        }
+
+        .control-group.right {
+            align-items: flex-end;
+        }
+
+        .joystick-container {
+            position: relative;
+            width: 140px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            touch-action: none;
+        }
+
+        .joystick-knob {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 168, 255, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 50%;
+            top: 45px;
+            left: 45px;
+            transform: translate(-50%, -50%);
+            touch-action: none;
+        }
+
+        .button-control {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            background: rgba(255, 150, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            text-align: center;
+            touch-action: manipulation;
+            transition: all 0.1s;
+            cursor: pointer;
+        }
+
+        .button-control:active {
+            background: rgba(255, 150, 0, 0.9);
+            box-shadow: 0 0 20px rgba(255, 150, 0, 0.8);
+            transform: scale(1.1);
+        }
+
+        .button-control.jump {
+            background: rgba(0, 200, 100, 0.6);
+        }
+
+        .button-control.jump:active {
+            background: rgba(0, 200, 100, 0.9);
+            box-shadow: 0 0 20px rgba(0, 200, 100, 0.8);
+        }
+
+        .button-control.pause {
+            width: 60px;
+            height: 60px;
+            font-size: 12px;
+            background: rgba(100, 100, 200, 0.6);
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 25;
+        }
+
+        .button-control.pause:active {
+            background: rgba(100, 100, 200, 0.9);
+            box-shadow: 0 0 20px rgba(100, 100, 200, 0.8);
+        }
+
+        @supports (padding: max(0px)) {
+            #touchControls {
+                padding-bottom: max(20px, env(safe-area-inset-bottom));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="menu">
+            <h1>🚀 ROCKET LEAGUE</h1>
+            <button onclick="game.startGame()">Start Game</button>
+            <button onclick="game.startTraining()">Training</button>
+            <p style="margin-top: 40px; color: #aaa; font-size: 14px; max-width: 90%; text-align: center;">
+                Tap the joystick to move • Jump & Boost buttons • Tap Pause to pause
+            </p>
+        </div>
+
+        <div id="ui">
+            <div class="team">
+                <span>BLUE</span>
+                <div class="score" id="blueScore">0</div>
+            </div>
+            <div class="timer" id="timer">5:00</div>
+            <div class="team">
+                <div class="score" id="orangeScore">0</div>
+                <span>ORANGE</span>
+            </div>
+        </div>
+
+        <div id="pauseMenu">
+            <h2>PAUSED</h2>
+            <button onclick="game.resume()">Resume</button>
+            <button onclick="game.goToMenu()">Main Menu</button>
+        </div>
+
+        <div id="gameOver">
+            <h2 id="winnerText">GAME OVER</h2>
+            <p id="scoreText"></p>
+            <button onclick="game.goToMenu()">Main Menu</button>
+        </div>
+
+        <div class="stat-display" id="stats"></div>
+
+        <div id="touchControls">
+            <div class="control-group left">
+                <div class="joystick-container" id="joystickContainer">
+                    <div class="joystick-knob" id="joystickKnob"></div>
+                </div>
+            </div>
+
+            <div class="control-group right">
+                <div class="button-control jump" id="jumpBtn" ontouchstart="game.handleJumpStart()" ontouchend="game.handleJumpEnd()">JUMP</div>
+                <div class="button-control" id="boostBtn" ontouchstart="game.handleBoostStart()" ontouchend="game.handleBoostEnd()">BOOST</div>
+            </div>
+        </div>
+
+        <div class="button-control pause" id="pauseBtn" ontouchstart="game.handlePause()">PAUSE</div>
+    </div>
+
+    <script>
+// ==================== PHYSICS ENGINE ====================
+class Vector2 {
+    constructor(x = 0, y = 0) {
+        this.x = x;
+        this.y = y;
+    }
+
+    add(v) {
+        this.x += v.x;
+        this.y += v.y;
+        return this;
+    }
+
+    subtract(v) {
+        this.x -= v.x;
+        this.y -= v.y;
+        return this;
+    }
+
+    multiply(scalar) {
+        this.x *= scalar;
+        this.y *= scalar;
+        return this;
+    }
+
+    divide(scalar) {
+        this.x /= scalar;
+        this.y /= scalar;
+        return this;
+    }
+
+    dot(v) {
+        return this.x * v.x + this.y * v.y;
+    }
+
+    length() {
+        return Math.sqrt(this.x * this.x + this.y * this.y);
+    }
+
+    normalize() {
+        const len = this.length();
+        if (len > 0) {
+            this.divide(len);
+        }
+        return this;
+    }
+
+    copy() {
+        return new Vector2(this.x, this.y);
+    }
+
+    static distance(v1, v2) {
+        const dx = v2.x - v1.x;
+        const dy = v2.y - v1.y;
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+}
+
+class Ball {
+    constructor(x, y) {
+        this.pos = new Vector2(x, y);
+        this.vel = new Vector2(0, 0);
+        this.acc = new Vector2(0, 0);
+        this.radius = 5;
+        this.mass = 5;
+        this.restitution = 0.95;
+        this.friction = 0.98;
+        this.gravity = 0.5;
+        this.maxVel = 25;
+    }
+
+    applyForce(force) {
+        const acc = force.copy().divide(this.mass);
+        this.acc.add(acc);
+    }
+
+    update() {
+        this.acc.y += this.gravity;
+        this.vel.multiply(this.friction);
+        this.vel.add(this.acc);
+
+        if (this.vel.length() > this.maxVel) {
+            this.vel.normalize().multiply(this.maxVel);
+        }
+
+        this.pos.add(this.vel);
+        this.acc = new Vector2(0, 0);
+    }
+
+    collideWithWall(x, y, width, height) {
+        if (this.pos.y - this.radius < y) {
+            this.pos.y = y + this.radius;
+            this.vel.y *= -this.restitution;
+        } else if (this.pos.y + this.radius > y + height) {
+            this.pos.y = y + height - this.radius;
+            this.vel.y *= -this.restitution;
+        }
+
+        if (this.pos.x - this.radius < x) {
+            this.pos.x = x + this.radius;
+            this.vel.x *= -this.restitution;
+        } else if (this.pos.x + this.radius > x + width) {
+            this.pos.x = x + width - this.radius;
+            this.vel.x *= -this.restitution;
+        }
+    }
+
+    collideWithCar(car) {
+        const distance = Vector2.distance(this.pos, car.pos);
+        const minDistance = this.radius + car.radius;
+
+        if (distance < minDistance) {
+            const collisionNormal = this.pos.copy().subtract(car.pos).normalize();
+            const separationDistance = minDistance - distance;
+
+            this.pos.add(collisionNormal.copy().multiply(separationDistance));
+
+            const relativeVel = this.vel.copy().subtract(car.vel);
+            const velAlongNormal = relativeVel.dot(collisionNormal);
+
+            if (velAlongNormal < 0) {
+                const restitution = 0.8;
+                const rMass = 1 / this.mass + 1 / car.mass;
+                const impulse = -(1 + restitution) * velAlongNormal / rMass;
+
+                const impulseVec = collisionNormal.copy().multiply(impulse);
+                this.vel.add(impulseVec.copy().divide(this.mass));
+                car.vel.subtract(impulseVec.copy().divide(car.mass));
+            }
+
+            return true;
+        }
+        return false;
+    }
+
+    reset(x, y) {
+        this.pos = new Vector2(x, y);
+        this.vel = new Vector2(0, 0);
+        this.acc = new Vector2(0, 0);
+    }
+}
+
+class Car {
+    constructor(x, y, team) {
+        this.pos = new Vector2(x, y);
+        this.vel = new Vector2(0, 0);
+        this.acc = new Vector2(0, 0);
+        this.angle = 0;
+        this.radius = 10;
+        this.mass = 20;
+        this.team = team;
+
+        this.maxSpeed = 15;
+        this.maxBoostSpeed = 20;
+        this.acceleration = 0.5;
+        this.rotationSpeed = 0.1;
+
+        this.boost = 100;
+        this.maxBoost = 100;
+        this.boostRechargeRate = 0.3;
+        this.isBoosting = false;
+
+        this.isGrounded = true;
+        this.jumpPower = 12;
+        this.canJump = true;
+        this.jumpCooldown = 0;
+
+        this.input = {
+            forward: false,
+            backward: false,
+            left: false,
+            right: false,
+            jump: false,
+            boost: false
+        };
+    }
+
+    update() {
+        if (!this.isGrounded) {
+            this.acc.y += 0.5;
+        }
+
+        if (this.input.left) {
+            this.angle -= this.rotationSpeed;
+        }
+        if (this.input.right) {
+            this.angle += this.rotationSpeed;
+        }
+
+        const targetSpeed = this.isBoosting && this.boost > 0 ? this.maxBoostSpeed : this.maxSpeed;
+        const moveX = Math.cos(this.angle) * this.acceleration;
+        const moveY = Math.sin(this.angle) * this.acceleration;
+
+        if (this.input.forward) {
+            this.acc.x += moveX;
+            this.acc.y += moveY;
+
+            if (this.isBoosting && this.boost > 0) {
+                this.acc.x *= 1.5;
+                this.acc.y *= 1.5;
+                this.boost -= 2;
+            }
+        }
+
+        if (this.input.backward) {
+            this.acc.x -= moveX * 0.6;
+            this.acc.y -= moveY * 0.6;
+        }
+
+        if (this.input.jump && this.isGrounded && this.canJump) {
+            this.vel.y = -this.jumpPower;
+            this.isGrounded = false;
+            this.canJump = false;
+            this.jumpCooldown = 5;
+        }
+
+        if (this.jumpCooldown > 0) {
+            this.jumpCooldown--;
+        } else {
+            this.canJump = true;
+        }
+
+        this.vel.add(this.acc);
+
+        const currentSpeed = this.vel.length();
+        if (currentSpeed > targetSpeed) {
+            this.vel.normalize().multiply(targetSpeed);
+        }
+
+        this.vel.multiply(0.95);
+        this.pos.add(this.vel);
+        this.acc = new Vector2(0, 0);
+
+        if (!this.isBoosting) {
+            this.boost = Math.min(this.boost + this.boostRechargeRate, this.maxBoost);
+        }
+    }
+
+    collideWithWall(x, y, width, height) {
+        if (this.pos.y - this.radius < y) {
+            this.pos.y = y + this.radius;
+            this.vel.y = 0;
+            this.isGrounded = true;
+        } else if (this.pos.y + this.radius > y + height) {
+            this.pos.y = y + height - this.radius;
+            this.vel.y *= -0.3;
+            this.isGrounded = true;
+        } else {
+            this.isGrounded = false;
+        }
+
+        if (this.pos.x - this.radius < x) {
+            this.pos.x = x + this.radius;
+            this.vel.x *= -0.5;
+        } else if (this.pos.x + this.radius > x + width) {
+            this.pos.x = x + width - this.radius;
+            this.vel.x *= -0.5;
+        }
+    }
+
+    collideWithCar(other) {
+        const distance = Vector2.distance(this.pos, other.pos);
+        const minDistance = this.radius + other.radius;
+
+        if (distance < minDistance) {
+            const collisionNormal = this.pos.copy().subtract(other.pos).normalize();
+            const separationDistance = minDistance - distance;
+
+            const separation = collisionNormal.copy().multiply(separationDistance / 2);
+            this.pos.add(separation);
+            other.pos.subtract(separation);
+
+            return true;
+        }
+        return false;
+    }
+
+    reset(x, y) {
+        this.pos = new Vector2(x, y);
+        this.vel = new Vector2(0, 0);
+        this.acc = new Vector2(0, 0);
+        this.angle = 0;
+        this.boost = this.maxBoost;
+        this.isGrounded = true;
+    }
+}
+
+class Goal {
+    constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.scored = false;
+    }
+
+    contains(pos, radius) {
+        return pos.x + radius > this.x &&
+               pos.x - radius < this.x + this.width &&
+               pos.y + radius > this.y &&
+               pos.y - radius < this.y + this.height;
+    }
+}
+
+// ==================== AI ENGINE ====================
+class AIController {
+    constructor(car, ball, targetGoal, fieldX, fieldY, fieldWidth, fieldHeight) {
+        this.car = car;
+        this.ball = ball;
+        this.targetGoal = targetGoal;
+        this.fieldX = fieldX;
+        this.fieldY = fieldY;
+        this.fieldWidth = fieldWidth;
+        this.fieldHeight = fieldHeight;
+
+        this.state = 'idle';
+        this.stateTimer = 0;
+        this.decisionInterval = 30;
+    }
+
+    update(allCars) {
+        this.stateTimer++;
+
+        if (this.stateTimer > this.decisionInterval) {
+            this.makeDecision(allCars);
+            this.stateTimer = 0;
+        }
+
+        this.executeState();
+    }
+
+    makeDecision(allCars) {
+        const ballDist = Vector2.distance(this.car.pos, this.ball.pos);
+        const ballToGoal = Vector2.distance(this.ball.pos, new Vector2(this.targetGoal.x + this.targetGoal.width / 2, this.targetGoal.y + this.targetGoal.height / 2));
+
+        if (ballDist < 150) {
+            this.state = 'chasing';
+        } else if (ballToGoal < 300) {
+            this.state = 'shooting';
+        } else {
+            this.state = 'idle';
+        }
+    }
+
+    executeState() {
+        this.car.input.boost = false;
+
+        switch (this.state) {
+            case 'chasing':
+                this.chaseBall();
+                break;
+            case 'shooting':
+                this.shootAtGoal();
+                break;
+            case 'idle':
+                this.patrol();
+                break;
+        }
+    }
+
+    chaseBall() {
+        const directionToBall = this.ball.pos.copy().subtract(this.car.pos);
+        const distanceToBall = directionToBall.length();
+
+        if (distanceToBall < 1) return;
+
+        directionToBall.normalize();
+        const desiredAngle = Math.atan2(directionToBall.y, directionToBall.x);
+        this.steerToAngle(desiredAngle);
+
+        this.car.input.forward = true;
+
+        if (distanceToBall > 200) {
+            this.car.input.boost = Math.random() > 0.7;
+        }
+
+        if (this.ball.pos.y < this.fieldY + 150) {
+            this.car.input.jump = true;
+        }
+    }
+
+    shootAtGoal() {
+        const directionToGoal = new Vector2(
+            this.targetGoal.x + this.targetGoal.width / 2 - this.car.pos.x,
+            this.targetGoal.y + this.targetGoal.height / 2 - this.car.pos.y
+        );
+
+        const distanceToGoal = directionToGoal.length();
+
+        if (distanceToGoal < 1) return;
+
+        directionToGoal.normalize();
+        const desiredAngle = Math.atan2(directionToGoal.y, directionToGoal.x);
+        this.steerToAngle(desiredAngle);
+
+        this.car.input.forward = true;
+
+        if (distanceToGoal > 100 && distanceToGoal < 400) {
+            this.car.input.boost = true;
+        }
+    }
+
+    patrol() {
+        const patrolX = this.fieldX + this.fieldWidth - 300;
+        const patrolY = this.fieldY + this.fieldHeight / 2;
+
+        const directionToPatrol = new Vector2(
+            patrolX - this.car.pos.x,
+            patrolY - this.car.pos.y
+        );
+
+        const distanceToPatrol = directionToPatrol.length();
+
+        if (distanceToPatrol > 20) {
+            directionToPatrol.normalize();
+            const desiredAngle = Math.atan2(directionToPatrol.y, directionToPatrol.x);
+            this.steerToAngle(desiredAngle);
+
+            if (distanceToPatrol > 50) {
+                this.car.input.forward = true;
+            }
+        } else {
+            this.car.input.forward = false;
+        }
+    }
+
+    steerToAngle(targetAngle) {
+        let diff = targetAngle - this.car.angle;
+
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+
+        if (Math.abs(diff) > 0.1) {
+            if (diff > 0) {
+                this.car.input.right = true;
+                this.car.input.left = false;
+            } else {
+                this.car.input.left = true;
+                this.car.input.right = false;
+            }
+        } else {
+            this.car.input.left = false;
+            this.car.input.right = false;
+        }
+    }
+}
+
+// ==================== GAME ENGINE ====================
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('gameCanvas');
+        this.ctx = this.canvas.getContext('2d');
+
+        this.resizeCanvas();
+        window.addEventListener('resize', () => this.resizeCanvas());
+        window.addEventListener('orientationchange', () => this.resizeCanvas());
+
+        this.gameState = 'menu';
+        this.gameTime = 300;
+        this.timeRemaining = this.gameTime;
+
+        this.setupArena();
+        this.ball = new Ball(this.fieldX + this.fieldWidth / 2, this.fieldY + this.fieldHeight / 2);
+
+        this.blueCars = [];
+        this.orangeCars = [];
+        this.allCars = [];
+
+        this.blueScore = 0;
+        this.orangeScore = 0;
+
+        this.physicsIterations = 4;
+        this.setupTouchControls();
+    }
+
+    resizeCanvas() {
+        this.canvas.width = window.innerWidth;
+        this.canvas.height = window.innerHeight;
+        this.setupArena();
+    }
+
+    setupArena() {
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+
+        this.arenaX = width * 0.05;
+        this.arenaY = height * 0.05;
+        this.arenaWidth = width * 0.9;
+        this.arenaHeight = height * 0.7;
+
+        this.fieldWidth = width * 0.8;
+        this.fieldHeight = height * 0.65;
+        this.fieldX = (width - this.fieldWidth) / 2;
+        this.fieldY = height * 0.08;
+
+        this.blueGoal = new Goal(this.fieldX - 50, this.fieldY + 200, 50, 350);
+        this.orangeGoal = new Goal(this.fieldX + this.fieldWidth, this.fieldY + 200, 50, 350);
+    }
+
+    setupTouchControls() {
+        const joystickContainer = document.getElementById('joystickContainer');
+        const joystickKnob = document.getElementById('joystickKnob');
+
+        let joystickActive = false;
+        let joystickStartX = 0;
+        let joystickStartY = 0;
+
+        joystickContainer.addEventListener('touchstart', (e) => {
+            joystickActive = true;
+            const touch = e.touches[0];
+            const rect = joystickContainer.getBoundingClientRect();
+            joystickStartX = rect.left + rect.width / 2;
+            joystickStartY = rect.top + rect.height / 2;
+            this.updateJoystick(touch.clientX, touch.clientY, joystickContainer, joystickKnob, true);
+        });
+
+        document.addEventListener('touchmove', (e) => {
+            if (joystickActive && e.touches[0]) {
+                this.updateJoystick(e.touches[0].clientX, e.touches[0].clientY, joystickContainer, joystickKnob, true);
+            }
+        });
+
+        document.addEventListener('touchend', () => {
+            joystickActive = false;
+            this.resetJoystick(joystickKnob, joystickContainer);
+            if (this.blueCars.length > 0) {
+                this.blueCars[0].input.forward = false;
+                this.blueCars[0].input.backward = false;
+                this.blueCars[0].input.left = false;
+                this.blueCars[0].input.right = false;
+            }
+        });
+    }
+
+    updateJoystick(touchX, touchY, container, knob, isTouch) {
+        const rect = container.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const radius = rect.width / 2;
+
+        let dx = touchX - centerX;
+        let dy = touchY - centerY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > radius) {
+            const angle = Math.atan2(dy, dx);
+            dx = Math.cos(angle) * radius;
+            dy = Math.sin(angle) * radius;
+        }
+
+        knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+
+        const angle = Math.atan2(dy, dx);
+        const magnitude = Math.min(distance / radius, 1);
+
+        if (this.blueCars.length > 0) {
+            const car = this.blueCars[0];
+            if (magnitude > 0.3) {
+                car.input.forward = true;
+                car.input.backward = false;
+                const carAngle = car.angle;
+                const angleDiff = angle - carAngle;
+
+                if (angleDiff > Math.PI) car.input.left = true;
+                else if (angleDiff < -Math.PI) car.input.right = true;
+                else if (angleDiff > 0.5) car.input.right = true;
+                else if (angleDiff < -0.5) car.input.left = true;
+                else {
+                    car.input.left = false;
+                    car.input.right = false;
+                }
+            } else {
+                car.input.forward = false;
+                car.input.left = false;
+                car.input.right = false;
+            }
+        }
+    }
+
+    resetJoystick(knob, container) {
+        const rect = container.getBoundingClientRect();
+        knob.style.transform = `translate(calc(-50% + ${rect.width / 2 - rect.width / 2}px), calc(-50% + ${rect.height / 2 - rect.height / 2}px))`;
+    }
+
+    handleJumpStart() {
+        if (this.blueCars.length > 0) {
+            this.blueCars[0].input.jump = true;
+        }
+        document.getElementById('jumpBtn').style.transform = 'scale(0.95)';
+    }
+
+    handleJumpEnd() {
+        if (this.blueCars.length > 0) {
+            this.blueCars[0].input.jump = false;
+        }
+        document.getElementById('jumpBtn').style.transform = 'scale(1)';
+    }
+
+    handleBoostStart() {
+        if (this.blueCars.length > 0) {
+            this.blueCars[0].input.boost = true;
+            this.blueCars[0].isBoosting = true;
+        }
+        document.getElementById('boostBtn').style.transform = 'scale(0.95)';
+    }
+
+    handleBoostEnd() {
+        if (this.blueCars.length > 0) {
+            this.blueCars[0].input.boost = false;
+            this.blueCars[0].isBoosting = false;
+        }
+        document.getElementById('boostBtn').style.transform = 'scale(1)';
+    }
+
+    handlePause() {
+        if (this.gameState === 'playing') {
+            this.pause();
+        } else if (this.gameState === 'paused') {
+            this.resume();
+        }
+    }
+
+    startGame() {
+        this.blueCars = [];
+        this.orangeCars = [];
+        this.allCars = [];
+
+        const blueCar = new Car(this.fieldX + 200, this.fieldY + this.fieldHeight / 2, 'blue');
+        this.blueCars.push(blueCar);
+        this.allCars.push(blueCar);
+
+        const orangeCar1 = new Car(this.fieldX + this.fieldWidth - 200, this.fieldY + this.fieldHeight / 2 - 100, 'orange');
+        const orangeCar2 = new Car(this.fieldX + this.fieldWidth - 200, this.fieldY + this.fieldHeight / 2 + 100, 'orange');
+        orangeCar1.ai = new AIController(orangeCar1, this.ball, this.blueGoal, this.fieldX, this.fieldY, this.fieldWidth, this.fieldHeight);
+        orangeCar2.ai = new AIController(orangeCar2, this.ball, this.blueGoal, this.fieldX, this.fieldY, this.fieldWidth, this.fieldHeight);
+
+        this.orangeCars.push(orangeCar1, orangeCar2);
+        this.allCars.push(orangeCar1, orangeCar2);
+
+        this.blueScore = 0;
+        this.orangeScore = 0;
+        this.timeRemaining = this.gameTime;
+        this.gameState = 'playing';
+
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById('pauseMenu').classList.remove('visible');
+        document.getElementById('gameOver').classList.remove('visible');
+
+        this.gameLoop();
+    }
+
+    startTraining() {
+        this.blueCars = [];
+        this.orangeCars = [];
+        this.allCars = [];
+
+        const blueCar = new Car(this.fieldX + this.fieldWidth / 2, this.fieldY + this.fieldHeight / 2, 'blue');
+        this.blueCars.push(blueCar);
+        this.allCars.push(blueCar);
+
+        this.blueScore = 0;
+        this.orangeScore = 0;
+        this.timeRemaining = 9999;
+        this.gameState = 'playing';
+
+        document.getElementById('menu').classList.add('hidden');
+        document.getElementById('pauseMenu').classList.remove('visible');
+        document.getElementById('gameOver').classList.remove('visible');
+
+        this.gameLoop();
+    }
+
+    update() {
+        if (this.gameState !== 'playing') return;
+
+        for (let car of this.orangeCars) {
+            if (car.ai) {
+                car.ai.update(this.allCars);
+            }
+        }
+
+        for (let i = 0; i < this.physicsIterations; i++) {
+            for (let car of this.allCars) {
+                car.update();
+                car.collideWithWall(this.fieldX, this.fieldY, this.fieldWidth, this.fieldHeight);
+            }
+
+            for (let i = 0; i < this.allCars.length; i++) {
+                for (let j = i + 1; j < this.allCars.length; j++) {
+                    this.allCars[i].collideWithCar(this.allCars[j]);
+                }
+            }
+
+            this.ball.update();
+            this.ball.collideWithWall(this.fieldX, this.fieldY, this.fieldWidth, this.fieldHeight);
+
+            for (let car of this.allCars) {
+                this.ball.collideWithCar(car);
+            }
+        }
+
+        if (this.orangeGoal.contains(this.ball.pos, this.ball.radius)) {
+            this.blueScore++;
+            this.resetField();
+        }
+
+        if (this.blueGoal.contains(this.ball.pos, this.ball.radius)) {
+            this.orangeScore++;
+            this.resetField();
+        }
+
+        this.timeRemaining -= 1/60;
+        if (this.timeRemaining <= 0) {
+            this.endGame();
+        }
+
+        this.updateUI();
+    }
+
+    resetField() {
+        this.ball.reset(this.fieldX + this.fieldWidth / 2, this.fieldY + this.fieldHeight / 2);
+
+        for (let car of this.blueCars) {
+            car.reset(this.fieldX + 200, this.fieldY + this.fieldHeight / 2);
+        }
+
+        for (let car of this.orangeCars) {
+            car.reset(this.fieldX + this.fieldWidth - 200, this.fieldY + this.fieldHeight / 2);
+        }
+    }
+
+    updateUI() {
+        document.getElementById('blueScore').textContent = Math.floor(this.blueScore);
+        document.getElementById('orangeScore').textContent = Math.floor(this.orangeScore);
+
+        const minutes = Math.floor(this.timeRemaining / 60);
+        const seconds = Math.floor(this.timeRemaining % 60);
+        document.getElementById('timer').textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        if (this.blueCars.length > 0) {
+            const car = this.blueCars[0];
+            const speed = Math.floor(car.vel.length() * 2);
+            const boost = Math.floor(car.boost);
+            document.getElementById('stats').innerHTML =
+                `Speed: ${speed}<br>Boost: ${boost}%`;
+        }
+    }
+
+    endGame() {
+        this.gameState = 'gameOver';
+        const gameOverDiv = document.getElementById('gameOver');
+        const winner = this.blueScore > this.orangeScore ? 'BLUE WINS!' :
+                      this.orangeScore > this.blueScore ? 'ORANGE WINS!' : 'TIE!';
+        document.getElementById('winnerText').textContent = winner;
+        document.getElementById('scoreText').textContent =
+            `Blue: ${Math.floor(this.blueScore)} - Orange: ${Math.floor(this.orangeScore)}`;
+        gameOverDiv.classList.add('visible');
+    }
+
+    pause() {
+        this.gameState = 'paused';
+        document.getElementById('pauseMenu').classList.add('visible');
+    }
+
+    resume() {
+        this.gameState = 'playing';
+        document.getElementById('pauseMenu').classList.remove('visible');
+        this.gameLoop();
+    }
+
+    goToMenu() {
+        this.gameState = 'menu';
+        document.getElementById('menu').classList.remove('hidden');
+        document.getElementById('pauseMenu').classList.remove('visible');
+        document.getElementById('gameOver').classList.remove('visible');
+    }
+
+    draw() {
+        this.ctx.fillStyle = 'rgba(135, 206, 235, 1)';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        this.drawArena();
+        this.drawBall();
+
+        for (let car of this.allCars) {
+            this.drawCar(car);
+        }
+
+        this.drawGoals();
+        this.drawCenterLine();
+    }
+
+    drawArena() {
+        this.ctx.strokeStyle = '#00a8ff';
+        this.ctx.lineWidth = 3;
+        this.ctx.strokeRect(this.arenaX, this.arenaY, this.arenaWidth, this.arenaHeight);
+
+        this.ctx.fillStyle = 'rgba(144, 238, 144, 0.3)';
+        this.ctx.fillRect(this.fieldX, this.fieldY, this.fieldWidth, this.fieldHeight);
+
+        this.ctx.strokeStyle = '#ffffff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(this.fieldX, this.fieldY, this.fieldWidth, this.fieldHeight);
+    }
+
+    drawBall() {
+        this.ctx.fillStyle = '#FF6B00';
+        this.ctx.beginPath();
+        this.ctx.arc(this.ball.pos.x, this.ball.pos.y, this.ball.radius, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+        this.ctx.beginPath();
+        this.ctx.arc(this.ball.pos.x - 2, this.ball.pos.y - 2, 2, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    drawCar(car) {
+        this.ctx.save();
+        this.ctx.translate(car.pos.x, car.pos.y);
+        this.ctx.rotate(car.angle);
+
+        this.ctx.fillStyle = car.team === 'blue' ? '#0066ff' : '#ff6600';
+        this.ctx.fillRect(-8, -6, 16, 12);
+
+        this.ctx.fillStyle = car.team === 'blue' ? '#0099ff' : '#ffaa33';
+        this.ctx.fillRect(-2, -6, 4, 3);
+
+        if (car.isBoosting && car.boost > 0) {
+            this.ctx.fillStyle = 'rgba(255, 150, 0, 0.8)';
+            this.ctx.fillRect(-6, 6, 12, 2);
+        }
+
+        this.ctx.restore();
+
+        this.ctx.fillStyle = '#333';
+        this.ctx.fillRect(car.pos.x - 10, car.pos.y - 20, 20, 3);
+        this.ctx.fillStyle = '#00ff00';
+        this.ctx.fillRect(car.pos.x - 10, car.pos.y - 20, (car.boost / car.maxBoost) * 20, 3);
+    }
+
+    drawGoals() {
+        this.ctx.fillStyle = 'rgba(0, 100, 255, 0.4)';
+        this.ctx.fillRect(this.blueGoal.x, this.blueGoal.y, this.blueGoal.width, this.blueGoal.height);
+        this.ctx.strokeStyle = '#0066ff';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(this.blueGoal.x, this.blueGoal.y, this.blueGoal.width, this.blueGoal.height);
+
+        this.ctx.fillStyle = 'rgba(255, 100, 0, 0.4)';
+        this.ctx.fillRect(this.orangeGoal.x, this.orangeGoal.y, this.orangeGoal.width, this.orangeGoal.height);
+        this.ctx.strokeStyle = '#ff6600';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(this.orangeGoal.x, this.orangeGoal.y, this.orangeGoal.width, this.orangeGoal.height);
+    }
+
+    drawCenterLine() {
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([10, 10]);
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.fieldX + this.fieldWidth / 2, this.fieldY);
+        this.ctx.lineTo(this.fieldX + this.fieldWidth / 2, this.fieldY + this.fieldHeight);
+        this.ctx.stroke();
+        this.ctx.setLineDash([]);
+    }
+
+    gameLoop = () => {
+        this.update();
+        this.draw();
+
+        if (this.gameState === 'playing') {
+            requestAnimationFrame(this.gameLoop);
+        }
+    }
+}
+
+const game = new Game();
+    </script>
+</body>
+</html>
