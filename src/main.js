@@ -104,6 +104,7 @@ function loop(t) {
   dt = Math.min(dt, 0.1);
   const g = CUR.game;
 
+  Input.pollGamepad(dt);
   if (UI.screen === 'garage' && Garage.active) { Garage.render(dt); return; }
 
   if (g && !CUR.paused) {

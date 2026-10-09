@@ -33,6 +33,7 @@ const Input = {
       this.buttons[name] = { el, down: new Set() };
     }
     this.applyLayout();
+    this.initGamepad();
     const opts = { passive: false };
     L.addEventListener('pointerdown', (e) => this.onDown(e), opts);
     L.addEventListener('pointermove', (e) => this.onMove(e), opts);
@@ -81,6 +82,7 @@ const Input = {
   onDown(e) {
     e.preventDefault();
     this.touchActive = e.pointerType === 'touch' || e.pointerType === 'pen';
+    if (this.touchActive && this.usingPad) { this.usingPad = false; document.body.classList.remove('pad'); }
     try { this.layer.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
     Sound.init();
     const btn = this.buttonAt(e.clientX, e.clientY);
@@ -157,28 +159,69 @@ const Input = {
     if (typeof UI !== 'undefined') UI.onKey(k);
   },
 
-  pollGamepad() {
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  // -------------------------------------------------------------------------
+  // Game controller (PS4 / PS5 / Xbox via Bluetooth). Standard mapping:
+  // 0 Cross/A  1 Circle/B  2 Square/X  3 Triangle/Y  4 L1  5 R1  6 L2  7 R2
+  // 8 Share  9 Options  10 L3  11 R3  12-15 D-pad up/down/left/right  16 PS  17 Touchpad
+  // -------------------------------------------------------------------------
+  padStatus: 'none', padName: '', usingPad: false, navT: 0, navDir: null,
+  initGamepad() {
+    window.addEventListener('gamepadconnected', (e) => {
+      this.padName = e.gamepad.id || 'Controller';
+      if (typeof UI !== 'undefined') UI.toast('🎮 ' + prettyPadName(this.padName) + ' connected');
+      Sound.init();
+    });
+    window.addEventListener('gamepaddisconnected', () => {
+      if (typeof UI !== 'undefined') UI.toast('Controller disconnected');
+      if (CUR.game && !CUR.attract && !UI.screen) pauseGame();
+    });
+  },
+  pollGamepad(dt) {
+    let pads = [];
+    try { pads = navigator.getGamepads ? navigator.getGamepads() : []; this.padBlocked = false; }
+    catch (e) { this.padBlocked = true; pads = []; }
     let gp = null;
-    for (const p of pads) if (p && p.connected) { gp = p; break; }
+    for (const p of pads || []) if (p && p.connected) { gp = p; break; }
     this.pad = gp;
-    if (!gp) return;
-    const bt = gp.buttons.map(b => b.pressed);
-    const edge = (i) => bt[i] && !this.padPrev[i];
-    if (edge(3)) { R.cam.ballCam = !R.cam.ballCam; this.buttons.ballcam.el.classList.toggle('active', R.cam.ballCam); }
-    if (typeof UI !== 'undefined') {
-      if (edge(9)) UI.onKey('Escape');
-      if (edge(12)) UI.onKey('Digit1'); if (edge(13)) UI.onKey('Digit3'); if (edge(14)) UI.onKey('Digit2'); if (edge(15)) UI.onKey('Digit4');
-      if (edge(8)) UI.onKey('Tab');
-      if (edge(0)) UI.onPadA && UI.onPadA();
-      if (edge(1)) UI.onPadB && UI.onPadB();
-    }
+    if (!gp) { this.padStatus = this.padBlocked ? 'blocked' : 'none'; return; }
+    this.padStatus = 'ok'; this.padName = gp.id;
+    const bt = gp.buttons.map(b => b.pressed || b.value > 0.5);
+    const prevBt = this.padPrev;
+    const edge = (i) => bt[i] && !prevBt[i];
+    const any = bt.some(Boolean) || gp.axes.some(a => Math.abs(a) > 0.4);
+    if (any && !this.usingPad) { this.usingPad = true; this.touchActive = false; document.body.classList.add('pad'); Sound.init(); }
     this.padPrev = bt;
+    if (typeof UI === 'undefined') return;
+    const inMatch = CUR.game && !CUR.attract && !UI.screen;
+    if (inMatch) {
+      if (edge(3)) { R.cam.ballCam = !R.cam.ballCam; this.buttons.ballcam.el.classList.toggle('active', R.cam.ballCam); Sound.play('click'); }
+      if (edge(9)) UI.onKey('Escape');
+      // D-pad quick chat, laid out like Rocket League (up/left/right/down)
+      if (edge(12)) UI.onKey('Digit1'); if (edge(14)) UI.onKey('Digit2'); if (edge(15)) UI.onKey('Digit3'); if (edge(13)) UI.onKey('Digit4');
+      const boardBtn = !!(bt[8] || bt[17]);
+      if (boardBtn !== this.padBoard) { this.padBoard = boardBtn; UI.showBoard(boardBtn); }
+      if ((edge(0) || edge(1)) && CUR.game.state === 'replay') skipReplay();
+      return;
+    }
+    // ---- menus ----
+    if (UI.screen === 'title') { if (bt.some((v, i) => v && !prevBt[i])) UI.padActivate(); return; }
+    if (edge(0)) UI.padActivate();
+    if (edge(1)) UI.onPadB();
+    if (edge(9)) UI.onKey('Escape');
+    if (edge(4)) UI.padTab(-1); if (edge(5)) UI.padTab(1);
+    let dx = 0, dy = 0;
+    const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+    if (bt[14] || ax < -0.55) dx = -1; else if (bt[15] || ax > 0.55) dx = 1;
+    if (bt[12] || ay < -0.55) dy = -1; else if (bt[13] || ay > 0.55) dy = 1;
+    const dir = dx || dy ? dx + ',' + dy : null;
+    if (dir !== this.navDir) { this.navDir = dir; this.navT = 0.38; if (dir) UI.padMove(dx, dy); }
+    else if (dir) { this.navT -= dt || 0.016; if (this.navT <= 0) { this.navT = 0.11; UI.padMove(dx, dy); } }
+    // right stick spins the car in the garage
+    if (UI.screen === 'garage' && Math.abs(gp.axes[2] || 0) > 0.2) Garage.rot += (gp.axes[2]) * 0.06;
   },
 
   // compose final control state for the player's car
   read() {
-    this.pollGamepad();
     const s = this.state;
     const dz = Settings.deadzone, sens = Settings.sensitivity;
     const curve = (v) => { const a = Math.abs(v); if (a < dz) return 0; return sign(v) * clamp(((a - dz) / (1 - dz)) * sens, 0, 1); };
@@ -205,21 +248,38 @@ const Input = {
       if (K('KeyQ')) rollL = true; if (K('KeyE')) rollR = true;
       if (K('KeyF')) useItem = true;
     }
-    // gamepad
+    // gamepad — Rocket League PS4 default layout
     const gp = this.pad;
+    this.camYaw = 0;
     if (gp) {
       const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
       if (Math.abs(ax) > dz) steer = curve(ax);
       if (Math.abs(ay) > dz) pitch = curve(-ay);
-      const rt = gp.buttons[7] ? gp.buttons[7].value : 0, lt = gp.buttons[6] ? gp.buttons[6].value : 0;
-      if (rt > 0.05 || lt > 0.05) throttle = rt - lt;
+      const val = (i) => gp.buttons[i] ? Math.max(gp.buttons[i].value, gp.buttons[i].pressed ? 1 : 0) : 0;
+      const rt = val(7), lt = val(6);
+      if (this.usingPad || rt > 0.05 || lt > 0.05) throttle = rt > 0.05 || lt > 0.05 ? rt - lt : (this.keys.size ? throttle : 0);
       const b = (i) => gp.buttons[i] && gp.buttons[i].pressed;
-      if (b(0)) jump = true; if (b(1)) boost = true; if (b(2)) hb = true;
-      if (b(4)) rollL = true; if (b(5)) rollR = true;
-      if (b(10) || b(11)) useItem = true;
+      if (b(0)) jump = true;            // Cross: jump
+      if (b(1)) boost = true;           // Circle: boost
+      if (b(2)) hb = true;              // Square: powerslide / air roll
+      if (b(4)) rollL = true;           // L1: air roll left
+      if (CUR.game && CUR.game.mode === 'rumble') { if (b(5)) useItem = true; } // R1: use item
+      else if (b(5)) rollR = true;      // R1: air roll right
+      // right stick swivels the camera, R3 looks behind
+      const rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
+      if (Math.hypot(rx, ry) > 0.3) this.camYaw = Math.atan2(rx, -ry);
+      if (b(11)) this.camYaw = Math.PI;
     }
     if (Settings.invertPitch) pitch = -pitch;
     s.steer = steer; s.pitch = pitch; s.throttle = throttle; s.jump = jump; s.boost = boost; s.handbrake = hb; s.rollL = rollL; s.rollR = rollR; s.useItem = useItem;
     return s;
   },
 };
+
+function prettyPadName(id) {
+  const s = (id || '').toLowerCase();
+  if (/dualsense/.test(s)) return 'DualSense controller';
+  if (/dualshock|wireless controller|054c/.test(s)) return 'DUALSHOCK 4 controller';
+  if (/xbox|045e/.test(s)) return 'Xbox controller';
+  return 'Controller';
+}

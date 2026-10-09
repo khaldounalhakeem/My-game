@@ -280,3 +280,11 @@ body.lefty .tbtn { right: auto; left: calc(var(--x) * var(--btn) + var(--sl)); }
 @media (orientation: portrait) and (max-width: 1100px) {
   body:not([data-screen]) #rotate, body[data-screen="game"] #rotate { display: block; position: fixed; left: 50%; top: calc(70px + var(--st)); transform: translateX(-50%); z-index: 40; background: var(--panel); border: 1px solid var(--panel-edge); padding: 8px 14px; border-radius: 6px; font-size: 14px; pointer-events: none; white-space: nowrap; }
 }
+
+/* controller */
+.padfocus { outline: 3px solid var(--amber) !important; outline-offset: 3px; box-shadow: 0 0 24px rgba(255,194,58,.35); }
+.mbtn.padfocus { transform: skewX(-10deg) translateX(6px); }
+.pc-pad { font-size: 12px; color: var(--ink-dim); }
+body.pad #touch .tbtn, body.pad .stick-hint { display: none; }
+body.pad .boostmeter { bottom: calc(24px + var(--sbm)); }
+body.pad .itemslot { bottom: calc(150px + var(--sbm)); right: calc(26px + var(--sr)); }

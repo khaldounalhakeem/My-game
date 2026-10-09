@@ -891,7 +891,11 @@ function updateCamera(dt, game, replayFrame) {
   const stiff = 2 + S.camStiffness * 14;
   C.dir.lerp(dir, damp(useBall ? stiff * 1.4 : stiff, dt)).normalize();
   const dist = S.camDist, height = S.camHeight;
-  const pos = tmpV().copy(focus).addScaledVector(C.dir, -dist).addScaledVector(C.up, height);
+  // right stick / R3 swivel (rear view)
+  C.yaw = lerp(C.yaw || 0, Input.camYaw || 0, damp(12, dt));
+  const camDir = (C.cd || (C.cd = new V3())).copy(C.dir);
+  if (Math.abs(C.yaw) > 0.001) camDir.applyAxisAngle(C.up, -C.yaw);
+  const pos = tmpV().copy(focus).addScaledVector(camDir, -dist).addScaledVector(C.up, height);
   keepInArena(pos, 40);
   C.pos.copy(pos);
   let look;
@@ -901,8 +905,9 @@ function updateCamera(dt, game, replayFrame) {
     const lim = clamp(ang, -0.2, 0.75);
     look = tmpV().copy(focus).addScaledVector(C.up, 40).addScaledVector(C.dir, 300).addScaledVector(C.up, Math.tan(lim) * 300);
   } else {
-    look = tmpV().copy(focus).addScaledVector(C.dir, 300).addScaledVector(C.up, 40);
+    look = tmpV().copy(focus).addScaledVector(camDir, 300).addScaledVector(C.up, 40);
   }
+  if (useBall && Math.abs(C.yaw) > 0.3) look = tmpV().copy(focus).addScaledVector(camDir, 300).addScaledVector(C.up, 40);
   look.addScaledVector(C.up, Math.tan(THREE.MathUtils.degToRad(S.camAngle)) * 300);
   C.look.copy(look);
   // shake

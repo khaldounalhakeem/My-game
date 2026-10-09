@@ -53,6 +53,8 @@ const UI = {
     if (!name) return;
     const fn = this['scr_' + name];
     if (fn) this.root.append(fn.call(this, arg));
+    this._pf = null;
+    if (Input.usingPad) setTimeout(() => this.padCurrent(), 30);
     Sound.play('select');
   },
   btn(label, on, cls, sub) {
@@ -76,6 +78,7 @@ const UI = {
       h('div', { class: 'pc-name' }, P.name), h('div', { class: 'pc-title' }, P.title),
       h('div', { class: 'pc-row' }, h('span', { class: 'pc-lvl' }, 'LVL ' + P.level), h('span', { class: 'pc-rank' }, rankFor(P.mmr))),
       h('div', { class: 'xpbar' }, h('i', { style: `width:${Math.min(100, P.xp / xpForLevel(P.level) * 100)}%` })),
+      h('div', { class: 'pc-pad', id: 'padstatus' }, padStatusText()),
       P.newItems.length ? h('div', { class: 'pc-new' }, `${P.newItems.length} new item${P.newItems.length > 1 ? 's' : ''} in the Garage`) : null,
     );
     return h('div', { class: 'menu main-menu' },
@@ -152,7 +155,8 @@ const UI = {
       ['Ball cam', 'BALL CAM keeps the ball on screen. Turn it off to look where your car is pointing.'],
       ['Flip reset', 'Touch the ball with all four wheels in the air to get your flip back.'],
       ['Keyboard', 'W/S drive & pitch · A/D steer · Space jump · Shift boost · X drift/air roll · Q/E directional roll · B ball cam · F item · Esc pause · 1–4 quick chat · Tab scoreboard'],
-      ['Controller', 'Left stick steer · RT/LT gas/brake · A jump · B boost · X drift · LB/RB air roll · Y ball cam · D-pad quick chat · Menu pause'],
+      ['PS4 / PS5 controller', 'Same as Rocket League: R2 gas · L2 brake/reverse · Left stick steer & air control · ✕ jump · ○ boost · □ powerslide / air roll · △ ball cam · L1 air roll left · R1 air roll right (use item in Rumble) · R3 look behind · right stick look around · D-pad quick chat · OPTIONS pause · touchpad/SHARE scoreboard. In menus: stick or D-pad to move, ✕ select, ○ back.'],
+      ['Xbox controller', 'RT gas · LT brake · A jump · B boost · X powerslide · Y ball cam · LB/RB air roll · same layout as above.'],
     ];
     return h('div', { class: 'menu scroll howto' },
       h('div', { class: 'mhead' }, this.back('main'), h('h2', null, 'How to play')),
@@ -516,9 +520,84 @@ const UI = {
     }
     if (k === 'KeyR' && CUR.game.kind === 'freeplay') CUR.game.freeplayLaunch();
   },
-  onPadA() { if (this.screen === 'title') this.show('main'); },
-  onPadB() { if (this.screen && this.screen !== 'main' && this.screen !== 'title' && this.screen !== 'pause') { const b = $('.back', this.root); if (b) b.click(); } },
+  // ---- controller menu navigation ----
+  padFocusables() {
+    const list = [...this.root.querySelectorAll('button, select, input, .hbtn')].filter(el => !el.disabled && el.offsetParent !== null && !el.closest('[hidden]'));
+    return list;
+  },
+  padFocus(el) {
+    if (this._pf) this._pf.classList.remove('padfocus');
+    this._pf = el;
+    if (!el) return;
+    el.classList.add('padfocus');
+    try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  },
+  padCurrent() {
+    const list = this.padFocusables();
+    if (this._pf && list.includes(this._pf)) return this._pf;
+    const first = list.find(el => el.classList.contains('on') && el.classList.contains('mode')) || list.find(el => !el.classList.contains('back')) || list[0];
+    this.padFocus(first || null);
+    return null;
+  },
+  padMove(dx, dy) {
+    if (this.screen === 'title') return;
+    const cur = this.padCurrent();
+    if (!cur) return;
+    // sliders and dropdowns change value with left/right
+    if (dx && cur.tagName === 'INPUT' && cur.type === 'range') {
+      const st = parseFloat(cur.step) || 1;
+      cur.value = clamp(parseFloat(cur.value) + dx * st, parseFloat(cur.min), parseFloat(cur.max));
+      cur.dispatchEvent(new Event('input', { bubbles: true })); Sound.play('click'); return;
+    }
+    if (dx && cur.tagName === 'SELECT') {
+      cur.selectedIndex = clamp(cur.selectedIndex + dx, 0, cur.options.length - 1);
+      cur.dispatchEvent(new Event('change', { bubbles: true })); Sound.play('click'); return;
+    }
+    const r0 = cur.getBoundingClientRect();
+    const cx = r0.left + r0.width / 2, cy = r0.top + r0.height / 2;
+    let best = null, bs = 1e9;
+    for (const el of this.padFocusables()) {
+      if (el === cur) continue;
+      const r = el.getBoundingClientRect();
+      const x = r.left + r.width / 2, y = r.top + r.height / 2;
+      const ddx = x - cx, ddy = y - cy;
+      const along = dx ? ddx * dx : ddy * dy;
+      if (along <= 4) continue;
+      const across = dx ? Math.abs(ddy) : Math.abs(ddx);
+      const score = along + across * 2.5;
+      if (score < bs) { bs = score; best = el; }
+    }
+    if (best) { this.padFocus(best); Sound.play('click'); }
+  },
+  padActivate() {
+    if (this.screen === 'title') { Sound.init(); Sound.startMusic(); this.show('main'); return; }
+    const cur = this.padCurrent();
+    if (!cur) return;
+    if (cur.tagName === 'SELECT') { cur.selectedIndex = (cur.selectedIndex + 1) % cur.options.length; cur.dispatchEvent(new Event('change', { bubbles: true })); return; }
+    if (cur.tagName === 'INPUT') { cur.focus(); return; }
+    cur.click();
+  },
+  padTab(d) {
+    // L1 / R1 cycle garage tabs
+    const tabs = [...this.root.querySelectorAll('.gtabs button')];
+    if (!tabs.length) return;
+    const i = tabs.findIndex(t => t.classList.contains('on'));
+    tabs[(i + d + tabs.length) % tabs.length].click();
+  },
+  onPadA() { this.padActivate(); },
+  onPadB() {
+    if (this.screen === 'pause') { resumeGame(); return; }
+    if (this.screen && this.screen !== 'main' && this.screen !== 'title') { const b = $('.back', this.root); if (b) b.click(); }
+  },
 };
+
+function padStatusText() {
+  if (Input.padStatus === 'ok') return '🎮 ' + prettyPadName(Input.padName) + ' connected';
+  if (Input.padStatus === 'blocked') return '🎮 Controllers are blocked in this view';
+  return '🎮 Controller: press any button on it to connect';
+}
+setInterval(() => { const el = document.getElementById('padstatus'); if (el) el.textContent = padStatusText(); }, 1000);
 
 function isStandalone() { return window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
 
