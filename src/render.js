@@ -870,7 +870,9 @@ function updateCamera(dt, game, replayFrame) {
     return;
   }
   const carUp = car.up(tmpV());
-  const wantUp = tmpV().copy(car.onGround && car.groundN.y < 0.9 ? car.groundN : UP);
+  // on walls the camera leans with the car but stays partly upright (less disorienting)
+  const wantUp = tmpV().copy(UP);
+  if (car.onGround && car.groundN.y < 0.9 && car.groundN.y > -0.3) wantUp.lerp(car.groundN, 0.55).normalize();
   if (!car.onGround && car.wallTime > 0) wantUp.copy(UP);
   C.up.lerp(wantUp, damp(car.onGround ? 6 : 3, dt)).normalize();
   let dir;

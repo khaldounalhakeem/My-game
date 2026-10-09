@@ -699,6 +699,7 @@ class Car {
     this.flipAvail = true; this.flipReset = false; this.dodging = false; this.dodgeT = 0; this.dodgeDir = [0, 0]; this.dodgeCancel = false;
     this.groundGrace = 0; this.supersonic = false; this.demolished = false; this.respawnT = 0;
     this.boosting = false; this.lastGroundTime = 0; this.airTime = 0; this.contactRoof = 0;
+    this.restT = 0; this.recoverT = 0; this.recoverN = new V3(0, 1, 0);
     this.wheelSpin = 0; this.steerVis = 0; this.landedT = 0; this.wasOnGround = false; this.slideAmt = 0;
     this.lastBallHit = -10; this.ballContact = false; this.wallTime = 0;
   }
@@ -785,7 +786,7 @@ class Car {
     // throttle / brake
     if (this.boosting) throttle = 1;
     let acc = 0;
-    if (Math.abs(throttle) > 0.02 && throttle * vf < -1) {
+    if (Math.abs(throttle) > 0.02 && throttle * vf < 0 && Math.abs(vf) > 30) {
       acc = sign(throttle) * PHYS.BRAKE_ACCEL;
       if (Math.abs(acc * dt) > Math.abs(vf)) acc = -vf / dt;
     } else if (Math.abs(throttle) > 0.02) {
@@ -825,14 +826,27 @@ class Car {
       this.jumpTime += dt;
     }
 
-    // turtle recovery (on the roof / side)
-    if (jumpEdge && this.contactRoof > 0) {
-      this.vel.addScaledVector(this.groundN, 420);
-      const r = this.right(_ve);
-      this.angVel.copy(this.fwd(_vn)).multiplyScalar(r.y > 0 ? 7 : -7);
-      this.contactRoof = 0;
-      game.events.push({ type: 'jump', car: this });
-      jumpEdge = false;
+    // recovery when resting on the side or roof: jump flips you back onto your wheels,
+    // and a car left lying on its side rights itself after a moment
+    if (this.contactRoof > 0 && this.vel.length() < 600) this.restT += dt; else this.restT = 0;
+    const lyingDot = up.dot(this.groundN);
+    if (this.recoverT <= 0 && this.contactRoof > 0 && (jumpEdge || (this.restT > 0.35 && lyingDot > -0.3) || this.restT > 1.4)) {
+      this.recoverT = 0.6;
+      this.recoverN.copy(this.groundN.y > 0.5 ? this.groundN : UP);
+      this.vel.addScaledVector(this.recoverN, jumpEdge ? 380 : 240);
+      this.groundGrace = 0.12; this.restT = 0; this.contactRoof = 0;
+      if (jumpEdge) { game.events.push({ type: 'jump', car: this }); jumpEdge = false; }
+    }
+    if (this.recoverT > 0) {
+      this.recoverT -= dt;
+      const d = up.dot(this.recoverN);
+      if (d < -0.95) _qa.setFromAxisAngle(this.fwd(_vn), Math.PI); else _qa.setFromUnitVectors(up, this.recoverN);
+      _qb.identity().slerp(_qa, damp(9, dt));
+      this.quat.premultiply(_qb).normalize();
+      this.angVel.set(0, 0, 0);
+      this.vel.y -= grav * dt;
+      if (this.recoverT <= 0 || d > 0.97) this.recoverT = 0;
+      return;
     }
 
     // second jump: double jump or dodge
@@ -3270,7 +3284,9 @@ function updateCamera(dt, game, replayFrame) {
     return;
   }
   const carUp = car.up(tmpV());
-  const wantUp = tmpV().copy(car.onGround && car.groundN.y < 0.9 ? car.groundN : UP);
+  // on walls the camera leans with the car but stays partly upright (less disorienting)
+  const wantUp = tmpV().copy(UP);
+  if (car.onGround && car.groundN.y < 0.9 && car.groundN.y > -0.3) wantUp.lerp(car.groundN, 0.55).normalize();
   if (!car.onGround && car.wallTime > 0) wantUp.copy(UP);
   C.up.lerp(wantUp, damp(car.onGround ? 6 : 3, dt)).normalize();
   let dir;
