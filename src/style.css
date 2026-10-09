@@ -288,3 +288,7 @@ body.lefty .tbtn { right: auto; left: calc(var(--x) * var(--btn) + var(--sl)); }
 body.pad #touch .tbtn, body.pad .stick-hint { display: none; }
 body.pad .boostmeter { bottom: calc(24px + var(--sbm)); }
 body.pad .itemslot { bottom: calc(150px + var(--sbm)); right: calc(26px + var(--sr)); }
+
+.fpbtns .hbtn.wide { justify-content: start; display: flex; gap: 8px; align-items: center; height: 40px; }
+.padkey { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 4px; border-radius: 4px; background: rgba(255,255,255,.14); font-size: 12px; font-family: var(--f-display); font-weight: 400; }
+body:not(.pad) .fpbtns .padkey { display: none; }

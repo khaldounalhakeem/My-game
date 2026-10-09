@@ -129,6 +129,7 @@ function carBallCollide(car, ball, game) {
   const frozenBall = ball.frozen > 0;
   if (frozenBall) ball.frozen = 0;
   let hitStrength = 0;
+  const approach = vn < 0 ? -vn : 0;
   if (vn < 0) {
     const j = -vn / (1 / mb + 1 / mc);
     ball.vel.addScaledVector(n, j / mb);
@@ -162,6 +163,30 @@ function carBallCollide(car, ball, game) {
     }
     const bs = ball.vel.length(), bmax = PHYS.BALL_MAX_SPEED * (game.mutators.ballSpeed || 1);
     if (bs > bmax) ball.vel.multiplyScalar(bmax / bs);
+    // pinch: ball squeezed between the car and the floor / a wall shoots out at huge speed
+    const bd = arenaDist(ball.pos.x, ball.pos.y, ball.pos.z, true);
+    const pinchV = Math.max(dv, approach);
+    if (bd < ball.radius + 45 && pinchV > 650) {
+      const sn = arenaNormal(ball.pos.x, ball.pos.y, ball.pos.z, true, new V3());
+      // the car must be driving into the surface the ball is resting on, with the ball in between
+      const cvl = Math.max(1, car.vel.length());
+      const intoV = car.vel.dot(sn);
+      if (intoV < -300 && n.dot(sn) < 0.4) {
+        const cv = car.vel.clone();
+        const vt = cv.addScaledVector(sn, -cv.dot(sn));
+        if (vt.lengthSq() < 1) vt.copy(n).addScaledVector(sn, -n.dot(sn));
+        vt.normalize();
+        const out = vt.multiplyScalar(0.82).addScaledVector(sn, 0.58).normalize();
+        const k = clamp(-intoV / cvl, 0, 1);
+        const sp = Math.min(PHYS.BALL_MAX_SPEED * (game.mutators.ballSpeed || 1), (2.1 * pinchV + 1300) * (0.55 + 0.45 * k));
+        if (sp > ball.vel.length()) {
+          ball.vel.copy(out).multiplyScalar(sp);
+          ball.pos.addScaledVector(sn, Math.max(0, ball.radius + 2 - bd));
+          game.events.push({ type: 'pinch', car, pos: ball.pos.clone(), speed: sp });
+          hitStrength = Math.max(hitStrength, sp);
+        }
+      }
+    }
     game.onTouch(car, hitStrength, cpWorld.clone());
   }
   return true;

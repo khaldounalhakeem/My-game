@@ -194,6 +194,19 @@ const Input = {
     if (typeof UI === 'undefined') return;
     const inMatch = CUR.game && !CUR.attract && !UI.screen;
     if (inMatch) {
+      if (CUR.game.kind === 'freeplay') {
+        const G = CUR.game;
+        if (edge(12)) G.freeplayLaunch();      // D-pad up: shoot the ball at me
+        if (edge(13)) G.freeplayResetBall();   // D-pad down: ball to center
+        if (edge(14)) G.freeplayAerial();      // D-pad left: aerial ball
+        if (edge(15)) G.freeplayWall();        // D-pad right: wall / pinch ball
+        if (edge(4)) G.freeplayRewind();       // L1: rewind 3 seconds
+        if (edge(5)) G.freeplayFreeze();       // R1: freeze / unfreeze the ball
+        if (edge(10)) G.freeplayResetCar();    // L3: reset car
+        if (edge(9)) UI.onKey('Escape');
+        if (edge(3)) { R.cam.ballCam = !R.cam.ballCam; this.buttons.ballcam.el.classList.toggle('active', R.cam.ballCam); }
+        return;
+      }
       if (edge(3)) { R.cam.ballCam = !R.cam.ballCam; this.buttons.ballcam.el.classList.toggle('active', R.cam.ballCam); Sound.play('click'); }
       if (edge(9)) UI.onKey('Escape');
       // D-pad quick chat, laid out like Rocket League (up/left/right/down)
@@ -262,9 +275,10 @@ const Input = {
       if (b(0)) jump = true;            // Cross: jump
       if (b(1)) boost = true;           // Circle: boost
       if (b(2)) hb = true;              // Square: powerslide / air roll
-      if (b(4)) rollL = true;           // L1: air roll left
+      const fp = CUR.game && CUR.game.kind === 'freeplay';
+      if (b(4) && !fp) rollL = true;    // L1: air roll left (rewind in free play)
       if (CUR.game && CUR.game.mode === 'rumble') { if (b(5)) useItem = true; } // R1: use item
-      else if (b(5)) rollR = true;      // R1: air roll right
+      else if (b(5) && !fp) rollR = true; // R1: air roll right (freeze ball in free play)
       // right stick swivels the camera, R3 looks behind
       const rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
       if (Math.hypot(rx, ry) > 0.3) this.camYaw = Math.atan2(rx, -ry);

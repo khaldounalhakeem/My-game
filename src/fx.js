@@ -232,6 +232,12 @@ const FX = {
         if (ev.item === 'haymaker' || ev.item === 'freeze' || ev.item === 'plunger') this.beam(ev.car.pos, game.ball.pos, ev.item === 'freeze' ? 0x80e0ff : 0xffd040);
         break;
       }
+      case 'pinch':
+        this.flash(ev.pos, 0xffffff, 260, 0.25);
+        this.burst(A, ev.pos, 90, 2200, 0.5, 18, [1, 0.9, 0.6], { drag: 3 });
+        this.ring(ev.pos, 0xffe0a0, 600, 0.4, ev.pos.y);
+        R.cam.shake = Math.max(R.cam.shake, 0.9);
+        break;
       case 'flipreset': this.burst(A, ev.car.pos, 25, 300, 0.5, 14, [0.4, 1, 0.6], {}); break;
     }
   },

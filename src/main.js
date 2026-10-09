@@ -193,6 +193,8 @@ function processEvents(g) {
       case 'pad': if (ev.car === me) Sound.play(ev.pad.big ? 'padBig' : 'padSmall'); break;
       case 'demo': Sound.play('demo', { vol: Math.max(v, Sound.distVol(ev.pos)) }); Sound.cheer(0.4, 1.2); break;
       case 'bump': Sound.play('bump', { vol: v }); break;
+      case 'pinch': Sound.play('hit', { s: 1.5 }); Sound.play('whoosh'); Sound.cheer(0.6, 1.2); break;
+      case 'fptool': Sound.play('click'); break;
       case 'goal': Sound.play('horn'); Sound.cheer(1, 4); break;
       case 'count': Sound.play('count'); break;
       case 'go': Sound.play('go'); break;

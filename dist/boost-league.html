@@ -304,6 +304,10 @@ body.pad #touch .tbtn, body.pad .stick-hint { display: none; }
 body.pad .boostmeter { bottom: calc(24px + var(--sbm)); }
 body.pad .itemslot { bottom: calc(150px + var(--sbm)); right: calc(26px + var(--sr)); }
 
+.fpbtns .hbtn.wide { justify-content: start; display: flex; gap: 8px; align-items: center; height: 40px; }
+.padkey { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 4px; border-radius: 4px; background: rgba(255,255,255,.14); font-size: 12px; font-family: var(--f-display); font-weight: 400; }
+body:not(.pad) .fpbtns .padkey { display: none; }
+
 </style>
 </head>
 <body>
@@ -355,6 +359,7 @@ const PHYS = {
   JUMP_MIN_TIME: 0.025,
   DOUBLE_JUMP_WINDOW: 1.25,
   DODGE_TIME: 0.65,
+  FLIP_SPIN_TIME: 0.62,
   DODGE_IMPULSE: 500,
   STICKY_FORCE: 325,
   REST_HEIGHT: 17,
@@ -703,7 +708,7 @@ class Car {
     this.flipAvail = true; this.flipReset = false; this.dodging = false; this.dodgeT = 0; this.dodgeDir = [0, 0]; this.dodgeCancel = false;
     this.groundGrace = 0; this.supersonic = false; this.demolished = false; this.respawnT = 0;
     this.boosting = false; this.lastGroundTime = 0; this.airTime = 0; this.contactRoof = 0;
-    this.restT = 0; this.recoverT = 0; this.recoverN = new V3(0, 1, 0);
+    this.restT = 0; this.recoverT = 0; this.recoverN = new V3(0, 1, 0); this.postFlipT = 0; this.dodgeAngle = 0;
     this.wheelSpin = 0; this.steerVis = 0; this.landedT = 0; this.wasOnGround = false; this.slideAmt = 0;
     this.lastBallHit = -10; this.ballContact = false; this.wallTime = 0;
   }
@@ -834,10 +839,10 @@ class Car {
     // and a car left lying on its side rights itself after a moment
     if (this.contactRoof > 0 && this.vel.length() < 600) this.restT += dt; else this.restT = 0;
     const lyingDot = up.dot(this.groundN);
-    if (this.recoverT <= 0 && this.contactRoof > 0 && (jumpEdge || (this.restT > 0.35 && lyingDot > -0.3) || this.restT > 1.4)) {
-      this.recoverT = 0.6;
+    if (this.recoverT <= 0 && this.contactRoof > 0 && (jumpEdge || this.restT > 0.12)) {
+      this.recoverT = 0.45;
       this.recoverN.copy(this.groundN.y > 0.5 ? this.groundN : UP);
-      this.vel.addScaledVector(this.recoverN, jumpEdge ? 380 : 240);
+      this.vel.addScaledVector(this.recoverN, jumpEdge ? 300 : 150);
       this.groundGrace = 0.12; this.restT = 0; this.contactRoof = 0;
       if (jumpEdge) { game.events.push({ type: 'jump', car: this }); jumpEdge = false; }
     }
@@ -845,11 +850,11 @@ class Car {
       this.recoverT -= dt;
       const d = up.dot(this.recoverN);
       if (d < -0.95) _qa.setFromAxisAngle(this.fwd(_vn), Math.PI); else _qa.setFromUnitVectors(up, this.recoverN);
-      _qb.identity().slerp(_qa, damp(9, dt));
+      _qb.identity().slerp(_qa, damp(15, dt));
       this.quat.premultiply(_qb).normalize();
       this.angVel.set(0, 0, 0);
       this.vel.y -= grav * dt;
-      if (this.recoverT <= 0 || d > 0.97) this.recoverT = 0;
+      if (this.recoverT <= 0 || d > 0.97) { this.recoverT = 0; this.postFlipT = 0.4; }
       return;
     }
 
@@ -874,26 +879,49 @@ class Car {
     let pitchIn = pitch;
 
     if (this.dodging) {
+      // scripted flip: one clean 360° rotation, then the car is level again
       this.dodgeT += dt;
       const [dx, dy] = this.dodgeDir;
-      if (!this.dodgeCancel && dx !== 0 && pitchIn * dx < -0.4 && this.dodgeT > 0.05) this.dodgeCancel = true;
-      if (this.dodgeT < PHYS.DODGE_TIME) {
-        if (!this.dodgeCancel) wl.z = -dx * PHYS.MAX_ANG_VEL;
-        wl.x = dy * PHYS.MAX_ANG_VEL * 0.95 + rollIn * 1.2;
-        if (!this.dodgeCancel) pitchIn = 0;
-        yawIn = 0;
-        // dodge gravity relief in the first part of the flip
-        if (this.dodgeT < 0.25) this.vel.y += grav * 0.6 * dt;
-      } else this.dodging = false;
+      const len = Math.hypot(dx, dy) || 1;
+      if (dx !== 0 && pitchIn * dx < -0.4 && this.dodgeT > 0.06) {
+        // flip cancel (half-flip): stop the pitch rotation and hand control back
+        this.dodgeCancel = true; this.dodging = false; wl.z *= 0.15;
+      } else {
+        const full = Math.PI * 2;
+        const step = Math.min(full / PHYS.FLIP_SPIN_TIME * dt, full - this.dodgeAngle);
+        const w = step / dt;
+        wl.z = -dx / len * w;
+        wl.x = dy / len * w + rollIn * 2;
+        wl.y = 0;
+        this.dodgeAngle += step;
+        pitchIn = 0; yawIn = 0;
+        this.vel.y += grav * 0.35 * dt; // flips float a little
+        if (this.dodgeAngle >= full - 1e-4) { this.dodging = false; this.postFlipT = 0.3; wl.set(rollIn * 2, 0, 0); }
+      }
     }
-    if (!this.dodging || this.dodgeCancel) {
+    if (this.postFlipT > 0) { this.postFlipT -= dt; pitchIn = 0; yawIn = 0; }
+    if (!this.dodging) {
       wl.x += (36.08 * rollIn - 4.47 * wl.x) * dt;
       wl.z += (12.15 * -pitchIn - 2.80 * wl.z * (1 - Math.abs(pitchIn))) * dt;
       wl.y += (8.92 * -yawIn - 1.89 * wl.y * (1 - Math.abs(yawIn))) * dt;
     }
     const wm = wl.length();
-    if (wm > PHYS.MAX_ANG_VEL) wl.multiplyScalar(PHYS.MAX_ANG_VEL / wm);
+    if (!this.dodging && wm > PHYS.MAX_ANG_VEL) wl.multiplyScalar(PHYS.MAX_ANG_VEL / wm);
     this.angVel.copy(wl).applyQuaternion(this.quat);
+
+    // landing assist: when dropping close to a surface, ease the car towards wheels-down
+    if (!this.dodging && this.airTime > 0.25 && this.vel.y < -50) {
+      const dd = arenaDist(this.pos.x, this.pos.y, this.pos.z, false);
+      if (dd < 170) {
+        const n = arenaNormal(this.pos.x, this.pos.y, this.pos.z, false, _vn);
+        if (up.dot(n) < 0.97) {
+          if (up.dot(n) < -0.95) _qa.setFromAxisAngle(this.fwd(_ve), Math.PI); else _qa.setFromUnitVectors(up, n);
+          _qb.identity().slerp(_qa, damp(7 * (1 - dd / 200), dt));
+          this.quat.premultiply(_qb).normalize();
+          this.angVel.multiplyScalar(1 - damp(6, dt));
+        }
+      }
+    }
 
     // forces
     if (this.boosting) this.vel.addScaledVector(fwd, PHYS.BOOST_ACCEL * dt);
@@ -917,8 +945,8 @@ class Car {
     const sImp = dy * PHYS.DODGE_IMPULSE * (1 + 0.9 * Math.min(1, Math.abs(vf) / PHYS.CAR_MAX_SPEED));
     const len = Math.hypot(dx, dy);
     this.vel.addScaledVector(fh, fImp / Math.max(1, len)).addScaledVector(rh, sImp / Math.max(1, len));
-    this.vel.y = Math.max(0, this.vel.y * 0.3);
-    this.dodging = true; this.dodgeT = 0; this.dodgeDir = [dx, dy]; this.dodgeCancel = false;
+    this.vel.y = Math.max(0, this.vel.y);
+    this.dodging = true; this.dodgeT = 0; this.dodgeDir = [dx, dy]; this.dodgeCancel = false; this.dodgeAngle = 0;
     game.events.push({ type: 'dodge', car: this, dir: [dx, dy] });
   }
 
@@ -937,7 +965,7 @@ class Car {
       const upDot = up.dot(n);
       const vn = this.vel.dot(n);
       const reach = wasGround ? PHYS.REST_HEIGHT + 8 : PHYS.REST_HEIGHT + 2;
-      if (d0 < reach && upDot > 0.55 && vn < 250 && (this.groundGrace <= 0 || vn < -1)) {
+      if (d0 < reach && upDot > (wasGround ? 0.55 : 0.3) && vn < 250 && (this.groundGrace <= 0 || vn < -1)) {
         this.onGround = true;
         this.groundN.copy(n);
         if (d0 < PHYS.REST_HEIGHT) this.pos.addScaledVector(n, PHYS.REST_HEIGHT - d0);
@@ -1143,6 +1171,7 @@ function carBallCollide(car, ball, game) {
   const frozenBall = ball.frozen > 0;
   if (frozenBall) ball.frozen = 0;
   let hitStrength = 0;
+  const approach = vn < 0 ? -vn : 0;
   if (vn < 0) {
     const j = -vn / (1 / mb + 1 / mc);
     ball.vel.addScaledVector(n, j / mb);
@@ -1176,6 +1205,30 @@ function carBallCollide(car, ball, game) {
     }
     const bs = ball.vel.length(), bmax = PHYS.BALL_MAX_SPEED * (game.mutators.ballSpeed || 1);
     if (bs > bmax) ball.vel.multiplyScalar(bmax / bs);
+    // pinch: ball squeezed between the car and the floor / a wall shoots out at huge speed
+    const bd = arenaDist(ball.pos.x, ball.pos.y, ball.pos.z, true);
+    const pinchV = Math.max(dv, approach);
+    if (bd < ball.radius + 45 && pinchV > 650) {
+      const sn = arenaNormal(ball.pos.x, ball.pos.y, ball.pos.z, true, new V3());
+      // the car must be driving into the surface the ball is resting on, with the ball in between
+      const cvl = Math.max(1, car.vel.length());
+      const intoV = car.vel.dot(sn);
+      if (intoV < -300 && n.dot(sn) < 0.4) {
+        const cv = car.vel.clone();
+        const vt = cv.addScaledVector(sn, -cv.dot(sn));
+        if (vt.lengthSq() < 1) vt.copy(n).addScaledVector(sn, -n.dot(sn));
+        vt.normalize();
+        const out = vt.multiplyScalar(0.82).addScaledVector(sn, 0.58).normalize();
+        const k = clamp(-intoV / cvl, 0, 1);
+        const sp = Math.min(PHYS.BALL_MAX_SPEED * (game.mutators.ballSpeed || 1), (2.1 * pinchV + 1300) * (0.55 + 0.45 * k));
+        if (sp > ball.vel.length()) {
+          ball.vel.copy(out).multiplyScalar(sp);
+          ball.pos.addScaledVector(sn, Math.max(0, ball.radius + 2 - bd));
+          game.events.push({ type: 'pinch', car, pos: ball.pos.clone(), speed: sp });
+          hitStrength = Math.max(hitStrength, sp);
+        }
+      }
+    }
     game.onTouch(car, hitStrength, cpWorld.clone());
   }
   return true;
@@ -1950,7 +2003,11 @@ class Game {
       if (g >= 0) this.scoreGoal(g);
     }
     if (this.kind === 'training') this.updateTraining(dt);
-    if (this.kind === 'freeplay' && (ball.pos.y < -400 || !isFinite(ball.pos.x))) this.freeplayLaunch();
+    if (this.kind === 'freeplay') {
+      if (ball.pos.y < -400 || !isFinite(ball.pos.x)) this.freeplayLaunch();
+      this.fpAcc = (this.fpAcc || 0) + dt;
+      if (this.fpAcc >= 0.1) { this.fpAcc = 0; this.fpSnapshot(); }
+    }
     this.recordReplay();
   }
 
@@ -2337,8 +2394,52 @@ class Game {
     const to = tmpV().copy(car.pos).sub(b.pos); to.y = 0; to.normalize();
     b.vel.set(to.x * rand(400, 900), rand(500, 1100), to.z * rand(400, 900));
   }
-  freeplayResetBall() { this.ball.reset(0, this.ball.radius + 200, 0); }
-  freeplayResetCar() { const s = kickoffSpots(ARENA.kind)[4]; this.player.spawn(s[0], s[1], 0, 0); this.player.boost = 100; }
+  freeplayResetBall() { this.ball.reset(0, this.ball.radius + 200, 0); this.events.push({ type: 'fptool', label: 'Ball to center' }); }
+  freeplayAerial() {
+    const car = this.player, b = this.ball;
+    const f = car.fwd(tmpV()); f.y = 0; if (f.lengthSq() < 0.01) f.set(0, 0, 1); f.normalize();
+    const p = tmpV().copy(car.pos).addScaledVector(f, 1700);
+    p.x = clamp(p.x, -ARENA.W + 500, ARENA.W - 500); p.z = clamp(p.z, -ARENA.L + 700, ARENA.L - 700);
+    b.reset(p.x, 950, p.z); b.vel.set(0, 350, 0); b.frozen = 0;
+    this.events.push({ type: 'fptool', label: 'Aerial ball' });
+  }
+  freeplayWall() {
+    // ball rolling along the nearest side wall: practice wall shots and pinches
+    const car = this.player, b = this.ball;
+    const side = car.pos.x >= 0 ? 1 : -1;
+    const z = clamp(car.pos.z + 1500, -ARENA.L + 1500, ARENA.L - 1500);
+    b.reset(side * (ARENA.W - 140), b.radius + 40, z - 1200); b.vel.set(side * 150, 0, 900); b.frozen = 0;
+    this.events.push({ type: 'fptool', label: 'Wall ball' });
+  }
+  freeplayFreeze() {
+    const b = this.ball;
+    if (b.frozen > 0) { b.frozen = 0; this.events.push({ type: 'fptool', label: 'Ball unfrozen' }); }
+    else { b.frozen = 1e9; b.vel.set(0, 0, 0); b.angVel.set(0, 0, 0); this.events.push({ type: 'fptool', label: 'Ball frozen' }); }
+  }
+  // free play rewind: snapshots every 0.1 s, rewind 3 s
+  fpSnapshot() {
+    const c = this.player, b = this.ball;
+    this.fpHist = this.fpHist || [];
+    this.fpHist.push({
+      c: { pos: c.pos.clone(), vel: c.vel.clone(), angVel: c.angVel.clone(), quat: c.quat.clone(), onGround: c.onGround, groundN: c.groundN.clone(), jumped: c.jumped, flipAvail: c.flipAvail, boost: c.boost },
+      b: { pos: b.pos.clone(), vel: b.vel.clone(), angVel: b.angVel.clone(), quat: b.quat.clone(), frozen: b.frozen },
+    });
+    if (this.fpHist.length > 120) this.fpHist.shift();
+  }
+  freeplayRewind() {
+    const H = this.fpHist || [];
+    if (H.length < 2) return;
+    const i = Math.max(0, H.length - 30);
+    const s = H[i]; H.length = i + 1;
+    const c = this.player, b = this.ball;
+    c.resetState();
+    c.pos.copy(s.c.pos); c.vel.copy(s.c.vel); c.angVel.copy(s.c.angVel); c.quat.copy(s.c.quat); c.onGround = s.c.onGround; c.groundN.copy(s.c.groundN);
+    c.jumped = s.c.jumped; c.flipAvail = s.c.flipAvail; c.boost = s.c.boost; c.prevJump = true;
+    b.pos.copy(s.b.pos); b.vel.copy(s.b.vel); b.angVel.copy(s.b.angVel); b.quat.copy(s.b.quat); b.frozen = s.b.frozen;
+    this.ballHidden = false;
+    this.events.push({ type: 'fptool', label: '⏪ Rewind 3s' });
+  }
+  freeplayResetCar() { const s = kickoffSpots(ARENA.kind)[4]; this.player.spawn(s[0], s[1], 0, 0); this.player.boost = 100; this.events.push({ type: 'fptool', label: 'Car reset' }); }
 
   // ---------------------------------------------------------------------------
   // Training packs
@@ -3597,6 +3698,12 @@ const FX = {
         if (ev.item === 'haymaker' || ev.item === 'freeze' || ev.item === 'plunger') this.beam(ev.car.pos, game.ball.pos, ev.item === 'freeze' ? 0x80e0ff : 0xffd040);
         break;
       }
+      case 'pinch':
+        this.flash(ev.pos, 0xffffff, 260, 0.25);
+        this.burst(A, ev.pos, 90, 2200, 0.5, 18, [1, 0.9, 0.6], { drag: 3 });
+        this.ring(ev.pos, 0xffe0a0, 600, 0.4, ev.pos.y);
+        R.cam.shake = Math.max(R.cam.shake, 0.9);
+        break;
       case 'flipreset': this.burst(A, ev.car.pos, 25, 300, 0.5, 14, [0.4, 1, 0.6], {}); break;
     }
   },
@@ -4037,6 +4144,19 @@ const Input = {
     if (typeof UI === 'undefined') return;
     const inMatch = CUR.game && !CUR.attract && !UI.screen;
     if (inMatch) {
+      if (CUR.game.kind === 'freeplay') {
+        const G = CUR.game;
+        if (edge(12)) G.freeplayLaunch();      // D-pad up: shoot the ball at me
+        if (edge(13)) G.freeplayResetBall();   // D-pad down: ball to center
+        if (edge(14)) G.freeplayAerial();      // D-pad left: aerial ball
+        if (edge(15)) G.freeplayWall();        // D-pad right: wall / pinch ball
+        if (edge(4)) G.freeplayRewind();       // L1: rewind 3 seconds
+        if (edge(5)) G.freeplayFreeze();       // R1: freeze / unfreeze the ball
+        if (edge(10)) G.freeplayResetCar();    // L3: reset car
+        if (edge(9)) UI.onKey('Escape');
+        if (edge(3)) { R.cam.ballCam = !R.cam.ballCam; this.buttons.ballcam.el.classList.toggle('active', R.cam.ballCam); }
+        return;
+      }
       if (edge(3)) { R.cam.ballCam = !R.cam.ballCam; this.buttons.ballcam.el.classList.toggle('active', R.cam.ballCam); Sound.play('click'); }
       if (edge(9)) UI.onKey('Escape');
       // D-pad quick chat, laid out like Rocket League (up/left/right/down)
@@ -4105,9 +4225,10 @@ const Input = {
       if (b(0)) jump = true;            // Cross: jump
       if (b(1)) boost = true;           // Circle: boost
       if (b(2)) hb = true;              // Square: powerslide / air roll
-      if (b(4)) rollL = true;           // L1: air roll left
+      const fp = CUR.game && CUR.game.kind === 'freeplay';
+      if (b(4) && !fp) rollL = true;    // L1: air roll left (rewind in free play)
       if (CUR.game && CUR.game.mode === 'rumble') { if (b(5)) useItem = true; } // R1: use item
-      else if (b(5)) rollR = true;      // R1: air roll right
+      else if (b(5) && !fp) rollR = true; // R1: air roll right (freeze ball in free play)
       // right stick swivels the camera, R3 looks behind
       const rx = gp.axes[2] || 0, ry = gp.axes[3] || 0;
       if (Math.hypot(rx, ry) > 0.3) this.camYaw = Math.atan2(rx, -ry);
@@ -4285,6 +4406,8 @@ const UI = {
       ['Demolitions', 'Hit an opponent while supersonic to blow them up. They respawn after 3 seconds.'],
       ['Ball cam', 'BALL CAM keeps the ball on screen. Turn it off to look where your car is pointing.'],
       ['Flip reset', 'Touch the ball with all four wheels in the air to get your flip back.'],
+      ['Pinch', 'Hit the ball hard while it is pressed against the floor or a wall. It shoots out much faster than a normal hit. Practice with Free Play → Wall / pinch ball (D-pad right).'],
+      ['Free Play buttons', 'D-pad ↑ shoot ball at me · ↓ ball to center · ← aerial ball · → wall/pinch ball · L1 rewind 3 seconds · R1 freeze ball · L3 reset car. Air roll stays on □ in free play.'],
       ['Keyboard', 'W/S drive & pitch · A/D steer · Space jump · Shift boost · X drift/air roll · Q/E directional roll · B ball cam · F item · Esc pause · 1–4 quick chat · Tab scoreboard'],
       ['PS4 / PS5 controller', 'Same as Rocket League: R2 gas · L2 brake/reverse · Left stick steer & air control · ✕ jump · ○ boost · □ powerslide / air roll · △ ball cam · L1 air roll left · R1 air roll right (use item in Rumble) · R3 look behind · right stick look around · D-pad quick chat · OPTIONS pause · touchpad/SHARE scoreboard. In menus: stick or D-pad to move, ✕ select, ○ back.'],
       ['Xbox controller', 'RT gas · LT brake · A jump · B boost · X powerslide · Y ball cam · LB/RB air roll · same layout as above.'],
@@ -4468,10 +4591,15 @@ const UI = {
       h('button', { class: 'hbtn', onclick: () => this.toggleQuick(), 'aria-label': 'Quick chat' }, '💬'),
       h('button', { class: 'hbtn', onpointerdown: () => this.showBoard(true), onpointerup: () => this.showBoard(false), onpointerleave: () => this.showBoard(false), 'aria-label': 'Scoreboard' }, '☰'),
     );
+    const fpb = (label, key, fn) => h('button', { class: 'hbtn wide', onclick: () => CUR.game && CUR.game[fn]() }, h('b', { class: 'padkey' }, key), ' ' + label);
     H.fp = h('div', { class: 'fpbtns' },
-      h('button', { class: 'hbtn wide', onclick: () => CUR.game && CUR.game.freeplayResetBall() }, 'Ball to center'),
-      h('button', { class: 'hbtn wide', onclick: () => CUR.game && CUR.game.freeplayLaunch() }, 'Shoot ball at me'),
-      h('button', { class: 'hbtn wide', onclick: () => CUR.game && CUR.game.freeplayResetCar() }, 'Reset car'),
+      fpb('Shoot ball at me', '↑', 'freeplayLaunch'),
+      fpb('Ball to center', '↓', 'freeplayResetBall'),
+      fpb('Aerial ball', '←', 'freeplayAerial'),
+      fpb('Wall / pinch ball', '→', 'freeplayWall'),
+      fpb('Rewind 3s', 'L1', 'freeplayRewind'),
+      fpb('Freeze ball', 'R1', 'freeplayFreeze'),
+      fpb('Reset car', 'L3', 'freeplayResetCar'),
     );
     H.quick = h('div', { class: 'quick', hidden: true });
     H.board = h('div', { class: 'board', hidden: true });
@@ -4555,7 +4683,7 @@ const UI = {
   },
 
   award(label, pts) {
-    const el = h('div', { class: 'award' }, h('b', null, label.toUpperCase()), h('span', null, '+' + pts));
+    const el = h('div', { class: 'award' }, h('b', null, label.toUpperCase()), pts ? h('span', null, '+' + pts) : null);
     this.hudEls.awards.prepend(el);
     setTimeout(() => el.classList.add('out'), 2200);
     setTimeout(() => el.remove(), 2700);
@@ -4627,6 +4755,8 @@ const UI = {
         break;
       }
       case 'itemget': if (ev.car === me) { Sound.play('item'); } break;
+      case 'fptool': this.award(ev.label, 0); break;
+      case 'pinch': if (ev.car === me) { this.award('Pinch! ' + Math.round(ev.speed * 0.036) + ' kph', 0); } break;
       case 'flipreset': if (ev.car === me) { this.award('Flip Reset', 0); Sound.play('flipreset'); } break;
       case 'charge': this.feedAdd(ev.level >= 2 ? 'Ball is SUPER CHARGED!' : 'Ball is CHARGED!'); break;
       case 'trainingResult': this.bannerShow(`<div class="g-mid">${ev.success ? (game.trainingPack === 'goalie' ? 'SAVED!' : 'NICE SHOT!') : (game.trainingPack === 'goalie' ? 'GOAL AGAINST' : 'MISSED')}</div>`, ev.success ? 'goal t0' : 'demo', 1800); break;
@@ -4987,6 +5117,8 @@ function processEvents(g) {
       case 'pad': if (ev.car === me) Sound.play(ev.pad.big ? 'padBig' : 'padSmall'); break;
       case 'demo': Sound.play('demo', { vol: Math.max(v, Sound.distVol(ev.pos)) }); Sound.cheer(0.4, 1.2); break;
       case 'bump': Sound.play('bump', { vol: v }); break;
+      case 'pinch': Sound.play('hit', { s: 1.5 }); Sound.play('whoosh'); Sound.cheer(0.6, 1.2); break;
+      case 'fptool': Sound.play('click'); break;
       case 'goal': Sound.play('horn'); Sound.cheer(1, 4); break;
       case 'count': Sound.play('count'); break;
       case 'go': Sound.play('go'); break;

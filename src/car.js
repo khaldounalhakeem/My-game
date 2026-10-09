@@ -51,7 +51,7 @@ class Car {
     this.flipAvail = true; this.flipReset = false; this.dodging = false; this.dodgeT = 0; this.dodgeDir = [0, 0]; this.dodgeCancel = false;
     this.groundGrace = 0; this.supersonic = false; this.demolished = false; this.respawnT = 0;
     this.boosting = false; this.lastGroundTime = 0; this.airTime = 0; this.contactRoof = 0;
-    this.restT = 0; this.recoverT = 0; this.recoverN = new V3(0, 1, 0);
+    this.restT = 0; this.recoverT = 0; this.recoverN = new V3(0, 1, 0); this.postFlipT = 0; this.dodgeAngle = 0;
     this.wheelSpin = 0; this.steerVis = 0; this.landedT = 0; this.wasOnGround = false; this.slideAmt = 0;
     this.lastBallHit = -10; this.ballContact = false; this.wallTime = 0;
   }
@@ -182,10 +182,10 @@ class Car {
     // and a car left lying on its side rights itself after a moment
     if (this.contactRoof > 0 && this.vel.length() < 600) this.restT += dt; else this.restT = 0;
     const lyingDot = up.dot(this.groundN);
-    if (this.recoverT <= 0 && this.contactRoof > 0 && (jumpEdge || (this.restT > 0.35 && lyingDot > -0.3) || this.restT > 1.4)) {
-      this.recoverT = 0.6;
+    if (this.recoverT <= 0 && this.contactRoof > 0 && (jumpEdge || this.restT > 0.12)) {
+      this.recoverT = 0.45;
       this.recoverN.copy(this.groundN.y > 0.5 ? this.groundN : UP);
-      this.vel.addScaledVector(this.recoverN, jumpEdge ? 380 : 240);
+      this.vel.addScaledVector(this.recoverN, jumpEdge ? 300 : 150);
       this.groundGrace = 0.12; this.restT = 0; this.contactRoof = 0;
       if (jumpEdge) { game.events.push({ type: 'jump', car: this }); jumpEdge = false; }
     }
@@ -193,11 +193,11 @@ class Car {
       this.recoverT -= dt;
       const d = up.dot(this.recoverN);
       if (d < -0.95) _qa.setFromAxisAngle(this.fwd(_vn), Math.PI); else _qa.setFromUnitVectors(up, this.recoverN);
-      _qb.identity().slerp(_qa, damp(9, dt));
+      _qb.identity().slerp(_qa, damp(15, dt));
       this.quat.premultiply(_qb).normalize();
       this.angVel.set(0, 0, 0);
       this.vel.y -= grav * dt;
-      if (this.recoverT <= 0 || d > 0.97) this.recoverT = 0;
+      if (this.recoverT <= 0 || d > 0.97) { this.recoverT = 0; this.postFlipT = 0.4; }
       return;
     }
 
@@ -222,26 +222,49 @@ class Car {
     let pitchIn = pitch;
 
     if (this.dodging) {
+      // scripted flip: one clean 360° rotation, then the car is level again
       this.dodgeT += dt;
       const [dx, dy] = this.dodgeDir;
-      if (!this.dodgeCancel && dx !== 0 && pitchIn * dx < -0.4 && this.dodgeT > 0.05) this.dodgeCancel = true;
-      if (this.dodgeT < PHYS.DODGE_TIME) {
-        if (!this.dodgeCancel) wl.z = -dx * PHYS.MAX_ANG_VEL;
-        wl.x = dy * PHYS.MAX_ANG_VEL * 0.95 + rollIn * 1.2;
-        if (!this.dodgeCancel) pitchIn = 0;
-        yawIn = 0;
-        // dodge gravity relief in the first part of the flip
-        if (this.dodgeT < 0.25) this.vel.y += grav * 0.6 * dt;
-      } else this.dodging = false;
+      const len = Math.hypot(dx, dy) || 1;
+      if (dx !== 0 && pitchIn * dx < -0.4 && this.dodgeT > 0.06) {
+        // flip cancel (half-flip): stop the pitch rotation and hand control back
+        this.dodgeCancel = true; this.dodging = false; wl.z *= 0.15;
+      } else {
+        const full = Math.PI * 2;
+        const step = Math.min(full / PHYS.FLIP_SPIN_TIME * dt, full - this.dodgeAngle);
+        const w = step / dt;
+        wl.z = -dx / len * w;
+        wl.x = dy / len * w + rollIn * 2;
+        wl.y = 0;
+        this.dodgeAngle += step;
+        pitchIn = 0; yawIn = 0;
+        this.vel.y += grav * 0.35 * dt; // flips float a little
+        if (this.dodgeAngle >= full - 1e-4) { this.dodging = false; this.postFlipT = 0.3; wl.set(rollIn * 2, 0, 0); }
+      }
     }
-    if (!this.dodging || this.dodgeCancel) {
+    if (this.postFlipT > 0) { this.postFlipT -= dt; pitchIn = 0; yawIn = 0; }
+    if (!this.dodging) {
       wl.x += (36.08 * rollIn - 4.47 * wl.x) * dt;
       wl.z += (12.15 * -pitchIn - 2.80 * wl.z * (1 - Math.abs(pitchIn))) * dt;
       wl.y += (8.92 * -yawIn - 1.89 * wl.y * (1 - Math.abs(yawIn))) * dt;
     }
     const wm = wl.length();
-    if (wm > PHYS.MAX_ANG_VEL) wl.multiplyScalar(PHYS.MAX_ANG_VEL / wm);
+    if (!this.dodging && wm > PHYS.MAX_ANG_VEL) wl.multiplyScalar(PHYS.MAX_ANG_VEL / wm);
     this.angVel.copy(wl).applyQuaternion(this.quat);
+
+    // landing assist: when dropping close to a surface, ease the car towards wheels-down
+    if (!this.dodging && this.airTime > 0.25 && this.vel.y < -50) {
+      const dd = arenaDist(this.pos.x, this.pos.y, this.pos.z, false);
+      if (dd < 170) {
+        const n = arenaNormal(this.pos.x, this.pos.y, this.pos.z, false, _vn);
+        if (up.dot(n) < 0.97) {
+          if (up.dot(n) < -0.95) _qa.setFromAxisAngle(this.fwd(_ve), Math.PI); else _qa.setFromUnitVectors(up, n);
+          _qb.identity().slerp(_qa, damp(7 * (1 - dd / 200), dt));
+          this.quat.premultiply(_qb).normalize();
+          this.angVel.multiplyScalar(1 - damp(6, dt));
+        }
+      }
+    }
 
     // forces
     if (this.boosting) this.vel.addScaledVector(fwd, PHYS.BOOST_ACCEL * dt);
@@ -265,8 +288,8 @@ class Car {
     const sImp = dy * PHYS.DODGE_IMPULSE * (1 + 0.9 * Math.min(1, Math.abs(vf) / PHYS.CAR_MAX_SPEED));
     const len = Math.hypot(dx, dy);
     this.vel.addScaledVector(fh, fImp / Math.max(1, len)).addScaledVector(rh, sImp / Math.max(1, len));
-    this.vel.y = Math.max(0, this.vel.y * 0.3);
-    this.dodging = true; this.dodgeT = 0; this.dodgeDir = [dx, dy]; this.dodgeCancel = false;
+    this.vel.y = Math.max(0, this.vel.y);
+    this.dodging = true; this.dodgeT = 0; this.dodgeDir = [dx, dy]; this.dodgeCancel = false; this.dodgeAngle = 0;
     game.events.push({ type: 'dodge', car: this, dir: [dx, dy] });
   }
 
@@ -285,7 +308,7 @@ class Car {
       const upDot = up.dot(n);
       const vn = this.vel.dot(n);
       const reach = wasGround ? PHYS.REST_HEIGHT + 8 : PHYS.REST_HEIGHT + 2;
-      if (d0 < reach && upDot > 0.55 && vn < 250 && (this.groundGrace <= 0 || vn < -1)) {
+      if (d0 < reach && upDot > (wasGround ? 0.55 : 0.3) && vn < 250 && (this.groundGrace <= 0 || vn < -1)) {
         this.onGround = true;
         this.groundN.copy(n);
         if (d0 < PHYS.REST_HEIGHT) this.pos.addScaledVector(n, PHYS.REST_HEIGHT - d0);

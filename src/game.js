@@ -213,7 +213,11 @@ class Game {
       if (g >= 0) this.scoreGoal(g);
     }
     if (this.kind === 'training') this.updateTraining(dt);
-    if (this.kind === 'freeplay' && (ball.pos.y < -400 || !isFinite(ball.pos.x))) this.freeplayLaunch();
+    if (this.kind === 'freeplay') {
+      if (ball.pos.y < -400 || !isFinite(ball.pos.x)) this.freeplayLaunch();
+      this.fpAcc = (this.fpAcc || 0) + dt;
+      if (this.fpAcc >= 0.1) { this.fpAcc = 0; this.fpSnapshot(); }
+    }
     this.recordReplay();
   }
 
@@ -600,8 +604,52 @@ class Game {
     const to = tmpV().copy(car.pos).sub(b.pos); to.y = 0; to.normalize();
     b.vel.set(to.x * rand(400, 900), rand(500, 1100), to.z * rand(400, 900));
   }
-  freeplayResetBall() { this.ball.reset(0, this.ball.radius + 200, 0); }
-  freeplayResetCar() { const s = kickoffSpots(ARENA.kind)[4]; this.player.spawn(s[0], s[1], 0, 0); this.player.boost = 100; }
+  freeplayResetBall() { this.ball.reset(0, this.ball.radius + 200, 0); this.events.push({ type: 'fptool', label: 'Ball to center' }); }
+  freeplayAerial() {
+    const car = this.player, b = this.ball;
+    const f = car.fwd(tmpV()); f.y = 0; if (f.lengthSq() < 0.01) f.set(0, 0, 1); f.normalize();
+    const p = tmpV().copy(car.pos).addScaledVector(f, 1700);
+    p.x = clamp(p.x, -ARENA.W + 500, ARENA.W - 500); p.z = clamp(p.z, -ARENA.L + 700, ARENA.L - 700);
+    b.reset(p.x, 950, p.z); b.vel.set(0, 350, 0); b.frozen = 0;
+    this.events.push({ type: 'fptool', label: 'Aerial ball' });
+  }
+  freeplayWall() {
+    // ball rolling along the nearest side wall: practice wall shots and pinches
+    const car = this.player, b = this.ball;
+    const side = car.pos.x >= 0 ? 1 : -1;
+    const z = clamp(car.pos.z + 1500, -ARENA.L + 1500, ARENA.L - 1500);
+    b.reset(side * (ARENA.W - 140), b.radius + 40, z - 1200); b.vel.set(side * 150, 0, 900); b.frozen = 0;
+    this.events.push({ type: 'fptool', label: 'Wall ball' });
+  }
+  freeplayFreeze() {
+    const b = this.ball;
+    if (b.frozen > 0) { b.frozen = 0; this.events.push({ type: 'fptool', label: 'Ball unfrozen' }); }
+    else { b.frozen = 1e9; b.vel.set(0, 0, 0); b.angVel.set(0, 0, 0); this.events.push({ type: 'fptool', label: 'Ball frozen' }); }
+  }
+  // free play rewind: snapshots every 0.1 s, rewind 3 s
+  fpSnapshot() {
+    const c = this.player, b = this.ball;
+    this.fpHist = this.fpHist || [];
+    this.fpHist.push({
+      c: { pos: c.pos.clone(), vel: c.vel.clone(), angVel: c.angVel.clone(), quat: c.quat.clone(), onGround: c.onGround, groundN: c.groundN.clone(), jumped: c.jumped, flipAvail: c.flipAvail, boost: c.boost },
+      b: { pos: b.pos.clone(), vel: b.vel.clone(), angVel: b.angVel.clone(), quat: b.quat.clone(), frozen: b.frozen },
+    });
+    if (this.fpHist.length > 120) this.fpHist.shift();
+  }
+  freeplayRewind() {
+    const H = this.fpHist || [];
+    if (H.length < 2) return;
+    const i = Math.max(0, H.length - 30);
+    const s = H[i]; H.length = i + 1;
+    const c = this.player, b = this.ball;
+    c.resetState();
+    c.pos.copy(s.c.pos); c.vel.copy(s.c.vel); c.angVel.copy(s.c.angVel); c.quat.copy(s.c.quat); c.onGround = s.c.onGround; c.groundN.copy(s.c.groundN);
+    c.jumped = s.c.jumped; c.flipAvail = s.c.flipAvail; c.boost = s.c.boost; c.prevJump = true;
+    b.pos.copy(s.b.pos); b.vel.copy(s.b.vel); b.angVel.copy(s.b.angVel); b.quat.copy(s.b.quat); b.frozen = s.b.frozen;
+    this.ballHidden = false;
+    this.events.push({ type: 'fptool', label: '⏪ Rewind 3s' });
+  }
+  freeplayResetCar() { const s = kickoffSpots(ARENA.kind)[4]; this.player.spawn(s[0], s[1], 0, 0); this.player.boost = 100; this.events.push({ type: 'fptool', label: 'Car reset' }); }
 
   // ---------------------------------------------------------------------------
   // Training packs

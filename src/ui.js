@@ -154,6 +154,8 @@ const UI = {
       ['Demolitions', 'Hit an opponent while supersonic to blow them up. They respawn after 3 seconds.'],
       ['Ball cam', 'BALL CAM keeps the ball on screen. Turn it off to look where your car is pointing.'],
       ['Flip reset', 'Touch the ball with all four wheels in the air to get your flip back.'],
+      ['Pinch', 'Hit the ball hard while it is pressed against the floor or a wall. It shoots out much faster than a normal hit. Practice with Free Play → Wall / pinch ball (D-pad right).'],
+      ['Free Play buttons', 'D-pad ↑ shoot ball at me · ↓ ball to center · ← aerial ball · → wall/pinch ball · L1 rewind 3 seconds · R1 freeze ball · L3 reset car. Air roll stays on □ in free play.'],
       ['Keyboard', 'W/S drive & pitch · A/D steer · Space jump · Shift boost · X drift/air roll · Q/E directional roll · B ball cam · F item · Esc pause · 1–4 quick chat · Tab scoreboard'],
       ['PS4 / PS5 controller', 'Same as Rocket League: R2 gas · L2 brake/reverse · Left stick steer & air control · ✕ jump · ○ boost · □ powerslide / air roll · △ ball cam · L1 air roll left · R1 air roll right (use item in Rumble) · R3 look behind · right stick look around · D-pad quick chat · OPTIONS pause · touchpad/SHARE scoreboard. In menus: stick or D-pad to move, ✕ select, ○ back.'],
       ['Xbox controller', 'RT gas · LT brake · A jump · B boost · X powerslide · Y ball cam · LB/RB air roll · same layout as above.'],
@@ -337,10 +339,15 @@ const UI = {
       h('button', { class: 'hbtn', onclick: () => this.toggleQuick(), 'aria-label': 'Quick chat' }, '💬'),
       h('button', { class: 'hbtn', onpointerdown: () => this.showBoard(true), onpointerup: () => this.showBoard(false), onpointerleave: () => this.showBoard(false), 'aria-label': 'Scoreboard' }, '☰'),
     );
+    const fpb = (label, key, fn) => h('button', { class: 'hbtn wide', onclick: () => CUR.game && CUR.game[fn]() }, h('b', { class: 'padkey' }, key), ' ' + label);
     H.fp = h('div', { class: 'fpbtns' },
-      h('button', { class: 'hbtn wide', onclick: () => CUR.game && CUR.game.freeplayResetBall() }, 'Ball to center'),
-      h('button', { class: 'hbtn wide', onclick: () => CUR.game && CUR.game.freeplayLaunch() }, 'Shoot ball at me'),
-      h('button', { class: 'hbtn wide', onclick: () => CUR.game && CUR.game.freeplayResetCar() }, 'Reset car'),
+      fpb('Shoot ball at me', '↑', 'freeplayLaunch'),
+      fpb('Ball to center', '↓', 'freeplayResetBall'),
+      fpb('Aerial ball', '←', 'freeplayAerial'),
+      fpb('Wall / pinch ball', '→', 'freeplayWall'),
+      fpb('Rewind 3s', 'L1', 'freeplayRewind'),
+      fpb('Freeze ball', 'R1', 'freeplayFreeze'),
+      fpb('Reset car', 'L3', 'freeplayResetCar'),
     );
     H.quick = h('div', { class: 'quick', hidden: true });
     H.board = h('div', { class: 'board', hidden: true });
@@ -424,7 +431,7 @@ const UI = {
   },
 
   award(label, pts) {
-    const el = h('div', { class: 'award' }, h('b', null, label.toUpperCase()), h('span', null, '+' + pts));
+    const el = h('div', { class: 'award' }, h('b', null, label.toUpperCase()), pts ? h('span', null, '+' + pts) : null);
     this.hudEls.awards.prepend(el);
     setTimeout(() => el.classList.add('out'), 2200);
     setTimeout(() => el.remove(), 2700);
@@ -496,6 +503,8 @@ const UI = {
         break;
       }
       case 'itemget': if (ev.car === me) { Sound.play('item'); } break;
+      case 'fptool': this.award(ev.label, 0); break;
+      case 'pinch': if (ev.car === me) { this.award('Pinch! ' + Math.round(ev.speed * 0.036) + ' kph', 0); } break;
       case 'flipreset': if (ev.car === me) { this.award('Flip Reset', 0); Sound.play('flipreset'); } break;
       case 'charge': this.feedAdd(ev.level >= 2 ? 'Ball is SUPER CHARGED!' : 'Ball is CHARGED!'); break;
       case 'trainingResult': this.bannerShow(`<div class="g-mid">${ev.success ? (game.trainingPack === 'goalie' ? 'SAVED!' : 'NICE SHOT!') : (game.trainingPack === 'goalie' ? 'GOAL AGAINST' : 'MISSED')}</div>`, ev.success ? 'goal t0' : 'demo', 1800); break;

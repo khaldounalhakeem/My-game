@@ -10,7 +10,7 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 
 ## What's in it
 
-**Car physics, using Rocket League's published constants:** throttle and steering curves, 2300 uu/s top speed, supersonic at 2200, boost (33.3/s, pads give 12 or 100), powerslide, driving on curved walls and the ceiling, sticky wheels, variable-height jump, double jump, directional flips (front, back, side, diagonal), flip cancels, half-flips, air roll (free and directional), flip resets off the ball, turtle recovery, demolitions and bumps.
+**Car physics, using Rocket League's published constants:** throttle and steering curves, 2300 uu/s top speed, supersonic at 2200, boost (33.3/s, pads give 12 or 100), powerslide, driving on curved walls and the ceiling, sticky wheels, variable-height jump, double jump, directional flips (front, back, side, diagonal), flip cancels, half-flips, air roll (free and directional), flip resets off the ball, pinches (ball squeezed against a wall or the floor), automatic self-righting, demolitions and bumps.
 
 **Six hitbox types:** Striker (Octane), Phantom (Dominus), Blade (Breakout), Wedge (Plank), Hybrid X and Bulwark (Merc).
 
@@ -22,7 +22,7 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 
 **Mutators:** match length, max score, game speed, ball speed, ball type, ball weight, ball size, bounciness, boost amount, gravity, demolish rules and respawn time.
 
-**Training:** Striker, Goalie and Aerial packs, plus Free Play (shoot-at-me, reset ball, reset car).
+**Training:** Striker, Goalie and Aerial packs, plus Free Play. Free Play tools on the controller: D-pad ↑ shoot the ball at me, ↓ ball to center, ← aerial ball, → wall/pinch ball, L1 rewind 3 seconds, R1 freeze ball, L3 reset car. The same tools are on-screen buttons for touch.
 
 **Progression:** XP and levels, item drops with rarities, a competitive rating with ranks from Bronze to Supersonic Legend, and career stats.
 
