@@ -51,7 +51,7 @@ class Car {
     this.flipAvail = true; this.flipReset = false; this.dodging = false; this.dodgeT = 0; this.dodgeDir = [0, 0]; this.dodgeCancel = false;
     this.groundGrace = 0; this.supersonic = false; this.demolished = false; this.respawnT = 0;
     this.boosting = false; this.lastGroundTime = 0; this.airTime = 0; this.contactRoof = 0;
-    this.restT = 0; this.recoverT = 0; this.recoverN = new V3(0, 1, 0); this.postFlipT = 0; this.dodgeAngle = 0;
+    this.restT = 0; this.recoverT = 0; this.recoverN = new V3(0, 1, 0); this.postFlipT = 0; this.dodgeAngle = 0; this.wedgeT = 0;
     this.wheelSpin = 0; this.steerVis = 0; this.landedT = 0; this.wasOnGround = false; this.slideAmt = 0;
     this.lastBallHit = -10; this.ballContact = false; this.wallTime = 0;
   }
@@ -159,6 +159,9 @@ class Car {
     this.vel.y -= grav * dt;
     this.vel.addScaledVector(n, -PHYS.STICKY_FORCE * dt);
     if (n.y < 0.7) this.wallTime += dt; else this.wallTime = 0;
+    // wedged on a wall (e.g. in a goal corner) and not moving: let go of the wall and drop
+    if (n.y < 0.7 && Math.abs(throttle) > 0.1 && Math.abs(vf) < 60) this.wedgeT += dt; else this.wedgeT = 0;
+    if (this.wedgeT > 0.6) { this.wedgeT = 0; this.vel.addScaledVector(n, 250); this.onGround = false; this.groundGrace = 0.35; }
   }
 
   doJump(up, game) {
@@ -182,9 +185,9 @@ class Car {
     // and a car left lying on its side rights itself after a moment
     if (this.contactRoof > 0 && this.vel.length() < 600) this.restT += dt; else this.restT = 0;
     const lyingDot = up.dot(this.groundN);
-    if (this.recoverT <= 0 && this.contactRoof > 0 && (jumpEdge || this.restT > 0.12)) {
+    if (this.recoverT <= 0 && this.contactRoof > 0 && this.groundN.y > 0.45 && (jumpEdge || this.restT > 0.12)) {
       this.recoverT = 0.45;
-      this.recoverN.copy(this.groundN.y > 0.5 ? this.groundN : UP);
+      this.recoverN.copy(this.groundN);
       this.vel.addScaledVector(this.recoverN, jumpEdge ? 300 : 150);
       this.groundGrace = 0.12; this.restT = 0; this.contactRoof = 0;
       if (jumpEdge) { game.events.push({ type: 'jump', car: this }); jumpEdge = false; }
@@ -239,7 +242,7 @@ class Car {
         this.dodgeAngle += step;
         pitchIn = 0; yawIn = 0;
         this.vel.y += grav * 0.35 * dt; // flips float a little
-        if (this.dodgeAngle >= full - 1e-4) { this.dodging = false; this.postFlipT = 0.3; wl.set(rollIn * 2, 0, 0); }
+        if (this.dodgeAngle >= full - 1e-4) { this.dodging = false; this.postFlipT = 0.5; wl.set(rollIn * 2, 0, 0); }
       }
     }
     if (this.postFlipT > 0) { this.postFlipT -= dt; pitchIn = 0; yawIn = 0; }
@@ -356,8 +359,10 @@ class Car {
           this.vel.addScaledVector(n, j / PHYS.CAR_MASS);
           this.angVel.addScaledVector(rxn, j / I);
           // friction
+          // Coulomb friction: limited by how hard the car hit, so scraping keeps most speed
           const vt = pv.addScaledVector(n, -vn);
-          this.vel.addScaledVector(vt, -0.15);
+          const vtl = vt.length();
+          if (vtl > 1e-3) this.vel.addScaledVector(vt, -Math.min(0.15, 0.25 * (j / PHYS.CAR_MASS) / vtl));
           if (this.onGround) this.angVel.multiplyScalar(0.5);
         }
         const upN = this.up(_va).dot(n);

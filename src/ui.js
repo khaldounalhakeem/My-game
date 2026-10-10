@@ -329,11 +329,15 @@ const UI = {
     setTimeout(() => { const i = xpBar.querySelector('i'); i.style.width = res.xpTo + '%'; }, 300);
     const el = h('div', { class: 'menu post scroll' },
       h('div', { class: 'result ' + (won ? 'win' : 'loss') }, won ? 'VICTORY' : 'DEFEAT'),
+      g.forfeitTeam !== undefined ? h('div', { class: 'mvp' }, g.forfeitTeam === g.player.team ? 'Your team forfeited' : 'The other team forfeited') : null,
       g.mvp ? h('div', { class: 'mvp' }, `MVP: ${g.mvp.name}`) : null,
       h('div', { class: 'sbs' }, tbl(0), tbl(1)),
       h('div', { class: 'xpwrap' }, h('div', null, `+${res.xp} XP`, res.leveled ? h('b', { class: 'lvlup' }, ` LEVEL UP! Level ${Profile.level}`) : null), xpBar),
       res.rating ? this.ratingBlock(res.rating) : null,
       res.drops.length ? h('div', { class: 'drops' }, h('div', { class: 'drops-h' }, 'ITEM DROP'), res.drops.map(d => h('div', { class: 'drop', style: `--rar:${RARITY_COLORS[d.rarity]}` }, h('b', null, d.name), h('small', null, `${RARITY[d.rarity]} ${d.catName}`)))) : null,
+      h('div', { class: 'postchat' },
+        h('div', { class: 'row center' }, ['gg', 'Well played.', 'That was fun!', 'Rematch!', 'What a game!', 'Nice moves!'].map(m => h('button', { class: 'ghost', onclick: () => g.chat(g.player, m, false) }, m))),
+        h('div', { class: 'postchatlog scroll', id: 'postchatlog' }, g.chatLog.filter(c => c.t > g.time - 8).map(c => h('div', { class: 'citem' }, h('b', { class: 't' + c.car.team }, c.car.name + ': '), c.msg)))),
       h('div', { class: 'row center' },
         this.btn('PLAY AGAIN', () => startMatch(g.cfg), 'go'),
         this.btn('MAIN MENU', () => quitToMenu()),
@@ -551,7 +555,13 @@ const UI = {
         break;
       }
       case 'save': this.feedAdd(`<b class="t${ev.car.team}">${ev.car.name}</b> ${ev.epic ? 'EPIC SAVE!' : 'saved it!'}`); break;
-      case 'chat': this.chatAdd(ev.car, ev.msg, ev.team); Sound.play('chat'); break;
+      case 'chat': {
+        this.chatAdd(ev.car, ev.msg, ev.team); Sound.play('chat');
+        const log = document.getElementById('postchatlog');
+        if (log) { log.append(h('div', { class: 'citem' }, h('b', { class: 't' + ev.car.team }, (ev.team ? '[TEAM] ' : '') + ev.car.name + ': '), ev.msg)); log.scrollTop = 1e6; }
+        break;
+      }
+      case 'forfeit': this.bannerShow(`<div class="g-mid">${TEAM_COLORS[ev.team].name} FORFEITS</div><div class="g-sub">They gave up</div>`, 'ot', 3000); break;
       case 'end': {
         const won = ev.winner === me.team;
         this.bannerShow(`<div class="g-big">${won ? 'VICTORY' : 'DEFEAT'}</div><div class="g-sub">${game.score[0]} – ${game.score[1]}</div>`, 'end t' + ev.winner);

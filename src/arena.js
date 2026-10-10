@@ -94,7 +94,9 @@ function arenaDist(x, y, z, forBall) {
   // ---- inside a goal tunnel ----
   if (g && az > A.L) {
     if (ax < g.w && y < g.h) return Math.min(g.w - ax, g.h - y, A.L + g.d - az, y);
-    return A.L - az; // inside the back wall: push back towards the field
+    // inside the back wall next to the goal: push out the shortest way (into the field or into the goal)
+    const ex = Math.min(az - A.L, (ax >= g.w && y < g.h) ? ax - g.w : Infinity, (y >= g.h && ax < g.w) ? y - g.h : Infinity);
+    return -ex;
   }
 
   let floorD = y;

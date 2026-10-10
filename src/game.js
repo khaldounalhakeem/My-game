@@ -129,6 +129,11 @@ class Game {
     dt *= this.mutators.gameSpeed;
     this.time += dt;
     this.stateT -= dt;
+    this.updateChat();
+    if (this.state === 'play' && this.clockRunning) {
+      this.ffClock = (this.ffClock || 0) + dt;
+      if (this.ffClock > 2) { this.ffClock = 0; this.checkForfeit(); if (this.state === 'ended') return; }
+    }
     const st = this.state;
 
     if (st === 'countdown') {
@@ -350,6 +355,7 @@ class Game {
       if (epic) car.stats.epicSaves++;
       this.award(car, epic ? 'Epic Save' : 'Save', epic ? 75 : 50);
       this.events.push({ type: 'save', car, epic });
+      this.setHero(car);
       this.ballThreat = after;
     }
     if (after && after.team !== car.team && (!this.lastShot || this.lastShot.car !== car || now - this.lastShot.t > 1.5)) {
@@ -402,6 +408,7 @@ class Game {
     att.stats.demos++;
     this.award(att, 'Demolition', 25);
     this.events.push({ type: 'demo', car: att, victim: vic, pos: vic.pos.clone() });
+    this.setHero(att);
     for (const b of this.bots) b.react(this, { type: 'demo', car: att, victim: vic });
   }
 
@@ -434,12 +441,13 @@ class Game {
     }
     const ownGoal = ball.lastTouch && ball.lastTouch.car.team !== scoringTeam;
     if (scorer) {
+      this.setHero(scorer);
       scorer.stats.goals++;
       this.award(scorer, 'Goal', 100);
       if (!scorer.onGround && ball.pos.y > 300) this.award(scorer, 'Aerial Goal', 20);
       if (scorer.lastBallHit && this.time - scorer.lastBallHit > 3 && ownGoal) { /* nothing */ }
     }
-    if (assist) { assist.stats.assists++; this.award(assist, 'Assist', 50); }
+    if (assist) { assist.stats.assists++; this.award(assist, 'Assist', 50); this.assistHero = assist; }
     this.goalInfo = { team: scoringTeam, scorer, assist, ownGoal: ownGoal && !scorer, speed: ball.vel.length() * 0.036, time: this.clock };
     this.events.push({ type: 'goal', team: scoringTeam, scorer, assist, pos: ball.pos.clone(), speed: ball.vel.length(), ownGoal: this.goalInfo.ownGoal });
     for (const b of this.bots) b.react(this, { type: 'goal', team: scoringTeam, scorer });
@@ -577,6 +585,62 @@ class Game {
     const e = { type: 'chat', car, msg, team: !!teamOnly, t: this.time };
     this.chatLog.push(e); if (this.chatLog.length > 30) this.chatLog.shift();
     this.events.push(e);
+    // bots answer: always when you talk to them, sometimes when they talk to each other
+    if (!car.isBot || Math.random() < 0.3) this.queueReplies(car, msg, teamOnly);
+  }
+
+  // who the last big moment belonged to (for "Nice shot!" → "Thanks!")
+  setHero(car) { this.hero = { car, t: this.time }; }
+  queueReplies(from, msg, teamOnly) {
+    this.pendingChat = this.pendingChat || [];
+    const bots = this.cars.filter(c => c.isBot && c !== from);
+    if (!bots.length) return;
+    const delay = () => rand(0.7, 1.9);
+    const say = (car, text, team) => this.pendingChat.push({ t: this.time + delay(), car, msg: text, team });
+    if (QUICKCHAT.PostGame.includes(msg)) {
+      for (const b of bots) if (Math.random() < 0.75) say(b, pick(POSTGAME_REPLIES), false);
+      return;
+    }
+    const rule = CHAT_REPLIES[msg];
+    if (!rule || rule.who === 'none') return;
+    if (rule.chance && Math.random() > rule.chance) return;
+    const mates = bots.filter(c => c.team === from.team), opps = bots.filter(c => c.team !== from.team);
+    if (rule.who === 'hero') {
+      let hero = this.hero && this.time - this.hero.t < 12 ? this.hero.car : (this.ball.lastTouch ? this.ball.lastTouch.car : null);
+      if (msg === 'Great pass!' && this.assistHero && this.assistHero !== from) hero = this.assistHero;
+      if (!hero || hero === from || !hero.isBot) hero = mates[0] || null;
+      if (hero) say(hero, pick(rule.r), hero.team === from.team);
+      // a teammate sometimes piles on
+      const other = mates.find(c => c !== hero);
+      if (other && Math.random() < 0.3) say(other, pick(['What a play!', 'Nice one!', 'Wow!']), true);
+      return;
+    }
+    if (rule.who === 'team' && !teamOnly && rule.opp && opps.length && Math.random() < 0.4) say(pick(opps), pick(rule.opp), false);
+    let pool = rule.who === 'team' ? mates : rule.who === 'opp' ? (teamOnly ? [] : opps) : (teamOnly ? mates : bots);
+    if (!pool.length) return;
+    say(pick(pool), pick(rule.r), rule.who !== 'opp' && (teamOnly || rule.who === 'team'));
+  }
+  updateChat() {
+    if (!this.pendingChat || !this.pendingChat.length) return;
+    const due = this.pendingChat.filter(c => c.t <= this.time);
+    if (!due.length) return;
+    this.pendingChat = this.pendingChat.filter(c => c.t > this.time);
+    for (const d of due) if (!d.car.demolished || this.state === 'ended') this.chat(d.car, d.msg, d.team);
+  }
+
+  // bots that are losing badly give up and forfeit
+  checkForfeit() {
+    if (this.kind !== 'match' || this.overtime || this.mutators.matchLength === 0 || this.cfg.attract) return;
+    this.ffT = (this.ffT || 0) + 1;
+    const me = this.player.team, opp = 1 - me;
+    const diff = this.score[me] - this.score[opp];
+    const hopeless = diff >= 6 || (diff >= 4 && this.clock < 90) || (diff >= 3 && this.clock < 35);
+    if (!hopeless || Math.random() > 0.3) return;
+    const loser = this.cars.find(c => c.team === opp);
+    if (loser) this.chat(loser, pick(['gg', 'ff', 'gg', 'Well played.']), false);
+    this.forfeitTeam = opp;
+    this.events.push({ type: 'forfeit', team: opp });
+    this.endMatch();
   }
 
   // ---------------------------------------------------------------------------

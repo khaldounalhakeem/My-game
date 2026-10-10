@@ -321,6 +321,10 @@ body:not(.pad) .fpbtns .padkey { display: none; }
 .rankresult.big b { font-size: 30px; }
 .rbadge { display: block; }
 
+.postchat { display: flex; flex-direction: column; gap: 8px; align-items: center; width: min(720px, 100%); }
+.postchatlog { width: 100%; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
+.postchatlog .citem { align-self: center; }
+
 </style>
 
 <canvas id="gl"></canvas>
@@ -635,7 +639,9 @@ function arenaDist(x, y, z, forBall) {
   // ---- inside a goal tunnel ----
   if (g && az > A.L) {
     if (ax < g.w && y < g.h) return Math.min(g.w - ax, g.h - y, A.L + g.d - az, y);
-    return A.L - az; // inside the back wall: push back towards the field
+    // inside the back wall next to the goal: push out the shortest way (into the field or into the goal)
+    const ex = Math.min(az - A.L, (ax >= g.w && y < g.h) ? ax - g.w : Infinity, (y >= g.h && ax < g.w) ? y - g.h : Infinity);
+    return -ex;
   }
 
   let floorD = y;
@@ -794,7 +800,7 @@ class Car {
     this.flipAvail = true; this.flipReset = false; this.dodging = false; this.dodgeT = 0; this.dodgeDir = [0, 0]; this.dodgeCancel = false;
     this.groundGrace = 0; this.supersonic = false; this.demolished = false; this.respawnT = 0;
     this.boosting = false; this.lastGroundTime = 0; this.airTime = 0; this.contactRoof = 0;
-    this.restT = 0; this.recoverT = 0; this.recoverN = new V3(0, 1, 0); this.postFlipT = 0; this.dodgeAngle = 0;
+    this.restT = 0; this.recoverT = 0; this.recoverN = new V3(0, 1, 0); this.postFlipT = 0; this.dodgeAngle = 0; this.wedgeT = 0;
     this.wheelSpin = 0; this.steerVis = 0; this.landedT = 0; this.wasOnGround = false; this.slideAmt = 0;
     this.lastBallHit = -10; this.ballContact = false; this.wallTime = 0;
   }
@@ -902,6 +908,9 @@ class Car {
     this.vel.y -= grav * dt;
     this.vel.addScaledVector(n, -PHYS.STICKY_FORCE * dt);
     if (n.y < 0.7) this.wallTime += dt; else this.wallTime = 0;
+    // wedged on a wall (e.g. in a goal corner) and not moving: let go of the wall and drop
+    if (n.y < 0.7 && Math.abs(throttle) > 0.1 && Math.abs(vf) < 60) this.wedgeT += dt; else this.wedgeT = 0;
+    if (this.wedgeT > 0.6) { this.wedgeT = 0; this.vel.addScaledVector(n, 250); this.onGround = false; this.groundGrace = 0.35; }
   }
 
   doJump(up, game) {
@@ -925,9 +934,9 @@ class Car {
     // and a car left lying on its side rights itself after a moment
     if (this.contactRoof > 0 && this.vel.length() < 600) this.restT += dt; else this.restT = 0;
     const lyingDot = up.dot(this.groundN);
-    if (this.recoverT <= 0 && this.contactRoof > 0 && (jumpEdge || this.restT > 0.12)) {
+    if (this.recoverT <= 0 && this.contactRoof > 0 && this.groundN.y > 0.45 && (jumpEdge || this.restT > 0.12)) {
       this.recoverT = 0.45;
-      this.recoverN.copy(this.groundN.y > 0.5 ? this.groundN : UP);
+      this.recoverN.copy(this.groundN);
       this.vel.addScaledVector(this.recoverN, jumpEdge ? 300 : 150);
       this.groundGrace = 0.12; this.restT = 0; this.contactRoof = 0;
       if (jumpEdge) { game.events.push({ type: 'jump', car: this }); jumpEdge = false; }
@@ -982,7 +991,7 @@ class Car {
         this.dodgeAngle += step;
         pitchIn = 0; yawIn = 0;
         this.vel.y += grav * 0.35 * dt; // flips float a little
-        if (this.dodgeAngle >= full - 1e-4) { this.dodging = false; this.postFlipT = 0.3; wl.set(rollIn * 2, 0, 0); }
+        if (this.dodgeAngle >= full - 1e-4) { this.dodging = false; this.postFlipT = 0.5; wl.set(rollIn * 2, 0, 0); }
       }
     }
     if (this.postFlipT > 0) { this.postFlipT -= dt; pitchIn = 0; yawIn = 0; }
@@ -1099,8 +1108,10 @@ class Car {
           this.vel.addScaledVector(n, j / PHYS.CAR_MASS);
           this.angVel.addScaledVector(rxn, j / I);
           // friction
+          // Coulomb friction: limited by how hard the car hit, so scraping keeps most speed
           const vt = pv.addScaledVector(n, -vn);
-          this.vel.addScaledVector(vt, -0.15);
+          const vtl = vt.length();
+          if (vtl > 1e-3) this.vel.addScaledVector(vt, -Math.min(0.15, 0.25 * (j / PHYS.CAR_MASS) / vtl));
           if (this.onGround) this.angVel.multiplyScalar(0.5);
         }
         const upN = this.up(_va).dot(n);
@@ -1502,6 +1513,52 @@ const TRAINING_PACKS = {
   goalie: { name: 'Goalie', desc: 'Shots fly at your goal. Stop them.', count: 8 },
   aerial: { name: 'Aerial', desc: 'Take to the sky and score off high balls.', count: 8 },
 };
+
+// How bots answer quick chat. who: hero (the player being complimented), team, opp, others
+const CHAT_REPLIES = {
+  'Nice shot!': { who: 'hero', r: ['Thanks!', 'Thanks!', 'Calculated.', 'Thanks!'] },
+  'What a play!': { who: 'hero', r: ['Thanks!', 'Calculated.', 'Siiiick!'] },
+  'Nice one!': { who: 'hero', r: ['Thanks!', 'Thanks!'] },
+  'Great pass!': { who: 'hero', r: ['Thanks!', 'No problem.', 'Nice shot!'] },
+  'What a save!': { who: 'hero', r: ['Thanks!', 'Thanks!', 'Whew.'] },
+  'Great clear!': { who: 'hero', r: ['Thanks!', 'No problem.'] },
+  'Nice block!': { who: 'hero', r: ['Thanks!', 'Whew.'] },
+  'Nice bump!': { who: 'hero', r: ['Thanks!', 'Bumping!'] },
+  'Nice demo!': { who: 'hero', r: ['Thanks!', 'Savage!'] },
+  'Thanks!': { who: 'team', r: ['No problem.', 'No problem.', 'Okay.'] },
+  'Sorry!': { who: 'team', r: ['No problem.', 'No problem.', 'Okay.', 'No problem.'] },
+  'My bad...': { who: 'team', r: ['No problem.', 'Okay.'] },
+  'My fault.': { who: 'team', r: ['No problem.', 'Okay.'] },
+  'Whoops...': { who: 'team', r: ['No problem.', 'Close one!'] },
+  'Oops!': { who: 'team', r: ['No problem.', 'Okay.'] },
+  '$#@%!': { who: 'team', r: ['No problem.', 'Close one!', 'Okay.'], opp: ['Calculated.', 'Okay.'] },
+  'I got it!': { who: 'team', r: ['All yours.', 'Okay.', 'In position.'] },
+  'Need boost!': { who: 'team', r: ['Okay.', 'Defending...'] },
+  'Take the shot!': { who: 'team', r: ['Okay.', 'I got it!'] },
+  'Defending...': { who: 'team', r: ['Okay.', 'Go for it!'] },
+  'Go for it!': { who: 'team', r: ['I got it!', 'Okay.'] },
+  'Centering!': { who: 'team', r: ['In position.', 'Take the shot!'] },
+  'All yours.': { who: 'team', r: ['I got it!', 'Okay.'] },
+  'In position.': { who: 'team', r: ['Centering!', 'Okay.'] },
+  'Incoming!': { who: 'team', r: ['Defending...', 'Okay.'] },
+  'Passing!': { who: 'team', r: ['In position.', 'Okay.'] },
+  'Rotating back.': { who: 'team', r: ['Okay.', 'Go for it!'] },
+  'Bumping!': { who: 'team', r: ['Okay.', 'Go for it!'] },
+  'On your left.': { who: 'team', r: ['Okay.', 'Passing!'] },
+  'On your right.': { who: 'team', r: ['Okay.', 'Passing!'] },
+  'Faking.': { who: 'team', r: ['Okay.'] },
+  'OMG!': { who: 'others', r: ['Wow!', 'What a play!', 'Close one!'], chance: 0.6 },
+  'Wow!': { who: 'others', r: ['What a play!', 'OMG!', 'Wow!'], chance: 0.5 },
+  'Holy cow!': { who: 'others', r: ['Wow!', 'OMG!'], chance: 0.5 },
+  'No way!': { who: 'others', r: ['Calculated.', 'Wow!', 'Close one!'], chance: 0.5 },
+  'Siiiick!': { who: 'others', r: ['What a play!', 'Wow!'], chance: 0.5 },
+  'Noooo!': { who: 'team', r: ['Close one!', 'No problem.', 'Whew.'] },
+  'Close one!': { who: 'others', r: ['Whew.', 'Close one!'], chance: 0.6 },
+  'Calculated.': { who: 'opp', r: ['Savage!', 'Okay.', 'Wow!'], chance: 0.6 },
+  'Savage!': { who: 'opp', r: ['Calculated.', 'Okay.'], chance: 0.5 },
+  'Okay.': { who: 'none' }, 'No problem.': { who: 'none' }, 'Whew.': { who: 'none' },
+};
+const POSTGAME_REPLIES = ['gg', 'gg', 'Well played.', 'That was fun!', 'What a game!', 'Nice moves!', 'Rematch!'];
 
 </script>
 <script>/* src/ranks.js */
@@ -2146,6 +2203,11 @@ class Game {
     dt *= this.mutators.gameSpeed;
     this.time += dt;
     this.stateT -= dt;
+    this.updateChat();
+    if (this.state === 'play' && this.clockRunning) {
+      this.ffClock = (this.ffClock || 0) + dt;
+      if (this.ffClock > 2) { this.ffClock = 0; this.checkForfeit(); if (this.state === 'ended') return; }
+    }
     const st = this.state;
 
     if (st === 'countdown') {
@@ -2367,6 +2429,7 @@ class Game {
       if (epic) car.stats.epicSaves++;
       this.award(car, epic ? 'Epic Save' : 'Save', epic ? 75 : 50);
       this.events.push({ type: 'save', car, epic });
+      this.setHero(car);
       this.ballThreat = after;
     }
     if (after && after.team !== car.team && (!this.lastShot || this.lastShot.car !== car || now - this.lastShot.t > 1.5)) {
@@ -2419,6 +2482,7 @@ class Game {
     att.stats.demos++;
     this.award(att, 'Demolition', 25);
     this.events.push({ type: 'demo', car: att, victim: vic, pos: vic.pos.clone() });
+    this.setHero(att);
     for (const b of this.bots) b.react(this, { type: 'demo', car: att, victim: vic });
   }
 
@@ -2451,12 +2515,13 @@ class Game {
     }
     const ownGoal = ball.lastTouch && ball.lastTouch.car.team !== scoringTeam;
     if (scorer) {
+      this.setHero(scorer);
       scorer.stats.goals++;
       this.award(scorer, 'Goal', 100);
       if (!scorer.onGround && ball.pos.y > 300) this.award(scorer, 'Aerial Goal', 20);
       if (scorer.lastBallHit && this.time - scorer.lastBallHit > 3 && ownGoal) { /* nothing */ }
     }
-    if (assist) { assist.stats.assists++; this.award(assist, 'Assist', 50); }
+    if (assist) { assist.stats.assists++; this.award(assist, 'Assist', 50); this.assistHero = assist; }
     this.goalInfo = { team: scoringTeam, scorer, assist, ownGoal: ownGoal && !scorer, speed: ball.vel.length() * 0.036, time: this.clock };
     this.events.push({ type: 'goal', team: scoringTeam, scorer, assist, pos: ball.pos.clone(), speed: ball.vel.length(), ownGoal: this.goalInfo.ownGoal });
     for (const b of this.bots) b.react(this, { type: 'goal', team: scoringTeam, scorer });
@@ -2594,6 +2659,62 @@ class Game {
     const e = { type: 'chat', car, msg, team: !!teamOnly, t: this.time };
     this.chatLog.push(e); if (this.chatLog.length > 30) this.chatLog.shift();
     this.events.push(e);
+    // bots answer: always when you talk to them, sometimes when they talk to each other
+    if (!car.isBot || Math.random() < 0.3) this.queueReplies(car, msg, teamOnly);
+  }
+
+  // who the last big moment belonged to (for "Nice shot!" → "Thanks!")
+  setHero(car) { this.hero = { car, t: this.time }; }
+  queueReplies(from, msg, teamOnly) {
+    this.pendingChat = this.pendingChat || [];
+    const bots = this.cars.filter(c => c.isBot && c !== from);
+    if (!bots.length) return;
+    const delay = () => rand(0.7, 1.9);
+    const say = (car, text, team) => this.pendingChat.push({ t: this.time + delay(), car, msg: text, team });
+    if (QUICKCHAT.PostGame.includes(msg)) {
+      for (const b of bots) if (Math.random() < 0.75) say(b, pick(POSTGAME_REPLIES), false);
+      return;
+    }
+    const rule = CHAT_REPLIES[msg];
+    if (!rule || rule.who === 'none') return;
+    if (rule.chance && Math.random() > rule.chance) return;
+    const mates = bots.filter(c => c.team === from.team), opps = bots.filter(c => c.team !== from.team);
+    if (rule.who === 'hero') {
+      let hero = this.hero && this.time - this.hero.t < 12 ? this.hero.car : (this.ball.lastTouch ? this.ball.lastTouch.car : null);
+      if (msg === 'Great pass!' && this.assistHero && this.assistHero !== from) hero = this.assistHero;
+      if (!hero || hero === from || !hero.isBot) hero = mates[0] || null;
+      if (hero) say(hero, pick(rule.r), hero.team === from.team);
+      // a teammate sometimes piles on
+      const other = mates.find(c => c !== hero);
+      if (other && Math.random() < 0.3) say(other, pick(['What a play!', 'Nice one!', 'Wow!']), true);
+      return;
+    }
+    if (rule.who === 'team' && !teamOnly && rule.opp && opps.length && Math.random() < 0.4) say(pick(opps), pick(rule.opp), false);
+    let pool = rule.who === 'team' ? mates : rule.who === 'opp' ? (teamOnly ? [] : opps) : (teamOnly ? mates : bots);
+    if (!pool.length) return;
+    say(pick(pool), pick(rule.r), rule.who !== 'opp' && (teamOnly || rule.who === 'team'));
+  }
+  updateChat() {
+    if (!this.pendingChat || !this.pendingChat.length) return;
+    const due = this.pendingChat.filter(c => c.t <= this.time);
+    if (!due.length) return;
+    this.pendingChat = this.pendingChat.filter(c => c.t > this.time);
+    for (const d of due) if (!d.car.demolished || this.state === 'ended') this.chat(d.car, d.msg, d.team);
+  }
+
+  // bots that are losing badly give up and forfeit
+  checkForfeit() {
+    if (this.kind !== 'match' || this.overtime || this.mutators.matchLength === 0 || this.cfg.attract) return;
+    this.ffT = (this.ffT || 0) + 1;
+    const me = this.player.team, opp = 1 - me;
+    const diff = this.score[me] - this.score[opp];
+    const hopeless = diff >= 6 || (diff >= 4 && this.clock < 90) || (diff >= 3 && this.clock < 35);
+    if (!hopeless || Math.random() > 0.3) return;
+    const loser = this.cars.find(c => c.team === opp);
+    if (loser) this.chat(loser, pick(['gg', 'ff', 'gg', 'Well played.']), false);
+    this.forfeitTeam = opp;
+    this.events.push({ type: 'forfeit', team: opp });
+    this.endMatch();
   }
 
   // ---------------------------------------------------------------------------
@@ -4808,11 +4929,15 @@ const UI = {
     setTimeout(() => { const i = xpBar.querySelector('i'); i.style.width = res.xpTo + '%'; }, 300);
     const el = h('div', { class: 'menu post scroll' },
       h('div', { class: 'result ' + (won ? 'win' : 'loss') }, won ? 'VICTORY' : 'DEFEAT'),
+      g.forfeitTeam !== undefined ? h('div', { class: 'mvp' }, g.forfeitTeam === g.player.team ? 'Your team forfeited' : 'The other team forfeited') : null,
       g.mvp ? h('div', { class: 'mvp' }, `MVP: ${g.mvp.name}`) : null,
       h('div', { class: 'sbs' }, tbl(0), tbl(1)),
       h('div', { class: 'xpwrap' }, h('div', null, `+${res.xp} XP`, res.leveled ? h('b', { class: 'lvlup' }, ` LEVEL UP! Level ${Profile.level}`) : null), xpBar),
       res.rating ? this.ratingBlock(res.rating) : null,
       res.drops.length ? h('div', { class: 'drops' }, h('div', { class: 'drops-h' }, 'ITEM DROP'), res.drops.map(d => h('div', { class: 'drop', style: `--rar:${RARITY_COLORS[d.rarity]}` }, h('b', null, d.name), h('small', null, `${RARITY[d.rarity]} ${d.catName}`)))) : null,
+      h('div', { class: 'postchat' },
+        h('div', { class: 'row center' }, ['gg', 'Well played.', 'That was fun!', 'Rematch!', 'What a game!', 'Nice moves!'].map(m => h('button', { class: 'ghost', onclick: () => g.chat(g.player, m, false) }, m))),
+        h('div', { class: 'postchatlog scroll', id: 'postchatlog' }, g.chatLog.filter(c => c.t > g.time - 8).map(c => h('div', { class: 'citem' }, h('b', { class: 't' + c.car.team }, c.car.name + ': '), c.msg)))),
       h('div', { class: 'row center' },
         this.btn('PLAY AGAIN', () => startMatch(g.cfg), 'go'),
         this.btn('MAIN MENU', () => quitToMenu()),
@@ -5030,7 +5155,13 @@ const UI = {
         break;
       }
       case 'save': this.feedAdd(`<b class="t${ev.car.team}">${ev.car.name}</b> ${ev.epic ? 'EPIC SAVE!' : 'saved it!'}`); break;
-      case 'chat': this.chatAdd(ev.car, ev.msg, ev.team); Sound.play('chat'); break;
+      case 'chat': {
+        this.chatAdd(ev.car, ev.msg, ev.team); Sound.play('chat');
+        const log = document.getElementById('postchatlog');
+        if (log) { log.append(h('div', { class: 'citem' }, h('b', { class: 't' + ev.car.team }, (ev.team ? '[TEAM] ' : '') + ev.car.name + ': '), ev.msg)); log.scrollTop = 1e6; }
+        break;
+      }
+      case 'forfeit': this.bannerShow(`<div class="g-mid">${TEAM_COLORS[ev.team].name} FORFEITS</div><div class="g-sub">They gave up</div>`, 'ot', 3000); break;
       case 'end': {
         const won = ev.winner === me.team;
         this.bannerShow(`<div class="g-big">${won ? 'VICTORY' : 'DEFEAT'}</div><div class="g-sub">${game.score[0]} – ${game.score[1]}</div>`, 'end t' + ev.winner);
