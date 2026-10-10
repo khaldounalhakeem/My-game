@@ -483,6 +483,8 @@ class Game {
     this.ballHidden = false; this.lastGoalPos = null;
     if (this.kind === 'freeplay') { this.state = 'play'; this.goalInfo = null; this.freeplayLaunch(); return; }
     if (this.kind === 'training') return;
+    // the match-winning goal goes straight to the end, no replay to wait through
+    if (this.otWinner) { this.finishReplay(); return; }
     if (this.cfg.replays !== false && this.replay.frames.length > 40 && !this.skipReplay) {
       this.state = 'replay'; this.replay.t = 0; this.replay.playing = true;
       this.replay.snap = this.replay.frames.slice(Math.max(0, this.replay.goalFrame - 150), this.replay.goalFrame + 20);

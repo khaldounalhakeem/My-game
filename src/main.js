@@ -133,16 +133,10 @@ function loop(t) {
       CUR.acc -= PHYS.TICK; steps++;
     }
     if (steps >= 8) CUR.acc = 0;
-    processEvents(g);
+    // a glitch in effects or the HUD must never stop the match from finishing
+    try { processEvents(g); } catch (e) { console.error(e); }
     if (!CUR.attract) {
-      UI.hudUpdate(g, dt);
-      // match end → post-match screen
-      if (g.state === 'ended' && g.kind === 'match') {
-        CUR.endT += dt;
-        // save the result the moment the match ends, so nothing can lose it
-        if (!g.result) { g.result = finishMatchProgress(g); Input.show(false); }
-        if (CUR.endT > 3.2 && UI.screen !== 'post') { CUR.paused = false; UI.showHud(false, g); UI.show('post', g.result); Sound.startMusic(); }
-      }
+      try { UI.hudUpdate(g, dt); } catch (e) { console.error(e); }
       if (g.state === 'ended' && g.kind === 'training' && !UI.screen) {
         CUR.endT += dt;
         if (CUR.endT > 1.5) { Input.show(false); UI.showHud(false, g); UI.show('trainingEnd', { results: g.trainingResults }); }
@@ -150,6 +144,7 @@ function loop(t) {
     } else if (g.state === 'ended' || g.time > 600) startAttract();
     Sound.updateCar(g.player, !CUR.attract && !UI.screen && g.state !== 'replay');
   } else Sound.updateCar(null, false);
+  if (g && !CUR.attract && g.state === 'ended' && g.kind === 'match') endOfMatch(g, dt);
 
   let replayFrame = null;
   if (g && g.state === 'replay') {
@@ -222,6 +217,26 @@ function processEvents(g) {
       case 'end': Sound.play('horn'); Sound.cheer(0.8, 4); break;
       case 'trainingResult': Sound.play(ev.success ? 'levelup' : 'back'); break;
     }
+  }
+}
+
+// match end → post-match screen (runs even while paused, and survives errors)
+function endOfMatch(g, dt) {
+  CUR.endT += dt;
+  // save the result the moment the match ends, so nothing can lose it
+  if (!g.result) {
+    try { g.result = finishMatchProgress(g); } catch (e) { console.error(e); g.result = { game: g, xp: 0, xpFrom: 0, xpTo: 0, leveled: false, drops: [], rating: null }; }
+    Input.show(false);
+  }
+  if (CUR.endT > 2.5 && UI.screen !== 'post') {
+    CUR.paused = false;
+    try { UI.showHud(false, g); } catch (e) { console.error(e); }
+    try { UI.show('post', g.result); } catch (e) {
+      console.error(e);
+      // fall back to a bare post screen without the extras
+      try { UI.show('post', { game: g, xp: g.result.xp || 0, xpFrom: 0, xpTo: 0, leveled: false, drops: [], rating: null }); } catch (e2) { console.error(e2); startAttract(); UI.show('main'); }
+    }
+    try { Sound.startMusic(); } catch (e) { /* audio is optional */ }
   }
 }
 
