@@ -287,9 +287,9 @@ class Game {
 
   onBounce(ball, n, j) {
     this.events.push({ type: 'bounce', strength: j, pos: ball.pos.clone(), n: n.clone() });
+    // heatseeker: hitting the wall around the goal speeds the ball up, but only a player's touch changes its target
     if (this.mode === 'heatseeker' && this.heat.target >= 0 && Math.abs(n.z) > 0.7 && Math.abs(ball.pos.z) > ARENA.L - 300) {
-      this.heat.target = 1 - this.heat.target;
-      this.heat.speed = Math.min(4600, this.heat.speed + 100);
+      this.heat.speed = Math.min(4600, this.heat.speed + 60);
     }
     if (ARENA.dropshot && n.y > 0.8 && ball.pos.y < ball.radius + 20 && ball.dsTeam !== undefined && ball.dsTeam >= 0) {
       const t = tileAt(ball.pos.x, ball.pos.z);
@@ -334,6 +334,10 @@ class Game {
 
     // heatseeker
     if (this.mode === 'heatseeker') {
+      // a touch sends the ball back out: it can't keep flying into the toucher's own net
+      const ownDir = car.team === 0 ? -1 : 1;
+      if (ball.vel.z * ownDir > 0) ball.vel.z = -ball.vel.z * 0.9;
+      if (ball.vel.z * ownDir > -500) ball.vel.z = -ownDir * Math.max(500, Math.abs(ball.vel.z));
       this.heat.target = car.team === 0 ? 1 : 0;
       this.heat.speed = this.heat.speed ? Math.min(4600, this.heat.speed + 200) : 1900;
     }
