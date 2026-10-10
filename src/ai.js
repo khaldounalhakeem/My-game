@@ -84,7 +84,11 @@ class Bot {
     if (game.kickoffPending) {
       const mates = game.cars.filter(o => o.team === car.team && !o.demolished);
       let best = null, bd = 1e9;
-      for (const m of mates) { const d = m.pos.distanceTo(ball.pos) + m.pos.x * 0.001; if (d < bd) { bd = d; best = m; } }
+      for (const m of mates) {
+        // a human who isn't driving at the ball after GO doesn't count as taking the kickoff
+        if (!m.bot && game.goTime !== undefined && game.time - game.goTime > 0.5 && !humanCommitted(m, ball)) continue;
+        const d = m.pos.distanceTo(ball.pos) + m.pos.x * 0.001; if (d < bd) { bd = d; best = m; }
+      }
       this.mode = best === car ? 'kickoff' : 'kickoffSupport';
       return;
     }
@@ -92,7 +96,8 @@ class Bot {
     const team = game.cars.filter(o => o.team === car.team && !o.demolished);
     const etas = team.map(o => {
       const onside = (ball.pos.z - o.pos.z) * dir > -200 ? 0 : 1.2;
-      return { car: o, e: o.bot ? o.bot.eta(ball.pos) + onside : estimateHumanEta(o, ball.pos) + onside };
+      // only defer to a human teammate who is actually going for the ball
+      return { car: o, e: o.bot ? o.bot.eta(ball.pos) + onside : estimateHumanEta(o, ball.pos) + onside + (humanCommitted(o, ball) ? 0 : 2.5) };
     }).sort((a, b) => a.e - b.e);
     const idx = etas.findIndex(x => x.car === car);
     this.role = idx === 0 ? 'attack' : idx === 1 ? 'support' : 'goalie';
@@ -144,7 +149,7 @@ class Bot {
       if ((ball.pos.z - own.z) * dir < 2500) this.role = 'attack';
     } else if (this.role === 'support') {
       this.mode = 'position';
-      const bz = ball.pos.z - dir * 2400;
+      const bz = ball.pos.z - dir * 1900;
       this.target.set(ball.pos.x * 0.45, 0, clamp(bz, -ARENA.L + 600, ARENA.L - 600));
       // grab boost on the way if low
       if (car.boost < 40) {
@@ -419,4 +424,12 @@ function estimateHumanEta(car, p) {
   const to = _ai2.copy(p).sub(car.pos); to.y = 0; to.normalize();
   const ang = Math.acos(clamp(f.dot(to), -1, 1));
   return d / Math.max(900, car.vel.length()) + ang * 0.45;
+}
+
+// is a human player driving at the ball?
+function humanCommitted(car, ball) {
+  const sp = car.vel.length();
+  if (sp < 400) return car.pos.distanceTo(ball.pos) < 350;
+  const to = _ai2.copy(ball.pos).sub(car.pos).normalize();
+  return car.vel.dot(to) / sp > 0.7;
 }

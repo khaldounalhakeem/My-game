@@ -144,7 +144,7 @@ class Game {
       // cars can't move but physics settles
       for (const c of this.cars) { c.vel.set(0, 0, 0); c.angVel.set(0, 0, 0); c.ctrl.jump && (c.prevJump = true); }
       if (this.stateT <= 0) {
-        this.state = 'play'; this.events.push({ type: 'go' });
+        this.state = 'play'; this.events.push({ type: 'go' }); this.goTime = this.time;
         if (this.mode === 'heatseeker' && this.kind === 'match') {
           // heatseeker kickoff: the ball fires off towards a random goal
           const tgt = Math.random() < 0.5 ? 0 : 1;
