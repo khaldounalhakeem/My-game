@@ -5,7 +5,11 @@
 // ============================================================================
 
 const PLACEMENT_GAMES = 10;
-const PLAYLISTS = { 1: 'Duel', 2: 'Doubles', 3: 'Standard' };
+const PLAYLISTS = { 1: 'Duel', 2: 'Doubles', 3: 'Standard', hoops: 'Hoops', rumble: 'Rumble', heatseeker: 'Heatseeker', dropshot: 'Dropshot', snowday: 'Snow Day' };
+const RANKED_KEYS = ['1', '2', '3', 'hoops', 'rumble', 'heatseeker', 'dropshot', 'snowday'];
+const START_MMR = 1860; // everyone starts at Supersonic Legend and finds their level from there
+// Soccar has Duel/Doubles/Standard; every other mode has one rank of its own
+function rankedKey(cfg) { return cfg.mode && cfg.mode !== 'soccar' ? cfg.mode : String(cfg.teamSize); }
 
 // tiers: [name, min MMR, colour]
 const TIERS = [
@@ -57,31 +61,27 @@ function levelForMMR(mmr) {
 // ---------------------------------------------------------------------------
 function ensureRatings() {
   const P = Profile;
-  if (!P.ranked) P.ranked = {};
+  if (!P.ranked || P.rankVer !== 2) { P.ranked = {}; P.rankVer = 2; } // new ladder: everyone restarts at the top
   if (!P.casual) P.casual = {};
-  for (const k of ['1', '2', '3']) {
-    if (!P.ranked[k]) P.ranked[k] = { mmr: 450, games: 0, wins: 0, losses: 0, placed: false, peak: 0, streak: 0 };
-    if (!P.casual[k]) P.casual[k] = { mmr: 250, games: 0, wins: 0, losses: 0, streak: 0 };
-  }
+  for (const k of RANKED_KEYS) if (!P.ranked[k]) P.ranked[k] = { mmr: START_MMR, games: 0, wins: 0, losses: 0, placed: true, peak: START_MMR, streak: 0 };
+  for (const k of ['1', '2', '3']) if (!P.casual[k]) P.casual[k] = { mmr: 250, games: 0, wins: 0, losses: 0, streak: 0 };
 }
-function rankedState(size) { ensureRatings(); return Profile.ranked[String(size)]; }
+function rankedState(key) { ensureRatings(); return Profile.ranked[String(key)]; }
 function casualState(size) { ensureRatings(); return Profile.casual[String(size)]; }
-function rankLabel(size) {
-  const r = rankedState(size);
-  if (!r.placed) return { text: `Unranked · placement ${r.games}/${PLACEMENT_GAMES}`, color: '#8a94a8', placed: false };
-  const ri = rankInfo(r.mmr);
+function rankLabel(key) {
+  const r = rankedState(key), ri = rankInfo(r.mmr);
   return { text: `${ri.name}${ri.divName ? ' · ' + ri.divName : ''}`, color: ri.color, placed: true, info: ri };
 }
 function bestRank() {
   ensureRatings();
   let best = null;
-  for (const k of ['1', '2', '3']) { const r = Profile.ranked[k]; if (r.placed && (!best || r.mmr > best.mmr)) best = r; }
+  for (const k of RANKED_KEYS) { const r = Profile.ranked[k]; if (r.games > 0 && (!best || r.mmr > best.mmr)) best = r; }
   return best ? rankInfo(best.mmr) : null;
 }
 
 // The rating the bots are tuned to for a match
 function matchRating(cfg) {
-  if (cfg.competitive) return rankedState(cfg.teamSize).mmr;
+  if (cfg.competitive) return rankedState(rankedKey(cfg)).mmr;
   if (cfg.level === 'adaptive') return casualState(cfg.teamSize).mmr;
   return null;
 }
@@ -90,23 +90,22 @@ function matchRating(cfg) {
 function applyRatingResult(cfg, won, goalDiff) {
   const size = cfg.teamSize;
   if (cfg.competitive) {
-    const r = rankedState(size);
-    const before = { mmr: r.mmr, placed: r.placed, rank: rankInfo(r.mmr) };
+    const key = rankedKey(cfg);
+    const r = rankedState(key);
+    const before = rankInfo(r.mmr);
     r.games++; if (won) r.wins++; else r.losses++;
     r.streak = won ? Math.max(1, r.streak + 1) : Math.min(-1, r.streak - 1);
+    // wins climb steadily; losing streaks drop faster until you find the rank you can hold
     let delta;
-    if (!r.placed) delta = (won ? 38 : -28) + clamp(goalDiff, -3, 3) * 4;
-    else delta = (won ? 10 : -10) + (Math.abs(r.streak) >= 3 ? sign(r.streak) * 2 : 0) + clamp(goalDiff, -3, 3);
-    r.mmr = Math.max(0, r.mmr + delta);
-    let justPlaced = false;
-    if (!r.placed && r.games >= PLACEMENT_GAMES) { r.placed = true; justPlaced = true; }
-    r.peak = Math.max(r.peak || 0, r.placed ? r.mmr : 0);
+    if (won) delta = 12 + Math.min(6, (r.streak - 1) * 2) + clamp(goalDiff, 0, 3);
+    else delta = -Math.min(70, 18 + 8 * (-r.streak - 1)) + clamp(goalDiff, -3, 0);
+    r.mmr = clamp(r.mmr + delta, 0, 2200);
+    r.peak = Math.max(r.peak || 0, r.mmr);
     const after = rankInfo(r.mmr);
     return {
-      ranked: true, playlist: PLAYLISTS[size], delta, placed: r.placed, justPlaced, games: r.games,
-      before: before.rank, after, rankUp: before.placed && after.index > before.rank.index, rankDown: before.placed && after.index < before.rank.index,
-      divUp: before.placed && after.index === before.rank.index && after.div > before.rank.div,
-      divDown: before.placed && after.index === before.rank.index && after.div < before.rank.div,
+      ranked: true, playlist: PLAYLISTS[key], delta, placed: true, games: r.games,
+      before, after, rankUp: after.index > before.index, rankDown: after.index < before.index,
+      divUp: after.index === before.index && after.div > before.div, divDown: after.index === before.index && after.div < before.div,
     };
   }
   if (cfg.level === 'adaptive') {

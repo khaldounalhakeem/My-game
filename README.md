@@ -24,7 +24,7 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 
 **Training:** Striker, Goalie and Aerial packs, plus Free Play. Free Play tools on the controller: D-pad ↑ shoot the ball at me, ↓ ball to center, ← aerial ball, → wall/pinch ball, L1 rewind 3 seconds, R1 freeze ball, L3 reset car. The same tools are on-screen buttons for touch.
 
-**Ranked:** separate Duel, Doubles and Standard ratings. 10 placement matches, then ranks from Bronze I to Supersonic Legend with divisions I–IV. Bots are tuned to your rating, so they get harder as you climb. Leaving a ranked match early counts as a loss.
+**Ranked:** every mode has its own rank: Soccar Duel, Doubles and Standard, plus Hoops, Rumble, Heatseeker, Dropshot and Snow Day. Everyone starts at Supersonic Legend against near-perfect bots. Losses drop you, faster on a losing streak, until you settle at the rank you can hold, and wins climb you back up. Ranks run from Bronze I to Supersonic Legend with divisions I–IV, and bots play at your rank. Leaving a ranked match early counts as a loss. Results are saved the instant a match ends.
 
 **Casual:** Adaptive bots by default. A hidden rating goes up when you win and down when you lose, and the bots follow it. Fixed Rookie, Pro and All-Star bots are still available.
 

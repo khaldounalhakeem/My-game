@@ -102,17 +102,17 @@ const UI = {
     const save = () => Store.set('playcfg', C);
     const ranked = !!C.competitive;
     // re-render (keeps the controller focus on the same button)
-    const rerender = (label) => { this.show('play'); if (Input.usingPad) setTimeout(() => { const el = this.padFocusables().find(b => b.textContent === label); if (el) this.padFocus(el); }, 40); };
+    const rerender = (label) => { this.show('play'); if (Input.usingPad) setTimeout(() => { const el = this.padFocusables().find(b => b.textContent === label || b.textContent.startsWith(label)); if (el) this.padFocus(el); }, 40); };
     const seg = (label, key, opts, re) => h('div', { class: 'field' }, h('label', null, label), h('div', { class: 'seg' },
       opts.map(([v, t]) => h('button', { class: C[key] === v ? 'on' : '', onclick: (e) => {
         C[key] = v; save(); Sound.play('click');
         if (re) { rerender(t); return; }
         [...e.target.parentNode.children].forEach(b => b.classList.remove('on')); e.target.classList.add('on');
       } }, t))));
-    const modes = h('div', { class: 'modes' + (ranked ? ' locked' : '') }, Object.entries(MODES).map(([k, m]) => h('button', {
-      class: 'mode ' + ((ranked ? k === 'soccar' : C.mode === k) ? 'on' : ''), disabled: ranked && k !== 'soccar' ? true : null,
-      onclick: (e) => { C.mode = k; save(); [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); Sound.play('click'); },
-    }, h('b', null, m.name), h('small', null, m.desc))));
+    const modes = h('div', { class: 'modes' }, Object.entries(MODES).map(([k, m]) => h('button', {
+      class: 'mode ' + (C.mode === k ? 'on' : ''),
+      onclick: (e) => { C.mode = k; save(); Sound.play('click'); if (ranked) { rerender(m.name + (m.desc ? '' : '')); return; } [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); },
+    }, h('b', null, m.name), h('small', null, ranked ? (() => { const ri = rankInfo(rankedState(rankedKey({ mode: k, teamSize: C.teamSize })).mmr); return ri.name; })() : m.desc))));
     const mapSel = h('select', { id: 'mapsel', onchange: (e) => { C.map = e.target.value; save(); } },
       h('option', { value: 'auto' }, 'Random arena'), Object.entries(MAPS).map(([k, m]) => h('option', { value: k }, `${m.name} (${m.sub})`)));
     mapSel.value = C.map;
@@ -124,13 +124,12 @@ const UI = {
     // rank / difficulty panel for the chosen team size
     let info;
     if (ranked) {
-      const r = rankedState(C.teamSize), lab = rankLabel(C.teamSize);
-      const ri = r.placed ? rankInfo(r.mmr) : null;
+      const key = rankedKey(C), r = rankedState(key), ri = rankInfo(r.mmr);
       info = h('div', { class: 'rankpanel' }, h('span', { html: rankBadge(ri, 64) }),
         h('div', null,
-          h('div', { class: 'rp-name', style: `color:${lab.color}` }, r.placed ? `${ri.name}` : 'Unranked'),
-          h('div', { class: 'rp-sub' }, r.placed ? `${ri.divName} · ${PLAYLISTS[C.teamSize]} · ${r.wins}W ${r.losses}L` : `Placement matches: ${r.games} / ${PLACEMENT_GAMES} played. Win them to start higher.`),
-          h('div', { class: 'rp-sub dim' }, 'Bots are matched to your rank. Win to climb from Bronze I to Supersonic Legend.')));
+          h('div', { class: 'rp-name', style: `color:${ri.color}` }, ri.name),
+          h('div', { class: 'rp-sub' }, `${ri.divName ? ri.divName + ' · ' : ''}${PLAYLISTS[key]} · ${r.wins}W ${r.losses}L`),
+          h('div', { class: 'rp-sub dim' }, r.games === 0 ? 'Everyone starts at Supersonic Legend against the best bots. Losses drop you down until you find your level, then win to climb back up.' : 'Bots play at your rank. Win to climb, lose and you drop (faster on a losing streak).')));
     } else {
       const c = casualState(C.teamSize);
       info = h('div', { class: 'rankpanel' },
@@ -148,13 +147,13 @@ const UI = {
       ),
       info,
       modes,
-      ranked ? h('div', { class: 'rp-sub dim' }, 'Ranked is played in Soccar with standard rules.') : h('div', { class: 'row' },
+      ranked ? h('div', { class: 'rp-sub dim' }, 'Each mode has its own rank. Soccar has separate Duel, Doubles and Standard ranks.') : h('div', { class: 'row' },
         h('button', { class: 'ghost', onclick: () => { mutBox.hidden = !mutBox.hidden; Sound.play('click'); } }, 'Mutators ▾'),
         h('button', { class: 'ghost', onclick: () => { C.mutators = {}; save(); this.show('play'); } }, 'Reset mutators'),
       ),
       ranked ? null : mutBox,
       h('div', { class: 'go-row' }, this.btn(ranked ? 'FIND RANKED MATCH' : 'START MATCH', () => startMatch(ranked
-        ? { kind: 'match', mode: 'soccar', teamSize: C.teamSize, level: 'ranked', map: C.map, competitive: true, mutators: {} }
+        ? { kind: 'match', mode: C.mode, teamSize: C.teamSize, level: 'ranked', map: C.map, competitive: true, mutators: {} }
         : { kind: 'match', ...C, competitive: false }), 'go')),
     );
   },
@@ -211,12 +210,12 @@ const UI = {
       ),
       h('div', { class: 'rk-lvl' }, `Level ${P.level} · ${P.xp} / ${xpForLevel(P.level)} XP · ${Cloud.label()}`),
       h('h3', null, 'Ranked'),
-      h('div', { class: 'rankcards' }, ['1', '2', '3'].map(k => {
-        const r = rankedState(+k), ri = r.placed ? rankInfo(r.mmr) : null;
+      h('div', { class: 'rankcards' }, RANKED_KEYS.map(k => {
+        const r = rankedState(k), ri = rankInfo(r.mmr);
         return h('div', { class: 'rankcard' }, h('span', { html: rankBadge(ri, 72) }),
           h('div', { class: 'rk-pl' }, PLAYLISTS[k]),
           h('div', { class: 'rk-name', style: ri ? `color:${ri.color}` : '' }, ri ? ri.name : 'Unranked'),
-          h('div', { class: 'rk-mmr' }, ri ? `${ri.divName ? ri.divName + ' · ' : ''}${Math.round(r.mmr)} MMR` : `Placements ${r.games}/${PLACEMENT_GAMES}`),
+          h('div', { class: 'rk-mmr' }, `${ri.divName ? ri.divName + ' · ' : ''}${Math.round(r.mmr)} MMR`),
           h('div', { class: 'rk-mmr' }, `${r.wins}W ${r.losses}L` + (r.peak ? ` · peak ${rankFor(r.peak)}` : '')));
       })),
       h('div', { class: 'stats' }, stat('Wins', P.wins), stat('Losses', P.losses), stat('Goals', P.goals), stat('Assists', P.assists), stat('Saves', P.saves), stat('MVPs', P.mvps), stat('Demos', P.demos)),

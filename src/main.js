@@ -9,6 +9,9 @@ function boot() {
   ensureRatings();
   Cloud.init();
   initRenderer(document.getElementById('gl'));
+  const glc = document.getElementById('gl');
+  glc.addEventListener('webglcontextlost', (e) => { e.preventDefault(); }, false); // let Safari restore the GPU context instead of freezing
+  if (Profile.activeMatch) { delete Profile.activeMatch; saveProfile(); setTimeout(() => UI.toast('Your last match was interrupted, so it was not counted.'), 1500); }
   Input.init();
   UI.init();
   R.cam.ballCam = Settings.ballCamDefault;
@@ -60,6 +63,7 @@ function startMatch(cfg) {
   Input.show(true, { item: g.mode === 'rumble' });
   Sound.init(); Sound.stopMusic(); Sound.setCrowd(g.kind === 'match' ? 0.6 : 0.15);
   requestWakeLock();
+  if (g.kind === 'match') { Profile.activeMatch = { mode: g.mode, size: g.cfg.teamSize, ranked: !!g.cfg.competitive, at: Date.now() }; saveProfile(); }
 }
 
 // keep the iPad screen awake during matches
@@ -71,7 +75,7 @@ function requestWakeLock() {
 }
 
 function pauseGame() {
-  if (!CUR.game || CUR.attract) return;
+  if (!CUR.game || CUR.attract || CUR.game.state === 'ended') return;
   CUR.paused = true;
   Input.show(false);
   UI.show('pause');
@@ -82,6 +86,7 @@ function resumeGame() {
   Input.show(true, { item: CUR.game.mode === 'rumble' });
 }
 function quitToMenu(screen) {
+  if (Profile.activeMatch) { delete Profile.activeMatch; saveProfile(); }
   // leaving a ranked match early counts as a loss
   const g = CUR.game;
   if (g && !CUR.attract && g.kind === 'match' && g.cfg.competitive && g.state !== 'ended') {
@@ -134,7 +139,9 @@ function loop(t) {
       // match end → post-match screen
       if (g.state === 'ended' && g.kind === 'match') {
         CUR.endT += dt;
-        if (CUR.endT > 3.2 && !UI.screen) { Input.show(false); UI.showHud(false, g); const res = finishMatchProgress(g); UI.show('post', res); Sound.startMusic(); }
+        // save the result the moment the match ends, so nothing can lose it
+        if (!g.result) { g.result = finishMatchProgress(g); Input.show(false); }
+        if (CUR.endT > 3.2 && UI.screen !== 'post') { CUR.paused = false; UI.showHud(false, g); UI.show('post', g.result); Sound.startMusic(); }
       }
       if (g.state === 'ended' && g.kind === 'training' && !UI.screen) {
         CUR.endT += dt;
@@ -223,6 +230,7 @@ function processEvents(g) {
 // ---------------------------------------------------------------------------
 function finishMatchProgress(g) {
   const P = Profile, me = g.player;
+  delete P.activeMatch;
   const won = g.winner === me.team;
   const xpFrom = Math.min(100, P.xp / xpForLevel(P.level) * 100);
   const xp = Math.round(150 + me.stats.score * 0.6 + (won ? 150 : 0) + (g.mvp === me ? 75 : 0));

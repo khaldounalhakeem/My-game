@@ -1582,7 +1582,11 @@ const POSTGAME_REPLIES = ['gg', 'gg', 'Well played.', 'That was fun!', 'What a g
 // ============================================================================
 
 const PLACEMENT_GAMES = 10;
-const PLAYLISTS = { 1: 'Duel', 2: 'Doubles', 3: 'Standard' };
+const PLAYLISTS = { 1: 'Duel', 2: 'Doubles', 3: 'Standard', hoops: 'Hoops', rumble: 'Rumble', heatseeker: 'Heatseeker', dropshot: 'Dropshot', snowday: 'Snow Day' };
+const RANKED_KEYS = ['1', '2', '3', 'hoops', 'rumble', 'heatseeker', 'dropshot', 'snowday'];
+const START_MMR = 1860; // everyone starts at Supersonic Legend and finds their level from there
+// Soccar has Duel/Doubles/Standard; every other mode has one rank of its own
+function rankedKey(cfg) { return cfg.mode && cfg.mode !== 'soccar' ? cfg.mode : String(cfg.teamSize); }
 
 // tiers: [name, min MMR, colour]
 const TIERS = [
@@ -1634,31 +1638,27 @@ function levelForMMR(mmr) {
 // ---------------------------------------------------------------------------
 function ensureRatings() {
   const P = Profile;
-  if (!P.ranked) P.ranked = {};
+  if (!P.ranked || P.rankVer !== 2) { P.ranked = {}; P.rankVer = 2; } // new ladder: everyone restarts at the top
   if (!P.casual) P.casual = {};
-  for (const k of ['1', '2', '3']) {
-    if (!P.ranked[k]) P.ranked[k] = { mmr: 450, games: 0, wins: 0, losses: 0, placed: false, peak: 0, streak: 0 };
-    if (!P.casual[k]) P.casual[k] = { mmr: 250, games: 0, wins: 0, losses: 0, streak: 0 };
-  }
+  for (const k of RANKED_KEYS) if (!P.ranked[k]) P.ranked[k] = { mmr: START_MMR, games: 0, wins: 0, losses: 0, placed: true, peak: START_MMR, streak: 0 };
+  for (const k of ['1', '2', '3']) if (!P.casual[k]) P.casual[k] = { mmr: 250, games: 0, wins: 0, losses: 0, streak: 0 };
 }
-function rankedState(size) { ensureRatings(); return Profile.ranked[String(size)]; }
+function rankedState(key) { ensureRatings(); return Profile.ranked[String(key)]; }
 function casualState(size) { ensureRatings(); return Profile.casual[String(size)]; }
-function rankLabel(size) {
-  const r = rankedState(size);
-  if (!r.placed) return { text: `Unranked · placement ${r.games}/${PLACEMENT_GAMES}`, color: '#8a94a8', placed: false };
-  const ri = rankInfo(r.mmr);
+function rankLabel(key) {
+  const r = rankedState(key), ri = rankInfo(r.mmr);
   return { text: `${ri.name}${ri.divName ? ' · ' + ri.divName : ''}`, color: ri.color, placed: true, info: ri };
 }
 function bestRank() {
   ensureRatings();
   let best = null;
-  for (const k of ['1', '2', '3']) { const r = Profile.ranked[k]; if (r.placed && (!best || r.mmr > best.mmr)) best = r; }
+  for (const k of RANKED_KEYS) { const r = Profile.ranked[k]; if (r.games > 0 && (!best || r.mmr > best.mmr)) best = r; }
   return best ? rankInfo(best.mmr) : null;
 }
 
 // The rating the bots are tuned to for a match
 function matchRating(cfg) {
-  if (cfg.competitive) return rankedState(cfg.teamSize).mmr;
+  if (cfg.competitive) return rankedState(rankedKey(cfg)).mmr;
   if (cfg.level === 'adaptive') return casualState(cfg.teamSize).mmr;
   return null;
 }
@@ -1667,23 +1667,22 @@ function matchRating(cfg) {
 function applyRatingResult(cfg, won, goalDiff) {
   const size = cfg.teamSize;
   if (cfg.competitive) {
-    const r = rankedState(size);
-    const before = { mmr: r.mmr, placed: r.placed, rank: rankInfo(r.mmr) };
+    const key = rankedKey(cfg);
+    const r = rankedState(key);
+    const before = rankInfo(r.mmr);
     r.games++; if (won) r.wins++; else r.losses++;
     r.streak = won ? Math.max(1, r.streak + 1) : Math.min(-1, r.streak - 1);
+    // wins climb steadily; losing streaks drop faster until you find the rank you can hold
     let delta;
-    if (!r.placed) delta = (won ? 38 : -28) + clamp(goalDiff, -3, 3) * 4;
-    else delta = (won ? 10 : -10) + (Math.abs(r.streak) >= 3 ? sign(r.streak) * 2 : 0) + clamp(goalDiff, -3, 3);
-    r.mmr = Math.max(0, r.mmr + delta);
-    let justPlaced = false;
-    if (!r.placed && r.games >= PLACEMENT_GAMES) { r.placed = true; justPlaced = true; }
-    r.peak = Math.max(r.peak || 0, r.placed ? r.mmr : 0);
+    if (won) delta = 12 + Math.min(6, (r.streak - 1) * 2) + clamp(goalDiff, 0, 3);
+    else delta = -Math.min(70, 18 + 8 * (-r.streak - 1)) + clamp(goalDiff, -3, 0);
+    r.mmr = clamp(r.mmr + delta, 0, 2200);
+    r.peak = Math.max(r.peak || 0, r.mmr);
     const after = rankInfo(r.mmr);
     return {
-      ranked: true, playlist: PLAYLISTS[size], delta, placed: r.placed, justPlaced, games: r.games,
-      before: before.rank, after, rankUp: before.placed && after.index > before.rank.index, rankDown: before.placed && after.index < before.rank.index,
-      divUp: before.placed && after.index === before.rank.index && after.div > before.rank.div,
-      divDown: before.placed && after.index === before.rank.index && after.div < before.rank.div,
+      ranked: true, playlist: PLAYLISTS[key], delta, placed: true, games: r.games,
+      before, after, rankUp: after.index > before.index, rankDown: after.index < before.index,
+      divUp: after.index === before.index && after.div > before.div, divDown: after.index === before.index && after.div < before.div,
     };
   }
   if (cfg.level === 'adaptive') {
@@ -4800,17 +4799,17 @@ const UI = {
     const save = () => Store.set('playcfg', C);
     const ranked = !!C.competitive;
     // re-render (keeps the controller focus on the same button)
-    const rerender = (label) => { this.show('play'); if (Input.usingPad) setTimeout(() => { const el = this.padFocusables().find(b => b.textContent === label); if (el) this.padFocus(el); }, 40); };
+    const rerender = (label) => { this.show('play'); if (Input.usingPad) setTimeout(() => { const el = this.padFocusables().find(b => b.textContent === label || b.textContent.startsWith(label)); if (el) this.padFocus(el); }, 40); };
     const seg = (label, key, opts, re) => h('div', { class: 'field' }, h('label', null, label), h('div', { class: 'seg' },
       opts.map(([v, t]) => h('button', { class: C[key] === v ? 'on' : '', onclick: (e) => {
         C[key] = v; save(); Sound.play('click');
         if (re) { rerender(t); return; }
         [...e.target.parentNode.children].forEach(b => b.classList.remove('on')); e.target.classList.add('on');
       } }, t))));
-    const modes = h('div', { class: 'modes' + (ranked ? ' locked' : '') }, Object.entries(MODES).map(([k, m]) => h('button', {
-      class: 'mode ' + ((ranked ? k === 'soccar' : C.mode === k) ? 'on' : ''), disabled: ranked && k !== 'soccar' ? true : null,
-      onclick: (e) => { C.mode = k; save(); [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); Sound.play('click'); },
-    }, h('b', null, m.name), h('small', null, m.desc))));
+    const modes = h('div', { class: 'modes' }, Object.entries(MODES).map(([k, m]) => h('button', {
+      class: 'mode ' + (C.mode === k ? 'on' : ''),
+      onclick: (e) => { C.mode = k; save(); Sound.play('click'); if (ranked) { rerender(m.name + (m.desc ? '' : '')); return; } [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); },
+    }, h('b', null, m.name), h('small', null, ranked ? (() => { const ri = rankInfo(rankedState(rankedKey({ mode: k, teamSize: C.teamSize })).mmr); return ri.name; })() : m.desc))));
     const mapSel = h('select', { id: 'mapsel', onchange: (e) => { C.map = e.target.value; save(); } },
       h('option', { value: 'auto' }, 'Random arena'), Object.entries(MAPS).map(([k, m]) => h('option', { value: k }, `${m.name} (${m.sub})`)));
     mapSel.value = C.map;
@@ -4822,13 +4821,12 @@ const UI = {
     // rank / difficulty panel for the chosen team size
     let info;
     if (ranked) {
-      const r = rankedState(C.teamSize), lab = rankLabel(C.teamSize);
-      const ri = r.placed ? rankInfo(r.mmr) : null;
+      const key = rankedKey(C), r = rankedState(key), ri = rankInfo(r.mmr);
       info = h('div', { class: 'rankpanel' }, h('span', { html: rankBadge(ri, 64) }),
         h('div', null,
-          h('div', { class: 'rp-name', style: `color:${lab.color}` }, r.placed ? `${ri.name}` : 'Unranked'),
-          h('div', { class: 'rp-sub' }, r.placed ? `${ri.divName} · ${PLAYLISTS[C.teamSize]} · ${r.wins}W ${r.losses}L` : `Placement matches: ${r.games} / ${PLACEMENT_GAMES} played. Win them to start higher.`),
-          h('div', { class: 'rp-sub dim' }, 'Bots are matched to your rank. Win to climb from Bronze I to Supersonic Legend.')));
+          h('div', { class: 'rp-name', style: `color:${ri.color}` }, ri.name),
+          h('div', { class: 'rp-sub' }, `${ri.divName ? ri.divName + ' · ' : ''}${PLAYLISTS[key]} · ${r.wins}W ${r.losses}L`),
+          h('div', { class: 'rp-sub dim' }, r.games === 0 ? 'Everyone starts at Supersonic Legend against the best bots. Losses drop you down until you find your level, then win to climb back up.' : 'Bots play at your rank. Win to climb, lose and you drop (faster on a losing streak).')));
     } else {
       const c = casualState(C.teamSize);
       info = h('div', { class: 'rankpanel' },
@@ -4846,13 +4844,13 @@ const UI = {
       ),
       info,
       modes,
-      ranked ? h('div', { class: 'rp-sub dim' }, 'Ranked is played in Soccar with standard rules.') : h('div', { class: 'row' },
+      ranked ? h('div', { class: 'rp-sub dim' }, 'Each mode has its own rank. Soccar has separate Duel, Doubles and Standard ranks.') : h('div', { class: 'row' },
         h('button', { class: 'ghost', onclick: () => { mutBox.hidden = !mutBox.hidden; Sound.play('click'); } }, 'Mutators ▾'),
         h('button', { class: 'ghost', onclick: () => { C.mutators = {}; save(); this.show('play'); } }, 'Reset mutators'),
       ),
       ranked ? null : mutBox,
       h('div', { class: 'go-row' }, this.btn(ranked ? 'FIND RANKED MATCH' : 'START MATCH', () => startMatch(ranked
-        ? { kind: 'match', mode: 'soccar', teamSize: C.teamSize, level: 'ranked', map: C.map, competitive: true, mutators: {} }
+        ? { kind: 'match', mode: C.mode, teamSize: C.teamSize, level: 'ranked', map: C.map, competitive: true, mutators: {} }
         : { kind: 'match', ...C, competitive: false }), 'go')),
     );
   },
@@ -4909,12 +4907,12 @@ const UI = {
       ),
       h('div', { class: 'rk-lvl' }, `Level ${P.level} · ${P.xp} / ${xpForLevel(P.level)} XP · ${Cloud.label()}`),
       h('h3', null, 'Ranked'),
-      h('div', { class: 'rankcards' }, ['1', '2', '3'].map(k => {
-        const r = rankedState(+k), ri = r.placed ? rankInfo(r.mmr) : null;
+      h('div', { class: 'rankcards' }, RANKED_KEYS.map(k => {
+        const r = rankedState(k), ri = rankInfo(r.mmr);
         return h('div', { class: 'rankcard' }, h('span', { html: rankBadge(ri, 72) }),
           h('div', { class: 'rk-pl' }, PLAYLISTS[k]),
           h('div', { class: 'rk-name', style: ri ? `color:${ri.color}` : '' }, ri ? ri.name : 'Unranked'),
-          h('div', { class: 'rk-mmr' }, ri ? `${ri.divName ? ri.divName + ' · ' : ''}${Math.round(r.mmr)} MMR` : `Placements ${r.games}/${PLACEMENT_GAMES}`),
+          h('div', { class: 'rk-mmr' }, `${ri.divName ? ri.divName + ' · ' : ''}${Math.round(r.mmr)} MMR`),
           h('div', { class: 'rk-mmr' }, `${r.wins}W ${r.losses}L` + (r.peak ? ` · peak ${rankFor(r.peak)}` : '')));
       })),
       h('div', { class: 'stats' }, stat('Wins', P.wins), stat('Losses', P.losses), stat('Goals', P.goals), stat('Assists', P.assists), stat('Saves', P.saves), stat('MVPs', P.mvps), stat('Demos', P.demos)),
@@ -5445,6 +5443,9 @@ function boot() {
   ensureRatings();
   Cloud.init();
   initRenderer(document.getElementById('gl'));
+  const glc = document.getElementById('gl');
+  glc.addEventListener('webglcontextlost', (e) => { e.preventDefault(); }, false); // let Safari restore the GPU context instead of freezing
+  if (Profile.activeMatch) { delete Profile.activeMatch; saveProfile(); setTimeout(() => UI.toast('Your last match was interrupted, so it was not counted.'), 1500); }
   Input.init();
   UI.init();
   R.cam.ballCam = Settings.ballCamDefault;
@@ -5496,6 +5497,7 @@ function startMatch(cfg) {
   Input.show(true, { item: g.mode === 'rumble' });
   Sound.init(); Sound.stopMusic(); Sound.setCrowd(g.kind === 'match' ? 0.6 : 0.15);
   requestWakeLock();
+  if (g.kind === 'match') { Profile.activeMatch = { mode: g.mode, size: g.cfg.teamSize, ranked: !!g.cfg.competitive, at: Date.now() }; saveProfile(); }
 }
 
 // keep the iPad screen awake during matches
@@ -5507,7 +5509,7 @@ function requestWakeLock() {
 }
 
 function pauseGame() {
-  if (!CUR.game || CUR.attract) return;
+  if (!CUR.game || CUR.attract || CUR.game.state === 'ended') return;
   CUR.paused = true;
   Input.show(false);
   UI.show('pause');
@@ -5518,6 +5520,7 @@ function resumeGame() {
   Input.show(true, { item: CUR.game.mode === 'rumble' });
 }
 function quitToMenu(screen) {
+  if (Profile.activeMatch) { delete Profile.activeMatch; saveProfile(); }
   // leaving a ranked match early counts as a loss
   const g = CUR.game;
   if (g && !CUR.attract && g.kind === 'match' && g.cfg.competitive && g.state !== 'ended') {
@@ -5570,7 +5573,9 @@ function loop(t) {
       // match end → post-match screen
       if (g.state === 'ended' && g.kind === 'match') {
         CUR.endT += dt;
-        if (CUR.endT > 3.2 && !UI.screen) { Input.show(false); UI.showHud(false, g); const res = finishMatchProgress(g); UI.show('post', res); Sound.startMusic(); }
+        // save the result the moment the match ends, so nothing can lose it
+        if (!g.result) { g.result = finishMatchProgress(g); Input.show(false); }
+        if (CUR.endT > 3.2 && UI.screen !== 'post') { CUR.paused = false; UI.showHud(false, g); UI.show('post', g.result); Sound.startMusic(); }
       }
       if (g.state === 'ended' && g.kind === 'training' && !UI.screen) {
         CUR.endT += dt;
@@ -5659,6 +5664,7 @@ function processEvents(g) {
 // ---------------------------------------------------------------------------
 function finishMatchProgress(g) {
   const P = Profile, me = g.player;
+  delete P.activeMatch;
   const won = g.winner === me.team;
   const xpFrom = Math.min(100, P.xp / xpForLevel(P.level) * 100);
   const xp = Math.round(150 + me.stats.score * 0.6 + (won ? 150 : 0) + (g.mvp === me ? 75 : 0));
