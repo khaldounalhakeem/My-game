@@ -287,9 +287,19 @@ class Game {
 
   onBounce(ball, n, j) {
     this.events.push({ type: 'bounce', strength: j, pos: ball.pos.clone(), n: n.clone() });
-    // heatseeker: hitting the wall around the goal speeds the ball up, but only a player's touch changes its target
+    // heatseeker: a miss that hits the back wall of the goal it was heading for turns it around towards the other
+    // goal (and changes its colour); hitting the goal frame itself only speeds it up
     if (this.mode === 'heatseeker' && this.heat.target >= 0 && Math.abs(n.z) > 0.7 && Math.abs(ball.pos.z) > ARENA.L - 300) {
       this.heat.speed = Math.min(4600, this.heat.speed + 60);
+      const side = ball.pos.z > 0 ? 1 : 0;
+      const g = ARENA.goal, m = ball.radius + 40;
+      const onFrame = g && Math.abs(ball.pos.x) < g.w + m && ball.pos.y < g.h + m;
+      if (side === this.heat.target && !onFrame) {
+        this.heat.target = 1 - side;
+        const away = side === 1 ? -1 : 1;
+        if (ball.vel.z * away < 500) ball.vel.z = away * Math.max(500, Math.abs(ball.vel.z));
+        this.events.push({ type: 'heatwall', team: this.heat.target });
+      }
     }
     if (ARENA.dropshot && n.y > 0.8 && ball.pos.y < ball.radius + 20 && ball.dsTeam !== undefined && ball.dsTeam >= 0) {
       const t = tileAt(ball.pos.x, ball.pos.z);

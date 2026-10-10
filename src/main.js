@@ -129,7 +129,7 @@ function loop(t) {
     let steps = 0;
     while (CUR.acc >= PHYS.TICK && steps < 8) {
       if (ctrlIn && !g.player.isBot) Object.assign(g.player.ctrl, ctrlIn);
-      g.update(PHYS.TICK);
+      try { g.update(PHYS.TICK); } catch (e) { console.error(e); }
       CUR.acc -= PHYS.TICK; steps++;
     }
     if (steps >= 8) CUR.acc = 0;
@@ -142,8 +142,8 @@ function loop(t) {
         if (CUR.endT > 1.5) { Input.show(false); UI.showHud(false, g); UI.show('trainingEnd', { results: g.trainingResults }); }
       }
     } else if (g.state === 'ended' || g.time > 600) startAttract();
-    Sound.updateCar(g.player, !CUR.attract && !UI.screen && g.state !== 'replay');
-  } else Sound.updateCar(null, false);
+    try { Sound.updateCar(g.player, !CUR.attract && !UI.screen && g.state !== 'replay'); } catch (e) { /* audio is optional */ }
+  } else try { Sound.updateCar(null, false); } catch (e) { /* audio is optional */ }
   if (g && !CUR.attract && g.state === 'ended' && g.kind === 'match') endOfMatch(g, dt);
 
   let replayFrame = null;
@@ -247,39 +247,48 @@ function finishMatchProgress(g) {
   const P = Profile, me = g.player;
   delete P.activeMatch;
   const won = g.winner === me.team;
+  // the win/loss and rank change are recorded and saved first, before anything optional
+  const goalDiff = g.score[me.team] - g.score[1 - me.team];
+  let rating = null;
+  try { rating = applyRatingResult(g.cfg, won, goalDiff); } catch (e) { console.error(e); }
+  if (won) P.wins = (P.wins || 0) + 1; else P.losses = (P.losses || 0) + 1;
+  P.goals = (P.goals || 0) + me.stats.goals; P.assists = (P.assists || 0) + me.stats.assists;
+  P.saves = (P.saves || 0) + me.stats.saves; P.demos = (P.demos || 0) + me.stats.demos;
+  if (g.mvp === me) P.mvps = (P.mvps || 0) + 1;
+  saveProfile();
+  // XP, levels and item drops
+  if (!(P.level >= 1)) P.level = 1;
+  if (!isFinite(P.xp)) P.xp = 0;
   const xpFrom = Math.min(100, P.xp / xpForLevel(P.level) * 100);
   const xp = Math.round(150 + me.stats.score * 0.6 + (won ? 150 : 0) + (g.mvp === me ? 75 : 0));
-  P.xp += xp;
   let leveled = false;
   const drops = [];
-  while (P.xp >= xpForLevel(P.level)) {
-    P.xp -= xpForLevel(P.level); P.level++; leveled = true;
-    const d = rollDrop(); if (d) drops.push(d);
-  }
-  if (won && Math.random() < 0.35) { const d = rollDrop(); if (d) drops.push(d); }
-  const goalDiff = g.score[me.team] - g.score[1 - me.team];
-  const rating = applyRatingResult(g.cfg, won, goalDiff);
-  if (won) P.wins++; else P.losses++;
-  P.goals += me.stats.goals; P.assists += me.stats.assists; P.saves += me.stats.saves; P.demos += me.stats.demos;
-  if (g.mvp === me) P.mvps++;
+  try {
+    P.xp += xp;
+    while (P.xp >= xpForLevel(P.level)) {
+      P.xp -= xpForLevel(P.level); P.level++; leveled = true;
+      const d = rollDrop(); if (d) drops.push(d);
+    }
+    if (won && Math.random() < 0.35) { const d = rollDrop(); if (d) drops.push(d); }
+  } catch (e) { console.error(e); }
   saveProfile();
-  if (leveled) Sound.play('levelup');
-  const xpTo = leveled ? Math.min(100, P.xp / xpForLevel(P.level) * 100) : Math.min(100, P.xp / xpForLevel(P.level) * 100);
+  if (leveled) try { Sound.play('levelup'); } catch (e) { /* audio is optional */ }
+  const xpTo = Math.min(100, P.xp / xpForLevel(P.level) * 100);
   return { game: g, xp, xpFrom: leveled ? 0 : xpFrom, xpTo, leveled, drops, rating };
 }
 
 function rollDrop() {
   const P = Profile;
   const locked = [];
-  for (const cat of Object.keys(ITEMS)) for (const k of Object.keys(ITEMS[cat])) if (!P.unlocked[cat].includes(k)) locked.push([cat, k]);
+  for (const cat of Object.keys(ITEMS)) for (const k of Object.keys(ITEMS[cat])) if (!(P.unlocked[cat] || []).includes(k)) locked.push([cat, k]);
   if (!locked.length) return null;
   // rarer items are less likely
   const weighted = locked.map(([c, k]) => ({ c, k, w: 1 / (1 + itemRarity(c, k)) }));
   let r = Math.random() * weighted.reduce((a, b) => a + b.w, 0);
   let pickd = weighted[0];
   for (const it of weighted) { r -= it.w; if (r <= 0) { pickd = it; break; } }
-  P.unlocked[pickd.c].push(pickd.k);
-  P.newItems.push(pickd.c + ':' + pickd.k);
+  (P.unlocked[pickd.c] = P.unlocked[pickd.c] || []).push(pickd.k);
+  (P.newItems = P.newItems || []).push(pickd.c + ':' + pickd.k);
   const catNames = { body: 'Car', decal: 'Decal', wheels: 'Wheels', boost: 'Boost', explosion: 'Goal Explosion', topper: 'Topper', antenna: 'Antenna' };
   return { name: ITEMS[pickd.c][pickd.k], rarity: itemRarity(pickd.c, pickd.k), catName: catNames[pickd.c] };
 }
