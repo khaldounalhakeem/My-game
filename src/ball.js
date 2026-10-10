@@ -263,7 +263,7 @@ function carCarCollide(A, B, game) {
 // ---------------------------------------------------------------------------
 const Predict = {
   slices: [], ball: null,
-  run(src, mut, seconds, hz) {
+  run(src, mut, seconds, hz, heat) {
     if (!this.ball) this.ball = new Ball();
     const b = this.ball;
     b.kind = src.kind; b.t = src.t; b.radius = src.radius; b.h = src.h; b.puck = src.puck; b.rest = src.rest; b.gravMul = src.gravMul;
@@ -272,7 +272,9 @@ const Predict = {
     const dt = 1 / hz, n = Math.floor(seconds * hz);
     while (this.slices.length < n) this.slices.push({ t: 0, pos: new V3(), vel: new V3() });
     this.count = n;
+    const h = heat && heat.target >= 0 && typeof heatHome === 'function' ? { target: heat.target, speed: heat.speed } : null;
     for (let i = 0; i < n; i++) {
+      if (h) heatHome(b, h, mut.gravity, dt);
       b.step(dt, mut, null);
       const s = this.slices[i];
       s.t = (i + 1) * dt; s.pos.copy(b.pos); s.vel.copy(b.vel);
@@ -281,8 +283,8 @@ const Predict = {
   },
 };
 // will a ball at this state enter a goal? returns team whose goal (0 blue / 1 orange) or -1
-function predictGoal(ball, mut, seconds) {
-  const sl = Predict.run(ball, mut, seconds, 30);
+function predictGoal(ball, mut, seconds, heat) {
+  const sl = Predict.run(ball, mut, seconds, 30, heat);
   for (let i = 0; i < Predict.count; i++) {
     const g = goalCheck(sl[i].pos, ball.radius);
     if (g >= 0) return { team: g, t: sl[i].t };

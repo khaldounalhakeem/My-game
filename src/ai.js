@@ -97,14 +97,24 @@ class Bot {
     const idx = etas.findIndex(x => x.car === car);
     this.role = idx === 0 ? 'attack' : idx === 1 ? 'support' : 'goalie';
     if (team.length === 1) this.role = 'attack';
+    this.heatMode = game.mode === 'heatseeker';
+    if (this.heatMode) {
+      // the ball always homes in on a goal: one bot guards the net, the closest bot to it
+      const ownZ = -dir * ARENA.L;
+      const keeper = team.slice().sort((a, b) => Math.abs(a.pos.z - ownZ) - Math.abs(b.pos.z - ownZ))[0];
+      const incoming = game.heat.target === car.team;
+      if (team.length === 1) this.role = incoming ? 'keeper' : 'attack';
+      else this.role = keeper === car ? 'keeper' : (incoming && idx === 0 ? 'attack' : idx === 0 ? 'attack' : 'support');
+    }
 
     // threat: ball heading into our goal soon
     const threat = game.ballThreat && game.ballThreat.team === car.team && game.ballThreat.t < 3;
-    if (threat && idx <= 1) this.role = 'attack';
+    if (threat && idx <= 1 && this.role !== 'keeper') this.role = 'attack';
 
     // find intercept slice
     let chosen = null;
-    const maxH = (this.lv.aerial > 0 && car.boost > 35) ? 1200 * this.lv.aerial + 250 : 260;
+    const air = this.aerialSkill(game);
+    const maxH = (air > 0 && car.boost > (this.heatMode ? 12 : 35)) ? 1200 * air + 250 : 260;
     const og = this.oppGoal(new V3());
     for (let i = 0; i < pred.count; i += 2) {
       const s = pred.slices[i];
@@ -122,7 +132,13 @@ class Bot {
 
     // goalie/support positioning
     const own = this.ownGoal(_ai1);
-    if (this.role === 'goalie') {
+    if (this.role === 'keeper') {
+      // stand on the goal line, step out to save when the ball is coming
+      this.mode = 'keeper';
+      this.target.set(clamp(ball.pos.x * 0.3, -600, 600), 0, own.z + dir * 220);
+      // only leave the net to clear a slow ball sitting near our goal
+      if (ball.vel.length() < 700 && Math.abs(ball.pos.z - own.z) < 2200 && ball.pos.y < 250) { this.mode = 'attack'; this.role = 'attack'; }
+    } else if (this.role === 'goalie') {
       this.mode = 'position';
       this.target.set(clamp(ball.pos.x * 0.35, -700, 700), 0, own.z + dir * 350);
       if ((ball.pos.z - own.z) * dir < 2500) this.role = 'attack';
@@ -207,6 +223,41 @@ class Bot {
       const pad = this.nearestPad(game, true);
       tgt = this.role === 'goalie' || !pad ? T0.set(0, 0, own.z + this.attackDir() * 400) : T0.set(pad.x, 0, pad.z);
       if (Math.abs(car.pos.x) < 400) tgt = T0.set(0, 0, own.z + this.attackDir() * 400);
+    } else if (this.mode === 'keeper') {
+      const dir = this.attackDir(), ownZ = -dir * ARENA.L;
+      // where and when will the ball reach our goal line?
+      let cross = null;
+      if (game.heat.target === car.team) {
+        const pred = game.prediction;
+        const plane = Math.min((car.pos.z - ownZ) * dir + 40, 700);
+        for (let i = 0; i < pred.count; i++) { const sl = pred.slices[i]; if ((sl.pos.z - ownZ) * dir < plane) { cross = sl; break; } }
+      }
+      const lineZ = ownZ + dir * 200;
+      const tx = cross ? clamp(cross.pos.x, -ARENA.goal.w + 120, ARENA.goal.w - 120) : clamp(ball.pos.x * 0.3, -600, 600);
+      // save: leave the ground in time to meet the ball at its height
+      if (cross && car.onGround && Math.abs(car.pos.z - lineZ) < 400) {
+        const H = cross.pos.y, T = cross.t;
+        // jump early enough that the car is up at the ball's height as it arrives (hold longer for higher balls)
+        const lead = H < 200 ? 0.25 : H < 360 ? 0.45 : 0.7;
+        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < 200) {
+          this.aimPoint = cross.pos.clone();
+          if (H < 360) this.seq = [{ d: clamp((H - 100) / 700, 0.05, 0.2), c: { jump: true } }, { d: 0.6, c: { jump: false } }];
+          else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.5, c: { boost: car.boost > 5 }, aim: true }];
+          this.seqT = 0; return;
+        }
+      }
+      // drive onto the middle of the goal line and stop there (any facing works for a block)
+      const px = clamp(tx, -220, 220);
+      const d = Math.hypot(car.pos.x - px, car.pos.z - lineZ);
+      if (d < 140 && car.onGround) {
+        const vf = car.vel.dot(car.fwd(_ai4));
+        c.throttle = Math.abs(vf) > 40 ? -sign(vf) * Math.min(1, Math.abs(vf) / 250) : 0;
+        c.steer = 0; c.boost = false;
+        return;
+      }
+      tgt = T0.set(px, 0, lineZ);
+      wantSpeed = clamp(d * 1.8, 250, 2300);
+      if (d > 1500) c.boost = car.boost > 0;
     } else if (this.mode === 'attack' && this.intercept) {
       const I = this.intercept;
       tgt = T0.copy(I.aim).add(this.noise);
@@ -220,7 +271,8 @@ class Bot {
       const flatD = Math.hypot(localB.x, localB.z);
       const h = I.pos.y;
       const aligned = Math.abs(Math.atan2(localB.z, localB.x)) < 0.35;
-      if (h > 300 && this.lv.aerial > 0 && car.boost > 25 && aligned && I.t < 1.3 + this.lv.aerial * 0.6 && I.t > 0.4 && car.groundN.y > 0.9) {
+      const air = this.aerialSkill(game);
+      if (h > 300 && air > 0 && car.boost > (this.heatMode ? 12 : 25) && aligned && I.t < 1.3 + air * 0.6 && I.t > 0.4 && car.groundN.y > 0.9) {
         this.startAerial(I);
         return;
       }
@@ -282,6 +334,10 @@ class Bot {
   }
 
   // ---------------------------------------------------------------------------
+  aerialSkill(game) {
+    // in Heatseeker even weaker bots will fly up to save
+    return game && game.mode === 'heatseeker' ? Math.max(this.lv.aerial, 0.55) : this.lv.aerial;
+  }
   startAerial(I) {
     this.aerial = { t: 0, target: I.pos.clone(), arrive: I.t, dj: false };
     this.car.ctrl.jump = true;

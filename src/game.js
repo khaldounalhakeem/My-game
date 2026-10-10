@@ -36,6 +36,7 @@ class Game {
     this.mutators = Object.assign({}, DEFAULT_MUTATORS, cfg.mutators || {});
     if (this.kind === 'freeplay') { this.mutators.boost = cfg.freeBoost === false ? 'default' : 'unlimited'; this.mutators.matchLength = 0; }
     if (this.mode === 'dropshot' && this.mutators.boost === 'default') this.mutators.boost = 'recharge';
+    if (this.mode === 'heatseeker' && this.kind === 'match' && !(cfg.mutators && cfg.mutators.maxScore)) this.mutators.maxScore = 7;
     this.time = 0; this.events = []; this.bumpCooldown = new Map(); this.chatLog = [];
     this.score = [0, 0]; this.clock = this.mutators.matchLength; this.overtime = false; this.otTime = 0;
     this.state = 'countdown'; this.stateT = 0; this.kickoffPending = true; this.clockRunning = false;
@@ -142,7 +143,18 @@ class Game {
       if (now !== prev && now > 0) this.events.push({ type: 'count', n: now });
       // cars can't move but physics settles
       for (const c of this.cars) { c.vel.set(0, 0, 0); c.angVel.set(0, 0, 0); c.ctrl.jump && (c.prevJump = true); }
-      if (this.stateT <= 0) { this.state = 'play'; this.events.push({ type: 'go' }); }
+      if (this.stateT <= 0) {
+        this.state = 'play'; this.events.push({ type: 'go' });
+        if (this.mode === 'heatseeker' && this.kind === 'match') {
+          // heatseeker kickoff: the ball fires off towards a random goal
+          const tgt = Math.random() < 0.5 ? 0 : 1;
+          this.heat = { target: tgt, speed: 1500 };
+          const side = Math.random() < 0.5 ? -1 : 1;
+          this.ball.vel.set(side * 500, 650, (tgt === 1 ? 1 : -1) * 900);
+          this.kickoffPending = false; this.clockRunning = true;
+          this.events.push({ type: 'heatlaunch', team: tgt });
+        }
+      }
       this.updateBots(dt);
       return;
     }
@@ -179,7 +191,7 @@ class Game {
     this.predT -= dt;
     if (this.predT <= 0) {
       this.predT = 1 / 30;
-      const sl = Predict.run(this.ball, this.mutators, 4, 30);
+      const sl = Predict.run(this.ball, this.mutators, 4, 30, this.mode === 'heatseeker' ? this.heat : null);
       this.prediction.slices = sl; this.prediction.count = Predict.count;
       let threat = null;
       for (let i = 0; i < Predict.count; i++) { const g = goalCheck(sl[i].pos, this.ball.radius); if (g >= 0) { threat = { team: g, t: sl[i].t }; break; } }
@@ -230,18 +242,7 @@ class Game {
   modeForces(dt) {
     const ball = this.ball;
     // heatseeker homing
-    if (this.mode === 'heatseeker' && this.heat.target >= 0) {
-      const gz = this.heat.target === 1 ? ARENA.L : -ARENA.L;
-      const to = tmpV(0, 320, gz).sub(ball.pos);
-      if (to.length() > 300) {
-        to.normalize();
-        const sp0 = ball.vel.length();
-        const cur = tmpV().copy(ball.vel).normalize();
-        cur.lerp(to, damp(2.2, dt)).normalize();
-        ball.vel.copy(cur).multiplyScalar(lerp(sp0, this.heat.speed, damp(1.5, dt)));
-        ball.vel.y += PHYS.GRAVITY * this.mutators.gravity * dt * 0.85; // mostly ignores gravity
-      }
-    }
+    if (this.mode === 'heatseeker') heatHome(ball, this.heat, this.mutators.gravity, dt);
     // spikes: ball stuck to a car
     for (const c of this.cars) {
       if (c.effects.spikes > 0 && c.spiked && !c.demolished) {
@@ -334,7 +335,7 @@ class Game {
     // heatseeker
     if (this.mode === 'heatseeker') {
       this.heat.target = car.team === 0 ? 1 : 0;
-      this.heat.speed = this.heat.speed ? Math.min(4600, this.heat.speed + 185) : 1900;
+      this.heat.speed = this.heat.speed ? Math.min(4600, this.heat.speed + 200) : 1900;
     }
     // dropshot charge
     if (ARENA.dropshot) {
@@ -348,7 +349,7 @@ class Game {
 
     if (this.kind !== 'match') return;
     // shot / save / clear detection
-    const after = predictGoal(ball, this.mutators, 3.5);
+    const after = predictGoal(ball, this.mutators, 3.5, this.mode === 'heatseeker' ? this.heat : null);
     if (prevThreat && prevThreat.team === car.team && (!after || after.team !== car.team)) {
       const epic = prevThreat.t < 0.35 && Math.abs(ball.pos.z) > ARENA.L - 600;
       car.stats.saves++;
@@ -787,4 +788,19 @@ function randomLoadout() {
     decal: k(ITEMS.decal), wheels: k(ITEMS.wheels), boost: k(ITEMS.boost), explosion: k(ITEMS.explosion),
     topper: Math.random() < 0.6 ? 'none' : k(ITEMS.topper), antenna: Math.random() < 0.5 ? 'none' : k(ITEMS.antenna),
   };
+}
+
+// Heatseeker: steer the ball towards the target goal and bring it up to the heat speed
+function heatHome(ball, heat, gravity, dt) {
+  if (!heat || heat.target < 0) return;
+  const gz = heat.target === 1 ? ARENA.L : -ARENA.L;
+  const to = tmpV(0, 320, gz).sub(ball.pos);
+  if (to.length() <= 300) return;
+  to.normalize();
+  const sp0 = ball.vel.length();
+  const cur = tmpV().copy(ball.vel);
+  if (sp0 > 1) cur.multiplyScalar(1 / sp0); else cur.copy(to);
+  cur.lerp(to, damp(2.2, dt)).normalize();
+  ball.vel.copy(cur).multiplyScalar(lerp(sp0, heat.speed, damp(1.5, dt)));
+  ball.vel.y += PHYS.GRAVITY * gravity * dt * 0.85; // mostly ignores gravity
 }

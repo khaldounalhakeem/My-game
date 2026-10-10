@@ -882,11 +882,13 @@ class Car {
 
     // steering
     let curv = curveLookup(STEER_CURVE, Math.abs(vf));
-    if (c.handbrake) curv *= 1.25;
+    if (c.handbrake) curv *= 1.4;
     const yawRate = -steer * curv * vf;
     _qa.setFromAxisAngle(n, yawRate * dt);
     f.applyQuaternion(_qa); r.applyQuaternion(_qa);
     this.angVel.copy(n).multiplyScalar(yawRate); // integrated in step()
+    // the body turned but momentum didn't: re-split the velocity in the new heading
+    vf = this.vel.dot(f); vl = this.vel.dot(r);
 
     // throttle / brake
     if (this.boosting) throttle = 1;
@@ -903,9 +905,14 @@ class Car {
     vf += acc * dt;
 
     // tyre grip (powerslide = loose)
-    const grip = c.handbrake ? 1.2 : 16;
-    vl *= Math.exp(-grip * dt);
-    this.slideAmt = lerp(this.slideAmt, c.handbrake && Math.abs(vl) > 150 ? 1 : 0, damp(8, dt));
+    // tyre grip: normally the tyres bend sideways momentum back into forward speed;
+    // a powerslide lets the car slide sideways and keeps most of its speed
+    const grip = c.handbrake ? 3 : 22;
+    const vl2 = vl * Math.exp(-grip * dt);
+    const keep = c.handbrake ? 0.75 : 1;
+    vf = sign(vf || 1) * Math.sqrt(Math.max(0, vf * vf + (vl * vl - vl2 * vl2) * keep));
+    vl = vl2;
+    this.slideAmt = lerp(this.slideAmt, Math.abs(vl) > 180 ? 1 : 0, damp(8, dt));
 
     this.vel.copy(f).multiplyScalar(vf).addScaledVector(r, vl).addScaledVector(n, vn);
     // gravity + sticky force
@@ -1406,7 +1413,7 @@ function carCarCollide(A, B, game) {
 // ---------------------------------------------------------------------------
 const Predict = {
   slices: [], ball: null,
-  run(src, mut, seconds, hz) {
+  run(src, mut, seconds, hz, heat) {
     if (!this.ball) this.ball = new Ball();
     const b = this.ball;
     b.kind = src.kind; b.t = src.t; b.radius = src.radius; b.h = src.h; b.puck = src.puck; b.rest = src.rest; b.gravMul = src.gravMul;
@@ -1415,7 +1422,9 @@ const Predict = {
     const dt = 1 / hz, n = Math.floor(seconds * hz);
     while (this.slices.length < n) this.slices.push({ t: 0, pos: new V3(), vel: new V3() });
     this.count = n;
+    const h = heat && heat.target >= 0 && typeof heatHome === 'function' ? { target: heat.target, speed: heat.speed } : null;
     for (let i = 0; i < n; i++) {
+      if (h) heatHome(b, h, mut.gravity, dt);
       b.step(dt, mut, null);
       const s = this.slices[i];
       s.t = (i + 1) * dt; s.pos.copy(b.pos); s.vel.copy(b.vel);
@@ -1424,8 +1433,8 @@ const Predict = {
   },
 };
 // will a ball at this state enter a goal? returns team whose goal (0 blue / 1 orange) or -1
-function predictGoal(ball, mut, seconds) {
-  const sl = Predict.run(ball, mut, seconds, 30);
+function predictGoal(ball, mut, seconds, heat) {
+  const sl = Predict.run(ball, mut, seconds, 30, heat);
   for (let i = 0; i < Predict.count; i++) {
     const g = goalCheck(sl[i].pos, ball.radius);
     if (g >= 0) return { team: g, t: sl[i].t };
@@ -1806,14 +1815,24 @@ class Bot {
     const idx = etas.findIndex(x => x.car === car);
     this.role = idx === 0 ? 'attack' : idx === 1 ? 'support' : 'goalie';
     if (team.length === 1) this.role = 'attack';
+    this.heatMode = game.mode === 'heatseeker';
+    if (this.heatMode) {
+      // the ball always homes in on a goal: one bot guards the net, the closest bot to it
+      const ownZ = -dir * ARENA.L;
+      const keeper = team.slice().sort((a, b) => Math.abs(a.pos.z - ownZ) - Math.abs(b.pos.z - ownZ))[0];
+      const incoming = game.heat.target === car.team;
+      if (team.length === 1) this.role = incoming ? 'keeper' : 'attack';
+      else this.role = keeper === car ? 'keeper' : (incoming && idx === 0 ? 'attack' : idx === 0 ? 'attack' : 'support');
+    }
 
     // threat: ball heading into our goal soon
     const threat = game.ballThreat && game.ballThreat.team === car.team && game.ballThreat.t < 3;
-    if (threat && idx <= 1) this.role = 'attack';
+    if (threat && idx <= 1 && this.role !== 'keeper') this.role = 'attack';
 
     // find intercept slice
     let chosen = null;
-    const maxH = (this.lv.aerial > 0 && car.boost > 35) ? 1200 * this.lv.aerial + 250 : 260;
+    const air = this.aerialSkill(game);
+    const maxH = (air > 0 && car.boost > (this.heatMode ? 12 : 35)) ? 1200 * air + 250 : 260;
     const og = this.oppGoal(new V3());
     for (let i = 0; i < pred.count; i += 2) {
       const s = pred.slices[i];
@@ -1831,7 +1850,13 @@ class Bot {
 
     // goalie/support positioning
     const own = this.ownGoal(_ai1);
-    if (this.role === 'goalie') {
+    if (this.role === 'keeper') {
+      // stand on the goal line, step out to save when the ball is coming
+      this.mode = 'keeper';
+      this.target.set(clamp(ball.pos.x * 0.3, -600, 600), 0, own.z + dir * 220);
+      // only leave the net to clear a slow ball sitting near our goal
+      if (ball.vel.length() < 700 && Math.abs(ball.pos.z - own.z) < 2200 && ball.pos.y < 250) { this.mode = 'attack'; this.role = 'attack'; }
+    } else if (this.role === 'goalie') {
       this.mode = 'position';
       this.target.set(clamp(ball.pos.x * 0.35, -700, 700), 0, own.z + dir * 350);
       if ((ball.pos.z - own.z) * dir < 2500) this.role = 'attack';
@@ -1916,6 +1941,41 @@ class Bot {
       const pad = this.nearestPad(game, true);
       tgt = this.role === 'goalie' || !pad ? T0.set(0, 0, own.z + this.attackDir() * 400) : T0.set(pad.x, 0, pad.z);
       if (Math.abs(car.pos.x) < 400) tgt = T0.set(0, 0, own.z + this.attackDir() * 400);
+    } else if (this.mode === 'keeper') {
+      const dir = this.attackDir(), ownZ = -dir * ARENA.L;
+      // where and when will the ball reach our goal line?
+      let cross = null;
+      if (game.heat.target === car.team) {
+        const pred = game.prediction;
+        const plane = Math.min((car.pos.z - ownZ) * dir + 40, 700);
+        for (let i = 0; i < pred.count; i++) { const sl = pred.slices[i]; if ((sl.pos.z - ownZ) * dir < plane) { cross = sl; break; } }
+      }
+      const lineZ = ownZ + dir * 200;
+      const tx = cross ? clamp(cross.pos.x, -ARENA.goal.w + 120, ARENA.goal.w - 120) : clamp(ball.pos.x * 0.3, -600, 600);
+      // save: leave the ground in time to meet the ball at its height
+      if (cross && car.onGround && Math.abs(car.pos.z - lineZ) < 400) {
+        const H = cross.pos.y, T = cross.t;
+        // jump early enough that the car is up at the ball's height as it arrives (hold longer for higher balls)
+        const lead = H < 200 ? 0.25 : H < 360 ? 0.45 : 0.7;
+        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < 200) {
+          this.aimPoint = cross.pos.clone();
+          if (H < 360) this.seq = [{ d: clamp((H - 100) / 700, 0.05, 0.2), c: { jump: true } }, { d: 0.6, c: { jump: false } }];
+          else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.5, c: { boost: car.boost > 5 }, aim: true }];
+          this.seqT = 0; return;
+        }
+      }
+      // drive onto the middle of the goal line and stop there (any facing works for a block)
+      const px = clamp(tx, -220, 220);
+      const d = Math.hypot(car.pos.x - px, car.pos.z - lineZ);
+      if (d < 140 && car.onGround) {
+        const vf = car.vel.dot(car.fwd(_ai4));
+        c.throttle = Math.abs(vf) > 40 ? -sign(vf) * Math.min(1, Math.abs(vf) / 250) : 0;
+        c.steer = 0; c.boost = false;
+        return;
+      }
+      tgt = T0.set(px, 0, lineZ);
+      wantSpeed = clamp(d * 1.8, 250, 2300);
+      if (d > 1500) c.boost = car.boost > 0;
     } else if (this.mode === 'attack' && this.intercept) {
       const I = this.intercept;
       tgt = T0.copy(I.aim).add(this.noise);
@@ -1929,7 +1989,8 @@ class Bot {
       const flatD = Math.hypot(localB.x, localB.z);
       const h = I.pos.y;
       const aligned = Math.abs(Math.atan2(localB.z, localB.x)) < 0.35;
-      if (h > 300 && this.lv.aerial > 0 && car.boost > 25 && aligned && I.t < 1.3 + this.lv.aerial * 0.6 && I.t > 0.4 && car.groundN.y > 0.9) {
+      const air = this.aerialSkill(game);
+      if (h > 300 && air > 0 && car.boost > (this.heatMode ? 12 : 25) && aligned && I.t < 1.3 + air * 0.6 && I.t > 0.4 && car.groundN.y > 0.9) {
         this.startAerial(I);
         return;
       }
@@ -1991,6 +2052,10 @@ class Bot {
   }
 
   // ---------------------------------------------------------------------------
+  aerialSkill(game) {
+    // in Heatseeker even weaker bots will fly up to save
+    return game && game.mode === 'heatseeker' ? Math.max(this.lv.aerial, 0.55) : this.lv.aerial;
+  }
   startAerial(I) {
     this.aerial = { t: 0, target: I.pos.clone(), arrive: I.t, dj: false };
     this.car.ctrl.jump = true;
@@ -2114,6 +2179,7 @@ class Game {
     this.mutators = Object.assign({}, DEFAULT_MUTATORS, cfg.mutators || {});
     if (this.kind === 'freeplay') { this.mutators.boost = cfg.freeBoost === false ? 'default' : 'unlimited'; this.mutators.matchLength = 0; }
     if (this.mode === 'dropshot' && this.mutators.boost === 'default') this.mutators.boost = 'recharge';
+    if (this.mode === 'heatseeker' && this.kind === 'match' && !(cfg.mutators && cfg.mutators.maxScore)) this.mutators.maxScore = 7;
     this.time = 0; this.events = []; this.bumpCooldown = new Map(); this.chatLog = [];
     this.score = [0, 0]; this.clock = this.mutators.matchLength; this.overtime = false; this.otTime = 0;
     this.state = 'countdown'; this.stateT = 0; this.kickoffPending = true; this.clockRunning = false;
@@ -2220,7 +2286,18 @@ class Game {
       if (now !== prev && now > 0) this.events.push({ type: 'count', n: now });
       // cars can't move but physics settles
       for (const c of this.cars) { c.vel.set(0, 0, 0); c.angVel.set(0, 0, 0); c.ctrl.jump && (c.prevJump = true); }
-      if (this.stateT <= 0) { this.state = 'play'; this.events.push({ type: 'go' }); }
+      if (this.stateT <= 0) {
+        this.state = 'play'; this.events.push({ type: 'go' });
+        if (this.mode === 'heatseeker' && this.kind === 'match') {
+          // heatseeker kickoff: the ball fires off towards a random goal
+          const tgt = Math.random() < 0.5 ? 0 : 1;
+          this.heat = { target: tgt, speed: 1500 };
+          const side = Math.random() < 0.5 ? -1 : 1;
+          this.ball.vel.set(side * 500, 650, (tgt === 1 ? 1 : -1) * 900);
+          this.kickoffPending = false; this.clockRunning = true;
+          this.events.push({ type: 'heatlaunch', team: tgt });
+        }
+      }
       this.updateBots(dt);
       return;
     }
@@ -2257,7 +2334,7 @@ class Game {
     this.predT -= dt;
     if (this.predT <= 0) {
       this.predT = 1 / 30;
-      const sl = Predict.run(this.ball, this.mutators, 4, 30);
+      const sl = Predict.run(this.ball, this.mutators, 4, 30, this.mode === 'heatseeker' ? this.heat : null);
       this.prediction.slices = sl; this.prediction.count = Predict.count;
       let threat = null;
       for (let i = 0; i < Predict.count; i++) { const g = goalCheck(sl[i].pos, this.ball.radius); if (g >= 0) { threat = { team: g, t: sl[i].t }; break; } }
@@ -2308,18 +2385,7 @@ class Game {
   modeForces(dt) {
     const ball = this.ball;
     // heatseeker homing
-    if (this.mode === 'heatseeker' && this.heat.target >= 0) {
-      const gz = this.heat.target === 1 ? ARENA.L : -ARENA.L;
-      const to = tmpV(0, 320, gz).sub(ball.pos);
-      if (to.length() > 300) {
-        to.normalize();
-        const sp0 = ball.vel.length();
-        const cur = tmpV().copy(ball.vel).normalize();
-        cur.lerp(to, damp(2.2, dt)).normalize();
-        ball.vel.copy(cur).multiplyScalar(lerp(sp0, this.heat.speed, damp(1.5, dt)));
-        ball.vel.y += PHYS.GRAVITY * this.mutators.gravity * dt * 0.85; // mostly ignores gravity
-      }
-    }
+    if (this.mode === 'heatseeker') heatHome(ball, this.heat, this.mutators.gravity, dt);
     // spikes: ball stuck to a car
     for (const c of this.cars) {
       if (c.effects.spikes > 0 && c.spiked && !c.demolished) {
@@ -2412,7 +2478,7 @@ class Game {
     // heatseeker
     if (this.mode === 'heatseeker') {
       this.heat.target = car.team === 0 ? 1 : 0;
-      this.heat.speed = this.heat.speed ? Math.min(4600, this.heat.speed + 185) : 1900;
+      this.heat.speed = this.heat.speed ? Math.min(4600, this.heat.speed + 200) : 1900;
     }
     // dropshot charge
     if (ARENA.dropshot) {
@@ -2426,7 +2492,7 @@ class Game {
 
     if (this.kind !== 'match') return;
     // shot / save / clear detection
-    const after = predictGoal(ball, this.mutators, 3.5);
+    const after = predictGoal(ball, this.mutators, 3.5, this.mode === 'heatseeker' ? this.heat : null);
     if (prevThreat && prevThreat.team === car.team && (!after || after.team !== car.team)) {
       const epic = prevThreat.t < 0.35 && Math.abs(ball.pos.z) > ARENA.L - 600;
       car.stats.saves++;
@@ -2867,6 +2933,21 @@ function randomLoadout() {
   };
 }
 
+// Heatseeker: steer the ball towards the target goal and bring it up to the heat speed
+function heatHome(ball, heat, gravity, dt) {
+  if (!heat || heat.target < 0) return;
+  const gz = heat.target === 1 ? ARENA.L : -ARENA.L;
+  const to = tmpV(0, 320, gz).sub(ball.pos);
+  if (to.length() <= 300) return;
+  to.normalize();
+  const sp0 = ball.vel.length();
+  const cur = tmpV().copy(ball.vel);
+  if (sp0 > 1) cur.multiplyScalar(1 / sp0); else cur.copy(to);
+  cur.lerp(to, damp(2.2, dt)).normalize();
+  ball.vel.copy(cur).multiplyScalar(lerp(sp0, heat.speed, damp(1.5, dt)));
+  ball.vel.y += PHYS.GRAVITY * gravity * dt * 0.85; // mostly ignores gravity
+}
+
 </script>
 <script>/* src/render.js */
 'use strict';
@@ -2940,6 +3021,12 @@ function buildWorld(game) {
 
   buildArena(world, game, map);
   buildScenery(world, map, game);
+  // heatseeker: glowing target ring on the goal the ball is homing towards
+  R.heatRings = [];
+  if (game.mode === 'heatseeker' && ARENA.goal) for (const t of [0, 1]) {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(260, 330, 48), new THREE.MeshBasicMaterial({ color: 0x5cff8a, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    ring.position.set(0, 320, (t === 1 ? 1 : -1) * (ARENA.L + 5)); ring.visible = false; world.add(ring); R.heatRings[t] = ring;
+  }
   // pads
   for (const p of game.pads) { const v = buildPad(p); world.add(v.group); R.padViews.push(v); }
   // ball
@@ -3808,6 +3895,7 @@ function renderFrame(dt, game, replayFrame) {
     for (const [car, v] of R.carViews) syncCarView(car, v, replayFrame ? replayFrame.c[game.cars.indexOf(car)] : null);
     syncBallView(game.ball, replayFrame ? replayFrame.b : null, game.ballHidden);
     syncPads(game, dt);
+    if (R.heatRings && R.heatRings.length) for (const t of [0, 1]) { const r = R.heatRings[t]; r.visible = game.heat.target === t && !game.ballHidden; if (r.visible) { const k = 1 + 0.12 * Math.sin(R.time * 8); r.scale.set(k, k, 1); } }
     if (R.tileViews.length) updateTiles(dt);
   }
   if (typeof FX !== 'undefined') FX.update(dt, game);
@@ -4167,7 +4255,12 @@ const Sound = {
     const wf = ctx.createBiquadFilter(); wf.type = 'highpass'; wf.frequency.value = 2500;
     const wg = ctx.createGain(); wg.gain.value = 0;
     w.connect(wf); wf.connect(wg); wg.connect(this.sfx); w.start();
-    this.eng = { o1, o2, lp, g, bg, bp, wg };
+    // tyre screech for powerslides
+    const sq = ctx.createBufferSource(); sq.buffer = this.noise; sq.loop = true;
+    const sf = ctx.createBiquadFilter(); sf.type = 'bandpass'; sf.frequency.value = 2600; sf.Q.value = 6;
+    const sg = ctx.createGain(); sg.gain.value = 0;
+    sq.connect(sf); sf.connect(sg); sg.connect(this.sfx); sq.start();
+    this.eng = { o1, o2, lp, g, bg, bp, wg, sg };
   },
   initCrowd() {
     const ctx = this.ctx;
@@ -4190,7 +4283,7 @@ const Sound = {
   updateCar(car, inGame) {
     if (!this.ready || !this.eng) return;
     const e = this.eng, t = this.now();
-    if (!inGame || !car || car.demolished) { e.g.gain.setTargetAtTime(0, t, 0.1); e.bg.gain.setTargetAtTime(0, t, 0.05); e.wg.gain.setTargetAtTime(0, t, 0.1); return; }
+    if (!inGame || !car || car.demolished) { e.g.gain.setTargetAtTime(0, t, 0.1); e.bg.gain.setTargetAtTime(0, t, 0.05); e.wg.gain.setTargetAtTime(0, t, 0.1); e.sg.gain.setTargetAtTime(0, t, 0.05); return; }
     const sp = car.vel.length() / 2300;
     const thr = Math.abs(car.ctrl.throttle) + (car.boosting ? 1 : 0);
     const f = 45 + sp * 120 + (car.onGround ? 0 : 20);
@@ -4200,6 +4293,7 @@ const Sound = {
     e.bg.gain.setTargetAtTime(car.boosting ? 0.22 : 0, t, 0.03);
     e.bp.frequency.setTargetAtTime(700 + sp * 900, t, 0.05);
     e.wg.gain.setTargetAtTime(car.supersonic ? 0.06 : 0, t, 0.2);
+    e.sg.gain.setTargetAtTime(car.onGround ? car.slideAmt * 0.14 : 0, t, 0.06);
   },
 
   // ---- one-shots ----
@@ -4513,7 +4607,7 @@ const Input = {
       if (edge(9)) UI.onKey('Escape');
       // D-pad quick chat, laid out like Rocket League (up/left/right/down)
       if (edge(12)) UI.onKey('Digit1'); if (edge(14)) UI.onKey('Digit2'); if (edge(15)) UI.onKey('Digit3'); if (edge(13)) UI.onKey('Digit4');
-      const boardBtn = !!(bt[8] || bt[17]);
+      const boardBtn = !!bt[17];
       if (boardBtn !== this.padBoard) { this.padBoard = boardBtn; UI.showBoard(boardBtn); }
       if ((edge(0) || edge(1)) && CUR.game.state === 'replay') skipReplay();
       return;
@@ -4576,7 +4670,7 @@ const Input = {
       const b = (i) => gp.buttons[i] && gp.buttons[i].pressed;
       if (b(0)) jump = true;            // Cross: jump
       if (b(1)) boost = true;           // Circle: boost
-      if (b(2)) hb = true;              // Square: powerslide / air roll
+      if (b(2) || b(8)) hb = true;      // Square (or SHARE): powerslide / air roll
       const fp = CUR.game && CUR.game.kind === 'freeplay';
       if (b(4) && !fp) rollL = true;    // L1: air roll left (rewind in free play)
       if (CUR.game && CUR.game.mode === 'rumble') { if (b(5)) useItem = true; } // R1: use item
@@ -4791,7 +4885,7 @@ const UI = {
       ['Pinch', 'Hit the ball hard while it is pressed against the floor or a wall. It shoots out much faster than a normal hit. Practice with Free Play → Wall / pinch ball (D-pad right).'],
       ['Free Play buttons', 'D-pad ↑ shoot ball at me · ↓ ball to center · ← aerial ball · → wall/pinch ball · L1 rewind 3 seconds · R1 freeze ball · L3 reset car. Air roll stays on □ in free play.'],
       ['Keyboard', 'W/S drive & pitch · A/D steer · Space jump · Shift boost · X drift/air roll · Q/E directional roll · B ball cam · F item · Esc pause · 1–4 quick chat · Tab scoreboard'],
-      ['PS4 / PS5 controller', 'Same as Rocket League: R2 gas · L2 brake/reverse · Left stick steer & air control · ✕ jump · ○ boost · □ powerslide / air roll · △ ball cam · L1 air roll left · R1 air roll right (use item in Rumble) · R3 look behind · right stick look around · D-pad quick chat · OPTIONS pause · touchpad/SHARE scoreboard. In menus: stick or D-pad to move, ✕ select, ○ back.'],
+      ['PS4 / PS5 controller', 'Same as Rocket League: R2 gas · L2 brake/reverse · Left stick steer & air control · ✕ jump · ○ boost · □ or SHARE powerslide (drift) / air roll · △ ball cam · L1 air roll left · R1 air roll right (use item in Rumble) · R3 look behind · right stick look around · D-pad quick chat · OPTIONS pause · touchpad scoreboard. In menus: stick or D-pad to move, ✕ select, ○ back.'],
       ['Xbox controller', 'RT gas · LT brake · A jump · B boost · X powerslide · Y ball cam · LB/RB air roll · same layout as above.'],
     ];
     return h('div', { class: 'menu scroll howto' },
@@ -5165,6 +5259,7 @@ const UI = {
         if (log) { log.append(h('div', { class: 'citem' }, h('b', { class: 't' + ev.car.team }, (ev.team ? '[TEAM] ' : '') + ev.car.name + ': '), ev.msg)); log.scrollTop = 1e6; }
         break;
       }
+      case 'heatlaunch': this.bannerShow(`<div class="g-mid">BALL HEADING TO ${TEAM_COLORS[ev.team].name}</div><div class="g-sub">${ev.team === me.team ? 'Defend your goal!' : 'Chase it down!'}</div>`, 'ot', 1800); break;
       case 'forfeit': this.bannerShow(`<div class="g-mid">${TEAM_COLORS[ev.team].name} FORFEITS</div><div class="g-sub">They gave up</div>`, 'ot', 3000); break;
       case 'end': {
         const won = ev.winner === me.team;

@@ -129,11 +129,13 @@ class Car {
 
     // steering
     let curv = curveLookup(STEER_CURVE, Math.abs(vf));
-    if (c.handbrake) curv *= 1.25;
+    if (c.handbrake) curv *= 1.4;
     const yawRate = -steer * curv * vf;
     _qa.setFromAxisAngle(n, yawRate * dt);
     f.applyQuaternion(_qa); r.applyQuaternion(_qa);
     this.angVel.copy(n).multiplyScalar(yawRate); // integrated in step()
+    // the body turned but momentum didn't: re-split the velocity in the new heading
+    vf = this.vel.dot(f); vl = this.vel.dot(r);
 
     // throttle / brake
     if (this.boosting) throttle = 1;
@@ -150,9 +152,14 @@ class Car {
     vf += acc * dt;
 
     // tyre grip (powerslide = loose)
-    const grip = c.handbrake ? 1.2 : 16;
-    vl *= Math.exp(-grip * dt);
-    this.slideAmt = lerp(this.slideAmt, c.handbrake && Math.abs(vl) > 150 ? 1 : 0, damp(8, dt));
+    // tyre grip: normally the tyres bend sideways momentum back into forward speed;
+    // a powerslide lets the car slide sideways and keeps most of its speed
+    const grip = c.handbrake ? 3 : 22;
+    const vl2 = vl * Math.exp(-grip * dt);
+    const keep = c.handbrake ? 0.75 : 1;
+    vf = sign(vf || 1) * Math.sqrt(Math.max(0, vf * vf + (vl * vl - vl2 * vl2) * keep));
+    vl = vl2;
+    this.slideAmt = lerp(this.slideAmt, Math.abs(vl) > 180 ? 1 : 0, damp(8, dt));
 
     this.vel.copy(f).multiplyScalar(vf).addScaledVector(r, vl).addScaledVector(n, vn);
     // gravity + sticky force

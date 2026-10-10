@@ -187,7 +187,7 @@ const UI = {
       ['Pinch', 'Hit the ball hard while it is pressed against the floor or a wall. It shoots out much faster than a normal hit. Practice with Free Play → Wall / pinch ball (D-pad right).'],
       ['Free Play buttons', 'D-pad ↑ shoot ball at me · ↓ ball to center · ← aerial ball · → wall/pinch ball · L1 rewind 3 seconds · R1 freeze ball · L3 reset car. Air roll stays on □ in free play.'],
       ['Keyboard', 'W/S drive & pitch · A/D steer · Space jump · Shift boost · X drift/air roll · Q/E directional roll · B ball cam · F item · Esc pause · 1–4 quick chat · Tab scoreboard'],
-      ['PS4 / PS5 controller', 'Same as Rocket League: R2 gas · L2 brake/reverse · Left stick steer & air control · ✕ jump · ○ boost · □ powerslide / air roll · △ ball cam · L1 air roll left · R1 air roll right (use item in Rumble) · R3 look behind · right stick look around · D-pad quick chat · OPTIONS pause · touchpad/SHARE scoreboard. In menus: stick or D-pad to move, ✕ select, ○ back.'],
+      ['PS4 / PS5 controller', 'Same as Rocket League: R2 gas · L2 brake/reverse · Left stick steer & air control · ✕ jump · ○ boost · □ or SHARE powerslide (drift) / air roll · △ ball cam · L1 air roll left · R1 air roll right (use item in Rumble) · R3 look behind · right stick look around · D-pad quick chat · OPTIONS pause · touchpad scoreboard. In menus: stick or D-pad to move, ✕ select, ○ back.'],
       ['Xbox controller', 'RT gas · LT brake · A jump · B boost · X powerslide · Y ball cam · LB/RB air roll · same layout as above.'],
     ];
     return h('div', { class: 'menu scroll howto' },
@@ -561,6 +561,7 @@ const UI = {
         if (log) { log.append(h('div', { class: 'citem' }, h('b', { class: 't' + ev.car.team }, (ev.team ? '[TEAM] ' : '') + ev.car.name + ': '), ev.msg)); log.scrollTop = 1e6; }
         break;
       }
+      case 'heatlaunch': this.bannerShow(`<div class="g-mid">BALL HEADING TO ${TEAM_COLORS[ev.team].name}</div><div class="g-sub">${ev.team === me.team ? 'Defend your goal!' : 'Chase it down!'}</div>`, 'ot', 1800); break;
       case 'forfeit': this.bannerShow(`<div class="g-mid">${TEAM_COLORS[ev.team].name} FORFEITS</div><div class="g-sub">They gave up</div>`, 'ot', 3000); break;
       case 'end': {
         const won = ev.winner === me.team;

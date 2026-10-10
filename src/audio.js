@@ -54,7 +54,12 @@ const Sound = {
     const wf = ctx.createBiquadFilter(); wf.type = 'highpass'; wf.frequency.value = 2500;
     const wg = ctx.createGain(); wg.gain.value = 0;
     w.connect(wf); wf.connect(wg); wg.connect(this.sfx); w.start();
-    this.eng = { o1, o2, lp, g, bg, bp, wg };
+    // tyre screech for powerslides
+    const sq = ctx.createBufferSource(); sq.buffer = this.noise; sq.loop = true;
+    const sf = ctx.createBiquadFilter(); sf.type = 'bandpass'; sf.frequency.value = 2600; sf.Q.value = 6;
+    const sg = ctx.createGain(); sg.gain.value = 0;
+    sq.connect(sf); sf.connect(sg); sg.connect(this.sfx); sq.start();
+    this.eng = { o1, o2, lp, g, bg, bp, wg, sg };
   },
   initCrowd() {
     const ctx = this.ctx;
@@ -77,7 +82,7 @@ const Sound = {
   updateCar(car, inGame) {
     if (!this.ready || !this.eng) return;
     const e = this.eng, t = this.now();
-    if (!inGame || !car || car.demolished) { e.g.gain.setTargetAtTime(0, t, 0.1); e.bg.gain.setTargetAtTime(0, t, 0.05); e.wg.gain.setTargetAtTime(0, t, 0.1); return; }
+    if (!inGame || !car || car.demolished) { e.g.gain.setTargetAtTime(0, t, 0.1); e.bg.gain.setTargetAtTime(0, t, 0.05); e.wg.gain.setTargetAtTime(0, t, 0.1); e.sg.gain.setTargetAtTime(0, t, 0.05); return; }
     const sp = car.vel.length() / 2300;
     const thr = Math.abs(car.ctrl.throttle) + (car.boosting ? 1 : 0);
     const f = 45 + sp * 120 + (car.onGround ? 0 : 20);
@@ -87,6 +92,7 @@ const Sound = {
     e.bg.gain.setTargetAtTime(car.boosting ? 0.22 : 0, t, 0.03);
     e.bp.frequency.setTargetAtTime(700 + sp * 900, t, 0.05);
     e.wg.gain.setTargetAtTime(car.supersonic ? 0.06 : 0, t, 0.2);
+    e.sg.gain.setTargetAtTime(car.onGround ? car.slideAmt * 0.14 : 0, t, 0.06);
   },
 
   // ---- one-shots ----

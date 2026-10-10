@@ -211,7 +211,7 @@ const Input = {
       if (edge(9)) UI.onKey('Escape');
       // D-pad quick chat, laid out like Rocket League (up/left/right/down)
       if (edge(12)) UI.onKey('Digit1'); if (edge(14)) UI.onKey('Digit2'); if (edge(15)) UI.onKey('Digit3'); if (edge(13)) UI.onKey('Digit4');
-      const boardBtn = !!(bt[8] || bt[17]);
+      const boardBtn = !!bt[17];
       if (boardBtn !== this.padBoard) { this.padBoard = boardBtn; UI.showBoard(boardBtn); }
       if ((edge(0) || edge(1)) && CUR.game.state === 'replay') skipReplay();
       return;
@@ -274,7 +274,7 @@ const Input = {
       const b = (i) => gp.buttons[i] && gp.buttons[i].pressed;
       if (b(0)) jump = true;            // Cross: jump
       if (b(1)) boost = true;           // Circle: boost
-      if (b(2)) hb = true;              // Square: powerslide / air roll
+      if (b(2) || b(8)) hb = true;      // Square (or SHARE): powerslide / air roll
       const fp = CUR.game && CUR.game.kind === 'freeplay';
       if (b(4) && !fp) rollL = true;    // L1: air roll left (rewind in free play)
       if (CUR.game && CUR.game.mode === 'rumble') { if (b(5)) useItem = true; } // R1: use item

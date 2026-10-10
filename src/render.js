@@ -69,6 +69,12 @@ function buildWorld(game) {
 
   buildArena(world, game, map);
   buildScenery(world, map, game);
+  // heatseeker: glowing target ring on the goal the ball is homing towards
+  R.heatRings = [];
+  if (game.mode === 'heatseeker' && ARENA.goal) for (const t of [0, 1]) {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(260, 330, 48), new THREE.MeshBasicMaterial({ color: 0x5cff8a, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+    ring.position.set(0, 320, (t === 1 ? 1 : -1) * (ARENA.L + 5)); ring.visible = false; world.add(ring); R.heatRings[t] = ring;
+  }
   // pads
   for (const p of game.pads) { const v = buildPad(p); world.add(v.group); R.padViews.push(v); }
   // ball
@@ -937,6 +943,7 @@ function renderFrame(dt, game, replayFrame) {
     for (const [car, v] of R.carViews) syncCarView(car, v, replayFrame ? replayFrame.c[game.cars.indexOf(car)] : null);
     syncBallView(game.ball, replayFrame ? replayFrame.b : null, game.ballHidden);
     syncPads(game, dt);
+    if (R.heatRings && R.heatRings.length) for (const t of [0, 1]) { const r = R.heatRings[t]; r.visible = game.heat.target === t && !game.ballHidden; if (r.visible) { const k = 1 + 0.12 * Math.sin(R.time * 8); r.scale.set(k, k, 1); } }
     if (R.tileViews.length) updateTiles(dt);
   }
   if (typeof FX !== 'undefined') FX.update(dt, game);
