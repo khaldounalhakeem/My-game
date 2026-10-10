@@ -101,7 +101,6 @@ const DEFAULT_SETTINGS = {
   master: 0.8, sfx: 0.9, music: 0.5, crowd: 0.7,
 };
 const Settings = Object.assign({}, DEFAULT_SETTINGS, Store.get('settings', {}));
-function saveSettings() { Store.set('settings', Settings); }
 
 const DEFAULT_PROFILE = {
   name: 'Player', title: 'ROOKIE', xp: 0, level: 1, mmr: 600, wins: 0, losses: 0, goals: 0, saves: 0, assists: 0, mvps: 0, demos: 0,
@@ -112,13 +111,5 @@ const DEFAULT_PROFILE = {
 const Profile = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_PROFILE)), Store.get('profile', {}));
 Profile.car = Object.assign({}, DEFAULT_PROFILE.car, Profile.car || {});
 Profile.unlocked = Object.assign({}, DEFAULT_PROFILE.unlocked, Profile.unlocked || {});
-function saveProfile() { Store.set('profile', Profile); }
 
-const RANKS = [
-  ['Bronze I', 0], ['Bronze II', 170], ['Bronze III', 230], ['Silver I', 290], ['Silver II', 350], ['Silver III', 410],
-  ['Gold I', 470], ['Gold II', 530], ['Gold III', 590], ['Platinum I', 650], ['Platinum II', 710], ['Platinum III', 770],
-  ['Diamond I', 840], ['Diamond II', 920], ['Diamond III', 1000], ['Champion I', 1090], ['Champion II', 1190], ['Champion III', 1300],
-  ['Grand Champion I', 1420], ['Grand Champion II', 1540], ['Grand Champion III', 1660], ['Supersonic Legend', 1860],
-];
-function rankFor(mmr) { let r = RANKS[0][0]; for (const [n, m] of RANKS) if (mmr >= m) r = n; return r; }
 function xpForLevel(l) { return 600 + l * 150; }

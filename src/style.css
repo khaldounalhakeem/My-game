@@ -292,3 +292,19 @@ body.pad .itemslot { bottom: calc(150px + var(--sbm)); right: calc(26px + var(--
 .fpbtns .hbtn.wide { justify-content: start; display: flex; gap: 8px; align-items: center; height: 40px; }
 .padkey { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 4px; border-radius: 4px; background: rgba(255,255,255,.14); font-size: 12px; font-family: var(--f-display); font-weight: 400; }
 body:not(.pad) .fpbtns .padkey { display: none; }
+
+/* ranks */
+.rankpanel { display: flex; gap: 16px; align-items: center; padding: 12px 16px; background: rgba(255,255,255,.04); border: 1px solid var(--panel-edge); border-radius: 8px; max-width: 760px; }
+.rp-name { font-family: var(--f-display); font-size: 22px; font-style: italic; }
+.rp-sub { font-size: 14px; color: var(--ink); line-height: 1.4; }
+.rp-sub.dim { color: var(--ink-dim); }
+.modes.locked .mode:disabled { opacity: .35; cursor: not-allowed; }
+.rankcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; max-width: 760px; }
+.rankcards .rankcard { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; }
+.rk-pl { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-dim); }
+.rankresult { display: flex; gap: 14px; align-items: center; padding: 10px 18px; border-radius: 8px; background: rgba(0,0,0,.35); border: 1px solid var(--rc, var(--panel-edge)); }
+.rankresult b { font-family: var(--f-display); font-weight: 400; font-size: 22px; display: block; }
+.rankresult small { color: var(--ink-dim); font-size: 14px; }
+.rankresult.big { animation: dropIn .7s cubic-bezier(.2,1.4,.4,1); box-shadow: 0 0 40px -8px var(--rc); }
+.rankresult.big b { font-size: 30px; }
+.rbadge { display: block; }

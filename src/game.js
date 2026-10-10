@@ -69,7 +69,7 @@ class Game {
         for (let k = have; k < size; k++) {
           const lo = randomLoadout();
           const car = new Car(id++, t, botName(), true, lo.body, lo);
-          car.bot = new Bot(car, cfg.level || 'pro');
+          car.bot = new Bot(car, cfg.botRating != null ? levelForMMR(Math.max(0, cfg.botRating + rand(-60, 60))) : (BOT_LEVELS[cfg.level] ? cfg.level : 'pro'));
           this.cars.push(car); this.bots.push(car.bot);
         }
       }

@@ -308,6 +308,22 @@ body.pad .itemslot { bottom: calc(150px + var(--sbm)); right: calc(26px + var(--
 .padkey { display: inline-grid; place-items: center; min-width: 26px; height: 22px; padding: 0 4px; border-radius: 4px; background: rgba(255,255,255,.14); font-size: 12px; font-family: var(--f-display); font-weight: 400; }
 body:not(.pad) .fpbtns .padkey { display: none; }
 
+/* ranks */
+.rankpanel { display: flex; gap: 16px; align-items: center; padding: 12px 16px; background: rgba(255,255,255,.04); border: 1px solid var(--panel-edge); border-radius: 8px; max-width: 760px; }
+.rp-name { font-family: var(--f-display); font-size: 22px; font-style: italic; }
+.rp-sub { font-size: 14px; color: var(--ink); line-height: 1.4; }
+.rp-sub.dim { color: var(--ink-dim); }
+.modes.locked .mode:disabled { opacity: .35; cursor: not-allowed; }
+.rankcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; max-width: 760px; }
+.rankcards .rankcard { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; }
+.rk-pl { font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink-dim); }
+.rankresult { display: flex; gap: 14px; align-items: center; padding: 10px 18px; border-radius: 8px; background: rgba(0,0,0,.35); border: 1px solid var(--rc, var(--panel-edge)); }
+.rankresult b { font-family: var(--f-display); font-weight: 400; font-size: 22px; display: block; }
+.rankresult small { color: var(--ink-dim); font-size: 14px; }
+.rankresult.big { animation: dropIn .7s cubic-bezier(.2,1.4,.4,1); box-shadow: 0 0 40px -8px var(--rc); }
+.rankresult.big b { font-size: 30px; }
+.rbadge { display: block; }
+
 </style>
 </head>
 <body>
@@ -429,7 +445,6 @@ const DEFAULT_SETTINGS = {
   master: 0.8, sfx: 0.9, music: 0.5, crowd: 0.7,
 };
 const Settings = Object.assign({}, DEFAULT_SETTINGS, Store.get('settings', {}));
-function saveSettings() { Store.set('settings', Settings); }
 
 const DEFAULT_PROFILE = {
   name: 'Player', title: 'ROOKIE', xp: 0, level: 1, mmr: 600, wins: 0, losses: 0, goals: 0, saves: 0, assists: 0, mvps: 0, demos: 0,
@@ -440,16 +455,91 @@ const DEFAULT_PROFILE = {
 const Profile = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_PROFILE)), Store.get('profile', {}));
 Profile.car = Object.assign({}, DEFAULT_PROFILE.car, Profile.car || {});
 Profile.unlocked = Object.assign({}, DEFAULT_PROFILE.unlocked, Profile.unlocked || {});
-function saveProfile() { Store.set('profile', Profile); }
 
-const RANKS = [
-  ['Bronze I', 0], ['Bronze II', 170], ['Bronze III', 230], ['Silver I', 290], ['Silver II', 350], ['Silver III', 410],
-  ['Gold I', 470], ['Gold II', 530], ['Gold III', 590], ['Platinum I', 650], ['Platinum II', 710], ['Platinum III', 770],
-  ['Diamond I', 840], ['Diamond II', 920], ['Diamond III', 1000], ['Champion I', 1090], ['Champion II', 1190], ['Champion III', 1300],
-  ['Grand Champion I', 1420], ['Grand Champion II', 1540], ['Grand Champion III', 1660], ['Supersonic Legend', 1860],
-];
-function rankFor(mmr) { let r = RANKS[0][0]; for (const [n, m] of RANKS) if (mmr >= m) r = n; return r; }
 function xpForLevel(l) { return 600 + l * 150; }
+
+</script>
+<script>/* src/cloud.js */
+'use strict';
+// ============================================================================
+// Cloud save: progress (profile, ranks, garage, settings) is stored in the
+// viewer's private space in the artifact database, so it survives closing the
+// game, clearing Safari data or switching devices. Falls back to on-device
+// storage when the database isn't available (e.g. the plain HTML file).
+// ============================================================================
+
+const Cloud = {
+  status: 'local', // local | connecting | cloud | error
+  doc: null, timer: null, writing: false, dirty: false, lastSaved: 0,
+
+  async init() {
+    const api = window.claude;
+    if (!api || !api.use) { this.status = 'local'; return; }
+    this.status = 'connecting';
+    try {
+      const [user, db] = await Promise.all([api.use('user'), api.use('db')]);
+      const id = user ? await user.id() : null;
+      if (!db || !id) { this.status = 'local'; return; }
+      this.doc = db.doc('data/users/' + id + '/save');
+      const snap = await this.doc.get();
+      if (snap.exists) this.merge(snap.data());
+      this.status = 'cloud';
+      // first save (or local progress made before the cloud answered)
+      this.dirty = true; this.flush();
+    } catch (e) {
+      this.status = 'error';
+    }
+    if (typeof UI !== 'undefined' && UI.screen === 'main') UI.show('main');
+  },
+
+  // cloud copy wins when it is newer than what this device has
+  merge(data) {
+    if (!data || !data.profile) return;
+    const localAt = Profile.savedAt || 0, cloudAt = data.savedAt || 0;
+    if (cloudAt < localAt) return;
+    const p = data.profile;
+    for (const k of Object.keys(Profile)) delete Profile[k];
+    Object.assign(Profile, JSON.parse(JSON.stringify(DEFAULT_PROFILE)), p);
+    Profile.car = Object.assign({}, DEFAULT_PROFILE.car, p.car || {});
+    Profile.unlocked = Object.assign({}, DEFAULT_PROFILE.unlocked, p.unlocked || {});
+    if (data.settings) Object.assign(Settings, data.settings);
+    try { localStorage.setItem('boostleague.profile', JSON.stringify(Profile)); localStorage.setItem('boostleague.settings', JSON.stringify(Settings)); } catch (e) { /* ignore */ }
+    if (typeof applySettings === 'function') applySettings(true);
+  },
+
+  // called after every local save; coalesces bursts into one write
+  schedule() {
+    this.dirty = true;
+    if (!this.doc) return;
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.flush(), 1200);
+  },
+  async flush() {
+    if (!this.doc || !this.dirty || this.writing) return;
+    this.dirty = false; this.writing = true;
+    try {
+      await this.doc.set({ v: 1, savedAt: Profile.savedAt || Date.now(), profile: JSON.parse(JSON.stringify(Profile)), settings: JSON.parse(JSON.stringify(Settings)) });
+      this.lastSaved = Date.now(); this.status = 'cloud';
+    } catch (e) {
+      if (e && e.code === 'unavailable') { this.dirty = true; setTimeout(() => this.flush(), 2500 + Math.random() * 2000); }
+      else this.status = 'error';
+    }
+    this.writing = false;
+    if (this.dirty) this.schedule();
+  },
+  label() {
+    if (this.status === 'cloud') return '☁ Progress saved to your account';
+    if (this.status === 'connecting') return '☁ Connecting to cloud save…';
+    if (this.status === 'error') return 'Saved on this device (cloud save unavailable)';
+    return 'Saved on this device';
+  },
+};
+
+// save hooks: stamp the time, keep a local copy, and sync to the cloud
+function saveProfile() { Profile.savedAt = Date.now(); Store.set('profile', Profile); Cloud.schedule(); }
+function saveSettings() { Profile.savedAt = Date.now(); Store.set('settings', Settings); Store.set('profile', Profile); Cloud.schedule(); }
+document.addEventListener('visibilitychange', () => { if (document.hidden) Cloud.flush(); });
+window.addEventListener('pagehide', () => Cloud.flush());
 
 </script>
 <script>/* src/arena.js */
@@ -1418,6 +1508,147 @@ const TRAINING_PACKS = {
 };
 
 </script>
+<script>/* src/ranks.js */
+'use strict';
+// ============================================================================
+// Ranked & casual matchmaking: placements, ranks with divisions, MMR, and
+// bot difficulty that scales with your rating
+// ============================================================================
+
+const PLACEMENT_GAMES = 10;
+const PLAYLISTS = { 1: 'Duel', 2: 'Doubles', 3: 'Standard' };
+
+// tiers: [name, min MMR, colour]
+const TIERS = [
+  ['Bronze', 0, '#c07a3e'], ['Silver', 300, '#b9c4cf'], ['Gold', 520, '#e9b931'], ['Platinum', 740, '#5fd6e3'],
+  ['Diamond', 960, '#3d7dff'], ['Champion', 1180, '#a35cff'], ['Grand Champion', 1420, '#ff3b5c'], ['Supersonic Legend', 1700, '#ffffff'],
+];
+const ROMAN = ['I', 'II', 'III'];
+const DIVS = ['I', 'II', 'III', 'IV'];
+
+// a rank: tier index, sub-rank (I/II/III), division (I-IV)
+function rankInfo(mmr) {
+  mmr = Math.max(0, mmr);
+  let t = 0;
+  for (let i = 0; i < TIERS.length; i++) if (mmr >= TIERS[i][1]) t = i;
+  const tier = TIERS[t];
+  if (t === TIERS.length - 1) return { tier: t, name: tier[0], full: tier[0], color: tier[2], sub: 0, div: 0, divName: '', index: t * 3 };
+  const span = TIERS[t + 1][1] - tier[1];
+  const step = span / 3;
+  const sub = Math.min(2, Math.floor((mmr - tier[1]) / step));
+  const within = (mmr - tier[1] - sub * step) / step;
+  const div = Math.min(3, Math.floor(within * 4));
+  return { tier: t, name: tier[0] + ' ' + ROMAN[sub], full: tier[0] + ' ' + ROMAN[sub], color: tier[2], sub, div, divName: 'Div ' + DIVS[div], index: t * 3 + sub };
+}
+function rankFor(mmr) { return rankInfo(mmr).name; }
+
+// ---------------------------------------------------------------------------
+// Bot skill that scales with MMR (interpolated between anchor levels)
+// ---------------------------------------------------------------------------
+const SKILL_ANCHORS = [
+  [0, { react: 0.5, skill: 0.2, aerial: 0, maxBoost: 0.3, flip: 0.15, aim: 0.35, assist: 0 }],
+  [350, { react: 0.35, skill: 0.35, aerial: 0, maxBoost: 0.4, flip: 0.3, aim: 0.5, assist: 0.06 }],
+  [800, { react: 0.18, skill: 0.65, aerial: 0.4, maxBoost: 0.8, flip: 0.7, aim: 0.8, assist: 0.2 }],
+  [1250, { react: 0.08, skill: 0.9, aerial: 0.85, maxBoost: 1, flip: 1, aim: 0.95, assist: 0.35 }],
+  [1750, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.5 }],
+];
+function levelForMMR(mmr) {
+  const A = SKILL_ANCHORS;
+  let i = 0;
+  while (i < A.length - 2 && mmr > A[i + 1][0]) i++;
+  const [m0, a] = A[i], [m1, b] = A[i + 1];
+  const t = clamp((mmr - m0) / (m1 - m0), 0, 1);
+  const lv = { name: 'Rated ' + Math.round(mmr), mmr };
+  for (const k in a) lv[k] = a[k] + (b[k] - a[k]) * t;
+  return lv;
+}
+
+// ---------------------------------------------------------------------------
+// Player rating state (stored in Profile)
+// ---------------------------------------------------------------------------
+function ensureRatings() {
+  const P = Profile;
+  if (!P.ranked) P.ranked = {};
+  if (!P.casual) P.casual = {};
+  for (const k of ['1', '2', '3']) {
+    if (!P.ranked[k]) P.ranked[k] = { mmr: 450, games: 0, wins: 0, losses: 0, placed: false, peak: 0, streak: 0 };
+    if (!P.casual[k]) P.casual[k] = { mmr: 250, games: 0, wins: 0, losses: 0, streak: 0 };
+  }
+}
+function rankedState(size) { ensureRatings(); return Profile.ranked[String(size)]; }
+function casualState(size) { ensureRatings(); return Profile.casual[String(size)]; }
+function rankLabel(size) {
+  const r = rankedState(size);
+  if (!r.placed) return { text: `Unranked · placement ${r.games}/${PLACEMENT_GAMES}`, color: '#8a94a8', placed: false };
+  const ri = rankInfo(r.mmr);
+  return { text: `${ri.name}${ri.divName ? ' · ' + ri.divName : ''}`, color: ri.color, placed: true, info: ri };
+}
+function bestRank() {
+  ensureRatings();
+  let best = null;
+  for (const k of ['1', '2', '3']) { const r = Profile.ranked[k]; if (r.placed && (!best || r.mmr > best.mmr)) best = r; }
+  return best ? rankInfo(best.mmr) : null;
+}
+
+// The rating the bots are tuned to for a match
+function matchRating(cfg) {
+  if (cfg.competitive) return rankedState(cfg.teamSize).mmr;
+  if (cfg.level === 'adaptive') return casualState(cfg.teamSize).mmr;
+  return null;
+}
+
+// Apply a finished match; returns a summary for the post-match screen
+function applyRatingResult(cfg, won, goalDiff) {
+  const size = cfg.teamSize;
+  if (cfg.competitive) {
+    const r = rankedState(size);
+    const before = { mmr: r.mmr, placed: r.placed, rank: rankInfo(r.mmr) };
+    r.games++; if (won) r.wins++; else r.losses++;
+    r.streak = won ? Math.max(1, r.streak + 1) : Math.min(-1, r.streak - 1);
+    let delta;
+    if (!r.placed) delta = (won ? 38 : -28) + clamp(goalDiff, -3, 3) * 4;
+    else delta = (won ? 10 : -10) + (Math.abs(r.streak) >= 3 ? sign(r.streak) * 2 : 0) + clamp(goalDiff, -3, 3);
+    r.mmr = Math.max(0, r.mmr + delta);
+    let justPlaced = false;
+    if (!r.placed && r.games >= PLACEMENT_GAMES) { r.placed = true; justPlaced = true; }
+    r.peak = Math.max(r.peak || 0, r.placed ? r.mmr : 0);
+    const after = rankInfo(r.mmr);
+    return {
+      ranked: true, playlist: PLAYLISTS[size], delta, placed: r.placed, justPlaced, games: r.games,
+      before: before.rank, after, rankUp: before.placed && after.index > before.rank.index, rankDown: before.placed && after.index < before.rank.index,
+      divUp: before.placed && after.index === before.rank.index && after.div > before.rank.div,
+      divDown: before.placed && after.index === before.rank.index && after.div < before.rank.div,
+    };
+  }
+  if (cfg.level === 'adaptive') {
+    const c = casualState(size);
+    c.games++; if (won) c.wins++; else c.losses++;
+    c.streak = won ? Math.max(1, c.streak + 1) : Math.min(-1, c.streak - 1);
+    const delta = (won ? 18 : -14) + clamp(goalDiff, -3, 3) * 2;
+    c.mmr = clamp(c.mmr + delta, 0, 2000);
+    return { ranked: false, delta, casualMmr: c.mmr };
+  }
+  return null;
+}
+
+// small rank emblem (inline SVG) used in menus and the post-match screen
+function rankBadge(info, size) {
+  size = size || 48;
+  const c = info ? info.color : '#5c6678';
+  const pips = info && info.tier < TIERS.length - 1 ? info.sub + 1 : 0;
+  const glow = info && info.tier >= 6;
+  let p = '';
+  for (let i = 0; i < pips; i++) p += `<rect x="${36 + (i - (pips - 1) / 2) * 12 - 3}" y="56" width="6" height="10" rx="1" fill="${c}"/>`;
+  return `<svg class="rbadge" width="${size}" height="${size}" viewBox="0 0 72 72" aria-hidden="true">
+    ${glow ? `<circle cx="36" cy="34" r="30" fill="${c}" opacity=".18"/>` : ''}
+    <path d="M36 4 L62 18 L62 44 L36 60 L10 44 L10 18 Z" fill="#0d1428" stroke="${c}" stroke-width="4"/>
+    <path d="M36 14 L52 23 L52 40 L36 50 L20 40 L20 23 Z" fill="${c}" opacity="${info ? 0.85 : 0.3}"/>
+    ${info && info.tier >= 5 ? `<path d="M36 18 L41 30 L54 30 L44 38 L48 50 L36 42 L24 50 L28 38 L18 30 L31 30 Z" fill="#fff" opacity=".9" transform="translate(0,-2) scale(1)"/>` : ''}
+    ${p}
+  </svg>`;
+}
+
+</script>
 <script>/* src/ai.js */
 'use strict';
 // ============================================================================
@@ -1429,7 +1660,7 @@ const _ai1 = new V3(), _ai2 = new V3(), _ai3 = new V3(), _ai4 = new V3(), _aiq =
 
 class Bot {
   constructor(car, levelKey) {
-    this.car = car; this.lv = BOT_LEVELS[levelKey] || BOT_LEVELS.pro;
+    this.car = car; this.lv = typeof levelKey === 'object' ? levelKey : (BOT_LEVELS[levelKey] || BOT_LEVELS.pro);
     this.seq = []; this.seqT = 0; this.thinkT = Math.random() * 0.2; this.target = new V3(); this.targetT = 0;
     this.mode = 'idle'; this.aerial = null; this.flipCd = 0; this.chatCd = rand(5, 10); this.noise = new V3();
     this.role = 'attack'; this.itemT = rand(1, 3); this.kickoffMove = 0;
@@ -1859,7 +2090,7 @@ class Game {
         for (let k = have; k < size; k++) {
           const lo = randomLoadout();
           const car = new Car(id++, t, botName(), true, lo.body, lo);
-          car.bot = new Bot(car, cfg.level || 'pro');
+          car.bot = new Bot(car, cfg.botRating != null ? levelForMMR(Math.max(0, cfg.botRating + rand(-60, 60))) : (BOT_LEVELS[cfg.level] ? cfg.level : 'pro'));
           this.cars.push(car); this.bots.push(car.bot);
         }
       }
@@ -4328,7 +4559,8 @@ const UI = {
     const P = Profile;
     const card = h('div', { class: 'pcard' },
       h('div', { class: 'pc-name' }, P.name), h('div', { class: 'pc-title' }, P.title),
-      h('div', { class: 'pc-row' }, h('span', { class: 'pc-lvl' }, 'LVL ' + P.level), h('span', { class: 'pc-rank' }, rankFor(P.mmr))),
+      h('div', { class: 'pc-row' }, h('span', { class: 'pc-lvl' }, 'LVL ' + P.level), (() => { const b = bestRank(); return h('span', { class: 'pc-rank', style: b ? `color:${b.color}` : '' }, b ? b.name : 'Unranked'); })()),
+      h('div', { class: 'pc-pad', id: 'cloudstatus' }, Cloud.label()),
       h('div', { class: 'xpbar' }, h('i', { style: `width:${Math.min(100, P.xp / xpForLevel(P.level) * 100)}%` })),
       h('div', { class: 'pc-pad', id: 'padstatus' }, padStatusText()),
       P.newItems.length ? h('div', { class: 'pc-new' }, `${P.newItems.length} new item${P.newItems.length > 1 ? 's' : ''} in the Garage`) : null,
@@ -4349,11 +4581,20 @@ const UI = {
 
   scr_play() {
     const C = this.playCfg;
+    if (C.level === undefined || C.level === 'pro' && !C._migrated) { C.level = 'adaptive'; C._migrated = true; }
     const save = () => Store.set('playcfg', C);
-    const seg = (label, key, opts) => h('div', { class: 'field' }, h('label', null, label), h('div', { class: 'seg' },
-      opts.map(([v, t]) => h('button', { class: C[key] === v ? 'on' : '', onclick: (e) => { C[key] = v; save(); [...e.target.parentNode.children].forEach(b => b.classList.remove('on')); e.target.classList.add('on'); Sound.play('click'); } }, t))));
-    const modes = h('div', { class: 'modes' }, Object.entries(MODES).map(([k, m]) => h('button', {
-      class: 'mode ' + (C.mode === k ? 'on' : ''), onclick: (e) => { C.mode = k; save(); [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); Sound.play('click'); },
+    const ranked = !!C.competitive;
+    // re-render (keeps the controller focus on the same button)
+    const rerender = (label) => { this.show('play'); if (Input.usingPad) setTimeout(() => { const el = this.padFocusables().find(b => b.textContent === label); if (el) this.padFocus(el); }, 40); };
+    const seg = (label, key, opts, re) => h('div', { class: 'field' }, h('label', null, label), h('div', { class: 'seg' },
+      opts.map(([v, t]) => h('button', { class: C[key] === v ? 'on' : '', onclick: (e) => {
+        C[key] = v; save(); Sound.play('click');
+        if (re) { rerender(t); return; }
+        [...e.target.parentNode.children].forEach(b => b.classList.remove('on')); e.target.classList.add('on');
+      } }, t))));
+    const modes = h('div', { class: 'modes' + (ranked ? ' locked' : '') }, Object.entries(MODES).map(([k, m]) => h('button', {
+      class: 'mode ' + ((ranked ? k === 'soccar' : C.mode === k) ? 'on' : ''), disabled: ranked && k !== 'soccar' ? true : null,
+      onclick: (e) => { C.mode = k; save(); [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); Sound.play('click'); },
     }, h('b', null, m.name), h('small', null, m.desc))));
     const mapSel = h('select', { id: 'mapsel', onchange: (e) => { C.map = e.target.value; save(); } },
       h('option', { value: 'auto' }, 'Random arena'), Object.entries(MAPS).map(([k, m]) => h('option', { value: k }, `${m.name} (${m.sub})`)));
@@ -4363,21 +4604,41 @@ const UI = {
       const cur = C.mutators[key]; const idx = opts.findIndex(o => o[0] === cur); sel.selectedIndex = idx >= 0 ? idx : 0;
       return h('div', { class: 'mut' }, h('label', { for: 'mut-' + key }, label), sel);
     }));
+    // rank / difficulty panel for the chosen team size
+    let info;
+    if (ranked) {
+      const r = rankedState(C.teamSize), lab = rankLabel(C.teamSize);
+      const ri = r.placed ? rankInfo(r.mmr) : null;
+      info = h('div', { class: 'rankpanel' }, h('span', { html: rankBadge(ri, 64) }),
+        h('div', null,
+          h('div', { class: 'rp-name', style: `color:${lab.color}` }, r.placed ? `${ri.name}` : 'Unranked'),
+          h('div', { class: 'rp-sub' }, r.placed ? `${ri.divName} · ${PLAYLISTS[C.teamSize]} · ${r.wins}W ${r.losses}L` : `Placement matches: ${r.games} / ${PLACEMENT_GAMES} played. Win them to start higher.`),
+          h('div', { class: 'rp-sub dim' }, 'Bots are matched to your rank. Win to climb from Bronze I to Supersonic Legend.')));
+    } else {
+      const c = casualState(C.teamSize);
+      info = h('div', { class: 'rankpanel' },
+        h('div', null,
+          h('div', { class: 'rp-name' }, C.level === 'adaptive' ? 'Adaptive bots' : `${BOT_LEVELS[C.level].name} bots`),
+          h('div', { class: 'rp-sub' }, C.level === 'adaptive' ? `Bots get harder as you win (current skill: ${rankFor(c.mmr)}).` : 'Fixed difficulty. Pick Adaptive to have bots get harder as you win.')));
+    }
     return h('div', { class: 'menu play-menu scroll' },
       h('div', { class: 'mhead' }, this.back('main'), h('h2', null, 'Play')),
-      modes,
       h('div', { class: 'opts' },
-        seg('Team Size', 'teamSize', [[1, '1v1 Duel'], [2, '2v2 Doubles'], [3, '3v3 Standard']]),
-        seg('Bot Difficulty', 'level', [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star']]),
-        seg('Playlist', 'competitive', [[false, 'Casual'], [true, 'Competitive']]),
+        seg('Playlist', 'competitive', [[false, 'Casual'], [true, 'Ranked']], true),
+        seg('Team Size', 'teamSize', [[1, '1v1 Duel'], [2, '2v2 Doubles'], [3, '3v3 Standard']], true),
+        ranked ? null : seg('Bots', 'level', [['adaptive', 'Adaptive'], ['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star']], true),
         h('div', { class: 'field' }, h('label', { for: 'mapsel' }, 'Arena'), mapSel),
       ),
-      h('div', { class: 'row' },
+      info,
+      modes,
+      ranked ? h('div', { class: 'rp-sub dim' }, 'Ranked is played in Soccar with standard rules.') : h('div', { class: 'row' },
         h('button', { class: 'ghost', onclick: () => { mutBox.hidden = !mutBox.hidden; Sound.play('click'); } }, 'Mutators ▾'),
         h('button', { class: 'ghost', onclick: () => { C.mutators = {}; save(); this.show('play'); } }, 'Reset mutators'),
       ),
-      mutBox,
-      h('div', { class: 'go-row' }, this.btn('START MATCH', () => startMatch({ kind: 'match', ...C, mutators: C.competitive ? {} : C.mutators }), 'go')),
+      ranked ? null : mutBox,
+      h('div', { class: 'go-row' }, this.btn(ranked ? 'FIND RANKED MATCH' : 'START MATCH', () => startMatch(ranked
+        ? { kind: 'match', mode: 'soccar', teamSize: C.teamSize, level: 'ranked', map: C.map, competitive: true, mutators: {} }
+        : { kind: 'match', ...C, competitive: false }), 'go')),
     );
   },
 
@@ -4431,8 +4692,16 @@ const UI = {
         h('div', { class: 'field' }, h('label', { for: 'pname' }, 'Player name'), nameIn),
         h('div', { class: 'field' }, h('label', { for: 'ptitle' }, 'Title'), titleSel),
       ),
-      h('div', { class: 'rankcard' }, h('div', { class: 'rk-name' }, rankFor(P.mmr)), h('div', { class: 'rk-mmr' }, `Competitive rating ${Math.round(P.mmr)}`),
-        h('div', { class: 'rk-lvl' }, `Level ${P.level} · ${P.xp} / ${xpForLevel(P.level)} XP`)),
+      h('div', { class: 'rk-lvl' }, `Level ${P.level} · ${P.xp} / ${xpForLevel(P.level)} XP · ${Cloud.label()}`),
+      h('h3', null, 'Ranked'),
+      h('div', { class: 'rankcards' }, ['1', '2', '3'].map(k => {
+        const r = rankedState(+k), ri = r.placed ? rankInfo(r.mmr) : null;
+        return h('div', { class: 'rankcard' }, h('span', { html: rankBadge(ri, 72) }),
+          h('div', { class: 'rk-pl' }, PLAYLISTS[k]),
+          h('div', { class: 'rk-name', style: ri ? `color:${ri.color}` : '' }, ri ? ri.name : 'Unranked'),
+          h('div', { class: 'rk-mmr' }, ri ? `${ri.divName ? ri.divName + ' · ' : ''}${Math.round(r.mmr)} MMR` : `Placements ${r.games}/${PLACEMENT_GAMES}`),
+          h('div', { class: 'rk-mmr' }, `${r.wins}W ${r.losses}L` + (r.peak ? ` · peak ${rankFor(r.peak)}` : '')));
+      })),
       h('div', { class: 'stats' }, stat('Wins', P.wins), stat('Losses', P.losses), stat('Goals', P.goals), stat('Assists', P.assists), stat('Saves', P.saves), stat('MVPs', P.mvps), stat('Demos', P.demos)),
     );
   },
@@ -4546,7 +4815,7 @@ const UI = {
       g.mvp ? h('div', { class: 'mvp' }, `MVP: ${g.mvp.name}`) : null,
       h('div', { class: 'sbs' }, tbl(0), tbl(1)),
       h('div', { class: 'xpwrap' }, h('div', null, `+${res.xp} XP`, res.leveled ? h('b', { class: 'lvlup' }, ` LEVEL UP! Level ${Profile.level}`) : null), xpBar),
-      res.mmr ? h('div', { class: 'mmr' }, `${rankFor(Profile.mmr)} · ${res.mmr > 0 ? '+' : ''}${res.mmr} rating`) : null,
+      res.rating ? this.ratingBlock(res.rating) : null,
       res.drops.length ? h('div', { class: 'drops' }, h('div', { class: 'drops-h' }, 'ITEM DROP'), res.drops.map(d => h('div', { class: 'drop', style: `--rar:${RARITY_COLORS[d.rarity]}` }, h('b', null, d.name), h('small', null, `${RARITY[d.rarity]} ${d.catName}`)))) : null,
       h('div', { class: 'row center' },
         this.btn('PLAY AGAIN', () => startMatch(g.cfg), 'go'),
@@ -4554,6 +4823,23 @@ const UI = {
       ),
     );
     return el;
+  },
+
+  ratingBlock(r) {
+    const d = (r.delta > 0 ? '+' : '') + r.delta;
+    if (!r.ranked) return h('div', { class: 'mmr' }, `Adaptive bots: ${r.delta > 0 ? 'getting harder' : 'getting easier'} (${d}) · bot skill now ${rankFor(r.casualMmr)}`);
+    if (!r.placed) return h('div', { class: 'rankresult' }, h('span', { html: rankBadge(null, 64) }),
+      h('div', null, h('b', null, `Placement match ${r.games} / ${PLACEMENT_GAMES}`), h('small', null, `${r.playlist} · ${PLACEMENT_GAMES - r.games} to go before your rank is revealed`)));
+    const a = r.after;
+    let head = `${a.name} · ${a.divName}`;
+    if (r.justPlaced) head = `RANK REVEALED: ${a.name}`;
+    else if (r.rankUp) head = `RANK UP! ${a.name}`;
+    else if (r.rankDown) head = `Rank down: ${a.name}`;
+    else if (r.divUp) head = `Division up! ${a.name} ${a.divName}`;
+    else if (r.divDown) head = `Division down: ${a.name} ${a.divName}`;
+    const big = r.justPlaced || r.rankUp;
+    return h('div', { class: 'rankresult' + (big ? ' big' : ''), style: `--rc:${a.color}` }, h('span', { html: rankBadge(a, big ? 96 : 64) }),
+      h('div', null, h('b', { style: `color:${a.color}` }, head), h('small', null, `${r.playlist} · ${d} MMR`)));
   },
 
   scr_trainingEnd(res) {
@@ -4858,7 +5144,7 @@ function padStatusText() {
   if (Input.padStatus === 'blocked') return '🎮 Controllers are blocked in this view';
   return '🎮 Controller: press any button on it to connect';
 }
-setInterval(() => { const el = document.getElementById('padstatus'); if (el) el.textContent = padStatusText(); }, 1000);
+setInterval(() => { const el = document.getElementById('padstatus'); if (el) el.textContent = padStatusText(); const c = document.getElementById('cloudstatus'); if (c) c.textContent = Cloud.label(); }, 1000);
 
 function isStandalone() { return window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
 
@@ -4930,6 +5216,8 @@ const Garage = {
 const CUR = { game: null, attract: false, paused: false, menuCam: true, acc: 0, last: 0, endT: 0 };
 
 function boot() {
+  ensureRatings();
+  Cloud.init();
   initRenderer(document.getElementById('gl'));
   Input.init();
   UI.init();
@@ -4966,6 +5254,7 @@ function startAttract() {
 function startMatch(cfg) {
   cfg = JSON.parse(JSON.stringify(cfg));
   if (cfg.kind === 'match' && cfg.competitive) cfg.mutators = {};
+  if (cfg.kind === 'match') { const r = matchRating(cfg); cfg.botRating = r != null ? r : undefined; }
   Garage.close();
   const g = new Game(cfg);
   CUR.game = g; CUR.attract = false; CUR.menuCam = false; CUR.paused = false; CUR.acc = 0; CUR.endT = 0;
@@ -5003,6 +5292,14 @@ function resumeGame() {
   Input.show(true, { item: CUR.game.mode === 'rumble' });
 }
 function quitToMenu(screen) {
+  // leaving a ranked match early counts as a loss
+  const g = CUR.game;
+  if (g && !CUR.attract && g.kind === 'match' && g.cfg.competitive && g.state !== 'ended') {
+    const res = applyRatingResult(g.cfg, false, -3);
+    g.player.stats && Profile.losses++;
+    saveProfile();
+    if (res) setTimeout(() => UI.toast(`Forfeit — counted as a loss (${res.delta} MMR)`), 300);
+  }
   startAttract();
   Sound.startMusic();
   UI.show(screen || 'main');
@@ -5147,19 +5444,15 @@ function finishMatchProgress(g) {
     const d = rollDrop(); if (d) drops.push(d);
   }
   if (won && Math.random() < 0.35) { const d = rollDrop(); if (d) drops.push(d); }
-  let mmr = 0;
-  if (g.cfg.competitive) {
-    const lvlMul = { rookie: 0.6, pro: 1, allstar: 1.4 }[g.cfg.level] || 1;
-    mmr = Math.round((won ? 9 : -9) * (won ? lvlMul : 1 / lvlMul) + (won ? randInt(0, 3) : -randInt(0, 3)));
-    P.mmr = Math.max(0, P.mmr + mmr);
-  }
+  const goalDiff = g.score[me.team] - g.score[1 - me.team];
+  const rating = applyRatingResult(g.cfg, won, goalDiff);
   if (won) P.wins++; else P.losses++;
   P.goals += me.stats.goals; P.assists += me.stats.assists; P.saves += me.stats.saves; P.demos += me.stats.demos;
   if (g.mvp === me) P.mvps++;
   saveProfile();
   if (leveled) Sound.play('levelup');
   const xpTo = leveled ? Math.min(100, P.xp / xpForLevel(P.level) * 100) : Math.min(100, P.xp / xpForLevel(P.level) * 100);
-  return { game: g, xp, xpFrom: leveled ? 0 : xpFrom, xpTo, leveled, drops, mmr };
+  return { game: g, xp, xpFrom: leveled ? 0 : xpFrom, xpTo, leveled, drops, rating };
 }
 
 function rollDrop() {

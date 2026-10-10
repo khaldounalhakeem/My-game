@@ -8,7 +8,7 @@ const _ai1 = new V3(), _ai2 = new V3(), _ai3 = new V3(), _ai4 = new V3(), _aiq =
 
 class Bot {
   constructor(car, levelKey) {
-    this.car = car; this.lv = BOT_LEVELS[levelKey] || BOT_LEVELS.pro;
+    this.car = car; this.lv = typeof levelKey === 'object' ? levelKey : (BOT_LEVELS[levelKey] || BOT_LEVELS.pro);
     this.seq = []; this.seqT = 0; this.thinkT = Math.random() * 0.2; this.target = new V3(); this.targetT = 0;
     this.mode = 'idle'; this.aerial = null; this.flipCd = 0; this.chatCd = rand(5, 10); this.noise = new V3();
     this.role = 'attack'; this.itemT = rand(1, 3); this.kickoffMove = 0;

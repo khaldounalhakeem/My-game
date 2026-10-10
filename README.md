@@ -24,7 +24,13 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 
 **Training:** Striker, Goalie and Aerial packs, plus Free Play. Free Play tools on the controller: D-pad ↑ shoot the ball at me, ↓ ball to center, ← aerial ball, → wall/pinch ball, L1 rewind 3 seconds, R1 freeze ball, L3 reset car. The same tools are on-screen buttons for touch.
 
-**Progression:** XP and levels, item drops with rarities, a competitive rating with ranks from Bronze to Supersonic Legend, and career stats.
+**Ranked:** separate Duel, Doubles and Standard ratings. 10 placement matches, then ranks from Bronze I to Supersonic Legend with divisions I–IV. Bots are tuned to your rating, so they get harder as you climb. Leaving a ranked match early counts as a loss.
+
+**Casual:** Adaptive bots by default. A hidden rating goes up when you win and down when you lose, and the bots follow it. Fixed Rookie, Pro and All-Star bots are still available.
+
+**Progression:** XP and levels, item drops with rarities, and career stats.
+
+**Saving:** when played as a Claude artifact, progress (profile, ranks, garage, settings) is saved to your Claude account, so it survives closing the game or clearing Safari data. Otherwise it is saved on the device.
 
 **Garage:** car bodies, paint, decals, wheels, boost trails, goal explosions, toppers and antennas.
 
@@ -44,6 +50,8 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 | File | Contents |
 | --- | --- |
 | `src/core.js` | constants, curves, settings and profile storage |
+| `src/cloud.js` | cloud save to the artifact database (falls back to on-device storage) |
+| `src/ranks.js` | ranks, placements, MMR and bot skill scaling |
 | `src/arena.js` | arena signed-distance field (collisions), boost pad and spawn layouts, Dropshot tiles |
 | `src/car.js` | car physics |
 | `src/ball.js` | ball physics, car↔ball and car↔car collisions, ball prediction |

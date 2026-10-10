@@ -4,7 +4,7 @@ const root = path.join(__dirname, '..');
 const THREE = require(process.argv[2] || '/tmp/three.cjs');
 const ctx = { THREE, console, Math, performance: { now: () => Date.now() }, setTimeout, localStorage: undefined };
 ctx.window = ctx; vm.createContext(ctx);
-for (const f of ['core', 'arena', 'car', 'ball', 'data', 'ai', 'game']) vm.runInContext(fs.readFileSync(path.join(root, 'src', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
+for (const f of ['core', 'arena', 'car', 'ball', 'data', 'ranks', 'ai', 'game']) vm.runInContext(fs.readFileSync(path.join(root, 'src', f + '.js'), 'utf8'), ctx, { filename: f + '.js' });
 const run = (cfg, seconds) => vm.runInContext(`(() => {
   const cfg = ${JSON.stringify(cfg)};
   const g = new Game(cfg);

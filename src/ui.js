@@ -76,7 +76,8 @@ const UI = {
     const P = Profile;
     const card = h('div', { class: 'pcard' },
       h('div', { class: 'pc-name' }, P.name), h('div', { class: 'pc-title' }, P.title),
-      h('div', { class: 'pc-row' }, h('span', { class: 'pc-lvl' }, 'LVL ' + P.level), h('span', { class: 'pc-rank' }, rankFor(P.mmr))),
+      h('div', { class: 'pc-row' }, h('span', { class: 'pc-lvl' }, 'LVL ' + P.level), (() => { const b = bestRank(); return h('span', { class: 'pc-rank', style: b ? `color:${b.color}` : '' }, b ? b.name : 'Unranked'); })()),
+      h('div', { class: 'pc-pad', id: 'cloudstatus' }, Cloud.label()),
       h('div', { class: 'xpbar' }, h('i', { style: `width:${Math.min(100, P.xp / xpForLevel(P.level) * 100)}%` })),
       h('div', { class: 'pc-pad', id: 'padstatus' }, padStatusText()),
       P.newItems.length ? h('div', { class: 'pc-new' }, `${P.newItems.length} new item${P.newItems.length > 1 ? 's' : ''} in the Garage`) : null,
@@ -97,11 +98,20 @@ const UI = {
 
   scr_play() {
     const C = this.playCfg;
+    if (C.level === undefined || C.level === 'pro' && !C._migrated) { C.level = 'adaptive'; C._migrated = true; }
     const save = () => Store.set('playcfg', C);
-    const seg = (label, key, opts) => h('div', { class: 'field' }, h('label', null, label), h('div', { class: 'seg' },
-      opts.map(([v, t]) => h('button', { class: C[key] === v ? 'on' : '', onclick: (e) => { C[key] = v; save(); [...e.target.parentNode.children].forEach(b => b.classList.remove('on')); e.target.classList.add('on'); Sound.play('click'); } }, t))));
-    const modes = h('div', { class: 'modes' }, Object.entries(MODES).map(([k, m]) => h('button', {
-      class: 'mode ' + (C.mode === k ? 'on' : ''), onclick: (e) => { C.mode = k; save(); [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); Sound.play('click'); },
+    const ranked = !!C.competitive;
+    // re-render (keeps the controller focus on the same button)
+    const rerender = (label) => { this.show('play'); if (Input.usingPad) setTimeout(() => { const el = this.padFocusables().find(b => b.textContent === label); if (el) this.padFocus(el); }, 40); };
+    const seg = (label, key, opts, re) => h('div', { class: 'field' }, h('label', null, label), h('div', { class: 'seg' },
+      opts.map(([v, t]) => h('button', { class: C[key] === v ? 'on' : '', onclick: (e) => {
+        C[key] = v; save(); Sound.play('click');
+        if (re) { rerender(t); return; }
+        [...e.target.parentNode.children].forEach(b => b.classList.remove('on')); e.target.classList.add('on');
+      } }, t))));
+    const modes = h('div', { class: 'modes' + (ranked ? ' locked' : '') }, Object.entries(MODES).map(([k, m]) => h('button', {
+      class: 'mode ' + ((ranked ? k === 'soccar' : C.mode === k) ? 'on' : ''), disabled: ranked && k !== 'soccar' ? true : null,
+      onclick: (e) => { C.mode = k; save(); [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); Sound.play('click'); },
     }, h('b', null, m.name), h('small', null, m.desc))));
     const mapSel = h('select', { id: 'mapsel', onchange: (e) => { C.map = e.target.value; save(); } },
       h('option', { value: 'auto' }, 'Random arena'), Object.entries(MAPS).map(([k, m]) => h('option', { value: k }, `${m.name} (${m.sub})`)));
@@ -111,21 +121,41 @@ const UI = {
       const cur = C.mutators[key]; const idx = opts.findIndex(o => o[0] === cur); sel.selectedIndex = idx >= 0 ? idx : 0;
       return h('div', { class: 'mut' }, h('label', { for: 'mut-' + key }, label), sel);
     }));
+    // rank / difficulty panel for the chosen team size
+    let info;
+    if (ranked) {
+      const r = rankedState(C.teamSize), lab = rankLabel(C.teamSize);
+      const ri = r.placed ? rankInfo(r.mmr) : null;
+      info = h('div', { class: 'rankpanel' }, h('span', { html: rankBadge(ri, 64) }),
+        h('div', null,
+          h('div', { class: 'rp-name', style: `color:${lab.color}` }, r.placed ? `${ri.name}` : 'Unranked'),
+          h('div', { class: 'rp-sub' }, r.placed ? `${ri.divName} · ${PLAYLISTS[C.teamSize]} · ${r.wins}W ${r.losses}L` : `Placement matches: ${r.games} / ${PLACEMENT_GAMES} played. Win them to start higher.`),
+          h('div', { class: 'rp-sub dim' }, 'Bots are matched to your rank. Win to climb from Bronze I to Supersonic Legend.')));
+    } else {
+      const c = casualState(C.teamSize);
+      info = h('div', { class: 'rankpanel' },
+        h('div', null,
+          h('div', { class: 'rp-name' }, C.level === 'adaptive' ? 'Adaptive bots' : `${BOT_LEVELS[C.level].name} bots`),
+          h('div', { class: 'rp-sub' }, C.level === 'adaptive' ? `Bots get harder as you win (current skill: ${rankFor(c.mmr)}).` : 'Fixed difficulty. Pick Adaptive to have bots get harder as you win.')));
+    }
     return h('div', { class: 'menu play-menu scroll' },
       h('div', { class: 'mhead' }, this.back('main'), h('h2', null, 'Play')),
-      modes,
       h('div', { class: 'opts' },
-        seg('Team Size', 'teamSize', [[1, '1v1 Duel'], [2, '2v2 Doubles'], [3, '3v3 Standard']]),
-        seg('Bot Difficulty', 'level', [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star']]),
-        seg('Playlist', 'competitive', [[false, 'Casual'], [true, 'Competitive']]),
+        seg('Playlist', 'competitive', [[false, 'Casual'], [true, 'Ranked']], true),
+        seg('Team Size', 'teamSize', [[1, '1v1 Duel'], [2, '2v2 Doubles'], [3, '3v3 Standard']], true),
+        ranked ? null : seg('Bots', 'level', [['adaptive', 'Adaptive'], ['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star']], true),
         h('div', { class: 'field' }, h('label', { for: 'mapsel' }, 'Arena'), mapSel),
       ),
-      h('div', { class: 'row' },
+      info,
+      modes,
+      ranked ? h('div', { class: 'rp-sub dim' }, 'Ranked is played in Soccar with standard rules.') : h('div', { class: 'row' },
         h('button', { class: 'ghost', onclick: () => { mutBox.hidden = !mutBox.hidden; Sound.play('click'); } }, 'Mutators ▾'),
         h('button', { class: 'ghost', onclick: () => { C.mutators = {}; save(); this.show('play'); } }, 'Reset mutators'),
       ),
-      mutBox,
-      h('div', { class: 'go-row' }, this.btn('START MATCH', () => startMatch({ kind: 'match', ...C, mutators: C.competitive ? {} : C.mutators }), 'go')),
+      ranked ? null : mutBox,
+      h('div', { class: 'go-row' }, this.btn(ranked ? 'FIND RANKED MATCH' : 'START MATCH', () => startMatch(ranked
+        ? { kind: 'match', mode: 'soccar', teamSize: C.teamSize, level: 'ranked', map: C.map, competitive: true, mutators: {} }
+        : { kind: 'match', ...C, competitive: false }), 'go')),
     );
   },
 
@@ -179,8 +209,16 @@ const UI = {
         h('div', { class: 'field' }, h('label', { for: 'pname' }, 'Player name'), nameIn),
         h('div', { class: 'field' }, h('label', { for: 'ptitle' }, 'Title'), titleSel),
       ),
-      h('div', { class: 'rankcard' }, h('div', { class: 'rk-name' }, rankFor(P.mmr)), h('div', { class: 'rk-mmr' }, `Competitive rating ${Math.round(P.mmr)}`),
-        h('div', { class: 'rk-lvl' }, `Level ${P.level} · ${P.xp} / ${xpForLevel(P.level)} XP`)),
+      h('div', { class: 'rk-lvl' }, `Level ${P.level} · ${P.xp} / ${xpForLevel(P.level)} XP · ${Cloud.label()}`),
+      h('h3', null, 'Ranked'),
+      h('div', { class: 'rankcards' }, ['1', '2', '3'].map(k => {
+        const r = rankedState(+k), ri = r.placed ? rankInfo(r.mmr) : null;
+        return h('div', { class: 'rankcard' }, h('span', { html: rankBadge(ri, 72) }),
+          h('div', { class: 'rk-pl' }, PLAYLISTS[k]),
+          h('div', { class: 'rk-name', style: ri ? `color:${ri.color}` : '' }, ri ? ri.name : 'Unranked'),
+          h('div', { class: 'rk-mmr' }, ri ? `${ri.divName ? ri.divName + ' · ' : ''}${Math.round(r.mmr)} MMR` : `Placements ${r.games}/${PLACEMENT_GAMES}`),
+          h('div', { class: 'rk-mmr' }, `${r.wins}W ${r.losses}L` + (r.peak ? ` · peak ${rankFor(r.peak)}` : '')));
+      })),
       h('div', { class: 'stats' }, stat('Wins', P.wins), stat('Losses', P.losses), stat('Goals', P.goals), stat('Assists', P.assists), stat('Saves', P.saves), stat('MVPs', P.mvps), stat('Demos', P.demos)),
     );
   },
@@ -294,7 +332,7 @@ const UI = {
       g.mvp ? h('div', { class: 'mvp' }, `MVP: ${g.mvp.name}`) : null,
       h('div', { class: 'sbs' }, tbl(0), tbl(1)),
       h('div', { class: 'xpwrap' }, h('div', null, `+${res.xp} XP`, res.leveled ? h('b', { class: 'lvlup' }, ` LEVEL UP! Level ${Profile.level}`) : null), xpBar),
-      res.mmr ? h('div', { class: 'mmr' }, `${rankFor(Profile.mmr)} · ${res.mmr > 0 ? '+' : ''}${res.mmr} rating`) : null,
+      res.rating ? this.ratingBlock(res.rating) : null,
       res.drops.length ? h('div', { class: 'drops' }, h('div', { class: 'drops-h' }, 'ITEM DROP'), res.drops.map(d => h('div', { class: 'drop', style: `--rar:${RARITY_COLORS[d.rarity]}` }, h('b', null, d.name), h('small', null, `${RARITY[d.rarity]} ${d.catName}`)))) : null,
       h('div', { class: 'row center' },
         this.btn('PLAY AGAIN', () => startMatch(g.cfg), 'go'),
@@ -302,6 +340,23 @@ const UI = {
       ),
     );
     return el;
+  },
+
+  ratingBlock(r) {
+    const d = (r.delta > 0 ? '+' : '') + r.delta;
+    if (!r.ranked) return h('div', { class: 'mmr' }, `Adaptive bots: ${r.delta > 0 ? 'getting harder' : 'getting easier'} (${d}) · bot skill now ${rankFor(r.casualMmr)}`);
+    if (!r.placed) return h('div', { class: 'rankresult' }, h('span', { html: rankBadge(null, 64) }),
+      h('div', null, h('b', null, `Placement match ${r.games} / ${PLACEMENT_GAMES}`), h('small', null, `${r.playlist} · ${PLACEMENT_GAMES - r.games} to go before your rank is revealed`)));
+    const a = r.after;
+    let head = `${a.name} · ${a.divName}`;
+    if (r.justPlaced) head = `RANK REVEALED: ${a.name}`;
+    else if (r.rankUp) head = `RANK UP! ${a.name}`;
+    else if (r.rankDown) head = `Rank down: ${a.name}`;
+    else if (r.divUp) head = `Division up! ${a.name} ${a.divName}`;
+    else if (r.divDown) head = `Division down: ${a.name} ${a.divName}`;
+    const big = r.justPlaced || r.rankUp;
+    return h('div', { class: 'rankresult' + (big ? ' big' : ''), style: `--rc:${a.color}` }, h('span', { html: rankBadge(a, big ? 96 : 64) }),
+      h('div', null, h('b', { style: `color:${a.color}` }, head), h('small', null, `${r.playlist} · ${d} MMR`)));
   },
 
   scr_trainingEnd(res) {
@@ -606,7 +661,7 @@ function padStatusText() {
   if (Input.padStatus === 'blocked') return '🎮 Controllers are blocked in this view';
   return '🎮 Controller: press any button on it to connect';
 }
-setInterval(() => { const el = document.getElementById('padstatus'); if (el) el.textContent = padStatusText(); }, 1000);
+setInterval(() => { const el = document.getElementById('padstatus'); if (el) el.textContent = padStatusText(); const c = document.getElementById('cloudstatus'); if (c) c.textContent = Cloud.label(); }, 1000);
 
 function isStandalone() { return window.navigator.standalone || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
 

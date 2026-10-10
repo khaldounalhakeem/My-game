@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), vm = require('vm');
 const THREE = require(process.argv[2] || '/tmp/three.cjs');
 const ctx = { THREE, process, console, Math, setTimeout, localStorage: undefined }; ctx.window = ctx; vm.createContext(ctx);
-for (const f of ['core', 'arena', 'car', 'ball', 'data', 'ai', 'game']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', f + '.js'), 'utf8'), ctx);
+for (const f of ['core', 'arena', 'car', 'ball', 'data', 'ranks', 'ai', 'game']) vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'src', f + '.js'), 'utf8'), ctx);
 vm.runInContext(`
 let seed = ${+(process.argv[3] || 1)};
 const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };

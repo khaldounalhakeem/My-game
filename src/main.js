@@ -6,6 +6,8 @@
 const CUR = { game: null, attract: false, paused: false, menuCam: true, acc: 0, last: 0, endT: 0 };
 
 function boot() {
+  ensureRatings();
+  Cloud.init();
   initRenderer(document.getElementById('gl'));
   Input.init();
   UI.init();
@@ -42,6 +44,7 @@ function startAttract() {
 function startMatch(cfg) {
   cfg = JSON.parse(JSON.stringify(cfg));
   if (cfg.kind === 'match' && cfg.competitive) cfg.mutators = {};
+  if (cfg.kind === 'match') { const r = matchRating(cfg); cfg.botRating = r != null ? r : undefined; }
   Garage.close();
   const g = new Game(cfg);
   CUR.game = g; CUR.attract = false; CUR.menuCam = false; CUR.paused = false; CUR.acc = 0; CUR.endT = 0;
@@ -79,6 +82,14 @@ function resumeGame() {
   Input.show(true, { item: CUR.game.mode === 'rumble' });
 }
 function quitToMenu(screen) {
+  // leaving a ranked match early counts as a loss
+  const g = CUR.game;
+  if (g && !CUR.attract && g.kind === 'match' && g.cfg.competitive && g.state !== 'ended') {
+    const res = applyRatingResult(g.cfg, false, -3);
+    g.player.stats && Profile.losses++;
+    saveProfile();
+    if (res) setTimeout(() => UI.toast(`Forfeit — counted as a loss (${res.delta} MMR)`), 300);
+  }
   startAttract();
   Sound.startMusic();
   UI.show(screen || 'main');
@@ -223,19 +234,15 @@ function finishMatchProgress(g) {
     const d = rollDrop(); if (d) drops.push(d);
   }
   if (won && Math.random() < 0.35) { const d = rollDrop(); if (d) drops.push(d); }
-  let mmr = 0;
-  if (g.cfg.competitive) {
-    const lvlMul = { rookie: 0.6, pro: 1, allstar: 1.4 }[g.cfg.level] || 1;
-    mmr = Math.round((won ? 9 : -9) * (won ? lvlMul : 1 / lvlMul) + (won ? randInt(0, 3) : -randInt(0, 3)));
-    P.mmr = Math.max(0, P.mmr + mmr);
-  }
+  const goalDiff = g.score[me.team] - g.score[1 - me.team];
+  const rating = applyRatingResult(g.cfg, won, goalDiff);
   if (won) P.wins++; else P.losses++;
   P.goals += me.stats.goals; P.assists += me.stats.assists; P.saves += me.stats.saves; P.demos += me.stats.demos;
   if (g.mvp === me) P.mvps++;
   saveProfile();
   if (leveled) Sound.play('levelup');
   const xpTo = leveled ? Math.min(100, P.xp / xpForLevel(P.level) * 100) : Math.min(100, P.xp / xpForLevel(P.level) * 100);
-  return { game: g, xp, xpFrom: leveled ? 0 : xpFrom, xpTo, leveled, drops, mmr };
+  return { game: g, xp, xpFrom: leveled ? 0 : xpFrom, xpTo, leveled, drops, rating };
 }
 
 function rollDrop() {
