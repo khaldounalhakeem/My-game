@@ -42,8 +42,6 @@ class Bot {
     if (car.demolished) return;
     c.throttle = 0; c.steer = 0; c.pitch = 0; c.jump = false; c.boost = false; c.handbrake = false; c.rollL = c.rollR = false; c.roll = 0; c.useItem = false;
     this.flipCd -= dt; this.chatCd -= dt;
-    car.perf = this.lv.speed || 0;
-    if (this.lv.regen) car.boost = Math.min(100, car.boost + this.lv.regen * dt); // top bots never run dry
 
     if (game.state === 'countdown') { this.kickoffMove = 0; return; }
 
@@ -111,7 +109,7 @@ class Bot {
       const keeper = team.slice().sort((a, b) => Math.abs(a.pos.z - ownZ) - Math.abs(b.pos.z - ownZ))[0];
       const incoming = game.heat.target === car.team;
       // top bots in 1v1 never leave the net open: the ball always comes back to it
-      if (team.length === 1) this.role = incoming || this.lv.power >= 2000 ? 'keeper' : 'attack';
+      if (team.length === 1) this.role = incoming || this.lv.aggro ? 'keeper' : 'attack';
       else this.role = keeper === car ? 'keeper' : (incoming && idx === 0 ? 'attack' : idx === 0 ? 'attack' : 'support');
     }
 
@@ -165,7 +163,7 @@ class Bot {
       // wrong side of the ball: rotate back post first
       const behind = (ball.pos.z - car.pos.z) * dir;
       // top bots stay aggressive: they only rotate back when well past the ball
-      if (behind < (this.lv.power >= 2000 ? -1200 : -250) && !threat) {
+      if (behind < (this.lv.aggro ? -1200 : -250) && !threat) {
         this.mode = 'rotate';
         const side = car.pos.x > 0 ? 1 : -1;
         this.target.set(side * 900, 0, own.z + dir * 900);
@@ -248,7 +246,7 @@ class Bot {
         const H = cross.pos.y, T = cross.t;
         // jump early enough that the car is up at the ball's height as it arrives (hold longer for higher balls)
         const lead = H < 200 ? 0.25 : H < 260 ? 0.45 : 0.7;
-        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < (this.lv.power ? 300 : 200)) {
+        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < (this.lv.aggro ? 300 : 200)) {
           this.aimPoint = cross.pos.clone();
           if (H < 260) this.seq = [{ d: clamp((H - 100) / 700, 0.05, 0.2), c: { jump: true } }, { d: 0.6, c: { jump: false } }];
           else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.5, c: { boost: car.boost > 5 }, aim: true }];

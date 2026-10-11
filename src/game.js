@@ -427,34 +427,16 @@ class Game {
       const T = clamp(d / 1400, 0.7, 1.7);
       const g = PHYS.GRAVITY * this.mutators.gravity * ball.gravMul;
       const want = tmpV(dx / T, (h.y + 250 - ball.pos.y + 0.5 * g * T * T) / T, dz / T);
-      v.lerp(want, car.bot.lv.power ? 0.9 : clamp(car.bot.lv.assist * 1.6, 0, 0.6));
+      v.lerp(want, clamp(car.bot.lv.assist * 1.6, 0, 0.6));
       return;
     }
-    const lv = car.bot.lv, power = lv.power || 0;
-    // strong bots never knock the ball towards their own goal: it gets cleared up-field
-    if (power && v.z * dir < 0) v.z = -v.z * 0.8;
-    if (sp < 300 && !power) return;
+    const lv = car.bot.lv;
+    if (sp < 300) return;
     const cur = Math.atan2(v.x, v.z), want = Math.atan2(tgt.x - ball.pos.x, tgt.z - ball.pos.z);
     const diff = angleWrap(want - cur);
-    if (Math.abs(diff) > 1.4 && !power) return; // not heading anywhere near the goal
-    const toGoal = Math.hypot(tgt.x - ball.pos.x, tgt.z - ball.pos.z);
-    if (power && ARENA.goal && toGoal < 6500) {
-      // a real shot: hard and on target, aimed inside the posts and under the bar
-      const g = ARENA.goal;
-      const ax = clamp(ball.pos.x * 0.3 + rand(-1, 1) * g.w * 0.55, -g.w + 160, g.w - 160);
-      const tx = ax - ball.pos.x, tz = dir * (ARENA.L + 200) - ball.pos.z, d = Math.hypot(tx, tz);
-      const S = Math.max(Math.hypot(v.x, v.y, v.z), power * (0.85 + 0.3 * Math.random()));
-      const T = d / S;
-      const grav = PHYS.GRAVITY * this.mutators.gravity * ball.gravMul;
-      const wantY = ball.puck ? 0 : rand(160, Math.min(500, g.h - 140));
-      let vy = ball.puck ? 0 : (wantY - ball.pos.y + 0.5 * grav * T * T) / T;
-      vy = clamp(vy, -1200, 1300);
-      v.set(tx / d * S, vy, tz / d * S);
-      return;
-    }
+    if (Math.abs(diff) > 1.4) return; // not heading anywhere near the goal
     const a = cur + clamp(diff, -lv.assist, lv.assist);
-    const sp2 = power ? Math.max(sp, power * 0.75) : sp; // clears and passes go hard too
-    v.x = Math.sin(a) * sp2; v.z = Math.cos(a) * sp2;
+    v.x = Math.sin(a) * sp; v.z = Math.cos(a) * sp; // aim only: the ball keeps the speed of the real hit
   }
 
   award(car, label, pts, quiet) {

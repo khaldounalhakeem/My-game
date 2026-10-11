@@ -107,8 +107,7 @@ class Car {
 
     // speed caps
     const sp = this.vel.length();
-    const vmax = PHYS.CAR_MAX_SPEED * (1 + (this.perf || 0) * 0.4); // top bots' cars are a bit quicker
-    if (sp > vmax) this.vel.multiplyScalar(vmax / sp);
+    if (sp > PHYS.CAR_MAX_SPEED) this.vel.multiplyScalar(PHYS.CAR_MAX_SPEED / sp);
     if (sp >= PHYS.SUPERSONIC_START) this.supersonic = true; else if (sp < PHYS.SUPERSONIC_KEEP) this.supersonic = false;
 
     // integrate
@@ -146,11 +145,11 @@ class Car {
       acc = sign(throttle) * PHYS.BRAKE_ACCEL;
       if (Math.abs(acc * dt) > Math.abs(vf)) acc = -vf / dt;
     } else if (Math.abs(throttle) > 0.02) {
-      acc = throttle * curveLookup(THROTTLE_CURVE, Math.abs(vf)) * (1 + (this.perf || 0));
+      acc = throttle * curveLookup(THROTTLE_CURVE, Math.abs(vf));
     } else {
       acc = -sign(vf) * Math.min(PHYS.COAST_DECEL, Math.abs(vf) / dt);
     }
-    if (this.boosting) acc += PHYS.BOOST_ACCEL * (1 + (this.perf || 0));
+    if (this.boosting) acc += PHYS.BOOST_ACCEL;
     vf += acc * dt;
 
     // tyre grip (powerslide = loose)
@@ -279,7 +278,7 @@ class Car {
     }
 
     // forces
-    if (this.boosting) this.vel.addScaledVector(fwd, PHYS.BOOST_ACCEL * (1 + (this.perf || 0)) * dt);
+    if (this.boosting) this.vel.addScaledVector(fwd, PHYS.BOOST_ACCEL * dt);
     else if (Math.abs(throttle) > 0.02) this.vel.addScaledVector(fwd, PHYS.AIR_THROTTLE_ACCEL * throttle * dt);
     this.vel.y -= grav * dt;
     if (this.contactRoof > 0) this.contactRoof -= dt;

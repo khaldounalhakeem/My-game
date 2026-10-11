@@ -877,8 +877,7 @@ class Car {
 
     // speed caps
     const sp = this.vel.length();
-    const vmax = PHYS.CAR_MAX_SPEED * (1 + (this.perf || 0) * 0.4); // top bots' cars are a bit quicker
-    if (sp > vmax) this.vel.multiplyScalar(vmax / sp);
+    if (sp > PHYS.CAR_MAX_SPEED) this.vel.multiplyScalar(PHYS.CAR_MAX_SPEED / sp);
     if (sp >= PHYS.SUPERSONIC_START) this.supersonic = true; else if (sp < PHYS.SUPERSONIC_KEEP) this.supersonic = false;
 
     // integrate
@@ -916,11 +915,11 @@ class Car {
       acc = sign(throttle) * PHYS.BRAKE_ACCEL;
       if (Math.abs(acc * dt) > Math.abs(vf)) acc = -vf / dt;
     } else if (Math.abs(throttle) > 0.02) {
-      acc = throttle * curveLookup(THROTTLE_CURVE, Math.abs(vf)) * (1 + (this.perf || 0));
+      acc = throttle * curveLookup(THROTTLE_CURVE, Math.abs(vf));
     } else {
       acc = -sign(vf) * Math.min(PHYS.COAST_DECEL, Math.abs(vf) / dt);
     }
-    if (this.boosting) acc += PHYS.BOOST_ACCEL * (1 + (this.perf || 0));
+    if (this.boosting) acc += PHYS.BOOST_ACCEL;
     vf += acc * dt;
 
     // tyre grip (powerslide = loose)
@@ -1049,7 +1048,7 @@ class Car {
     }
 
     // forces
-    if (this.boosting) this.vel.addScaledVector(fwd, PHYS.BOOST_ACCEL * (1 + (this.perf || 0)) * dt);
+    if (this.boosting) this.vel.addScaledVector(fwd, PHYS.BOOST_ACCEL * dt);
     else if (Math.abs(throttle) > 0.02) this.vel.addScaledVector(fwd, PHYS.AIR_THROTTLE_ACCEL * throttle * dt);
     this.vel.y -= grav * dt;
     if (this.contactRoof > 0) this.contactRoof -= dt;
@@ -1535,9 +1534,9 @@ const BOT_NAMES = ['Armstrong', 'Bandit', 'Beast', 'Boomer', 'Buzz', 'Casper', '
   'Scout', 'Shepard', 'Slider', 'Squall', 'Sticks', 'Stinger', 'Storm', 'Sultan', 'Sundown', 'Swabbie', 'Tex', 'Tusk', 'Viper', 'Wolfman', 'Yuri'];
 
 const BOT_LEVELS = {
-  rookie: { name: 'Rookie', react: 0.3, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1 },
-  pro: { name: 'Pro', react: 0.1, skill: 0.85, aerial: 0.75, maxBoost: 1, flip: 0.95, aim: 0.93, assist: 0.32, power: 1400, regen: 8, speed: 0.05 },
-  allstar: { name: 'All-Star', react: 0.035, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.55, power: 2600, regen: 40, speed: 0.18 },
+  rookie: { name: 'Rookie', react: 0.3, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0 },
+  pro: { name: 'Pro', react: 0.1, skill: 0.85, aerial: 0.75, maxBoost: 1, flip: 0.95, aim: 0.93, assist: 0.32, aggro: 0 },
+  allstar: { name: 'All-Star', react: 0.035, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1 },
 };
 
 const TRAINING_PACKS = {
@@ -1635,15 +1634,14 @@ function rankFor(mmr) { return rankInfo(mmr).name; }
 // Bot skill that scales with MMR (interpolated between anchor levels)
 // ---------------------------------------------------------------------------
 const SKILL_ANCHORS = [
-  // each rank plays like the old rank above it: Champions like Grand Champions, Grand Champions like SSL,
-  // and SSL (and above) better still
-  [0, { react: 0.4, skill: 0.3, aerial: 0, maxBoost: 0.35, flip: 0.25, aim: 0.45, assist: 0.04, power: 0, regen: 0, speed: 0 }],
-  [300, { react: 0.28, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, power: 0, regen: 0, speed: 0 }],
-  [740, { react: 0.14, skill: 0.75, aerial: 0.55, maxBoost: 0.9, flip: 0.85, aim: 0.88, assist: 0.25, power: 0, regen: 0, speed: 0 }],
-  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.44, power: 1400, regen: 8, speed: 0.05 }],
-  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.5, power: 2200, regen: 25, speed: 0.12 }],
-  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.62, power: 2900, regen: 50, speed: 0.22 }],
-  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.72, power: 3400, regen: 90, speed: 0.3 }],
+  // better reactions, aim and decisions as the rank rises — same car, same boost, same physics as you
+  [0, { react: 0.4, skill: 0.3, aerial: 0, maxBoost: 0.35, flip: 0.25, aim: 0.45, assist: 0.04, aggro: 0 }],
+  [300, { react: 0.28, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0 }],
+  [740, { react: 0.14, skill: 0.75, aerial: 0.55, maxBoost: 0.9, flip: 0.85, aim: 0.88, assist: 0.25, aggro: 0 }],
+  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.27, aggro: 0 }],
+  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.3, aggro: 1 }],
+  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1 }],
+  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.4, aggro: 1 }],
 ];
 function levelForMMR(mmr) {
   const A = SKILL_ANCHORS;
@@ -1783,8 +1781,6 @@ class Bot {
     if (car.demolished) return;
     c.throttle = 0; c.steer = 0; c.pitch = 0; c.jump = false; c.boost = false; c.handbrake = false; c.rollL = c.rollR = false; c.roll = 0; c.useItem = false;
     this.flipCd -= dt; this.chatCd -= dt;
-    car.perf = this.lv.speed || 0;
-    if (this.lv.regen) car.boost = Math.min(100, car.boost + this.lv.regen * dt); // top bots never run dry
 
     if (game.state === 'countdown') { this.kickoffMove = 0; return; }
 
@@ -1852,7 +1848,7 @@ class Bot {
       const keeper = team.slice().sort((a, b) => Math.abs(a.pos.z - ownZ) - Math.abs(b.pos.z - ownZ))[0];
       const incoming = game.heat.target === car.team;
       // top bots in 1v1 never leave the net open: the ball always comes back to it
-      if (team.length === 1) this.role = incoming || this.lv.power >= 2000 ? 'keeper' : 'attack';
+      if (team.length === 1) this.role = incoming || this.lv.aggro ? 'keeper' : 'attack';
       else this.role = keeper === car ? 'keeper' : (incoming && idx === 0 ? 'attack' : idx === 0 ? 'attack' : 'support');
     }
 
@@ -1906,7 +1902,7 @@ class Bot {
       // wrong side of the ball: rotate back post first
       const behind = (ball.pos.z - car.pos.z) * dir;
       // top bots stay aggressive: they only rotate back when well past the ball
-      if (behind < (this.lv.power >= 2000 ? -1200 : -250) && !threat) {
+      if (behind < (this.lv.aggro ? -1200 : -250) && !threat) {
         this.mode = 'rotate';
         const side = car.pos.x > 0 ? 1 : -1;
         this.target.set(side * 900, 0, own.z + dir * 900);
@@ -1989,7 +1985,7 @@ class Bot {
         const H = cross.pos.y, T = cross.t;
         // jump early enough that the car is up at the ball's height as it arrives (hold longer for higher balls)
         const lead = H < 200 ? 0.25 : H < 260 ? 0.45 : 0.7;
-        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < (this.lv.power ? 300 : 200)) {
+        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < (this.lv.aggro ? 300 : 200)) {
           this.aimPoint = cross.pos.clone();
           if (H < 260) this.seq = [{ d: clamp((H - 100) / 700, 0.05, 0.2), c: { jump: true } }, { d: 0.6, c: { jump: false } }];
           else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.5, c: { boost: car.boost > 5 }, aim: true }];
@@ -2610,34 +2606,16 @@ class Game {
       const T = clamp(d / 1400, 0.7, 1.7);
       const g = PHYS.GRAVITY * this.mutators.gravity * ball.gravMul;
       const want = tmpV(dx / T, (h.y + 250 - ball.pos.y + 0.5 * g * T * T) / T, dz / T);
-      v.lerp(want, car.bot.lv.power ? 0.9 : clamp(car.bot.lv.assist * 1.6, 0, 0.6));
+      v.lerp(want, clamp(car.bot.lv.assist * 1.6, 0, 0.6));
       return;
     }
-    const lv = car.bot.lv, power = lv.power || 0;
-    // strong bots never knock the ball towards their own goal: it gets cleared up-field
-    if (power && v.z * dir < 0) v.z = -v.z * 0.8;
-    if (sp < 300 && !power) return;
+    const lv = car.bot.lv;
+    if (sp < 300) return;
     const cur = Math.atan2(v.x, v.z), want = Math.atan2(tgt.x - ball.pos.x, tgt.z - ball.pos.z);
     const diff = angleWrap(want - cur);
-    if (Math.abs(diff) > 1.4 && !power) return; // not heading anywhere near the goal
-    const toGoal = Math.hypot(tgt.x - ball.pos.x, tgt.z - ball.pos.z);
-    if (power && ARENA.goal && toGoal < 6500) {
-      // a real shot: hard and on target, aimed inside the posts and under the bar
-      const g = ARENA.goal;
-      const ax = clamp(ball.pos.x * 0.3 + rand(-1, 1) * g.w * 0.55, -g.w + 160, g.w - 160);
-      const tx = ax - ball.pos.x, tz = dir * (ARENA.L + 200) - ball.pos.z, d = Math.hypot(tx, tz);
-      const S = Math.max(Math.hypot(v.x, v.y, v.z), power * (0.85 + 0.3 * Math.random()));
-      const T = d / S;
-      const grav = PHYS.GRAVITY * this.mutators.gravity * ball.gravMul;
-      const wantY = ball.puck ? 0 : rand(160, Math.min(500, g.h - 140));
-      let vy = ball.puck ? 0 : (wantY - ball.pos.y + 0.5 * grav * T * T) / T;
-      vy = clamp(vy, -1200, 1300);
-      v.set(tx / d * S, vy, tz / d * S);
-      return;
-    }
+    if (Math.abs(diff) > 1.4) return; // not heading anywhere near the goal
     const a = cur + clamp(diff, -lv.assist, lv.assist);
-    const sp2 = power ? Math.max(sp, power * 0.75) : sp; // clears and passes go hard too
-    v.x = Math.sin(a) * sp2; v.z = Math.cos(a) * sp2;
+    v.x = Math.sin(a) * sp; v.z = Math.cos(a) * sp; // aim only: the ball keeps the speed of the real hit
   }
 
   award(car, label, pts, quiet) {
