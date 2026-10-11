@@ -1538,9 +1538,9 @@ const BOT_NAMES = ['Armstrong', 'Bandit', 'Beast', 'Boomer', 'Buzz', 'Casper', '
   'Scout', 'Shepard', 'Slider', 'Squall', 'Sticks', 'Stinger', 'Storm', 'Sultan', 'Sundown', 'Swabbie', 'Tex', 'Tusk', 'Viper', 'Wolfman', 'Yuri'];
 
 const BOT_LEVELS = {
-  rookie: { name: 'Rookie', react: 0.35, skill: 0.35, aerial: 0, maxBoost: 0.4, flip: 0.3, aim: 0.5, assist: 0.06 },
-  pro: { name: 'Pro', react: 0.18, skill: 0.65, aerial: 0.4, maxBoost: 0.8, flip: 0.7, aim: 0.8, assist: 0.2 },
-  allstar: { name: 'All-Star', react: 0.08, skill: 0.9, aerial: 0.85, maxBoost: 1, flip: 1, aim: 0.95, assist: 0.35 },
+  rookie: { name: 'Rookie', react: 0.3, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1 },
+  pro: { name: 'Pro', react: 0.1, skill: 0.85, aerial: 0.75, maxBoost: 1, flip: 0.95, aim: 0.93, assist: 0.32 },
+  allstar: { name: 'All-Star', react: 0.035, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.55 },
 };
 
 const TRAINING_PACKS = {
@@ -1638,11 +1638,15 @@ function rankFor(mmr) { return rankInfo(mmr).name; }
 // Bot skill that scales with MMR (interpolated between anchor levels)
 // ---------------------------------------------------------------------------
 const SKILL_ANCHORS = [
-  [0, { react: 0.5, skill: 0.2, aerial: 0, maxBoost: 0.3, flip: 0.15, aim: 0.35, assist: 0 }],
-  [350, { react: 0.35, skill: 0.35, aerial: 0, maxBoost: 0.4, flip: 0.3, aim: 0.5, assist: 0.06 }],
-  [800, { react: 0.18, skill: 0.65, aerial: 0.4, maxBoost: 0.8, flip: 0.7, aim: 0.8, assist: 0.2 }],
-  [1250, { react: 0.08, skill: 0.9, aerial: 0.85, maxBoost: 1, flip: 1, aim: 0.95, assist: 0.35 }],
-  [1750, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.5 }],
+  // each rank plays like the old rank above it: Champions like Grand Champions, Grand Champions like SSL,
+  // and SSL (and above) better still
+  [0, { react: 0.4, skill: 0.3, aerial: 0, maxBoost: 0.35, flip: 0.25, aim: 0.45, assist: 0.04 }],
+  [300, { react: 0.28, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1 }],
+  [740, { react: 0.14, skill: 0.75, aerial: 0.55, maxBoost: 0.9, flip: 0.85, aim: 0.88, assist: 0.25 }],
+  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.44 }],
+  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.5 }],
+  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.62 }],
+  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.72 }],
 ];
 function levelForMMR(mmr) {
   const A = SKILL_ANCHORS;
@@ -1696,8 +1700,9 @@ function applyRatingResult(cfg, won, goalDiff) {
     r.streak = won ? Math.max(1, r.streak + 1) : Math.min(-1, r.streak - 1);
     // wins climb steadily; losing streaks drop faster until you find the rank you can hold
     let delta;
-    if (won) delta = 12 + Math.min(6, (r.streak - 1) * 2) + clamp(goalDiff, 0, 3);
-    else delta = -Math.min(70, 18 + 8 * (-r.streak - 1)) + clamp(goalDiff, -3, 0);
+    // every loss costs a real chunk, more on a losing streak: 2–3 losses in a row drop a rank
+    if (won) delta = 14 + Math.min(8, (r.streak - 1) * 2) + clamp(goalDiff, 0, 3);
+    else delta = -Math.min(80, 25 + 10 * (-r.streak - 1)) + clamp(goalDiff, -3, 0);
     r.mmr = clamp(r.mmr + delta, 0, 2200);
     r.peak = Math.max(r.peak || 0, r.mmr);
     const after = rankInfo(r.mmr);
