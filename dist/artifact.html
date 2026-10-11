@@ -325,6 +325,27 @@ body:not(.pad) .fpbtns .padkey { display: none; }
 .postchatlog { width: 100%; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 14px; }
 .postchatlog .citem { align-self: center; }
 
+/* ---------------- online party ---------------- */
+.party { gap: 14px; }
+.pcols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; max-width: 760px; }
+.pbox { background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 8px; padding: 16px 18px 20px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.pbox h3 { margin: 0; }
+.pbox p { margin: 0; color: var(--ink-dim); }
+.pcode-in { font-family: var(--f-display); font-size: 30px; letter-spacing: .3em; text-transform: uppercase; width: 100%; max-width: 230px; padding: 8px 12px;
+  background: rgba(0,0,0,.35); color: #fff; border: 1px solid var(--panel-edge); border-radius: 6px; }
+.pcodebig { display: flex; flex-direction: column; align-items: flex-start; }
+.pcodebig small { font-size: 12px; letter-spacing: .16em; color: var(--ink-dim); }
+.pcodebig b { font-family: var(--f-display); font-size: clamp(40px, 7vw, 64px); letter-spacing: .25em; color: var(--amber); line-height: 1.05; user-select: all; -webkit-user-select: all; }
+.pnote { color: var(--ink-dim); max-width: 640px; }
+.perr { color: #ff8a8a; background: rgba(255, 60, 60, .12); border: 1px solid rgba(255, 90, 90, .4); padding: 8px 12px; border-radius: 6px; max-width: 640px; }
+.pmembers { display: flex; flex-wrap: wrap; gap: 10px; }
+.pmem { background: var(--panel); border: 1px solid var(--panel-edge); border-left: 4px solid var(--blue); border-radius: 6px; padding: 8px 14px; display: flex; flex-direction: column; min-width: 150px; }
+.pmem.t1 { border-left-color: var(--orange); }
+.pmem small { color: var(--ink-dim); }
+.party .seg button:disabled { opacity: .7; }
+.party .field { align-items: flex-start; }
+.party .field select { min-width: 260px; }
+
 </style>
 
 <canvas id="gl"></canvas>
@@ -810,6 +831,7 @@ class Car {
     const a = Math.atan2(-(faceZ - z), faceX - x);
     this.quat.setFromAxisAngle(UP, a);
     this.onGround = true; this.groundN.set(0, 1, 0);
+    this.spawnSeq = (this.spawnSeq || 0) + 1; // online: tells a player's own device it was moved (kickoff, respawn)
   }
   fwd(out) { return out.set(1, 0, 0).applyQuaternion(this.quat); }
   up(out) { return out.set(0, 1, 0).applyQuaternion(this.quat); }
@@ -2213,9 +2235,26 @@ class Game {
     const used = new Set();
     const botName = () => { let n; do { n = pick(BOT_NAMES); } while (used.has(n)); used.add(n); return n; };
     let id = 0;
+    const on = cfg.online;
+    this.online = !!on; this.netHost = !!(on && on.host); this.netClient = !!(on && !on.host);
+    if (on) {
+      // online match: every device builds the same cars in the same order from the host's slot list
+      on.slots.forEach((sl, i) => {
+        const lo = sl.lo || randomLoadout();
+        const car = new Car(id++, sl.team, String(sl.name || 'Player').slice(0, 16), !!sl.bot, lo.body, lo);
+        car.netPeer = sl.peer || null;
+        if (i === on.me) this.player = car;
+        else if (this.netClient) car.puppet = true; // driven by the host's updates
+        else if (sl.bot) { car.bot = new Bot(car, BOT_LEVELS[cfg.level] ? cfg.level : 'allstar'); this.bots.push(car.bot); }
+        else car.remote = true; // another player's car, driven by their device
+        this.cars.push(car);
+      });
+      this.chatSeq = 0;
+    } else {
     this.player = new Car(id++, cfg.playerTeam || 0, prof.name || 'Player', false, prof.car.body, prof.car);
     this.cars.push(this.player);
-    if (this.kind === 'match') {
+    }
+    if (this.kind === 'match' && !on) {
       for (let t = 0; t < 2; t++) {
         const have = this.cars.filter(c => c.team === t).length;
         for (let k = have; k < size; k++) {
@@ -2278,6 +2317,7 @@ class Game {
 
   // ---------------------------------------------------------------------------
   update(dt) {
+    if (this.netClient) { NetSync.clientUpdate(this, dt * this.mutators.gameSpeed); return; }
     dt *= this.mutators.gameSpeed;
     this.time += dt;
     this.stateT -= dt;
@@ -2360,6 +2400,7 @@ class Game {
         if (c.respawnT <= 0) this.respawnCar(c);
         continue;
       }
+      if (c.remote) { NetSync.applyRemote(this, c); continue; }
       // rumble
       if (c.ctrl.useItem && !c.prevUse && c.item) this.useItem(c);
       c.prevUse = c.ctrl.useItem;
@@ -2477,6 +2518,8 @@ class Game {
   onTouch(car, strength, point) {
     const ball = this.ball;
     if (this.state === 'countdown') return;
+    // online guest: the host decides what a touch does; this is only the local preview
+    if (this.netClient) { this.localTouchT = this.time; this.events.push({ type: 'hit', car, strength, pos: point }); return; }
     car.stats.touches++;
     const now = this.time;
     const prevThreat = this.ballThreat;
@@ -2570,6 +2613,7 @@ class Game {
   }
 
   demolish(att, vic) {
+    if (this.netClient) return; // the host decides demolitions
     vic.demolished = true; vic.respawnT = this.mutators.respawn; vic.spiked = false;
     att.stats.demos++;
     this.award(att, 'Demolition', 25);
@@ -2751,8 +2795,10 @@ class Game {
   // ---------------------------------------------------------------------------
   chat(car, msg, teamOnly) {
     const e = { type: 'chat', car, msg, team: !!teamOnly, t: this.time };
+    if (this.online) e.seq = ++this.chatSeq;
     this.chatLog.push(e); if (this.chatLog.length > 30) this.chatLog.shift();
     this.events.push(e);
+    if (this.netClient) { if (car === this.player) Net.sendChat(msg, !!teamOnly); return; }
     // bots answer: always when you talk to them, sometimes when they talk to each other
     if (!car.isBot || Math.random() < 0.3) this.queueReplies(car, msg, teamOnly);
   }
@@ -2798,6 +2844,7 @@ class Game {
 
   // bots that are losing badly give up and forfeit
   checkForfeit() {
+    if (this.online) return;
     if (this.kind !== 'match' || this.overtime || this.mutators.matchLength === 0 || this.cfg.attract) return;
     this.ffT = (this.ffT || 0) + 1;
     const me = this.player.team, opp = 1 - me;
@@ -2971,6 +3018,443 @@ function heatHome(ball, heat, gravity, dt) {
   ball.vel.copy(cur).multiplyScalar(lerp(sp0, heat.speed, damp(1.5, dt)));
   ball.vel.y += PHYS.GRAVITY * gravity * dt * 0.85; // mostly ignores gravity
 }
+
+</script>
+<script>/* src/net.js */
+'use strict';
+// ============================================================================
+// Online parties. Uses the artifact "room" capability: everyone in a party
+// joins a named room ("bl-<code>") and shares state through presence.
+//   - The party leader (host) runs the match: ball, score, clock and bots.
+//   - Each player's own device drives their own car, so controls feel instant.
+//   - The host sends a snapshot of the whole match ~30 times a second; guests
+//     send their car's state back.
+// ============================================================================
+
+const NET_RELAY_SKIP = new Set(['hit', 'bounce', 'jump', 'doublejump', 'land', 'dodge', 'pad', 'padback', 'chat', 'replayStart', 'respawn', 'tiles', 'itemget', 'itemuse', 'charge', 'aerialhit', 'flipreset']);
+const _netEnc = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+function netBytes(o) { const j = JSON.stringify(o); return _netEnc ? _netEnc.encode(j).length : j.length * 2; }
+const NET_MODES = ['soccar', 'hoops', 'snowday', 'heatseeker', 'dropshot'];
+const r0 = Math.round, r2 = (v) => Math.round(v * 100) / 100, r3 = (v) => Math.round(v * 1000) / 1000;
+
+const Net = {
+  room: null, party: null, code: null, isHost: false, myPeer: null,
+  status: 'idle', // idle | connecting | party
+  error: '', myTeam: 0,
+  settings: { mode: 'soccar', size: 2, level: 'allstar', map: 'auto' },
+  match: null, startedId: null, hostPeer: null, hostMissingT: 0,
+  remote: new Map(), // host: peer -> { u, at }
+  ack: 0, chatSeq: 0, evSeq: 0, relay: [], lastS: null, lastEv: 0, lastChat: 0, sigLobby: '',
+
+  // the room namespace (null when this view can't go online, e.g. the plain HTML file)
+  init() {
+    if (this._init) return this._init;
+    this._init = (async () => {
+      try { if (window.claude && window.claude.use) this.room = await window.claude.use('room'); } catch (e) { this.room = null; }
+      if (UI.screen === 'party') UI.show('party');
+      return this.room;
+    })();
+    return this._init;
+  },
+  available() { return !!this.room; },
+  inParty() { return !!this.party; },
+
+  genCode() {
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let s = ''; for (let i = 0; i < 5; i++) s += A[Math.floor(Math.random() * A.length)];
+    return s;
+  },
+  myInfo() {
+    return { v: 1, name: String(Profile.name || 'Player').slice(0, 16), lo: Object.assign({}, Profile.car), team: this.myTeam };
+  },
+
+  async create() {
+    await this.init();
+    if (!this.room) { this.error = 'Online play needs the game opened on claude.ai while signed in.'; UI.show('party'); return; }
+    this.status = 'connecting'; this.error = ''; UI.show('party');
+    try {
+      const code = this.genCode();
+      await this.enter(code, true);
+      this.pushParty();
+    } catch (e) { this.fail(e); }
+  },
+
+  async join(code) {
+    await this.init();
+    code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length < 4) { this.error = 'Type the party code your friend sees.'; UI.show('party'); return; }
+    if (!this.room) { this.error = 'Online play needs the game opened on claude.ai while signed in.'; UI.show('party'); return; }
+    this.status = 'connecting'; this.error = ''; UI.show('party');
+    try {
+      await this.enter(code, false);
+      // wait for the host to show up
+      const t0 = Date.now();
+      while (Date.now() - t0 < 7000 && !this.hostPeerObj()) await new Promise(r => setTimeout(r, 250));
+      if (!this.hostPeerObj()) { await this.leave(true); this.error = `No party found with code ${code}.`; UI.show('party'); return; }
+      UI.show('party');
+    } catch (e) { this.fail(e); }
+  },
+
+  async enter(code, host) {
+    if (this.party) await this.leave(true);
+    const party = await this.room.join('bl-' + code.toLowerCase());
+    this.party = party; this.code = code; this.isHost = host; this.status = 'party';
+    this.myTeam = 0; this.match = null; this.startedId = null; this.hostMissingT = 0;
+    this.unsubs = [
+      party.onPeers((ch) => this.onPeers(ch), (e) => this.onRoomError(e)),
+    ];
+    await party.presence(Object.assign(this.myInfo(), { host: host || null }));
+  },
+
+  fail(e) {
+    this.status = 'idle'; this.party = null;
+    const c = e && e.code;
+    this.error = c === 'not_permitted' || c === 'not_granted' ? 'Online play isn\'t available for you on this page. The game must be shared with you (not by public link) and you must be signed in.'
+      : c === 'limit_reached' ? 'Too many rooms open right now. Try again in a moment.'
+      : 'Couldn\'t connect. Check your internet and try again.';
+    UI.show('party');
+  },
+  onRoomError(e) {
+    if (!this.party) return;
+    this.party = null; this.status = 'idle'; this.error = 'Lost connection to the party.';
+    if (CUR.game && CUR.game.online) { quitToMenu('party'); } else if (UI.screen === 'party') UI.show('party');
+  },
+
+  async leave(silent) {
+    const p = this.party;
+    this.party = null; this.status = 'idle'; this.code = null; this.isHost = false; this.match = null; this.remote.clear();
+    if (this.unsubs) this.unsubs.forEach(u => { try { u(); } catch (e) { /* ignore */ } });
+    this.unsubs = null;
+    if (p) try { await p.leave(); } catch (e) { /* ignore */ }
+    if (!silent && UI.screen === 'party') UI.show('party');
+  },
+
+  members() {
+    if (!this.party) return [];
+    const list = this.party.peers().filter(p => p.presence && p.presence.v === 1);
+    for (const p of list) if (p.isMe && p.sameTab) this.myPeer = p.peer;
+    return list.sort((a, b) => (b.presence.host ? 1 : 0) - (a.presence.host ? 1 : 0) || (a.peer < b.peer ? -1 : 1));
+  },
+  hostPeerObj() {
+    if (!this.party) return null;
+    return this.party.peers().find(p => p.presence && p.presence.v === 1 && p.presence.host && !p.isMe) || null;
+  },
+
+  setTeam(t) {
+    this.myTeam = t;
+    if (this.party) this.party.presence({ team: t }).catch(() => {});
+    UI.show('party');
+  },
+  setSetting(k, v) {
+    this.settings[k] = v;
+    Store.set('netcfg', this.settings);
+    this.pushParty();
+  },
+  pushParty() {
+    if (!this.party || !this.isHost) return;
+    const S = this.settings;
+    const party = { code: this.code, mode: S.mode, size: S.size, level: S.level, map: S.map, phase: this.match ? 'match' : 'lobby', match: this.match };
+    this.baseBytes = netBytes(Object.assign(this.myInfo(), { host: true, party }));
+    this.party.presence({ party }).catch(() => {});
+  },
+
+  // lobby changes → refresh the party screen (only when something it shows changed)
+  onPeers() {
+    const ms = this.members();
+    if (!this.isHost) {
+      const host = this.hostPeerObj();
+      const pp = host && host.presence.party;
+      // the host started a match with us in it
+      if (pp && pp.phase === 'match' && pp.match && pp.match.id !== this.startedId) {
+        const me = pp.match.slots.findIndex(s => s.peer && s.peer === this.myPeer);
+        if (me >= 0) { this.startedId = pp.match.id; this.startOnline(pp.match, false); return; }
+      }
+      // the host went back to the lobby (or quit the match)
+      if (pp && pp.phase === 'lobby' && CUR.game && CUR.game.online && CUR.game.state !== 'ended') {
+        UI.toast('The host ended the match');
+        quitToMenu('party');
+        return;
+      }
+    }
+    const host = this.isHost ? null : this.hostPeerObj();
+    const pp = host ? host.presence.party : null;
+    const sig = JSON.stringify([ms.map(m => [m.peer, m.presence.name, m.presence.team, !!m.presence.host]), pp && [pp.mode, pp.size, pp.level, pp.map, pp.phase]]);
+    if (sig !== this.sigLobby) { this.sigLobby = sig; if (UI.screen === 'party') UI.show('party'); }
+  },
+
+  // ---------------------------------------------------------------------------
+  // host: start a match for everyone in the party
+  start() {
+    if (!this.isHost || !this.party) return;
+    const S = this.settings;
+    const ms = this.members();
+    const size = S.size;
+    if (ms.length > size * 2) { UI.toast(`Too many players for ${size}v${size}. Pick a bigger team size.`); return; }
+    // put players on the team they picked, moving extras to the other side
+    const teams = [[], []];
+    for (const m of ms) teams[m.presence.team === 1 ? 1 : 0].push(m);
+    for (let t = 0; t < 2; t++) while (teams[t].length > size) teams[1 - t].push(teams[t].pop());
+    const used = new Set(ms.map(m => m.presence.name));
+    const botName = () => { let n, k = 0; do { n = pick(BOT_NAMES); k++; } while (used.has(n) && k < 50); used.add(n); return n; };
+    const slots = [];
+    for (let t = 0; t < 2; t++) {
+      for (const m of teams[t]) slots.push({ peer: m.peer, name: String(m.presence.name || 'Player').slice(0, 16), team: t, lo: m.presence.lo || null });
+      for (let k = teams[t].length; k < size; k++) slots.push({ peer: null, name: botName(), team: t, bot: 1, lo: randomLoadout() });
+    }
+    const md = MODES[S.mode];
+    const map = S.map === 'auto' ? (md.mapOverride || pick(Object.keys(MAPS))) : S.map;
+    const cfg = { kind: 'match', mode: S.mode, teamSize: size, level: S.level, map, mutators: {}, replays: false };
+    this.match = { id: Math.random().toString(36).slice(2, 10), cfg, slots };
+    this.startedId = this.match.id;
+    this.pushParty();
+    this.startOnline(this.match, true);
+  },
+
+  startOnline(match, host) {
+    const me = match.slots.findIndex(s => s.peer === this.myPeer);
+    if (me < 0) return;
+    const cfg = JSON.parse(JSON.stringify(match.cfg));
+    cfg.online = { host, me, slots: match.slots, id: match.id };
+    this.matchId = match.id;
+    this.ack = 0; this.lastS = null; this.lastEv = 0; this.lastChat = 0; this.relay = []; this.evSeq = 0; this.remote.clear();
+    this.chatSeq = 0; this._chat = null; this.hostMissingT = 0;
+    UI.toast(host ? 'Match started' : 'Joining the host\'s match…');
+    startMatch(cfg);
+  },
+
+  // called when the local player leaves an online match
+  leaveMatch(g) {
+    if (!this.party) return;
+    if (g.netHost) { this.match = null; this.party.presence({ s: null }).catch(() => {}); this.pushParty(); }
+    else this.party.presence({ u: null }).catch(() => {});
+  },
+
+  sendChat(msg, team) {
+    this.chatSeq++;
+    this._chat = [this.chatSeq, String(msg).slice(0, 60), team ? 1 : 0];
+  },
+
+  // ---------------------------------------------------------------------------
+  // per frame, after the simulation steps
+  tick(g, dt) {
+    if (!g.online || !this.party) return;
+    if (g.netHost) this.hostTick(g, dt); else this.clientTick(g, dt);
+  },
+
+  hostTick(g, dt) {
+    const now = performance.now();
+    // guests' car states
+    const seen = new Set();
+    for (const p of this.party.peers()) {
+      const u = p.presence && p.presence.u;
+      if (!u || u.id !== this.matchId) continue;
+      seen.add(p.peer);
+      const prev = this.remote.get(p.peer);
+      if (!prev || prev.u !== u) this.remote.set(p.peer, { u, at: now });
+    }
+    for (const c of g.cars) {
+      if (!c.remote) continue;
+      const rs = this.remote.get(c.netPeer);
+      // their chat
+      if (rs && rs.u.ch && rs.u.ch[0] > (c.netChat || 0)) {
+        c.netChat = rs.u.ch[0];
+        g.chat(c, String(rs.u.ch[1]).slice(0, 60), !!rs.u.ch[2]);
+      }
+      // a player who left (or never arrived) is replaced by a bot
+      const gone = !this.party.peers().some(p => p.peer === c.netPeer);
+      const stale = !rs ? g.time > 12 : now - rs.at > 6000;
+      if (gone || stale) {
+        c.remote = false; c.isBot = true; c.name = c.name + ' (bot)';
+        c.bot = new Bot(c, BOT_LEVELS[g.cfg.level] ? g.cfg.level : 'allstar'); g.bots.push(c.bot);
+        g.events.push({ type: 'chat', car: c, msg: 'left the match — a bot took over', team: false, t: g.time, seq: ++g.chatSeq });
+      }
+    }
+    // collect events worth showing on guests' screens
+    for (const ev of g.events) {
+      if (NET_RELAY_SKIP.has(ev.type)) continue;
+      if (ev.type === 'award' && ev.car && !ev.car.remote) continue; // only guests need their own awards
+      const o = { q: ++this.evSeq, at: g.time };
+      for (const k in ev) {
+        const v = ev[k];
+        if (v instanceof Car) o[k] = { $c: v.id };
+        else if (v && v.isVector3) o[k] = [r0(v.x), r0(v.y), r0(v.z)];
+        else if (v === null || typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') o[k] = typeof v === 'number' ? r2(v) : v;
+      }
+      this.relay.push(o);
+    }
+    this.relay = this.relay.filter(e => g.time - e.at < 2.5).slice(-8);
+    // snapshot (the platform sends presence ~30 times a second)
+    this.party.presence({ s: this.snapshot(g, 4040 - (this.baseBytes || 1500)) }).catch(() => {});
+  },
+
+  snapshot(g, budget) {
+    const b = g.ball;
+    const s = {
+      id: this.matchId, st: g.state, sT: r2(g.stateT), cl: r2(g.clock), sc: g.score.slice(), ot: g.overtime ? 1 : 0, oT: r2(g.otTime || 0),
+      bh: g.ballHidden ? 1 : 0, ht: g.heat.target, hs: r0(g.heat.speed),
+      c: g.cars.map(c => [r0(c.pos.x), r0(c.pos.y), r0(c.pos.z), r3(c.quat.x), r3(c.quat.y), r3(c.quat.z), r3(c.quat.w),
+        r0(c.vel.x), r0(c.vel.y), r0(c.vel.z), r2(c.angVel.x), r2(c.angVel.y), r2(c.angVel.z), r0(c.boost),
+        (c.demolished ? 1 : 0) | (c.boosting ? 2 : 0) | (c.onGround ? 4 : 0) | (c.supersonic ? 8 : 0), c.spawnSeq || 0]),
+      b: [r0(b.pos.x), r0(b.pos.y), r0(b.pos.z), r0(b.vel.x), r0(b.vel.y), r0(b.vel.z), r2(b.angVel.x), r2(b.angVel.y), r2(b.angVel.z)],
+      p: g.pads.map(p => p.active ? 1 : 0).join(''),
+      k: g.cars.map(c => [c.stats.score, c.stats.goals, c.stats.assists, c.stats.saves, c.stats.shots, c.stats.demos]),
+      e: this.relay,
+      ch: g.chatLog.filter(e => e.seq).slice(-5).map(e => [e.seq, e.car.id, e.msg, e.team ? 1 : 0]),
+    };
+    if (ARENA.dropshot) { s.d = Tiles.list.map(t => t.state).join(''); s.ds = [b.dsTeam === undefined ? -1 : b.dsTeam, b.chargeLevel || 0]; }
+    if (g.state === 'ended') { s.w = g.winner; s.mvp = g.mvp ? g.mvp.id : -1; }
+    // keep under the presence size limit
+    budget = budget || 2400;
+    while (netBytes(s) > budget && (s.e.length || s.ch.length || s.k)) { if (s.ch.length) s.ch.shift(); else if (s.e.length) s.e.shift(); else delete s.k; }
+    return s;
+  },
+
+  clientTick(g, dt) {
+    const c = g.player;
+    const host = this.hostPeerObj();
+    // host vanished → leave
+    if (!host) {
+      this.hostMissingT += dt;
+      if (this.hostMissingT > 5 && g.state !== 'ended') { UI.toast('The host left the party'); this.leave(true); quitToMenu('party'); }
+      return;
+    }
+    this.hostMissingT = 0;
+    const u = {
+      id: this.matchId, a: this.ack,
+      c: [r0(c.pos.x), r0(c.pos.y), r0(c.pos.z), r3(c.quat.x), r3(c.quat.y), r3(c.quat.z), r3(c.quat.w),
+        r0(c.vel.x), r0(c.vel.y), r0(c.vel.z), r2(c.angVel.x), r2(c.angVel.y), r2(c.angVel.z)],
+      b: r0(c.boost), f: (c.boosting ? 2 : 0) | (c.onGround ? 4 : 0) | (c.supersonic ? 8 : 0),
+    };
+    if (this._chat) u.ch = this._chat;
+    this.party.presence({ u }).catch(() => {});
+  },
+};
+
+// ============================================================================
+// Simulation hooks used by Game when it is online
+// ============================================================================
+const NetSync = {
+  // host: put a guest's car where their device says it is
+  applyRemote(g, c) {
+    const rs = Net.remote.get(c.netPeer);
+    if (!rs || c.demolished) return;
+    const u = rs.u;
+    // after a kickoff or respawn, wait until their device has moved the car there too
+    if ((u.a || 0) < (c.spawnSeq || 0)) { c.vel.set(0, 0, 0); c.angVel.set(0, 0, 0); return; }
+    const a = u.c;
+    const age = Math.min(0.15, (performance.now() - rs.at) / 1000);
+    c.vel.set(a[7], a[8], a[9]); c.angVel.set(a[10], a[11], a[12]);
+    c.pos.set(a[0] + a[7] * age, a[1] + a[8] * age, a[2] + a[9] * age);
+    c.quat.set(a[3], a[4], a[5], a[6]).normalize();
+    c.boost = u.b; c.boosting = !!(u.f & 2); c.onGround = !!(u.f & 4); c.supersonic = !!(u.f & 8);
+    if (!c.onGround) c.airTime = (c.airTime || 0) + PHYS.TICK; else c.airTime = 0;
+  },
+
+  // guest: run the local preview and follow the host's snapshots
+  clientUpdate(g, dt) {
+    g.time += dt;
+    const host = Net.hostPeerObj();
+    const s = host && host.presence.s;
+    if (s && s !== Net.lastS && s.id === Net.matchId) { Net.lastS = s; this.applySnapshot(g, s); }
+    const me = g.player;
+    const frozen = g.state === 'countdown';
+    // own car
+    if (!me.demolished && !frozen && g.state !== 'ended') me.step(dt, g);
+    else if (frozen) { me.vel.set(0, 0, 0); me.angVel.set(0, 0, 0); }
+    else if (g.state === 'ended' && !me.demolished) me.step(dt, g);
+    // other cars: keep moving them between snapshots
+    for (const c of g.cars) {
+      if (!c.puppet || c.demolished) continue;
+      c.pos.addScaledVector(c.vel, dt);
+      const w = c.angVel.length();
+      if (w > 1e-3) { _nq.setFromAxisAngle(_nv.copy(c.angVel).multiplyScalar(1 / w), w * dt); c.quat.premultiply(_nq).normalize(); }
+      if (c.visOff) c.visOff.multiplyScalar(Math.exp(-dt * 10));
+    }
+    // ball preview
+    const ball = g.ball;
+    if (!g.ballHidden && !frozen) {
+      if (g.mode === 'heatseeker') heatHome(ball, g.heat, g.mutators.gravity, dt);
+      ball.step(dt, g.mutators, (b, n, j) => g.events.push({ type: 'bounce', strength: j, pos: b.pos.clone(), n: n.clone() }));
+      if (!me.demolished) carBallCollide(me, ball, g);
+    }
+    if (ball.visOff) ball.visOff.multiplyScalar(Math.exp(-dt * 10));
+    if (!me.demolished) for (const c of g.cars) if (c !== me && !c.demolished) carCarCollide(me, c, g);
+    g.updatePads(dt);
+  },
+
+  applySnapshot(g, s) {
+    const prevState = g.state;
+    g.state = s.st; g.stateT = s.sT; g.clock = s.cl; g.score = s.sc.slice(); g.overtime = !!s.ot; g.otTime = s.oT;
+    g.ballHidden = !!s.bh; g.heat.target = s.ht; g.heat.speed = s.hs;
+    g.clockRunning = true; g.kickoffPending = false;
+    if (s.st === 'ended') { g.winner = s.w; g.mvp = g.cars[s.mvp] || null; }
+    // cars
+    s.c.forEach((a, i) => {
+      const c = g.cars[i]; if (!c) return;
+      const demo = !!(a[14] & 1);
+      if (c === g.player) {
+        // the host moved my car (kickoff / respawn) → follow it
+        if ((a[15] || 0) > Net.ack || s.st === 'countdown') {
+          if ((a[15] || 0) > Net.ack) { c.resetState(); Net.ack = a[15] || 0; c.boost = a[13]; }
+          c.pos.set(a[0], a[1], a[2]); c.quat.set(a[3], a[4], a[5], a[6]).normalize();
+          c.vel.set(0, 0, 0); c.angVel.set(0, 0, 0); c.onGround = !!(a[14] & 4);
+          if (c.onGround) c.groundN.set(0, 1, 0);
+        }
+        c.demolished = demo;
+      } else {
+        if (!c.visOff) c.visOff = new V3();
+        const jump = c.demolished !== demo || c.pos.distanceTo(_nv.set(a[0], a[1], a[2])) > 600;
+        if (!jump) c.visOff.add(_nv2.copy(c.pos).sub(_nv));
+        else c.visOff.set(0, 0, 0);
+        c.pos.set(a[0], a[1], a[2]); c.quat.set(a[3], a[4], a[5], a[6]).normalize();
+        c.vel.set(a[7], a[8], a[9]); c.angVel.set(a[10], a[11], a[12]);
+        c.boost = a[13]; c.demolished = demo; c.boosting = !!(a[14] & 2); c.onGround = !!(a[14] & 4); c.supersonic = !!(a[14] & 8);
+      }
+    });
+    // ball (right after my own touch, trust my preview for a moment)
+    const b = g.ball, sb = s.b;
+    _nv.set(sb[0], sb[1], sb[2]);
+    const recentTouch = g.localTouchT !== undefined && g.time - g.localTouchT < 0.3;
+    const far = b.pos.distanceTo(_nv) > 700;
+    if (!recentTouch || far || g.state !== 'play') {
+      if (!b.visOff) b.visOff = new V3();
+      if (!far && prevState === g.state) b.visOff.add(_nv2.copy(b.pos).sub(_nv)); else b.visOff.set(0, 0, 0);
+      b.pos.copy(_nv); b.vel.set(sb[3], sb[4], sb[5]); b.angVel.set(sb[6], sb[7], sb[8]);
+    }
+    // pads, tiles, stats
+    if (s.p) for (let i = 0; i < g.pads.length && i < s.p.length; i++) g.pads[i].active = s.p[i] === '1';
+    if (s.d && ARENA.dropshot) for (let i = 0; i < Tiles.list.length && i < s.d.length; i++) Tiles.list[i].state = +s.d[i];
+    if (s.ds) { b.dsTeam = s.ds[0]; b.chargeLevel = s.ds[1]; }
+    if (s.k) s.k.forEach((k, i) => { const c = g.cars[i]; if (c) Object.assign(c.stats, { score: k[0], goals: k[1], assists: k[2], saves: k[3], shots: k[4], demos: k[5] }); });
+    // events from the host
+    for (const e of s.e || []) {
+      if (e.q <= Net.lastEv) continue;
+      Net.lastEv = e.q;
+      const ev = {};
+      for (const k in e) {
+        if (k === 'q' || k === 'at') continue;
+        const v = e[k];
+        if (v && typeof v === 'object' && v.$c !== undefined) ev[k] = g.cars[v.$c] || null;
+        else if (Array.isArray(v) && v.length === 3) ev[k] = new V3(v[0], v[1], v[2]);
+        else ev[k] = v;
+      }
+      if (ev.type === 'goal' && ev.pos) g.explodeGoal(ev.pos, ev.team);
+      g.events.push(ev);
+    }
+    // chat from everyone else
+    for (const ch of s.ch || []) {
+      if (ch[0] <= Net.lastChat) continue;
+      Net.lastChat = ch[0];
+      const car = g.cars[ch[1]];
+      if (!car || car === g.player) continue;
+      if (ch[3] && car.team !== g.player.team) continue;
+      const e = { type: 'chat', car, msg: String(ch[2]).slice(0, 60), team: !!ch[3], t: g.time };
+      g.chatLog.push(e); if (g.chatLog.length > 30) g.chatLog.shift();
+      g.events.push(e);
+    }
+  },
+};
+const _nq = new Q4(), _nv = new V3(), _nv2 = new V3();
 
 </script>
 <script>/* src/render.js */
@@ -3765,6 +4249,7 @@ function syncCarView(car, v, state) {
     boosting = state[7]; demo = state[8]; wheelSpin = state[10]; steer = state[11];
   } else {
     px = car.pos.x; py = car.pos.y; pz = car.pos.z; v.group.quaternion.copy(car.quat);
+    if (car.visOff) { px += car.visOff.x; py += car.visOff.y; pz += car.visOff.z; } // online: smooth out corrections
     boosting = car.boosting; demo = car.demolished; wheelSpin = car.wheelSpin; steer = car.steerVis;
   }
   v.group.position.set(px, py, pz);
@@ -3792,7 +4277,7 @@ function syncCarView(car, v, state) {
 function syncBallView(ball, state, hidden) {
   const v = R.ballView;
   if (state) { v.group.position.set(state[0], state[1], state[2]); v.mesh.quaternion.set(state[3], state[4], state[5], state[6]); hidden = state[7]; }
-  else { v.group.position.copy(ball.pos); v.mesh.quaternion.copy(ball.quat); }
+  else { v.group.position.copy(ball.pos); if (ball.visOff) v.group.position.add(ball.visOff); v.mesh.quaternion.copy(ball.quat); }
   v.group.visible = !hidden;
   const p = v.group.position;
   v.shadow.visible = !hidden && p.y < 2000 && Math.abs(p.z) < ARENA.L;
@@ -4808,6 +5293,7 @@ const UI = {
       h('div', { class: 'logo small' }, h('span', { class: 'l1' }, 'BOOST'), h('span', { class: 'l2' }, 'LEAGUE')),
       h('div', { class: 'mlist' },
         this.btn('PLAY', () => this.show('play'), 'big', 'Matches vs bots'),
+        this.btn('ONLINE', () => this.show('party'), '', Net.inParty() ? `In party ${Net.code}` : 'Play with friends'),
         this.btn('TRAINING', () => this.show('training'), '', 'Packs & free play'),
         this.btn('GARAGE', () => this.show('garage'), '', 'Customize your car'),
         this.btn('PROFILE', () => this.show('profile'), '', 'Stats & rank'),
@@ -4985,7 +5471,7 @@ const UI = {
       h('h2', null, 'Paused'),
       h('div', { class: 'mlist' },
         this.btn('RESUME', () => resumeGame(), 'big'),
-        g && g.kind === 'match' && !g.cfg.competitive ? this.btn('RESTART', () => startMatch(g.cfg)) : null,
+        g && g.kind === 'match' && !g.cfg.competitive && !g.online ? this.btn('RESTART', () => startMatch(g.cfg)) : null,
         this.btn('SETTINGS', () => this.show('settings', 'pause')),
         this.btn('HOW TO PLAY', () => { this.show('howto'); this.root.querySelector('.back').onclick = () => this.show('pause'); }),
         this.btn(g && g.kind === 'match' ? (g.cfg.competitive ? 'FORFEIT' : 'LEAVE MATCH') : 'EXIT', () => quitToMenu()),
@@ -5059,12 +5545,66 @@ const UI = {
       h('div', { class: 'postchat' },
         h('div', { class: 'row center' }, ['gg', 'Well played.', 'That was fun!', 'Rematch!', 'What a game!', 'Nice moves!'].map(m => h('button', { class: 'ghost', onclick: () => g.chat(g.player, m, false) }, m))),
         h('div', { class: 'postchatlog scroll', id: 'postchatlog' }, g.chatLog.filter(c => c.t > g.time - 8).map(c => h('div', { class: 'citem' }, h('b', { class: 't' + c.car.team }, c.car.name + ': '), c.msg)))),
-      h('div', { class: 'row center' },
+      g.online ? h('div', { class: 'row center' },
+        this.btn('BACK TO PARTY', () => quitToMenu('party'), 'go'),
+        this.btn('LEAVE PARTY', () => { Net.leave(true); quitToMenu('main'); }),
+      ) : h('div', { class: 'row center' },
         this.btn('PLAY AGAIN', () => startMatch(g.cfg), 'go'),
         this.btn('MAIN MENU', () => quitToMenu()),
       ),
     );
     return el;
+  },
+
+  // ---- online party: create / join / lobby ----
+  scr_party() {
+    const N = Net;
+    const wrap = (...kids) => h('div', { class: 'menu party scroll' }, h('div', { class: 'mhead' }, this.back('main'), h('h2', null, 'Online')), ...kids);
+    const err = N.error ? h('div', { class: 'perr' }, N.error) : null;
+    if (N.status === 'connecting') return wrap(h('div', { class: 'pnote' }, 'Connecting…'));
+    if (!N.inParty()) {
+      const input = h('input', { class: 'pcode-in', maxlength: 5, placeholder: 'CODE', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false',
+        oninput: (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); },
+        onkeydown: (e) => { if (e.key === 'Enter') N.join(e.target.value); } });
+      return wrap(
+        err,
+        h('div', { class: 'pcols' },
+          h('div', { class: 'pbox' }, h('h3', null, 'Create a party'), h('p', null, 'You get a code. Send it to your friends.'),
+            this.btn('CREATE PARTY', () => N.create(), 'go')),
+          h('div', { class: 'pbox' }, h('h3', null, 'Join a party'), h('p', null, 'Type the code your friend sees.'),
+            input, this.btn('JOIN PARTY', () => N.join(input.value))),
+        ),
+        N.available() ? null : h('div', { class: 'pnote' }, 'Online play works when the game is opened on claude.ai while signed in, and shared with your friends.'),
+      );
+    }
+    const ms = N.members();
+    const host = N.isHost ? null : N.hostPeerObj();
+    const S = N.isHost ? N.settings : ((host && host.presence.party) ? { mode: host.presence.party.mode, size: host.presence.party.size, level: host.presence.party.level, map: host.presence.party.map } : N.settings);
+    const list = h('div', { class: 'pmembers' }, ms.map(m => h('div', { class: 'pmem t' + (m.presence.team === 1 ? 1 : 0) },
+      h('b', null, String(m.presence.name || 'Player').slice(0, 16)),
+      h('small', null, (m.presence.host ? 'Party leader' : 'Player') + (m.isMe && m.sameTab ? ' · you' : '')))));
+    const teamBtns = h('div', { class: 'field' }, h('label', null, 'Your team'), h('div', { class: 'seg' },
+      [[0, 'Blue'], [1, 'Orange']].map(([t, n]) => h('button', { class: N.myTeam === t ? 'on' : '', onclick: () => { Sound.play('click'); N.setTeam(t); } }, n))));
+    const seg = (label, key, opts) => h('div', { class: 'field' }, h('label', null, label), h('div', { class: 'seg' },
+      opts.map(([v, t]) => h('button', { class: S[key] === v ? 'on' : '', disabled: !N.isHost, onclick: () => { Sound.play('click'); N.setSetting(key, v); this.show('party'); } }, t))));
+    const mapSel = h('select', { disabled: !N.isHost, onchange: (e) => N.setSetting('map', e.target.value) },
+      h('option', { value: 'auto' }, 'Random arena'), Object.entries(MAPS).map(([k, m]) => h('option', { value: k }, m.name)));
+    mapSel.value = S.map || 'auto';
+    return wrap(
+      err,
+      h('div', { class: 'pcodebig' }, h('small', null, 'PARTY CODE'), h('b', null, N.code)),
+      h('div', { class: 'pnote' }, 'Friends: open this game, tap ONLINE → JOIN PARTY and type this code.'),
+      list,
+      teamBtns,
+      seg('Mode', 'mode', NET_MODES.map(k => [k, MODES[k].name])),
+      seg('Team size', 'size', [[1, '1v1'], [2, '2v2'], [3, '3v3']]),
+      seg('Bots fill empty spots', 'level', [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star']]),
+      h('div', { class: 'field' }, h('label', null, 'Arena'), mapSel),
+      h('div', { class: 'row center' },
+        N.isHost ? this.btn('START MATCH', () => N.start(), 'go') : h('div', { class: 'pnote' }, 'Waiting for the party leader to start…'),
+        this.btn('LEAVE PARTY', () => N.leave()),
+      ),
+    );
   },
 
   ratingBlock(r) {
@@ -5467,6 +6007,8 @@ const CUR = { game: null, attract: false, paused: false, menuCam: true, acc: 0, 
 function boot() {
   ensureRatings();
   Cloud.init();
+  Object.assign(Net.settings, Store.get('netcfg', {}));
+  Net.init();
   initRenderer(document.getElementById('gl'));
   const glc = document.getElementById('gl');
   glc.addEventListener('webglcontextlost', (e) => { e.preventDefault(); }, false); // let Safari restore the GPU context instead of freezing
@@ -5548,6 +6090,7 @@ function quitToMenu(screen) {
   if (Profile.activeMatch) { delete Profile.activeMatch; saveProfile(); }
   // leaving a ranked match early counts as a loss
   const g = CUR.game;
+  if (g && !CUR.attract && g.online) { Net.leaveMatch(g); if (!screen) screen = Net.inParty() ? 'party' : 'main'; }
   if (g && !CUR.attract && g.kind === 'match' && g.cfg.competitive && g.state !== 'ended') {
     const res = applyRatingResult(g.cfg, false, -3);
     g.player.stats && Profile.losses++;
@@ -5582,8 +6125,10 @@ function loop(t) {
   Input.pollGamepad(dt);
   if (UI.screen === 'garage' && Garage.active) { Garage.render(dt); return; }
 
-  if (g && !CUR.paused) {
+  // online matches keep running behind the pause menu (the others are still playing)
+  if (g && (!CUR.paused || g.online)) {
     const ctrlIn = (!CUR.attract && !UI.screen) ? Input.read() : null;
+    if (!ctrlIn && g.online && !g.player.isBot) g.player.ctrl = newControls();
     CUR.acc += Math.min(dt, 0.05);
     let steps = 0;
     while (CUR.acc >= PHYS.TICK && steps < 8) {
@@ -5592,6 +6137,7 @@ function loop(t) {
       CUR.acc -= PHYS.TICK; steps++;
     }
     if (steps >= 8) CUR.acc = 0;
+    try { Net.tick(g, dt); } catch (e) { console.error(e); }
     // a glitch in effects or the HUD must never stop the match from finishing
     try { processEvents(g); } catch (e) { console.error(e); }
     if (!CUR.attract) {

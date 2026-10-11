@@ -8,6 +8,8 @@ const CUR = { game: null, attract: false, paused: false, menuCam: true, acc: 0, 
 function boot() {
   ensureRatings();
   Cloud.init();
+  Object.assign(Net.settings, Store.get('netcfg', {}));
+  Net.init();
   initRenderer(document.getElementById('gl'));
   const glc = document.getElementById('gl');
   glc.addEventListener('webglcontextlost', (e) => { e.preventDefault(); }, false); // let Safari restore the GPU context instead of freezing
@@ -89,6 +91,7 @@ function quitToMenu(screen) {
   if (Profile.activeMatch) { delete Profile.activeMatch; saveProfile(); }
   // leaving a ranked match early counts as a loss
   const g = CUR.game;
+  if (g && !CUR.attract && g.online) { Net.leaveMatch(g); if (!screen) screen = Net.inParty() ? 'party' : 'main'; }
   if (g && !CUR.attract && g.kind === 'match' && g.cfg.competitive && g.state !== 'ended') {
     const res = applyRatingResult(g.cfg, false, -3);
     g.player.stats && Profile.losses++;
@@ -123,8 +126,10 @@ function loop(t) {
   Input.pollGamepad(dt);
   if (UI.screen === 'garage' && Garage.active) { Garage.render(dt); return; }
 
-  if (g && !CUR.paused) {
+  // online matches keep running behind the pause menu (the others are still playing)
+  if (g && (!CUR.paused || g.online)) {
     const ctrlIn = (!CUR.attract && !UI.screen) ? Input.read() : null;
+    if (!ctrlIn && g.online && !g.player.isBot) g.player.ctrl = newControls();
     CUR.acc += Math.min(dt, 0.05);
     let steps = 0;
     while (CUR.acc >= PHYS.TICK && steps < 8) {
@@ -133,6 +138,7 @@ function loop(t) {
       CUR.acc -= PHYS.TICK; steps++;
     }
     if (steps >= 8) CUR.acc = 0;
+    try { Net.tick(g, dt); } catch (e) { console.error(e); }
     // a glitch in effects or the HUD must never stop the match from finishing
     try { processEvents(g); } catch (e) { console.error(e); }
     if (!CUR.attract) {

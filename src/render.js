@@ -789,6 +789,7 @@ function syncCarView(car, v, state) {
     boosting = state[7]; demo = state[8]; wheelSpin = state[10]; steer = state[11];
   } else {
     px = car.pos.x; py = car.pos.y; pz = car.pos.z; v.group.quaternion.copy(car.quat);
+    if (car.visOff) { px += car.visOff.x; py += car.visOff.y; pz += car.visOff.z; } // online: smooth out corrections
     boosting = car.boosting; demo = car.demolished; wheelSpin = car.wheelSpin; steer = car.steerVis;
   }
   v.group.position.set(px, py, pz);
@@ -816,7 +817,7 @@ function syncCarView(car, v, state) {
 function syncBallView(ball, state, hidden) {
   const v = R.ballView;
   if (state) { v.group.position.set(state[0], state[1], state[2]); v.mesh.quaternion.set(state[3], state[4], state[5], state[6]); hidden = state[7]; }
-  else { v.group.position.copy(ball.pos); v.mesh.quaternion.copy(ball.quat); }
+  else { v.group.position.copy(ball.pos); if (ball.visOff) v.group.position.add(ball.visOff); v.mesh.quaternion.copy(ball.quat); }
   v.group.visible = !hidden;
   const p = v.group.position;
   v.shadow.visible = !hidden && p.y < 2000 && Math.abs(p.z) < ARENA.L;

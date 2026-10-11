@@ -86,6 +86,7 @@ const UI = {
       h('div', { class: 'logo small' }, h('span', { class: 'l1' }, 'BOOST'), h('span', { class: 'l2' }, 'LEAGUE')),
       h('div', { class: 'mlist' },
         this.btn('PLAY', () => this.show('play'), 'big', 'Matches vs bots'),
+        this.btn('ONLINE', () => this.show('party'), '', Net.inParty() ? `In party ${Net.code}` : 'Play with friends'),
         this.btn('TRAINING', () => this.show('training'), '', 'Packs & free play'),
         this.btn('GARAGE', () => this.show('garage'), '', 'Customize your car'),
         this.btn('PROFILE', () => this.show('profile'), '', 'Stats & rank'),
@@ -263,7 +264,7 @@ const UI = {
       h('h2', null, 'Paused'),
       h('div', { class: 'mlist' },
         this.btn('RESUME', () => resumeGame(), 'big'),
-        g && g.kind === 'match' && !g.cfg.competitive ? this.btn('RESTART', () => startMatch(g.cfg)) : null,
+        g && g.kind === 'match' && !g.cfg.competitive && !g.online ? this.btn('RESTART', () => startMatch(g.cfg)) : null,
         this.btn('SETTINGS', () => this.show('settings', 'pause')),
         this.btn('HOW TO PLAY', () => { this.show('howto'); this.root.querySelector('.back').onclick = () => this.show('pause'); }),
         this.btn(g && g.kind === 'match' ? (g.cfg.competitive ? 'FORFEIT' : 'LEAVE MATCH') : 'EXIT', () => quitToMenu()),
@@ -337,12 +338,66 @@ const UI = {
       h('div', { class: 'postchat' },
         h('div', { class: 'row center' }, ['gg', 'Well played.', 'That was fun!', 'Rematch!', 'What a game!', 'Nice moves!'].map(m => h('button', { class: 'ghost', onclick: () => g.chat(g.player, m, false) }, m))),
         h('div', { class: 'postchatlog scroll', id: 'postchatlog' }, g.chatLog.filter(c => c.t > g.time - 8).map(c => h('div', { class: 'citem' }, h('b', { class: 't' + c.car.team }, c.car.name + ': '), c.msg)))),
-      h('div', { class: 'row center' },
+      g.online ? h('div', { class: 'row center' },
+        this.btn('BACK TO PARTY', () => quitToMenu('party'), 'go'),
+        this.btn('LEAVE PARTY', () => { Net.leave(true); quitToMenu('main'); }),
+      ) : h('div', { class: 'row center' },
         this.btn('PLAY AGAIN', () => startMatch(g.cfg), 'go'),
         this.btn('MAIN MENU', () => quitToMenu()),
       ),
     );
     return el;
+  },
+
+  // ---- online party: create / join / lobby ----
+  scr_party() {
+    const N = Net;
+    const wrap = (...kids) => h('div', { class: 'menu party scroll' }, h('div', { class: 'mhead' }, this.back('main'), h('h2', null, 'Online')), ...kids);
+    const err = N.error ? h('div', { class: 'perr' }, N.error) : null;
+    if (N.status === 'connecting') return wrap(h('div', { class: 'pnote' }, 'Connecting…'));
+    if (!N.inParty()) {
+      const input = h('input', { class: 'pcode-in', maxlength: 5, placeholder: 'CODE', autocapitalize: 'characters', autocomplete: 'off', spellcheck: 'false',
+        oninput: (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); },
+        onkeydown: (e) => { if (e.key === 'Enter') N.join(e.target.value); } });
+      return wrap(
+        err,
+        h('div', { class: 'pcols' },
+          h('div', { class: 'pbox' }, h('h3', null, 'Create a party'), h('p', null, 'You get a code. Send it to your friends.'),
+            this.btn('CREATE PARTY', () => N.create(), 'go')),
+          h('div', { class: 'pbox' }, h('h3', null, 'Join a party'), h('p', null, 'Type the code your friend sees.'),
+            input, this.btn('JOIN PARTY', () => N.join(input.value))),
+        ),
+        N.available() ? null : h('div', { class: 'pnote' }, 'Online play works when the game is opened on claude.ai while signed in, and shared with your friends.'),
+      );
+    }
+    const ms = N.members();
+    const host = N.isHost ? null : N.hostPeerObj();
+    const S = N.isHost ? N.settings : ((host && host.presence.party) ? { mode: host.presence.party.mode, size: host.presence.party.size, level: host.presence.party.level, map: host.presence.party.map } : N.settings);
+    const list = h('div', { class: 'pmembers' }, ms.map(m => h('div', { class: 'pmem t' + (m.presence.team === 1 ? 1 : 0) },
+      h('b', null, String(m.presence.name || 'Player').slice(0, 16)),
+      h('small', null, (m.presence.host ? 'Party leader' : 'Player') + (m.isMe && m.sameTab ? ' · you' : '')))));
+    const teamBtns = h('div', { class: 'field' }, h('label', null, 'Your team'), h('div', { class: 'seg' },
+      [[0, 'Blue'], [1, 'Orange']].map(([t, n]) => h('button', { class: N.myTeam === t ? 'on' : '', onclick: () => { Sound.play('click'); N.setTeam(t); } }, n))));
+    const seg = (label, key, opts) => h('div', { class: 'field' }, h('label', null, label), h('div', { class: 'seg' },
+      opts.map(([v, t]) => h('button', { class: S[key] === v ? 'on' : '', disabled: !N.isHost, onclick: () => { Sound.play('click'); N.setSetting(key, v); this.show('party'); } }, t))));
+    const mapSel = h('select', { disabled: !N.isHost, onchange: (e) => N.setSetting('map', e.target.value) },
+      h('option', { value: 'auto' }, 'Random arena'), Object.entries(MAPS).map(([k, m]) => h('option', { value: k }, m.name)));
+    mapSel.value = S.map || 'auto';
+    return wrap(
+      err,
+      h('div', { class: 'pcodebig' }, h('small', null, 'PARTY CODE'), h('b', null, N.code)),
+      h('div', { class: 'pnote' }, 'Friends: open this game, tap ONLINE → JOIN PARTY and type this code.'),
+      list,
+      teamBtns,
+      seg('Mode', 'mode', NET_MODES.map(k => [k, MODES[k].name])),
+      seg('Team size', 'size', [[1, '1v1'], [2, '2v2'], [3, '3v3']]),
+      seg('Bots fill empty spots', 'level', [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star']]),
+      h('div', { class: 'field' }, h('label', null, 'Arena'), mapSel),
+      h('div', { class: 'row center' },
+        N.isHost ? this.btn('START MATCH', () => N.start(), 'go') : h('div', { class: 'pnote' }, 'Waiting for the party leader to start…'),
+        this.btn('LEAVE PARTY', () => N.leave()),
+      ),
+    );
   },
 
   ratingBlock(r) {

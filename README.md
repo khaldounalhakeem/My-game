@@ -26,6 +26,8 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 
 **Ranked:** every mode has its own rank: Soccar Duel, Doubles and Standard, plus Hoops, Rumble, Heatseeker, Dropshot and Snow Day. Everyone starts at Supersonic Legend against near-perfect bots. Losses drop you, faster on a losing streak, until you settle at the rank you can hold, and wins climb you back up. Ranks run from Bronze I to Supersonic Legend with divisions I–IV, and bots play at your rank. Leaving a ranked match early counts as a loss. Results are saved the instant a match ends.
 
+**Online parties:** tap ONLINE → CREATE PARTY to get a 5-letter code; friends tap JOIN PARTY and type it. Pick teams, mode (Soccar, Hoops, Snow Day, Heatseeker, Dropshot), 1v1–3v3 and arena; bots fill empty spots. The party leader's device runs the match (ball, score, bots) and each player's device drives their own car. Works when the game is opened as a Claude artifact shared with your friends (signed in; not by public link).
+
 **Casual:** Adaptive bots by default. A hidden rating goes up when you win and down when you lose, and the bots follow it. Fixed Rookie, Pro and All-Star bots are still available.
 
 **Progression:** XP and levels, item drops with rarities, and career stats.
@@ -57,6 +59,7 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 | `src/ball.js` | ball physics, car↔ball and car↔car collisions, ball prediction |
 | `src/ai.js` | bots |
 | `src/game.js` | match flow and all game modes |
+| `src/net.js` | online parties: party codes, lobby, host/guest match sync |
 | `src/render.js`, `src/fx.js` | three.js scene, models, camera and particles |
 | `src/audio.js`, `src/input.js`, `src/ui.js`, `src/main.js` | sound, controls, menus and HUD, main loop |
 

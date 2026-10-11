@@ -61,6 +61,7 @@ class Car {
     const a = Math.atan2(-(faceZ - z), faceX - x);
     this.quat.setFromAxisAngle(UP, a);
     this.onGround = true; this.groundN.set(0, 1, 0);
+    this.spawnSeq = (this.spawnSeq || 0) + 1; // online: tells a player's own device it was moved (kickoff, respawn)
   }
   fwd(out) { return out.set(1, 0, 0).applyQuaternion(this.quat); }
   up(out) { return out.set(0, 1, 0).applyQuaternion(this.quat); }

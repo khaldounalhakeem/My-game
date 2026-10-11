@@ -62,9 +62,26 @@ class Game {
     const used = new Set();
     const botName = () => { let n; do { n = pick(BOT_NAMES); } while (used.has(n)); used.add(n); return n; };
     let id = 0;
+    const on = cfg.online;
+    this.online = !!on; this.netHost = !!(on && on.host); this.netClient = !!(on && !on.host);
+    if (on) {
+      // online match: every device builds the same cars in the same order from the host's slot list
+      on.slots.forEach((sl, i) => {
+        const lo = sl.lo || randomLoadout();
+        const car = new Car(id++, sl.team, String(sl.name || 'Player').slice(0, 16), !!sl.bot, lo.body, lo);
+        car.netPeer = sl.peer || null;
+        if (i === on.me) this.player = car;
+        else if (this.netClient) car.puppet = true; // driven by the host's updates
+        else if (sl.bot) { car.bot = new Bot(car, BOT_LEVELS[cfg.level] ? cfg.level : 'allstar'); this.bots.push(car.bot); }
+        else car.remote = true; // another player's car, driven by their device
+        this.cars.push(car);
+      });
+      this.chatSeq = 0;
+    } else {
     this.player = new Car(id++, cfg.playerTeam || 0, prof.name || 'Player', false, prof.car.body, prof.car);
     this.cars.push(this.player);
-    if (this.kind === 'match') {
+    }
+    if (this.kind === 'match' && !on) {
       for (let t = 0; t < 2; t++) {
         const have = this.cars.filter(c => c.team === t).length;
         for (let k = have; k < size; k++) {
@@ -127,6 +144,7 @@ class Game {
 
   // ---------------------------------------------------------------------------
   update(dt) {
+    if (this.netClient) { NetSync.clientUpdate(this, dt * this.mutators.gameSpeed); return; }
     dt *= this.mutators.gameSpeed;
     this.time += dt;
     this.stateT -= dt;
@@ -209,6 +227,7 @@ class Game {
         if (c.respawnT <= 0) this.respawnCar(c);
         continue;
       }
+      if (c.remote) { NetSync.applyRemote(this, c); continue; }
       // rumble
       if (c.ctrl.useItem && !c.prevUse && c.item) this.useItem(c);
       c.prevUse = c.ctrl.useItem;
@@ -326,6 +345,8 @@ class Game {
   onTouch(car, strength, point) {
     const ball = this.ball;
     if (this.state === 'countdown') return;
+    // online guest: the host decides what a touch does; this is only the local preview
+    if (this.netClient) { this.localTouchT = this.time; this.events.push({ type: 'hit', car, strength, pos: point }); return; }
     car.stats.touches++;
     const now = this.time;
     const prevThreat = this.ballThreat;
@@ -419,6 +440,7 @@ class Game {
   }
 
   demolish(att, vic) {
+    if (this.netClient) return; // the host decides demolitions
     vic.demolished = true; vic.respawnT = this.mutators.respawn; vic.spiked = false;
     att.stats.demos++;
     this.award(att, 'Demolition', 25);
@@ -600,8 +622,10 @@ class Game {
   // ---------------------------------------------------------------------------
   chat(car, msg, teamOnly) {
     const e = { type: 'chat', car, msg, team: !!teamOnly, t: this.time };
+    if (this.online) e.seq = ++this.chatSeq;
     this.chatLog.push(e); if (this.chatLog.length > 30) this.chatLog.shift();
     this.events.push(e);
+    if (this.netClient) { if (car === this.player) Net.sendChat(msg, !!teamOnly); return; }
     // bots answer: always when you talk to them, sometimes when they talk to each other
     if (!car.isBot || Math.random() < 0.3) this.queueReplies(car, msg, teamOnly);
   }
@@ -647,6 +671,7 @@ class Game {
 
   // bots that are losing badly give up and forfeit
   checkForfeit() {
+    if (this.online) return;
     if (this.kind !== 'match' || this.overtime || this.mutators.matchLength === 0 || this.cfg.attract) return;
     this.ffT = (this.ffT || 0) + 1;
     const me = this.player.team, opp = 1 - me;
