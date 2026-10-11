@@ -1844,17 +1844,29 @@ class Bot {
     this.heatMode = game.mode === 'heatseeker';
     if (this.heatMode) {
       // the ball always homes in on a goal: one bot guards the net, the closest bot to it
-      const ownZ = -dir * ARENA.L;
-      const keeper = team.slice().sort((a, b) => Math.abs(a.pos.z - ownZ) - Math.abs(b.pos.z - ownZ))[0];
       const incoming = game.heat.target === car.team;
+      this.keeperSide = 0;
       // top bots in 1v1 never leave the net open: the ball always comes back to it
       if (team.length === 1) this.role = incoming || this.lv.aggro ? 'keeper' : 'attack';
-      else this.role = keeper === car ? 'keeper' : (incoming && idx === 0 ? 'attack' : idx === 0 ? 'attack' : 'support');
+      else {
+        // teamwork: one player stays up front to finish after a save, everybody else guards the net.
+        // A human teammate past the half line is the striker, so every bot stays home.
+        const humanUp = team.some(o => !o.bot && o.pos.z * dir > -300);
+        const bots = team.filter(o => o.bot);
+        let striker = null;
+        if (!humanUp && bots.length > 1) striker = bots.slice().sort((a, b) => b.pos.z * dir - a.pos.z * dir)[0];
+        if (car === striker) this.role = 'striker';
+        else {
+          this.role = 'keeper';
+          const keepers = bots.filter(o => o !== striker).sort((a, b) => a.pos.x - b.pos.x);
+          if (keepers.length > 1) this.keeperSide = (keepers.indexOf(car) === 0 ? -1 : 1);
+        }
+      }
     }
 
     // threat: ball heading into our goal soon
     const threat = game.ballThreat && game.ballThreat.team === car.team && game.ballThreat.t < 3;
-    if (threat && idx <= 1 && this.role !== 'keeper') this.role = 'attack';
+    if (threat && idx <= 1 && this.role !== 'keeper' && this.role !== 'striker') this.role = 'attack';
 
     // find intercept slice
     let chosen = null;
@@ -1881,8 +1893,15 @@ class Bot {
       // stand on the goal line, step out to save when the ball is coming
       this.mode = 'keeper';
       this.target.set(clamp(ball.pos.x * 0.3, -600, 600), 0, own.z + dir * 220);
-      // only leave the net to clear a slow ball sitting near our goal
-      if (ball.vel.length() < 700 && Math.abs(ball.pos.z - own.z) < 2200 && ball.pos.y < 250) { this.mode = 'attack'; this.role = 'attack'; }
+      // only leave the net to clear a slow ball sitting near our goal (with two keepers, the one on that side)
+      const mySide = !this.keeperSide || Math.sign(ball.pos.x || 1) === this.keeperSide;
+      if (mySide && ball.vel.length() < 700 && Math.abs(ball.pos.z - own.z) < 2200 && ball.pos.y < 250) { this.mode = 'attack'; this.role = 'attack'; }
+    } else if (this.role === 'striker') {
+      // ball coming at our net: wait just past the half line for the save, then finish it (in the air if needed)
+      if (game.heat.target === car.team) {
+        this.mode = 'position';
+        this.target.set(clamp(ball.pos.x * 0.4, -1500, 1500), 0, dir * 900);
+      } else this.role = 'attack';
     } else if (this.role === 'goalie') {
       this.mode = 'position';
       this.target.set(clamp(ball.pos.x * 0.35, -700, 700), 0, own.z + dir * 350);
@@ -1993,7 +2012,8 @@ class Bot {
         }
       }
       // drive onto the middle of the goal line and stop there (any facing works for a block)
-      const px = clamp(tx, -220, 220);
+      // two keepers split the goal: one covers each half
+      const px = this.keeperSide < 0 ? clamp(tx, -650, -110) : this.keeperSide > 0 ? clamp(tx, 110, 650) : clamp(tx, -220, 220);
       const d = Math.hypot(car.pos.x - px, car.pos.z - lineZ);
       if (d < 140 && car.onGround) {
         const vf = car.vel.dot(car.fwd(_ai4));
