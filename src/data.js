@@ -31,7 +31,7 @@ const PAINTS = [
 const ACCENTS = [0xeeeeee, 0x111111, 0xf2c814, 0x00e0ff, 0xff2bd0, 0x7fe02a, 0xff3030, 0x9a5cff];
 
 const ITEMS = {
-  body: { striker: 'Striker', phantom: 'Phantom', blade: 'Blade', wedge: 'Wedge', hybrid: 'Hybrid X', tank: 'Bulwark' },
+  body: { octane: 'Octane', dominus: 'Dominus', fennec: 'Fennec', striker: 'Striker', phantom: 'Phantom', blade: 'Blade', wedge: 'Wedge', hybrid: 'Hybrid X', tank: 'Bulwark' },
   decal: { none: 'None', stripes: 'Racing Stripes', flames: 'Flames', tiger: 'Tiger', checker: 'Checkered', lightning: 'Lightning', dots: 'Polka', camo: 'Camo' },
   wheels: { classic: 'Classic', spinner: 'Spinners', neon: 'Neon Rims', gold: 'Gold Rush', offroad: 'Offroad', star: 'Star Hubs' },
   boost: { standard: 'Standard', flames: 'Hellfire', neon: 'Neon', rainbow: 'Rainbow', bubbles: 'Bubbles', ion: 'Ion Sparks', smoke: 'Smokestack', hearts: 'Lovestruck' },

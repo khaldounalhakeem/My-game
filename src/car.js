@@ -5,6 +5,9 @@
 // ============================================================================
 
 const BODIES = {
+  octane: { name: 'Octane', type: 'Octane', l: 118.01, w: 84.2, h: 36.16, ox: 13.88, oy: 20.75, wf: 51, wb: -34, rf: 12.5, rb: 15 },
+  dominus: { name: 'Dominus', type: 'Dominus', l: 127.93, w: 83.28, h: 31.3, ox: 9.0, oy: 15.75, wf: 52, wb: -36, rf: 12, rb: 13.5 },
+  fennec: { name: 'Fennec', type: 'Octane', l: 118.01, w: 84.2, h: 36.16, ox: 13.88, oy: 20.75, wf: 47, wb: -36, rf: 13.5, rb: 14.5 },
   striker: { name: 'Striker', type: 'Octane', l: 118.01, w: 84.2, h: 36.16, ox: 13.88, oy: 20.75, wf: 51, wb: -34, rf: 12.5, rb: 15 },
   phantom: { name: 'Phantom', type: 'Dominus', l: 127.93, w: 83.28, h: 31.3, ox: 9.0, oy: 15.75, wf: 51, wb: -33, rf: 12, rb: 13.5 },
   blade: { name: 'Blade', type: 'Breakout', l: 131.49, w: 80.52, h: 30.3, ox: 12.5, oy: 11.75, wf: 51, wb: -35, rf: 13.5, rb: 15 },

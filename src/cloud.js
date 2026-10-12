@@ -40,6 +40,7 @@ const Cloud = {
     Object.assign(Profile, JSON.parse(JSON.stringify(DEFAULT_PROFILE)), p);
     Profile.car = Object.assign({}, DEFAULT_PROFILE.car, p.car || {});
     Profile.unlocked = Object.assign({}, DEFAULT_PROFILE.unlocked, p.unlocked || {});
+    for (const k of ['octane', 'dominus', 'fennec']) if (!Profile.unlocked.body.includes(k)) Profile.unlocked.body.unshift(k);
     if (data.settings) Object.assign(Settings, data.settings);
     try { localStorage.setItem('boostleague.profile', JSON.stringify(Profile)); localStorage.setItem('boostleague.settings', JSON.stringify(Settings)); } catch (e) { /* ignore */ }
     if (typeof applySettings === 'function') applySettings(true);

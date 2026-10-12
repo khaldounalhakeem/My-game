@@ -105,11 +105,13 @@ const Settings = Object.assign({}, DEFAULT_SETTINGS, Store.get('settings', {}));
 const DEFAULT_PROFILE = {
   name: 'Player', title: 'ROOKIE', xp: 0, level: 1, mmr: 600, wins: 0, losses: 0, goals: 0, saves: 0, assists: 0, mvps: 0, demos: 0,
   car: { body: 'striker', paint: 0, accent: 0xeeeeee, decal: 'stripes', wheels: 'classic', boost: 'standard', explosion: 'classic', topper: 'none', antenna: 'none' },
-  unlocked: { body: ['striker', 'phantom', 'blade'], decal: ['none', 'stripes'], wheels: ['classic'], boost: ['standard'], explosion: ['classic'], topper: ['none'], antenna: ['none'] },
+  unlocked: { body: ['octane', 'dominus', 'fennec', 'striker', 'phantom', 'blade'], decal: ['none', 'stripes'], wheels: ['classic'], boost: ['standard'], explosion: ['classic'], topper: ['none'], antenna: ['none'] },
   newItems: [],
 };
 const Profile = Object.assign({}, JSON.parse(JSON.stringify(DEFAULT_PROFILE)), Store.get('profile', {}));
 Profile.car = Object.assign({}, DEFAULT_PROFILE.car, Profile.car || {});
 Profile.unlocked = Object.assign({}, DEFAULT_PROFILE.unlocked, Profile.unlocked || {});
+// the Octane, Dominus and Fennec are always available
+for (const k of ['octane', 'dominus', 'fennec']) if (!Profile.unlocked.body.includes(k)) Profile.unlocked.body.unshift(k);
 
 function xpForLevel(l) { return 600 + l * 150; }

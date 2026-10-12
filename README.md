@@ -12,7 +12,7 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 
 **Car physics, using Rocket League's published constants:** throttle and steering curves, 2300 uu/s top speed, supersonic at 2200, boost (33.3/s, pads give 12 or 100), powerslide, driving on curved walls and the ceiling, sticky wheels, variable-height jump, double jump, directional flips (front, back, side, diagonal), flip cancels, half-flips, air roll (free and directional), flip resets off the ball, pinches (ball squeezed against a wall or the floor), automatic self-righting, demolitions and bumps.
 
-**Six hitbox types:** Striker (Octane), Phantom (Dominus), Blade (Breakout), Wedge (Plank), Hybrid X and Bulwark (Merc).
+**Cars:** the Octane, Dominus and Fennec (always unlocked, modelled after the originals with their real hitboxes), plus Striker, Phantom, Blade (Breakout hitbox), Wedge (Plank), Hybrid X and Bulwark (Merc).
 
 **Ball:** spin and friction, a hit impulse that scales with relative speed, and a 6000 uu/s speed cap.
 
