@@ -56,7 +56,18 @@ class Bot {
     }
 
     if (this.aerial) { this.doAerial(game, dt); return; }
-    if (!car.onGround) { this.recover(game, c); return; }
+    // wedged against something (a goal post, the back of the net): back out
+    if (car.onGround && Math.abs(c.throttle) < 0.01) {
+      const vfw = car.vel.length();
+      this.stuckT = vfw < 120 && this.wantMove ? (this.stuckT || 0) + dt : 0;
+      if (this.stuckT > 0.6) { this.stuckT = 0; this.seq = [{ d: 0.7, c: { throttle: -1, steer: Math.random() < 0.5 ? -1 : 1 } }]; this.seqT = 0; return; }
+    }
+    if (!car.onGround) {
+      // still flying with boost: go for the next touch (air dribble, double touch off the wall/backboard)
+      this.followCd = (this.followCd || 0) - dt;
+      if (this.followCd <= 0 && this.airFollow(game)) { this.doAerial(game, dt); return; }
+      this.recover(game, c); return;
+    }
 
     this.thinkT -= dt;
     if (this.thinkT <= 0) { this.think(game); this.thinkT = this.lv.react * rand(0.7, 1.3); }
@@ -125,6 +136,14 @@ class Bot {
       }
     }
 
+    // passing play: the receiver goes for the ball, the passer moves up for a return pass or rebound
+    const pass = game.pass && game.time - game.pass.t < 2.6 && game.pass.from.team === car.team ? game.pass : null;
+    if (pass && !this.heatMode) {
+      if (pass.to === car) this.role = 'attack';
+      else if (pass.from === car) this.role = 'passer';
+      else if (this.role === 'attack') this.role = 'support';
+    }
+
     // threat: ball heading into our goal soon
     const threat = game.ballThreat && game.ballThreat.team === car.team && game.ballThreat.t < 3;
     if (threat && idx <= 1 && this.role !== 'keeper' && this.role !== 'striker') this.role = 'attack';
@@ -150,7 +169,12 @@ class Bot {
 
     // goalie/support positioning
     const own = this.ownGoal(_ai1);
-    if (this.role === 'keeper') {
+    if (this.role === 'passer') {
+      // after the pass: get into a spot in front of goal on the far side for the return ball or a rebound
+      this.mode = 'position';
+      const og = this.oppGoal(_ai2);
+      this.target.set(-Math.sign(ball.pos.x || 1) * 700, 0, og.z - dir * 1700);
+    } else if (this.role === 'keeper') {
       // stand on the goal line, step out to save when the ball is coming
       this.mode = 'keeper';
       this.target.set(clamp(ball.pos.x * 0.3, -600, 600), 0, own.z + dir * 220);
@@ -171,6 +195,15 @@ class Bot {
       this.mode = 'position';
       const bz = ball.pos.z - dir * 1900;
       this.target.set(ball.pos.x * 0.45, 0, clamp(bz, -ARENA.L + 600, ARENA.L - 600));
+      // our attacker has the ball up the field: skilled players get in front of goal for a pass
+      // (in 3v3 the last player still stays back)
+      const att = etas[0] && etas[0].car !== car ? etas[0] : null;
+      const oppBest = Math.min(...game.cars.filter(o => o.team !== car.team && !o.demolished).map(o => o.bot ? o.bot.eta(ball.pos) : estimateHumanEta(o, ball.pos)), 9);
+      if ((this.lv.pass || 0) > 0.45 && ARENA.goal && att && att.e < oppBest + 0.2 && ball.pos.z * dir > 600 && !this.heatMode) {
+        const og = this.oppGoal(_ai2);
+        this.target.set(-Math.sign(ball.pos.x || 1) * 600, 0, og.z - dir * 2000);
+        this.mode = 'position';
+      }
       // grab boost on the way if low
       if (car.boost < 40) {
         const pad = this.nearestPad(game, true);
@@ -181,14 +214,23 @@ class Bot {
       this.mode = 'attack';
       // wrong side of the ball: rotate back post first
       const behind = (ball.pos.z - car.pos.z) * dir;
-      // top bots stay aggressive: they only rotate back when well past the ball
-      if (behind < (this.lv.aggro ? -1200 : -250) && !threat) {
+      const ballD = (ball.pos.z - own.z) * dir, carD = (car.pos.z - own.z) * dir;
+      const skilled = (this.lv.skill || 0) > 0.8;
+      if (skilled && carD > ballD + 250 && car.pos.distanceTo(ball.pos) > 700 && (ballD < 4200 || threat) && ballD > 600) {
+        // ball between us and our own net: race back to the far post and face the play, don't chase it from behind
+        this.mode = 'rotate';
+        const side = -Math.sign(ball.pos.x || car.pos.x || 1);
+        this.target.set(side * 650, 0, own.z + dir * 350);
+      } else if (behind < (this.lv.aggro ? -1200 : -250) && !threat) {
         this.mode = 'rotate';
         const side = car.pos.x > 0 ? 1 : -1;
         this.target.set(side * 900, 0, own.z + dir * 900);
         if ((ball.pos.z - own.z) * dir > 4500) this.target.set(ball.pos.x * 0.3, 0, ball.pos.z - dir * 1600);
       }
-      if (car.boost < 15 && this.mode === 'attack' && chosen && chosen.t > 2.2) {
+      // stuck inside our own net: drive straight out
+      if (Math.abs(car.pos.z) > ARENA.L - 40 && Math.sign(car.pos.z) === Math.sign(own.z)) { this.mode = 'rotate'; this.target.set(car.pos.x * 0.5, 0, own.z + dir * 700); }
+      const ballComing = ball.vel.z * dir < -300 && ballD < 6000;
+      if (car.boost < 15 && this.mode === 'attack' && chosen && chosen.t > 2.2 && !(skilled && ballComing)) {
         const pad = this.nearestPad(game, false);
         if (pad && pad.dist < 1200) { this.target.set(pad.x, 0, pad.z); this.mode = 'boost'; }
       }
@@ -358,12 +400,42 @@ class Bot {
     if (this.mode === 'kickoff') c.boost = true;
     // on a wall: steer down if target is on the floor
     if (car.groundN.y < 0.6 && tgt.y < 300) { c.steer = clamp(ang * 2, -1, 1); }
+    this.wantMove = c.throttle > 0.5 && d > 400 && wantSpeed > 300;
+    // stuck on a wall (or the back of a goal) while the play is on the floor: jump off it
+    if (car.groundN.y < 0.5 && car.wallTime > 0.5 && tgt.y < 300 && car.pos.y < 1100 && (this.lv.skill || 0) > 0.6 && this.flipCd <= 0) {
+      this.seq = [{ d: 0.12, c: { jump: true } }, { d: 0.05, c: { jump: false } }]; this.seqT = 0; this.flipCd = 0.8;
+    }
   }
 
   // ---------------------------------------------------------------------------
   aerialSkill(game) {
     // in Heatseeker even weaker bots will fly up to save
     return game && game.mode === 'heatseeker' ? Math.max(this.lv.aerial, 0.55) : this.lv.aerial;
+  }
+  // in the air already: is there a touch we can still reach with boost?
+  airFollow(game) {
+    const car = this.car, mech = this.lv.mech || 0;
+    if (!mech || car.boost < 6 || car.contactRoof > 0) return false;
+    if (Math.random() > mech) { this.followCd = 0.3; return false; } // weaker bots often just land
+    this.followCd = 0.12;
+    const pred = game.prediction, g = PHYS.GRAVITY * game.mutators.gravity;
+    const og = this.oppGoal(_ai1);
+    // only worth it going forwards: the ball must be on the way to (or near) their goal, not ours
+    if ((game.ball.pos.z - og.z) * (og.z > 0 ? -1 : 1) > 6500) return false;
+    for (let i = 2; i < pred.count; i += 2) {
+      const s = pred.slices[i];
+      if (s.t > 1.6) break;
+      if (s.pos.y < 200) continue;
+      const need = _ai2.copy(s.pos).sub(car.pos).addScaledVector(car.vel, -s.t);
+      need.y += 0.5 * g * s.t * s.t;
+      const a = need.length() / (0.5 * s.t * s.t);
+      if (a < 850 && s.t * 33.3 < car.boost + 5) {
+        this.aerial = { t: 0.35, target: s.pos.clone(), arrive: s.t + 0.35, dj: true, follow: true };
+        return true;
+      }
+    }
+    this.followCd = 0.25;
+    return false;
   }
   startAerial(I) {
     this.aerial = { t: 0, target: I.pos.clone(), arrive: I.t, dj: false };

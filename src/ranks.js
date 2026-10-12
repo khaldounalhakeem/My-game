@@ -45,14 +45,15 @@ function rankFor(mmr) { return rankInfo(mmr).name; }
 // Bot skill that scales with MMR (interpolated between anchor levels)
 // ---------------------------------------------------------------------------
 const SKILL_ANCHORS = [
-  // better reactions, aim and decisions as the rank rises — same car, same boost, same physics as you
-  [0, { react: 0.4, skill: 0.3, aerial: 0, maxBoost: 0.35, flip: 0.25, aim: 0.45, assist: 0.04, aggro: 0 }],
-  [300, { react: 0.28, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0 }],
-  [740, { react: 0.14, skill: 0.75, aerial: 0.55, maxBoost: 0.9, flip: 0.85, aim: 0.88, assist: 0.25, aggro: 0 }],
-  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.27, aggro: 0 }],
-  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.3, aggro: 1 }],
-  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1 }],
-  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.4, aggro: 1 }],
+  // better reactions, aim and decisions as the rank rises — same car, same boost, same physics as you.
+  // pass: how often they set up teammates; mech: air dribbles, double touches and follow-ups in the air
+  [0, { react: 0.4, skill: 0.3, aerial: 0, maxBoost: 0.35, flip: 0.25, aim: 0.45, assist: 0.04, aggro: 0, pass: 0, mech: 0 }],
+  [300, { react: 0.28, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0, pass: 0, mech: 0 }],
+  [740, { react: 0.14, skill: 0.75, aerial: 0.55, maxBoost: 0.9, flip: 0.85, aim: 0.88, assist: 0.25, aggro: 0, pass: 0.25, mech: 0.2 }],
+  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.27, aggro: 0, pass: 0.5, mech: 0.5 }],
+  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.3, aggro: 1, pass: 0.7, mech: 0.75 }],
+  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.85, mech: 0.9 }],
+  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.4, aggro: 1, pass: 0.95, mech: 1 }],
 ];
 function levelForMMR(mmr) {
   const A = SKILL_ANCHORS;

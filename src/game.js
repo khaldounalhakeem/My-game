@@ -415,6 +415,51 @@ class Game {
   }
 
   // bots get a small aiming correction (scaled by difficulty) so their shots find the net
+  // a bot in the attacking third can cross the ball into the air for a teammate waiting in front of goal.
+  // Direction only: the ball keeps the speed of the real hit.
+  botPass(car, ball, dir, lv) {
+    if (!lv.pass || !ARENA.goal || this.mode === 'heatseeker') return false;
+    const zf = ball.pos.z * dir; // how far up the field the ball is
+    if (zf < -500) return false;
+    const v = ball.vel, S = v.length();
+    if (S < 900) return false;
+    // a teammate free in front of goal, closer to it than the ball
+    let best = null, bs = -1e9;
+    for (const m of this.cars) {
+      if (m === car || m.team !== car.team || m.demolished) continue;
+      const mz = m.pos.z * dir;
+      if (mz < 1200 || mz > ARENA.L - 400 || Math.abs(m.pos.x) > 2200 || mz < zf + 800) continue; // ahead of the ball
+      if (m.bot && (m.bot.lv.aerial || 0) < 0.5) continue;
+      // nobody from the other team right on top of them
+      let open = 1e9;
+      for (const o of this.cars) if (o.team !== car.team && !o.demolished) open = Math.min(open, o.pos.distanceTo(m.pos));
+      if (open < 500) continue;
+      const sc = mz - Math.abs(m.pos.x) * 0.5 + Math.min(open, 2000) * 0.3;
+      if (sc > bs) { bs = sc; best = m; }
+    }
+    if (!best) return false;
+    // shoot it ourselves when we have a clear look at goal; pass from wide or deep spots
+    const wide = Math.abs(ball.pos.x) > 1400 || zf > ARENA.L - 900;
+    if (!wide && Math.random() > lv.pass * 0.6) return false;
+    if (Math.random() > lv.pass) return false;
+    // aim the ball to arrive in the air just in front of the teammate, towards goal
+    const tx = best.pos.x * 0.5, tz = dir * clamp(best.pos.z * dir + 700, 2000, ARENA.L - 900), ty = rand(350, 750);
+    const dx = tx - ball.pos.x, dz = tz - ball.pos.z, d = Math.hypot(dx, dz);
+    if (d < 600) return false;
+    const T = d / (S * 0.85);
+    const grav = PHYS.GRAVITY * this.mutators.gravity * ball.gravMul;
+    const vy = (ty - ball.pos.y + 0.5 * grav * T * T) / T;
+    if (Math.abs(vy) > S * 0.8) return false;
+    const hz = Math.sqrt(S * S - vy * vy);
+    // never bend the ball more than a real touch could
+    const turn = Math.abs(angleWrap(Math.atan2(dx, dz) - Math.atan2(v.x, v.z)));
+    if (turn > 1.1) return false;
+    v.set(dx / d * hz, vy, dz / d * hz);
+    this.pass = { from: car, to: best, t: this.time, pos: new V3(tx, ty, tz) };
+    this.events.push({ type: 'pass', car, to: best });
+    return true;
+  }
+
   botAim(car, ball) {
     const dir = car.team === 0 ? 1 : -1;
     const tgt = ARENA.hoop ? tmpV(0, 0, dir * ARENA.hoop.z) : tmpV(0, 0, dir * ARENA.L);
@@ -432,6 +477,7 @@ class Game {
     }
     const lv = car.bot.lv;
     if (sp < 300) return;
+    if (this.botPass(car, ball, dir, lv)) return;
     const cur = Math.atan2(v.x, v.z), want = Math.atan2(tgt.x - ball.pos.x, tgt.z - ball.pos.z);
     const diff = angleWrap(want - cur);
     if (Math.abs(diff) > 1.4) return; // not heading anywhere near the goal
