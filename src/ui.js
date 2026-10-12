@@ -113,7 +113,7 @@ const UI = {
     const modes = h('div', { class: 'modes' }, Object.entries(MODES).map(([k, m]) => h('button', {
       class: 'mode ' + (C.mode === k ? 'on' : ''),
       onclick: (e) => { C.mode = k; save(); Sound.play('click'); if (ranked) { rerender(m.name + (m.desc ? '' : '')); return; } [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); },
-    }, h('b', null, m.name), h('small', null, ranked ? (() => { const ri = rankInfo(rankedState(rankedKey({ mode: k, teamSize: C.teamSize })).mmr); return ri.name; })() : m.desc))));
+    }, h('b', null, m.name), h('small', null, ranked ? rankLabel(rankedKey({ mode: k, teamSize: C.teamSize })).text.split(' · ')[0] : m.desc))));
     const mapSel = h('select', { id: 'mapsel', onchange: (e) => { C.map = e.target.value; save(); } },
       h('option', { value: 'auto' }, 'Random arena'), Object.entries(MAPS).map(([k, m]) => h('option', { value: k }, `${m.name} (${m.sub})`)));
     mapSel.value = C.map;
@@ -125,12 +125,12 @@ const UI = {
     // rank / difficulty panel for the chosen team size
     let info;
     if (ranked) {
-      const key = rankedKey(C), r = rankedState(key), ri = rankInfo(r.mmr);
+      const key = rankedKey(C), r = rankedState(key), ri = r.placed ? rankInfo(r.mmr) : null;
       info = h('div', { class: 'rankpanel' }, h('span', { html: rankBadge(ri, 64) }),
         h('div', null,
-          h('div', { class: 'rp-name', style: `color:${ri.color}` }, ri.name),
-          h('div', { class: 'rp-sub' }, `${ri.divName ? ri.divName + ' · ' : ''}${PLAYLISTS[key]} · ${r.wins}W ${r.losses}L`),
-          h('div', { class: 'rp-sub dim' }, r.games === 0 ? 'Everyone starts at Supersonic Legend against the best bots. Losses drop you down until you find your level, then win to climb back up.' : 'Bots play at your rank. Win to climb, lose and you drop (faster on a losing streak).')));
+          h('div', { class: 'rp-name', style: ri ? `color:${ri.color}` : '' }, ri ? ri.name : `Placement match ${r.games + 1} of ${PLACEMENT_GAMES}`),
+          h('div', { class: 'rp-sub' }, ri ? `${ri.divName ? ri.divName + ' · ' : ''}${PLAYLISTS[key]} · ${r.wins}W ${r.losses}L` : `${PLAYLISTS[key]} · ${r.pw || 0} won, ${r.games - (r.pw || 0)} lost so far`),
+          h('div', { class: 'rp-sub dim' }, ri ? 'Bots play at your rank. Win to climb, lose and you drop (faster on a losing streak).' : 'Play 10 placement matches to get your rank. Win all 10 for Supersonic Legend; every loss places you lower. Bots get harder as you win.')));
     } else {
       const c = casualState(C.teamSize);
       info = h('div', { class: 'rankpanel' },
@@ -212,11 +212,11 @@ const UI = {
       h('div', { class: 'rk-lvl' }, `Level ${P.level} · ${P.xp} / ${xpForLevel(P.level)} XP · ${Cloud.label()}`),
       h('h3', null, 'Ranked'),
       h('div', { class: 'rankcards' }, RANKED_KEYS.map(k => {
-        const r = rankedState(k), ri = rankInfo(r.mmr);
+        const r = rankedState(k), ri = r.placed ? rankInfo(r.mmr) : null;
         return h('div', { class: 'rankcard' }, h('span', { html: rankBadge(ri, 72) }),
           h('div', { class: 'rk-pl' }, PLAYLISTS[k]),
           h('div', { class: 'rk-name', style: ri ? `color:${ri.color}` : '' }, ri ? ri.name : 'Unranked'),
-          h('div', { class: 'rk-mmr' }, `${ri.divName ? ri.divName + ' · ' : ''}${Math.round(r.mmr)} MMR`),
+          h('div', { class: 'rk-mmr' }, ri ? `${ri.divName ? ri.divName + ' · ' : ''}${Math.round(r.mmr)} MMR` : `Placements ${r.games}/${PLACEMENT_GAMES}`),
           h('div', { class: 'rk-mmr' }, `${r.wins}W ${r.losses}L` + (r.peak ? ` · peak ${rankFor(r.peak)}` : '')));
       })),
       h('div', { class: 'stats' }, stat('Wins', P.wins), stat('Losses', P.losses), stat('Goals', P.goals), stat('Assists', P.assists), stat('Saves', P.saves), stat('MVPs', P.mvps), stat('Demos', P.demos)),
@@ -404,7 +404,7 @@ const UI = {
     const d = (r.delta > 0 ? '+' : '') + r.delta;
     if (!r.ranked) return h('div', { class: 'mmr' }, `Adaptive bots: ${r.delta > 0 ? 'getting harder' : 'getting easier'} (${d}) · bot skill now ${rankFor(r.casualMmr)}`);
     if (!r.placed) return h('div', { class: 'rankresult' }, h('span', { html: rankBadge(null, 64) }),
-      h('div', null, h('b', null, `Placement match ${r.games} / ${PLACEMENT_GAMES}`), h('small', null, `${r.playlist} · ${PLACEMENT_GAMES - r.games} to go before your rank is revealed`)));
+      h('div', null, h('b', null, `Placement match ${r.games} / ${PLACEMENT_GAMES}`), h('small', null, `${r.playlist} · ${r.placeWins} won so far · ${PLACEMENT_GAMES - r.games} to go before your rank is revealed`)));
     const a = r.after;
     let head = `${a.name} · ${a.divName}`;
     if (r.justPlaced) head = `RANK REVEALED: ${a.name}`;

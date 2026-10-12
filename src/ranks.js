@@ -7,7 +7,13 @@
 const PLACEMENT_GAMES = 10;
 const PLAYLISTS = { 1: 'Duel', 2: 'Doubles', 3: 'Standard', hoops: 'Hoops', rumble: 'Rumble', heatseeker: 'Heatseeker', dropshot: 'Dropshot', snowday: 'Snow Day' };
 const RANKED_KEYS = ['1', '2', '3', 'hoops', 'rumble', 'heatseeker', 'dropshot', 'snowday'];
-const START_MMR = 1860; // everyone starts at Supersonic Legend and finds their level from there
+// placements: your rank after 10 games comes from how many you won (10/10 = Supersonic Legend)
+const PLACEMENT_MMR = [40, 120, 220, 380, 600, 820, 1040, 1270, 1480, 1630, 1760];
+function placementMMR(wins, games) {
+  if (!games) return 1000; // first placement game: bots start in the middle (Diamond)
+  const x = wins / games * PLACEMENT_GAMES, i = Math.floor(x), f = x - i;
+  return i >= PLACEMENT_GAMES ? PLACEMENT_MMR[PLACEMENT_GAMES] : PLACEMENT_MMR[i] + (PLACEMENT_MMR[i + 1] - PLACEMENT_MMR[i]) * f;
+}
 // Soccar has Duel/Doubles/Standard; every other mode has one rank of its own
 function rankedKey(cfg) { return cfg.mode && cfg.mode !== 'soccar' ? cfg.mode : String(cfg.teamSize); }
 
@@ -64,27 +70,34 @@ function levelForMMR(mmr) {
 // ---------------------------------------------------------------------------
 function ensureRatings() {
   const P = Profile;
-  if (!P.ranked || P.rankVer !== 2) { P.ranked = {}; P.rankVer = 2; } // new ladder: everyone restarts at the top
+  if (!P.ranked || P.rankVer !== 3) { P.ranked = {}; P.rankVer = 3; } // placements are back: everyone re-places
   if (!P.casual) P.casual = {};
-  for (const k of RANKED_KEYS) if (!P.ranked[k]) P.ranked[k] = { mmr: START_MMR, games: 0, wins: 0, losses: 0, placed: true, peak: START_MMR, streak: 0 };
+  for (const k of RANKED_KEYS) if (!P.ranked[k]) P.ranked[k] = { mmr: placementMMR(0, 0), games: 0, wins: 0, losses: 0, placed: false, peak: 0, streak: 0 };
   for (const k of ['1', '2', '3']) if (!P.casual[k]) P.casual[k] = { mmr: 250, games: 0, wins: 0, losses: 0, streak: 0 };
 }
 function rankedState(key) { ensureRatings(); return Profile.ranked[String(key)]; }
 function casualState(size) { ensureRatings(); return Profile.casual[String(size)]; }
 function rankLabel(key) {
   const r = rankedState(key), ri = rankInfo(r.mmr);
+  if (!r.placed) return { text: `Unranked · placement ${r.games}/${PLACEMENT_GAMES}`, color: '#9fb0cf', placed: false, info: null };
   return { text: `${ri.name}${ri.divName ? ' · ' + ri.divName : ''}`, color: ri.color, placed: true, info: ri };
 }
 function bestRank() {
   ensureRatings();
   let best = null;
-  for (const k of RANKED_KEYS) { const r = Profile.ranked[k]; if (r.games > 0 && (!best || r.mmr > best.mmr)) best = r; }
+  for (const k of RANKED_KEYS) { const r = Profile.ranked[k]; if (r.placed && (!best || r.mmr > best.mmr)) best = r; }
   return best ? rankInfo(best.mmr) : null;
 }
 
 // The rating the bots are tuned to for a match
 function matchRating(cfg) {
-  if (cfg.competitive) return rankedState(rankedKey(cfg)).mmr;
+  if (cfg.competitive) {
+    const r = rankedState(rankedKey(cfg));
+    if (r.placed) return r.mmr;
+    // placements: bots start in the middle and move towards your record a bit more every game
+    const k = Math.min(1, r.games / PLACEMENT_GAMES);
+    return 1000 + (placementMMR(r.pw || 0, r.games) - 1000) * (0.35 + 0.65 * k) * (r.games ? 1 : 0);
+  }
   if (cfg.level === 'adaptive') return casualState(cfg.teamSize).mmr;
   return null;
 }
@@ -98,6 +111,15 @@ function applyRatingResult(cfg, won, goalDiff) {
     const before = rankInfo(r.mmr);
     r.games++; if (won) r.wins++; else r.losses++;
     r.streak = won ? Math.max(1, r.streak + 1) : Math.min(-1, r.streak - 1);
+    if (!r.placed) {
+      // placement match: the rank comes from the record so far, revealed after game 10
+      r.pw = (r.pw || 0) + (won ? 1 : 0);
+      const done = r.games >= PLACEMENT_GAMES;
+      r.mmr = placementMMR(r.pw, r.games);
+      if (done) { r.placed = true; r.peak = r.mmr; }
+      const after = rankInfo(r.mmr);
+      return { ranked: true, playlist: PLAYLISTS[key], delta: 0, placed: done, justPlaced: done, games: r.games, placeWins: r.pw, before, after, rankUp: false, rankDown: false, divUp: false, divDown: false };
+    }
     // wins climb steadily; losing streaks drop faster until you find the rank you can hold
     let delta;
     // every loss costs a real chunk, more on a losing streak: 2–3 losses in a row drop a rank
