@@ -1332,6 +1332,8 @@ function carBallCollide(car, ball, game) {
   ball.pos.addScaledVector(n, pen * mc / (mb + mc));
   car.pos.addScaledVector(n, -pen * mb / (mb + mc));
 
+  // relative speed at the moment of impact (Rocket League's extra hit impulse is based on this)
+  const relPre = Math.min(_c1.copy(ball.vel).sub(car.vel).length(), 4600);
   // physical impulse (inelastic)
   const r = _c2.copy(cpWorld).sub(car.pos);
   const vCarPt = new V3().crossVectors(car.angVel, r).add(car.vel);
@@ -1360,7 +1362,7 @@ function carBallCollide(car, ball, game) {
     dir.y *= 0.35;
     dir.applyQuaternion(car.quat);
     dir.addScaledVector(fwd, -0.35 * dir.dot(fwd)).normalize();
-    const dv = Math.min(new V3().copy(ball.vel).sub(car.vel).length(), 4600);
+    const dv = relPre;
     let scale = curveLookup(HIT_SCALE_CURVE, dv);
     let power = 1;
     if (car.effects.powerhitter > 0) power = 1.6;
