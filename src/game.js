@@ -60,7 +60,7 @@ class Game {
     const prof = Profile;
     const size = this.kind === 'match' ? (cfg.teamSize || 3) : 1;
     const used = new Set();
-    const botName = () => { let n; do { n = pick(BOT_NAMES); } while (used.has(n)); used.add(n); return n; };
+    const botName = () => pickPlayerName(namePoolFor(cfg.botRating != null ? cfg.botRating : null, cfg.level), used);
     let id = 0;
     const on = cfg.online;
     this.online = !!on; this.netHost = !!(on && on.host); this.netClient = !!(on && !on.host);

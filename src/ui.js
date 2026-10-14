@@ -210,6 +210,24 @@ const UI = {
         h('div', { class: 'field' }, h('label', { for: 'ptitle' }, 'Title'), titleSel),
       ),
       h('div', { class: 'rk-lvl' }, `Level ${P.level} · ${P.xp} / ${xpForLevel(P.level)} XP · ${Cloud.label()}`),
+      (() => {
+        // save codes: move or back up progress by copying a piece of text
+        const box = h('div', { class: 'savecode', hidden: true });
+        const show = (mode) => {
+          box.hidden = false; box.innerHTML = '';
+          if (mode === 'copy') {
+            const ta = h('textarea', { readonly: true, rows: 3 }); ta.value = exportSaveCode();
+            box.append(h('small', null, 'Your save code. Copy it and keep it somewhere safe (Notes, a message to yourself).'), ta);
+            setTimeout(() => { ta.focus(); ta.select(); }, 30);
+            try { navigator.clipboard.writeText(ta.value).then(() => this.toast('Save code copied'), () => {}); } catch (e) { /* select-and-copy by hand */ }
+          } else {
+            const ta = h('textarea', { rows: 3, placeholder: 'Paste a save code (starts with BL1-)' });
+            box.append(h('small', null, 'Paste a save code to load that progress here. This replaces the progress on this screen.'), ta,
+              this.btn('LOAD', () => { if (importSaveCode(ta.value)) { this.toast('Progress loaded'); this.show('profile'); } else this.toast('That save code doesn\'t look right'); }, 'go'));
+          }
+        };
+        return h('div', null, h('div', { class: 'row' }, this.btn('COPY SAVE CODE', () => show('copy')), this.btn('LOAD SAVE CODE', () => show('load'))), box);
+      })(),
       h('h3', null, 'Ranked'),
       h('div', { class: 'rankcards' }, RANKED_KEYS.map(k => {
         const r = rankedState(k), ri = r.placed ? rankInfo(r.mmr) : null;

@@ -333,3 +333,6 @@ body:not(.pad) .fpbtns .padkey { display: none; }
 .party .seg button:disabled { opacity: .7; }
 .party .field { align-items: flex-start; }
 .party .field select { min-width: 260px; }
+.savecode { display: flex; flex-direction: column; gap: 8px; max-width: 640px; margin-top: 8px; }
+.savecode textarea { width: 100%; font: 12px/1.3 ui-monospace, monospace; background: rgba(0,0,0,.35); color: #fff; border: 1px solid var(--panel-edge); border-radius: 6px; padding: 8px; }
+.savecode small { color: var(--ink-dim); }

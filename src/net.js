@@ -172,7 +172,7 @@ const Net = {
     for (const m of ms) teams[m.presence.team === 1 ? 1 : 0].push(m);
     for (let t = 0; t < 2; t++) while (teams[t].length > size) teams[1 - t].push(teams[t].pop());
     const used = new Set(ms.map(m => m.presence.name));
-    const botName = () => { let n, k = 0; do { n = pick(BOT_NAMES); k++; } while (used.has(n) && k < 50); used.add(n); return n; };
+    const botName = () => pickPlayerName(namePoolFor(null, S.level), used);
     const slots = [];
     for (let t = 0; t < 2; t++) {
       for (const m of teams[t]) slots.push({ peer: m.peer, name: String(m.presence.name || 'Player').slice(0, 16), team: t, lo: m.presence.lo || null });

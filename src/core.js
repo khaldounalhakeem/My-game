@@ -86,6 +86,11 @@ const TEAM_COLORS = [
 // Persistence (localStorage can be unavailable — every access is guarded)
 // ---------------------------------------------------------------------------
 const Store = {
+  works() {
+    if (this._works !== undefined) return this._works;
+    try { localStorage.setItem('boostleague.t', '1'); this._works = localStorage.getItem('boostleague.t') === '1'; } catch (e) { this._works = false; }
+    return this._works;
+  },
   get(key, fallback) {
     try { const v = localStorage.getItem('boostleague.' + key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
   },

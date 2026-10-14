@@ -348,6 +348,9 @@ body:not(.pad) .fpbtns .padkey { display: none; }
 .party .seg button:disabled { opacity: .7; }
 .party .field { align-items: flex-start; }
 .party .field select { min-width: 260px; }
+.savecode { display: flex; flex-direction: column; gap: 8px; max-width: 640px; margin-top: 8px; }
+.savecode textarea { width: 100%; font: 12px/1.3 ui-monospace, monospace; background: rgba(0,0,0,.35); color: #fff; border: 1px solid var(--panel-edge); border-radius: 6px; padding: 8px; }
+.savecode small { color: var(--ink-dim); }
 
 </style>
 </head>
@@ -455,6 +458,11 @@ const TEAM_COLORS = [
 // Persistence (localStorage can be unavailable — every access is guarded)
 // ---------------------------------------------------------------------------
 const Store = {
+  works() {
+    if (this._works !== undefined) return this._works;
+    try { localStorage.setItem('boostleague.t', '1'); this._works = localStorage.getItem('boostleague.t') === '1'; } catch (e) { this._works = false; }
+    return this._works;
+  },
   get(key, fallback) {
     try { const v = localStorage.getItem('boostleague.' + key); return v ? JSON.parse(v) : fallback; } catch (e) { return fallback; }
   },
@@ -507,9 +515,11 @@ const Cloud = {
       const [user, db] = await Promise.all([api.use('user'), api.use('db')]);
       const id = user ? await user.id() : null;
       if (!db || !id) { this.status = 'local'; return; }
-      this.doc = db.doc('data/users/' + id + '/save');
-      const snap = await this.doc.get();
+      const doc = db.doc('data/users/' + id + '/save');
+      const snap = await doc.get();
       if (snap.exists) this.merge(snap.data());
+      // only start writing once the account copy has been read, so a fresh device can never overwrite it
+      this.doc = doc;
       this.status = 'cloud';
       // first save (or local progress made before the cloud answered)
       this.dirty = true; this.flush();
@@ -522,8 +532,11 @@ const Cloud = {
   // cloud copy wins when it is newer than what this device has
   merge(data) {
     if (!data || !data.profile) return;
+    // keep whichever copy has more progress; on a tie, the newer one
+    const games = (p) => (p.wins || 0) + (p.losses || 0) + (p.level || 1) * 0.001 + (p.xp || 0) * 1e-9;
+    const localG = games(Profile), cloudG = games(data.profile);
     const localAt = Profile.savedAt || 0, cloudAt = data.savedAt || 0;
-    if (cloudAt < localAt) return;
+    if (localG > cloudG + 1e-12 || (Math.abs(localG - cloudG) < 1e-12 && cloudAt < localAt)) return;
     const p = data.profile;
     for (const k of Object.keys(Profile)) delete Profile[k];
     Object.assign(Profile, JSON.parse(JSON.stringify(DEFAULT_PROFILE)), p);
@@ -556,10 +569,11 @@ const Cloud = {
     if (this.dirty) this.schedule();
   },
   label() {
-    if (this.status === 'cloud') return '☁ Progress saved to your account';
-    if (this.status === 'connecting') return '☁ Connecting to cloud save…';
-    if (this.status === 'error') return 'Saved on this device (cloud save unavailable)';
-    return 'Saved on this device';
+    if (this.status === 'cloud') return '☁ Progress saved to your Claude account';
+    if (this.status === 'connecting') return '☁ Connecting to your account…';
+    if (!Store.works()) return '⚠ Not saving here: sign in to Claude (or use a save code in Profile)';
+    if (this.status === 'error') return '⚠ Saved on this device only (account save unavailable)';
+    return '⚠ Saved on this device only: sign in to Claude to save to your account';
   },
 };
 
@@ -568,6 +582,29 @@ function saveProfile() { Profile.savedAt = Date.now(); Store.set('profile', Prof
 function saveSettings() { Profile.savedAt = Date.now(); Store.set('settings', Settings); Store.set('profile', Profile); Cloud.schedule(); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) Cloud.flush(); });
 window.addEventListener('pagehide', () => Cloud.flush());
+
+// save codes: copy your whole progress as text and load it anywhere
+function exportSaveCode() {
+  const json = JSON.stringify({ v: 1, profile: Profile, settings: Settings });
+  return 'BL1-' + btoa(unescape(encodeURIComponent(json)));
+}
+function importSaveCode(code) {
+  const m = String(code || '').trim().match(/^BL1-([A-Za-z0-9+/=\s]+)$/);
+  if (!m) return false;
+  let data;
+  try { data = JSON.parse(decodeURIComponent(escape(atob(m[1].replace(/\s+/g, ''))))); } catch (e) { return false; }
+  if (!data || !data.profile || typeof data.profile !== 'object') return false;
+  const p = data.profile;
+  for (const k of Object.keys(Profile)) delete Profile[k];
+  Object.assign(Profile, JSON.parse(JSON.stringify(DEFAULT_PROFILE)), p);
+  Profile.car = Object.assign({}, DEFAULT_PROFILE.car, p.car || {});
+  Profile.unlocked = Object.assign({}, DEFAULT_PROFILE.unlocked, p.unlocked || {});
+  for (const k of ['octane', 'dominus', 'fennec']) if (!Profile.unlocked.body.includes(k)) Profile.unlocked.body.unshift(k);
+  if (data.settings) Object.assign(Settings, data.settings);
+  ensureRatings();
+  saveSettings();
+  return true;
+}
 
 </script>
 <script>/* src/arena.js */
@@ -1538,6 +1575,33 @@ const QUICKCHAT = {
   PostGame: ['gg', 'Well played.', 'That was fun!', 'Rematch!', 'One. More. Game.', 'What a game!', 'Nice moves!', 'Everybody dance!'],
 };
 
+// Player names by rank, so lobbies look like real servers (made-up gamertags, not real people)
+const PLAYER_NAMES = [
+  // Bronze / Silver
+  ['Twang Jones', 'Tom Joe', 'carguy2009', 'xX_Dylan_Xx', 'MrPotato77', 'noob4life', 'SockLord', 'Blaze Gamer', 'goalie_jen', 'BigTruckBob',
+    'sweatyteddy', 'PizzaCat', 'turbo_tim', 'lilmax08', 'Dad Gamer', 'jjmoney', 'toaster pro', 'NotAScrub', 'grandma_rl', 'ChickenNugget', 'Kevin2011', 'whiffmaster'],
+  // Gold / Platinum
+  ['Mocha', 'DriftKing', 'Ozzy', 'kev.', 'SlimShot', 'Rook', 'Pixel', 'Breezy', 'Jaxx', 'Nova Kid', 'frosty', 'Tango', 'Dukes', 'Ricochet',
+    'bananas', 'Hex', 'Slate', 'Wavey', 'Cobalt', 'Spud', 'Marbles', 'Sizzle'],
+  // Diamond / Champion
+  ['Senju', 'Ravyn', 'Zephr', 'Talon', 'Kito', 'Vanta', 'Orbit', 'Crux', 'Lumen', 'Sable', 'Drako', 'Quill', 'Halcyon', 'Juno', 'Pyre',
+    'Rune', 'Echo7', 'Flux', 'Mirage', 'Tidal', 'Aster', 'Kestrel'],
+  // Grand Champion / Supersonic Legend
+  ['Vexx', 'Nyx', 'Kairo', 'Rhyno', 'Saelo', 'Aeon', 'Zyre', 'Kaelix', 'Voidd', 'Solace', 'Nero', 'Azure', 'Kyro', 'Lyric', 'Exo', 'Vyn',
+    'Onyx', 'Hyperion', 'Zenith', 'Wraith', 'Seraph', 'Ixion'],
+];
+// which name pool fits a bot: by its rating, or by a fixed difficulty
+function namePoolFor(rating, level) {
+  if (rating != null) return rating < 520 ? 0 : rating < 960 ? 1 : rating < 1420 ? 2 : 3;
+  return level === 'rookie' ? 0 : level === 'pro' ? 1 : 3;
+}
+function pickPlayerName(pool, used) {
+  const list = PLAYER_NAMES[pool] || PLAYER_NAMES[1];
+  let n, k = 0;
+  do { n = pick(list); k++; } while (used.has(n) && k < 60);
+  used.add(n);
+  return n;
+}
 const BOT_NAMES = ['Armstrong', 'Bandit', 'Beast', 'Boomer', 'Buzz', 'Casper', 'Caveman', 'C-Block', 'Centice', 'Chipper', 'Cougar', 'Dude',
   'Foamer', 'Fury', 'Gerwin', 'Goose', 'Heater', 'Hollywood', 'Hound', 'Iceman', 'Imp', 'Jester', 'Junker', 'Khan', 'Marley', 'Maverick',
   'Merlin', 'Middy', 'Mountain', 'Myrtle', 'Outlaw', 'Poncho', 'Rainmaker', 'Raja', 'Rex', 'Roundhouse', 'Sabretooth', 'Saltie', 'Samara',
@@ -2364,7 +2428,7 @@ class Game {
     const prof = Profile;
     const size = this.kind === 'match' ? (cfg.teamSize || 3) : 1;
     const used = new Set();
-    const botName = () => { let n; do { n = pick(BOT_NAMES); } while (used.has(n)); used.add(n); return n; };
+    const botName = () => pickPlayerName(namePoolFor(cfg.botRating != null ? cfg.botRating : null, cfg.level), used);
     let id = 0;
     const on = cfg.online;
     this.online = !!on; this.netHost = !!(on && on.host); this.netClient = !!(on && !on.host);
@@ -3377,7 +3441,7 @@ const Net = {
     for (const m of ms) teams[m.presence.team === 1 ? 1 : 0].push(m);
     for (let t = 0; t < 2; t++) while (teams[t].length > size) teams[1 - t].push(teams[t].pop());
     const used = new Set(ms.map(m => m.presence.name));
-    const botName = () => { let n, k = 0; do { n = pick(BOT_NAMES); k++; } while (used.has(n) && k < 50); used.add(n); return n; };
+    const botName = () => pickPlayerName(namePoolFor(null, S.level), used);
     const slots = [];
     for (let t = 0; t < 2; t++) {
       for (const m of teams[t]) slots.push({ peer: m.peer, name: String(m.presence.name || 'Player').slice(0, 16), team: t, lo: m.presence.lo || null });
@@ -5672,6 +5736,24 @@ const UI = {
         h('div', { class: 'field' }, h('label', { for: 'ptitle' }, 'Title'), titleSel),
       ),
       h('div', { class: 'rk-lvl' }, `Level ${P.level} · ${P.xp} / ${xpForLevel(P.level)} XP · ${Cloud.label()}`),
+      (() => {
+        // save codes: move or back up progress by copying a piece of text
+        const box = h('div', { class: 'savecode', hidden: true });
+        const show = (mode) => {
+          box.hidden = false; box.innerHTML = '';
+          if (mode === 'copy') {
+            const ta = h('textarea', { readonly: true, rows: 3 }); ta.value = exportSaveCode();
+            box.append(h('small', null, 'Your save code. Copy it and keep it somewhere safe (Notes, a message to yourself).'), ta);
+            setTimeout(() => { ta.focus(); ta.select(); }, 30);
+            try { navigator.clipboard.writeText(ta.value).then(() => this.toast('Save code copied'), () => {}); } catch (e) { /* select-and-copy by hand */ }
+          } else {
+            const ta = h('textarea', { rows: 3, placeholder: 'Paste a save code (starts with BL1-)' });
+            box.append(h('small', null, 'Paste a save code to load that progress here. This replaces the progress on this screen.'), ta,
+              this.btn('LOAD', () => { if (importSaveCode(ta.value)) { this.toast('Progress loaded'); this.show('profile'); } else this.toast('That save code doesn\'t look right'); }, 'go'));
+          }
+        };
+        return h('div', null, h('div', { class: 'row' }, this.btn('COPY SAVE CODE', () => show('copy')), this.btn('LOAD SAVE CODE', () => show('load'))), box);
+      })(),
       h('h3', null, 'Ranked'),
       h('div', { class: 'rankcards' }, RANKED_KEYS.map(k => {
         const r = rankedState(k), ri = r.placed ? rankInfo(r.mmr) : null;

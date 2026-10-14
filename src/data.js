@@ -50,6 +50,33 @@ const QUICKCHAT = {
   PostGame: ['gg', 'Well played.', 'That was fun!', 'Rematch!', 'One. More. Game.', 'What a game!', 'Nice moves!', 'Everybody dance!'],
 };
 
+// Player names by rank, so lobbies look like real servers (made-up gamertags, not real people)
+const PLAYER_NAMES = [
+  // Bronze / Silver
+  ['Twang Jones', 'Tom Joe', 'carguy2009', 'xX_Dylan_Xx', 'MrPotato77', 'noob4life', 'SockLord', 'Blaze Gamer', 'goalie_jen', 'BigTruckBob',
+    'sweatyteddy', 'PizzaCat', 'turbo_tim', 'lilmax08', 'Dad Gamer', 'jjmoney', 'toaster pro', 'NotAScrub', 'grandma_rl', 'ChickenNugget', 'Kevin2011', 'whiffmaster'],
+  // Gold / Platinum
+  ['Mocha', 'DriftKing', 'Ozzy', 'kev.', 'SlimShot', 'Rook', 'Pixel', 'Breezy', 'Jaxx', 'Nova Kid', 'frosty', 'Tango', 'Dukes', 'Ricochet',
+    'bananas', 'Hex', 'Slate', 'Wavey', 'Cobalt', 'Spud', 'Marbles', 'Sizzle'],
+  // Diamond / Champion
+  ['Senju', 'Ravyn', 'Zephr', 'Talon', 'Kito', 'Vanta', 'Orbit', 'Crux', 'Lumen', 'Sable', 'Drako', 'Quill', 'Halcyon', 'Juno', 'Pyre',
+    'Rune', 'Echo7', 'Flux', 'Mirage', 'Tidal', 'Aster', 'Kestrel'],
+  // Grand Champion / Supersonic Legend
+  ['Vexx', 'Nyx', 'Kairo', 'Rhyno', 'Saelo', 'Aeon', 'Zyre', 'Kaelix', 'Voidd', 'Solace', 'Nero', 'Azure', 'Kyro', 'Lyric', 'Exo', 'Vyn',
+    'Onyx', 'Hyperion', 'Zenith', 'Wraith', 'Seraph', 'Ixion'],
+];
+// which name pool fits a bot: by its rating, or by a fixed difficulty
+function namePoolFor(rating, level) {
+  if (rating != null) return rating < 520 ? 0 : rating < 960 ? 1 : rating < 1420 ? 2 : 3;
+  return level === 'rookie' ? 0 : level === 'pro' ? 1 : 3;
+}
+function pickPlayerName(pool, used) {
+  const list = PLAYER_NAMES[pool] || PLAYER_NAMES[1];
+  let n, k = 0;
+  do { n = pick(list); k++; } while (used.has(n) && k < 60);
+  used.add(n);
+  return n;
+}
 const BOT_NAMES = ['Armstrong', 'Bandit', 'Beast', 'Boomer', 'Buzz', 'Casper', 'Caveman', 'C-Block', 'Centice', 'Chipper', 'Cougar', 'Dude',
   'Foamer', 'Fury', 'Gerwin', 'Goose', 'Heater', 'Hollywood', 'Hound', 'Iceman', 'Imp', 'Jester', 'Junker', 'Khan', 'Marley', 'Maverick',
   'Merlin', 'Middy', 'Mountain', 'Myrtle', 'Outlaw', 'Poncho', 'Rainmaker', 'Raja', 'Rex', 'Roundhouse', 'Sabretooth', 'Saltie', 'Samara',
