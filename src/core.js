@@ -15,6 +15,8 @@ const PHYS = {
   BALL_DRAG: 0.0305,
   BALL_RESTITUTION: 0.6,
   BALL_FRICTION: 0.35,
+  CAR_BALL_FRICTION: 2.0, // car↔ball grip, as in Rocket League
+  BALL_CURVE: 0.03,       // how much spin bends the ball in the air
   CAR_MASS: 180,
   CAR_MAX_SPEED: 2300,
   SUPERSONIC_START: 2200,

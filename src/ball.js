@@ -42,6 +42,8 @@ class Ball {
     if (this.frozen > 0) { this.frozen -= dt; return; }
     this.vel.y -= PHYS.GRAVITY * mut.gravity * this.gravMul * dt;
     this.vel.multiplyScalar(1 - this.drag * dt);
+    // a spinning ball bends a little in the air (and much more when it bounces, see collide)
+    if (!this.puck && this.angVel.lengthSq() > 0.01) this.vel.addScaledVector(_b1.crossVectors(this.angVel, this.vel), PHYS.BALL_CURVE * dt);
     const maxS = PHYS.BALL_MAX_SPEED * (mut.ballSpeed || 1);
     const s = this.vel.length();
     if (s > maxS) this.vel.multiplyScalar(maxS / s);
@@ -137,9 +139,19 @@ function carBallCollide(car, ball, game) {
     ball.vel.addScaledVector(n, j / mb);
     car.vel.addScaledVector(n, -j / mc);
     hitStrength = -vn;
-    // spin from tangential rub
-    const vt = vRel.addScaledVector(n, -vn);
-    ball.angVel.addScaledVector(new V3().crossVectors(n, vt), -0.6 / ball.radius);
+    // grip between car and ball (Rocket League uses a high friction here): off-centre hits make the ball spin
+    if (!ball.puck) {
+      const rb = new V3().copy(n).multiplyScalar(-ball.radius);           // ball centre → contact point
+      const vc = new V3().crossVectors(ball.angVel, rb).add(ball.vel).sub(vCarPt);
+      vc.addScaledVector(n, -vc.dot(n));                                    // sliding velocity at the contact
+      const vcl = vc.length();
+      if (vcl > 1) {
+        const jt = Math.min(PHYS.CAR_BALL_FRICTION * j, vcl / (3.5 / mb + 1 / mc));
+        const J = vc.multiplyScalar(-jt / vcl);
+        ball.vel.addScaledVector(J, 1 / mb);
+        ball.angVel.addScaledVector(new V3().crossVectors(rb, J), 2.5 / (mb * ball.radius * ball.radius));
+      }
+    }
   }
 
   // extra "psyonix" impulse — once per touch
