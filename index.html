@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>BlockRealm</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=VT323&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!--BODY-->
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="bossbar" hidden><div id="bossname">Ender Dragon</div><div class="bar"><div id="bossfill"></div></div></div>
+  <div id="messages" aria-live="polite"></div>
+  <pre id="debug" hidden></pre>
+  <div id="bottom">
+    <div id="itemname"></div>
+    <div id="stats">
+      <div class="statrow"><div id="hearts"></div><div id="air"></div></div>
+      <div class="statrow right"><div id="food"></div></div>
+      <div id="xp"><div id="xpfill"></div><span id="level"></span></div>
+    </div>
+    <div id="hotbar"></div>
+  </div>
+</div>
+<div id="fx-water" class="fx"></div>
+<div id="fx-fire" class="fx"></div>
+<div id="fx-hurt" class="fx"></div>
+
+<div id="touch">
+  <div id="joy"><div id="knob"></div></div>
+  <button id="t-jump" class="tbtn big" type="button" aria-label="Jump">&#9650;</button>
+  <button id="t-sneak" class="tbtn" type="button" aria-label="Sneak or fly down">&#9660;</button>
+  <div id="t-top">
+    <button id="t-drop" class="tbtn small" type="button">Drop</button>
+    <button id="t-inv" class="tbtn small" type="button">Items</button>
+    <button id="t-pause" class="tbtn small" type="button">Menu</button>
+  </div>
+</div>
+
+<section id="menu-start" class="screen title">
+  <div class="title-wrap">
+    <h1 class="logo">Block<span>Realm</span></h1>
+    <p class="tag">Dig for gold. Build anything. Survive the night. Slay the dragon.</p>
+    <div class="play-row">
+      <button id="btn-survival" class="btn big" type="button"><b>Survival</b><small>Health, hunger, crafting, mobs</small></button>
+      <button id="btn-creative" class="btn big" type="button"><b>Creative</b><small>Every block, flying, no damage</small></button>
+    </div>
+    <button id="btn-continue" class="btn wide" type="button" hidden>Continue saved world</button>
+    <div class="seed-row">
+      <label for="seed">World seed</label>
+      <input id="seed" type="text" inputmode="text" autocomplete="off" spellcheck="false">
+      <button id="btn-reseed" class="btn" type="button">New world</button>
+    </div>
+    <div class="howto">
+      <div><kbd>W A S D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>Shift</kbd> sprint &middot; <kbd>C</kbd> sneak</div>
+      <div><kbd>Left click</kbd> mine / attack &middot; <kbd>Right click</kbd> place / use / eat</div>
+      <div><kbd>E</kbd> inventory &amp; crafting &middot; <kbd>1-9</kbd> or wheel: hotbar &middot; <kbd>Q</kbd> drop</div>
+      <div>Creative: double-tap <kbd>Space</kbd> or <kbd>F</kbd> to fly &middot; <kbd>V</kbd> camera &middot; <kbd>Esc</kbd> pause</div>
+      <div class="touch-only">Touch: left stick moves, drag to look, tap to place, hold to dig.</div>
+    </div>
+  </div>
+</section>
+
+<section id="menu-pause" class="screen dim" hidden>
+  <div class="panel menu">
+    <h2>Paused</h2>
+    <button id="btn-resume" class="btn wide" type="button">Back to game</button>
+    <button id="btn-mode" class="btn wide" type="button">Game mode</button>
+    <button id="btn-dragon" class="btn wide gold" type="button">Summon a dragon</button>
+    <button id="btn-time" class="btn wide" type="button">Make it night</button>
+    <button id="btn-cam" class="btn wide" type="button">Camera: First person</button>
+    <label class="slider" for="rd">View distance <span id="rd-val">5</span><input id="rd" type="range" min="2" max="9" step="1" value="5"></label>
+    <label class="slider" for="sens">Look speed <span id="sens-val">1.0</span><input id="sens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
+    <div class="row2">
+      <button id="btn-save" class="btn" type="button">Save</button>
+      <button id="btn-quit" class="btn" type="button">Save &amp; quit</button>
+    </div>
+  </div>
+</section>
+
+<section id="menu-dead" class="screen red" hidden>
+  <div class="menu">
+    <h2 class="dead">You died!</h2>
+    <p id="death-info"></p>
+    <button id="btn-respawn" class="btn wide" type="button">Respawn</button>
+  </div>
+</section>
+
+<section id="menu-inv" class="screen dim" hidden>
+  <div class="panel inv">
+    <div class="inv-left">
+      <div class="inv-head"><h2>Inventory</h2><button id="btn-inv-close" class="btn small" type="button">Close</button></div>
+      <div id="inv-main" class="grid9"></div>
+      <div id="inv-hot" class="grid9 hot"></div>
+      <div id="trash" class="trash" hidden>Drop an item here to delete it</div>
+    </div>
+    <div class="inv-right">
+      <div id="side-craft">
+        <h2 id="craft-title">Crafting</h2>
+        <p id="craft-hint" class="hint"></p>
+        <div id="recipes"></div>
+      </div>
+      <div id="side-creative" hidden>
+        <div class="tabs">
+          <button type="button" class="tab" data-tab="blocks">Blocks</button>
+          <button type="button" class="tab" data-tab="items">Items &amp; tools</button>
+          <input id="cat-search" type="search" placeholder="Search" aria-label="Search blocks and items">
+        </div>
+        <p class="hint">Click to grab a stack, then click a slot. Shift-click adds straight to your inventory.</p>
+        <div id="catalog"></div>
+      </div>
+    </div>
+  </div>
+</section>
+<div id="cursor" hidden><img alt=""><span></span></div>
+<div id="tooltip" hidden></div>
+<!--/BODY-->
+<script src="lib/three.min.js"></script>
+<script src="js/noise.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/world.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/player.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
