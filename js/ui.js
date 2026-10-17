@@ -14,6 +14,8 @@ const HEART = ['.XX...XX.', 'XWRX.XRRX', 'XRRRXRRRX', 'XRRRRRRRX', '.XRRRRRX.', 
 const HEART_HALF = ['.XX...XX.', 'XWRX.XEEX', 'XRRRXEEEX', 'XRRREEEEX', '.XRRREEX.', '..XRREX..', '...XRX...', '....X....'];
 const FOOD = ['....XXX..', '...XmmmX.', '..XmMmmX.', '..XmmmmX.', '...XmmX..', '..XbX....', '.XbX.....', 'XbbX.....', '.XX......'];
 const FOOD_HALF = ['....XXX..', '...XEEEX.', '..XmEEEX.', '..XmmEEX.', '...XmmX..', '..XbX....', '.XbX.....', 'XbbX.....', '.XX......'];
+const ARMOR_ICON = ['XX...XX', 'XWAXAAX', 'XAAAAAX', '.XAAAX.', '.XAAAX.', '.XAAAX.', '..XXX..'];
+const ARMOR_ICON_HALF = ['XX...XX', 'XWAXEEX', 'XAAAEEX', '.XAAEX.', '.XAAEX.', '.XAAEX.', '..XXX..'];
 const BUBBLE = ['..XXX..', '.XWBBX.', 'XWBBBBX', 'XBBBBBX', 'XBBBBBX', '.XBBBX.', '..XXX..'];
 const ICONS = {
   heart: pixelIcon(HEART, { X: '#1a0707', R: '#e3262b', W: '#ff9a9a' }),
@@ -23,6 +25,9 @@ const ICONS = {
   foodHalf: pixelIcon(FOOD_HALF, { X: '#1f1208', m: '#c8762e', M: '#f0a860', b: '#efe9dc', E: '#3a2410' }),
   foodEmpty: pixelIcon(FOOD, { X: '#1f1208', m: '#3a2410', M: '#3a2410', b: '#5a4a3a' }),
   bubble: pixelIcon(BUBBLE, { X: '#0d2a5a', B: '#3a8af0', W: '#c8e4ff' }),
+  armor: pixelIcon(ARMOR_ICON, { X: '#1a1a1a', A: '#d8d8d8', W: '#ffffff' }),
+  armorHalf: pixelIcon(ARMOR_ICON_HALF, { X: '#1a1a1a', A: '#d8d8d8', W: '#ffffff', E: '#3a3a3a' }),
+  armorEmpty: pixelIcon(ARMOR_ICON, { X: '#1a1a1a', A: '#3a3a3a', W: '#3a3a3a' }),
 };
 
 /* ---------- input ---------- */
@@ -85,10 +90,12 @@ const UI = {
     }
     const survival = P.mode === 'survival';
     $('stats').hidden = !survival;
-    const sig = [Math.ceil(P.health), Math.ceil(P.hunger), Math.ceil(P.air), P.level, Math.round(P.xp / (7 + P.level * 2) * 50), P.headInWater].join('|');
+    const armorPts = P.inv.armorPoints();
+    const sig = [armorPts, Math.ceil(P.health), Math.ceil(P.hunger), Math.ceil(P.air), P.level, Math.round(P.xp / (7 + P.level * 2) * 50), P.headInWater].join('|');
     if (sig !== this.sig) {
       this.sig = sig;
       $('hearts').innerHTML = this.row(P.health, 'heart');
+      $('armor').innerHTML = armorPts ? this.row(armorPts, 'armor') : '';
       $('food').innerHTML = this.row(P.hunger, 'food');
       const air = P.headInWater || P.air < 10;
       $('air').innerHTML = air ? Array.from({ length: Math.ceil(P.air) }, () => `<img src="${ICONS.bubble}" alt="">`).join('') : '';
@@ -146,6 +153,7 @@ const UI = {
       parent.appendChild(s);
       this.invSlots[i] = s;
     };
+    for (let i = 36; i < 40; i++) { mk($('inv-armor'), i); this.invSlots[i].dataset.hint = ['Head', 'Chest', 'Legs', 'Feet'][i - 36]; }
     for (let i = 9; i < 36; i++) mk($('inv-main'), i);
     for (let i = 0; i < 9; i++) mk($('inv-hot'), i);
     $('cat-search').addEventListener('input', () => this.renderSide());
@@ -173,6 +181,15 @@ const UI = {
 
   clickSlot(i, button, shift) {
     const inv = G.player.inv, s = inv.slots[i], cur = this.cursor;
+    // armor slots only take the matching piece
+    if (i >= 36 && cur && !(DEFS[cur.id].armor && DEFS[cur.id].armor.slot === i - 36)) { G.ui.message('That slot is for ' + ['helmets', 'chestplates', 'leggings', 'boots'][i - 36] + '.'); return; }
+    if (shift && s && !cur && i < 36 && DEFS[s.id].armor && !inv.slots[36 + DEFS[s.id].armor.slot]) {
+      inv.slots[36 + DEFS[s.id].armor.slot] = s; inv.slots[i] = null; inv.changed(); G.sound.play('click'); return;
+    }
+    if (shift && s && !cur && i >= 36) {
+      for (let k = 9; k < 36; k++) if (!inv.slots[k]) { inv.slots[k] = s; inv.slots[i] = null; break; }
+      inv.changed(); G.sound.play('click'); return;
+    }
     if (shift && s && !cur) {
       const [a, b] = i < 9 ? [9, 36] : [0, 9];
       const max = DEFS[s.id].stack;
@@ -218,7 +235,8 @@ const UI = {
 
   renderInventory() {
     const inv = G.player.inv;
-    for (let i = 0; i < 36; i++) this.fillSlot(this.invSlots[i], inv.slots[i]);
+    for (let i = 0; i < 40; i++) this.fillSlot(this.invSlots[i], inv.slots[i]);
+    for (let i = 36; i < 40; i++) this.invSlots[i].classList.toggle('empty', !inv.slots[i]);
     if (G.player.mode === 'survival') this.renderRecipes();
   },
 

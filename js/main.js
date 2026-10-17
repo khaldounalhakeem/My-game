@@ -291,6 +291,29 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors) => {
   }
 };
 
+/* right-click a bed: set your respawn point there and, at night, sleep until morning */
+G.sleep = (b) => {
+  const P = G.player;
+  if (G.dim === 'nether') {
+    G.world.setBlock(b.x, b.y, b.z, 0);
+    G.ui.message('Beds explode in the Nether!', 'purple');
+    G.explode(b.x + 0.5, b.y + 0.5, b.z + 0.5, 4, true);
+    return;
+  }
+  P.spawn.set(b.x + 0.5, b.y + 1, b.z + 0.5);
+  if (!G.isNight()) { G.ui.message('Respawn point set. You can only sleep at night.'); return; }
+  const near = G.mobs.some(m => !m.dead && m.T.hostile && m.pos.distanceTo(P.pos) < 10);
+  if (near) { G.ui.message('Respawn point set, but you can\'t sleep now: there are monsters nearby.'); return; }
+  const fx = $('fx-sleep');
+  fx.classList.add('on');
+  setTimeout(() => {
+    G.time = 0.02;
+    fx.classList.remove('on');
+    G.ui.message('You slept through the night. Good morning!', 'gold');
+    G.save();
+  }, 1600);
+};
+
 G.summonDragon = (kind) => {
   if (G.dim !== 'nether') { G.ui.message('Dragons can only be summoned in the Nether. Build an obsidian portal and light it with Flint and Steel.', 'purple'); return false; }
   if (G.dragons.some(d => !d.done)) { G.ui.message('A dragon is already flying around!', 'purple'); return false; }

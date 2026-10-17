@@ -277,6 +277,9 @@ class World {
         const g = this.noiseB.noise2(wx / 20, wz / 20);
         top = g > 0.25 ? ID.gravel : g < -0.3 ? ID.clay : ID.sand; fill = top === ID.clay ? ID.clay : ID.sand;
       }
+      // gravel patches on dry land, so flint is easy to find
+      if (h > SEA + 1 && (b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.BIRCH || b === BIOME.TAIGA || b === BIOME.MOUNTAIN || b === BIOME.SNOWY)
+        && this.noiseC.noise2(wx / 7 + 90, wz / 7 - 40) > 0.3) { top = ID.gravel; fill = ID.gravel; }
       const maxY = Math.max(h, SEA);
       for (let y = 0; y <= maxY; y++) {
         let id;
@@ -311,12 +314,12 @@ class World {
 
     // ores & pockets
     const ORE = [
-      [ID.coal_ore, 22, 5, 90, 10], [ID.iron_ore, 15, 4, 64, 7], [ID.gold_ore, 6, 4, 34, 7],
+      [ID.coal_ore, 22, 5, 90, 10], [ID.iron_ore, 26, 4, 80, 9], [ID.gold_ore, 6, 4, 34, 7],
       [ID.diamond_ore, 3, 2, 16, 5], [ID.redstone_ore, 6, 2, 18, 6], [ID.lapis_ore, 3, 4, 32, 5],
       [ID.gravel, 5, 5, 70, 14], [ID.dirt, 6, 5, 70, 14], [ID.obsidian, 1, 2, 10, 5],
     ];
     const mountainChunk = biomes[136] === BIOME.MOUNTAIN;
-    if (mountainChunk) ORE.push([ID.emerald_ore, 4, 4, 80, 2], [ID.gold_ore, 4, 30, 80, 6]);
+    if (mountainChunk) ORE.push([ID.emerald_ore, 4, 4, 80, 2], [ID.gold_ore, 4, 30, 80, 6], [ID.iron_ore, 8, 30, 90, 9]);
     if (biomes[136] === BIOME.DESERT) ORE.push([ID.gold_ore, 4, 20, 50, 6]);
     for (const [ore, count, y0, y1, size] of ORE) {
       for (let v = 0; v < count; v++) {

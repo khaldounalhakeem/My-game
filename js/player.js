@@ -2,7 +2,7 @@
 /* Player state, inventory, movement physics and block/mob interaction. */
 
 class Inventory {
-  constructor() { this.slots = new Array(36).fill(null); this.version = 0; }
+  constructor() { this.slots = new Array(40).fill(null); this.version = 0; } // 0-8 hotbar, 9-35 backpack, 36-39 armor
   changed() { this.version++; }
   add(id, count) {
     const max = DEFS[id].stack || 64;
@@ -16,7 +16,8 @@ class Inventory {
     this.changed();
     return count;
   }
-  count(id) { let n = 0; for (const s of this.slots) if (s && s.id === id) n += s.count; return n; }
+  count(id) { let n = 0; for (let i = 0; i < 36; i++) { const s = this.slots[i]; if (s && s.id === id) n += s.count; } return n; }
+  armorPoints() { let n = 0; for (let i = 36; i < 40; i++) { const s = this.slots[i]; if (s && DEFS[s.id].armor) n += DEFS[s.id].armor.points; } return n; }
   remove(id, count) {
     for (let i = 35; i >= 0 && count > 0; i--) {
       const s = this.slots[i];
@@ -32,7 +33,7 @@ class Inventory {
     this.changed();
   }
   toJSON() { return this.slots.map(s => (s ? [s.id, s.count] : 0)); }
-  load(arr) { this.slots = arr.map(a => (a && DEFS[a[0]] ? { id: a[0], count: a[1] } : null)); while (this.slots.length < 36) this.slots.push(null); this.changed(); }
+  load(arr) { this.slots = arr.map(a => (a && DEFS[a[0]] ? { id: a[0], count: a[1] } : null)); while (this.slots.length < 40) this.slots.push(null); this.changed(); }
 }
 
 class Player {
@@ -68,6 +69,8 @@ class Player {
   hurt(amount, from, kb = 6, force = false) {
     if (this.dead || this.mode === 'creative') return;
     if (this.hurtCd > 0 && !force) return;
+    // armor softens hits from mobs, players, arrows and explosions (4% per armor point)
+    if (from) amount = Math.max(1, Math.round(amount * (1 - Math.min(0.8, this.inv.armorPoints() * 0.04))));
     this.health -= amount; this.hurtCd = 0.5;
     G.ui.hurtFlash();
     G.sound.play('hurt');
@@ -80,7 +83,7 @@ class Player {
 
   die() {
     this.health = 0; this.dead = true;
-    for (let i = 0; i < 36; i++) {
+    for (let i = 0; i < 40; i++) {
       const s = this.inv.slots[i];
       if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 1, this.pos.z, new THREE.Vector3((Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6));
     }
@@ -329,6 +332,7 @@ class Player {
     const b = tgt.block;
     if (b && !this.sneaking) {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
+      if (b.id === ID.bed) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.furnace) { G.ui.openInventory('furnace'); return; }
       if (b.id === ID.tnt && hd && hd.key === 'flint_and_steel') {
         W.setBlock(b.x, b.y, b.z, 0); G.primeTNT(b.x, b.y, b.z, 4); this.useCd = 0.3; this.swing = 1; return;
@@ -350,6 +354,15 @@ class Player {
       }
     }
     if (!hd) return;
+    if (hd.armor) {
+      const slot = 36 + hd.armor.slot, old = this.inv.slots[slot];
+      this.inv.slots[slot] = { id: held.id, count: 1 };
+      this.inv.slots[this.sel] = old;
+      this.inv.changed();
+      G.sound.play('craft');
+      this.useCd = 0.4;
+      return;
+    }
     if (hd.food) {
       const canEat = this.mode === 'creative' || this.hunger < 20 || hd.heal;
       if (!canEat) return;

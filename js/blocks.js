@@ -373,6 +373,33 @@ makeTile('magma', P => { P.fill(0x5a1a0a, 8); for (let i = 0; i < 7; i++) { cons
 makeTile('portal', P => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = Math.sin(x * 0.9 + y * 0.5) + Math.sin(y * 1.3 - x * 0.4); P.put(x, y, v > 0.6 ? [190, 90, 255] : v > -0.4 ? [120, 30, 210] : [70, 10, 150], 210); } });
 makeTile('i_quartz', pGem(0xece6dc));
 makeTile('i_blaze_rod', pPlant(P => { for (let i = 0; i < 10; i++) { P.put(3 + i, 12 - i, 0xffc020); P.put(4 + i, 12 - i, 0xe08010); } P.pts([[3, 12], [13, 2]], 0xfff080); }));
+makeTile('bed_top', P => { P.fill(0xb02626, 8); P.speck(0x8a1a1a, 0.2, 5); P.rect(1, 1, 14, 5, 0xeeeeee, 4); for (let i = 0; i < 16; i++) { P.put(i, 0, 0x7a5a32); P.put(i, 15, 0x7a5a32); } });
+makeTile('bed_side', P => { pPlanks(0xa8834f)(P); P.rect(0, 2, 16, 7, 0xb02626, 8); P.rect(0, 2, 5, 4, 0xeeeeee, 4); P.rect(0, 13, 2, 3, 0x5a4228); P.rect(14, 13, 2, 3, 0x5a4228); for (let x = 2; x < 14; x++) for (let y = 13; y < 16; y++) P.erase(x, y); });
+function pArmor(piece, mat) {
+  return pPlant(P => {
+    const c = rgb(mat), hi = shadeC(c, 1.3), lo = shadeC(c, 0.65);
+    const put = (x, y) => P.put(x, y, x <= 4 ? hi : x >= 11 ? lo : c);
+    if (piece === 'helmet') {
+      for (let x = 5; x <= 10; x++) put(x, 4);
+      for (let x = 4; x <= 11; x++) put(x, 5);
+      for (let y = 6; y <= 10; y++) for (let x = 3; x <= 12; x++) if (y < 8 || x < 5 || x > 10) put(x, y);
+    } else if (piece === 'chestplate') {
+      for (let y = 3; y <= 5; y++) for (let x = 2; x <= 13; x++) if (y > 3 || x < 6 || x > 9) put(x, y);
+      for (let y = 6; y <= 13; y++) for (let x = 4; x <= 11; x++) put(x, y);
+      P.pts([[7, 6], [8, 6], [7, 7], [8, 7]], lo);
+    } else if (piece === 'leggings') {
+      for (let y = 3; y <= 5; y++) for (let x = 4; x <= 11; x++) put(x, y);
+      for (let y = 6; y <= 13; y++) for (let x = 4; x <= 11; x++) if (x < 7 || x > 8) put(x, y);
+    } else {
+      for (let y = 8; y <= 13; y++) for (let x = 2; x <= 6; x++) if (y > 10 || x > 3) put(x, y);
+      for (let y = 8; y <= 13; y++) for (let x = 9; x <= 13; x++) if (y > 10 || x < 12) put(x, y);
+    }
+  });
+}
+const ARMOR_MATS = [['leather', 'Leather', 0x8a4f2a, [1, 3, 2, 1]], ['golden', 'Golden', 0xf5cc2e, [2, 5, 3, 1]], ['iron', 'Iron', 0xdcdcdc, [2, 6, 5, 2]], ['diamond', 'Diamond', 0x5decf5, [3, 8, 6, 3]]];
+const ARMOR_PIECES = [['helmet', 'Helmet', 5], ['chestplate', 'Chestplate', 8], ['leggings', 'Leggings', 7], ['boots', 'Boots', 4]];
+for (const [k, , c] of ARMOR_MATS) for (const [piece] of ARMOR_PIECES) makeTile('i_' + k + '_' + piece, pArmor(piece, c));
+makeTile('i_armor_icon', pArmor('chestplate', 0xdcdcdc));
 makeTile('i_ghast_tear', pPlant(P => { for (let y = 3; y <= 13; y++) { const w = y < 8 ? (y - 3) / 2 : 3 - (y - 8) * 0.5; for (let x = Math.round(8 - w); x <= Math.round(8 + w); x++) P.put(x, y, x < 8 ? 0xffffff : 0xc8e0f0); } }));
 
 makeTile('i_stick', pPlant(P => { for (let i = 0; i < 10; i++) { P.put(3 + i, 12 - i, 0x7a5a32); P.put(4 + i, 12 - i, 0x4e3a20); } }));
@@ -446,7 +473,7 @@ block('oak_leaves', 'Oak Leaves', 'leaves_oak', Object.assign({ drop: (r) => (r(
 block('oak_planks', 'Oak Planks', 'planks_oak', { tool: 'axe', hardness: 2 });
 block('sand', 'Sand', 'sand', { tool: 'shovel', hardness: 0.5 });
 block('water', 'Water', 'water', { solid: false, opaque: false, translucent: true, liquid: true, hardness: Infinity });
-block('gravel', 'Gravel', 'gravel', { tool: 'shovel', hardness: 0.6, drop: (r) => (r() < 0.2 ? [['flint', 1]] : [['gravel', 1]]) });
+block('gravel', 'Gravel', 'gravel', { tool: 'shovel', hardness: 0.6, drop: (r) => (r() < 0.35 ? [['flint', 1]] : [['gravel', 1]]) });
 block('coal_ore', 'Coal Ore', 'coal_ore', PICK(1, 3, { drop: 'coal', xp: 1 }));
 block('iron_ore', 'Iron Ore', 'iron_ore', PICK(2, 3, { xp: 1 }));
 block('gold_ore', 'Gold Ore', 'gold_ore', PICK(3, 3, { xp: 2 }));
@@ -512,6 +539,7 @@ block('nether_bricks', 'Nether Bricks', 'nether_bricks', PICK(1, 2));
 block('nether_quartz_ore', 'Nether Quartz Ore', 'nether_quartz_ore', PICK(1, 3, { drop: 'quartz', xp: 2 }));
 block('nether_gold_ore', 'Nether Gold Ore', 'nether_gold_ore', PICK(1, 3, { drop: 'gold_ingot', xp: 1 }));
 block('magma', 'Magma Block', 'magma', PICK(1, 0.5, { light: true }));
+block('bed', 'Bed', { top: 'bed_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2 });
 block('nether_portal', 'Nether Portal', 'portal', { solid: false, opaque: false, translucent: true, hardness: 0, drop: null, light: true, portal: true });
 
 let nextItemId = 128;
@@ -562,6 +590,7 @@ for (const [k, n, tier, speed, dmg] of TOOL_MATS) {
 item('quartz', 'Nether Quartz', 'quartz');
 item('blaze_rod', 'Blaze Rod', 'blaze_rod');
 item('ghast_tear', 'Ghast Tear', 'ghast_tear');
+for (const [k, n, , pts] of ARMOR_MATS) ARMOR_PIECES.forEach(([piece, pn], slot) => item(k + '_' + piece, n + ' ' + pn, k + '_' + piece, { stack: 1, armor: { slot, points: pts[slot] } }));
 for (const [k, n, tier, speed, dmg] of TOOL_MATS) {
   item(k + '_shovel', n + ' Shovel', k + '_shovel', { stack: 1, tool: { type: 'shovel', tier, speed }, damage: dmg - 3 });
   item(k + '_axe', n + ' Axe', k + '_axe', { stack: 1, tool: { type: 'axe', tier, speed }, damage: dmg + 1 });
@@ -579,6 +608,7 @@ function getDrops(def, rng) {
 const GROUPS = {
   '#planks': ['oak_planks', 'birch_planks', 'spruce_planks'],
   '#log': ['oak_log', 'birch_log', 'spruce_log'],
+  '#wool': ['wool_white', 'wool_red', 'wool_blue', 'wool_green', 'wool_yellow', 'wool_black', 'wool_orange', 'wool_purple'],
 };
 const RECIPES = [
   ['oak_planks', 4, { oak_log: 1 }], ['birch_planks', 4, { birch_log: 1 }], ['spruce_planks', 4, { spruce_log: 1 }],
@@ -605,6 +635,23 @@ const RECIPES = [
   ['golden_axe', 1, { gold_ingot: 3, stick: 2 }, 'table'],
   ['diamond_shovel', 1, { diamond: 1, stick: 2 }, 'table'],
   ['diamond_axe', 1, { diamond: 3, stick: 2 }, 'table'],
+  ['leather_helmet', 1, { leather: 5 }, 'table'],
+  ['leather_chestplate', 1, { leather: 8 }, 'table'],
+  ['leather_leggings', 1, { leather: 7 }, 'table'],
+  ['leather_boots', 1, { leather: 4 }, 'table'],
+  ['golden_helmet', 1, { gold_ingot: 5 }, 'table'],
+  ['golden_chestplate', 1, { gold_ingot: 8 }, 'table'],
+  ['golden_leggings', 1, { gold_ingot: 7 }, 'table'],
+  ['golden_boots', 1, { gold_ingot: 4 }, 'table'],
+  ['iron_helmet', 1, { iron_ingot: 5 }, 'table'],
+  ['iron_chestplate', 1, { iron_ingot: 8 }, 'table'],
+  ['iron_leggings', 1, { iron_ingot: 7 }, 'table'],
+  ['iron_boots', 1, { iron_ingot: 4 }, 'table'],
+  ['diamond_helmet', 1, { diamond: 5 }, 'table'],
+  ['diamond_chestplate', 1, { diamond: 8 }, 'table'],
+  ['diamond_leggings', 1, { diamond: 7 }, 'table'],
+  ['diamond_boots', 1, { diamond: 4 }, 'table'],
+  ['bed', 1, { '#wool': 3, '#planks': 3 }, 'table'],
   ['bow', 1, { stick: 3, string: 3 }, 'table'],
   ['arrow', 4, { flint: 1, stick: 1, feather: 1 }, 'table'],
   ['flint_and_steel', 1, { iron_ingot: 1, flint: 1 }],

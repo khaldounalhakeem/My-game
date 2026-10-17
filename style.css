@@ -289,3 +289,11 @@ body.pad #tooltip[hidden] { display: none !important; }
 }
 body:not([data-state="play"]) #online-diag { display: none; }
 .web-link { text-decoration: none; text-align: center; box-sizing: border-box; display: block; }
+#fx-sleep { background: #05040a; transition: opacity 0.7s; }
+#fx-sleep.on { opacity: 1; }
+#armor { display: flex; gap: 1px; height: clamp(14px, 3.4vw, 18px); }
+#armor img { height: 100%; }
+.inv-armor-row { display: flex; gap: 10px; align-items: center; }
+.inv-armor-row .label { font-family: var(--font-display); font-size: 11px; color: var(--muted); }
+#inv-armor { display: grid; grid-template-columns: repeat(4, minmax(0, 48px)); gap: 3px; }
+#inv-armor .slot.empty::after { content: attr(data-hint); position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: #6a6478; pointer-events: none; }
