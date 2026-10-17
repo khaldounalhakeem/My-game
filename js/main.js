@@ -575,12 +575,18 @@ G.save = () => {
 };
 
 function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
+function refreshContinue() {
+  let s = null;
+  try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
+  $('btn-continue').hidden = !s;
+  if (s) $('btn-continue').textContent = 'Continue saved world (seed ' + s.seed + (s.mode === 'creative' ? ', Creative' : ', Survival') + ')';
+}
 
 G.toTitle = () => {
   G.setState('title');
   for (const id of ['menu-pause', 'menu-inv', 'menu-dead']) $(id).hidden = true;
   $('menu-start').hidden = false;
-  $('btn-continue').hidden = !hasSave();
+  refreshContinue();
   G.unlock();
   Net.leave();
   G.previewWorld(String(G.seed));
@@ -779,7 +785,7 @@ function boot() {
   Net.init();
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { saved = null; }
-  $('btn-continue').hidden = !saved;
+  refreshContinue();
   G.setState('title');
   G.previewWorld(saved ? String(saved.seed) : null);
   window.addEventListener('beforeunload', () => G.save());

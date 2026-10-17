@@ -277,3 +277,6 @@ body.pad #touch { display: none !important; }
 body.pad:not([data-state="play"]) #padcursor { display: block; }
 body.pad #tooltip { display: block; }
 body.pad #tooltip[hidden] { display: none !important; }
+
+.net-row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; background: rgba(0, 0, 0, 0.45); padding: 8px 12px; width: 100%; box-sizing: border-box; }
+.net-row .net-status { flex: 1 1 260px; min-width: 0; text-align: left; }

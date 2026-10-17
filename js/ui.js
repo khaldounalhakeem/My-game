@@ -354,7 +354,9 @@ const UI = {
     $('btn-dragon').textContent = G.dim === 'nether' ? 'Summon a dragon' : 'Summon a dragon (Nether only)';
     $('btn-dragon').classList.toggle('gold', G.dim === 'nether');
     const names = Net.names();
-    $('players').textContent = Net.wroom ? (names.length ? 'Playing with: ' + names.join(', ') : 'Nobody else is in this world yet. Friends who open this page and use seed ' + G.seed + ' will join you.') : '';
+    $('players').textContent = Net.status === 'on'
+      ? (names.length ? 'Playing with: ' + names.join(', ') + '. ' : 'Nobody else is in your world yet. Friends join you by typing seed ' + G.seed + ' on the title screen. ') + Net.describeOthers()
+      : 'Multiplayer is not connected. See the title screen for details.';
     $('pad-help').hidden = !Pad.active;
   },
 
