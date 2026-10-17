@@ -157,6 +157,15 @@ const Net = {
     if (rp.model) { const q = rp.model.group.position; G.particles.burst(q.x, q.y + 1.2, q.z, [0xff4040, 0xffffff], 6, 2, 0.1); }
   },
 
+  otherSummary() {
+    const all = [...this.peers.values()];
+    const elsewhere = all.filter(p => p.name && !p.inWorld);
+    const parts = elsewhere.map(p => p.name + (p.world ? ' is on seed ' + p.world.slice(1) : ' is on the title screen'));
+    const old = all.filter(p => p.kind === 'old').length;
+    if (old) parts.push(old + ' on an old version');
+    return parts.join(', ') || 'others are loading';
+  },
+
   names() { return [...this.peers.values()].filter(p => p.name && p.inWorld).map(p => p.name); },
 
   tick(dt) {
@@ -212,7 +221,12 @@ const Net = {
     if (!rp) { rp = { peer: peer.peer, last: 0, model: null, name: '', inWorld: false }; this.peers.set(peer.peer, rp); }
     if (rp.pres === pr) return;
     rp.pres = pr;
-    if (!pr || pr.v !== 2) { rp.name = ''; rp.world = null; rp.inWorld = false; this.removeModel(rp); return; }
+    if (!pr || pr.v !== 2) {
+      rp.name = ''; rp.world = null; rp.inWorld = false; this.removeModel(rp);
+      rp.kind = pr && pr.v === 1 ? 'old' : 'loading';
+      return;
+    }
+    rp.kind = 'ok';
     const name = this.clean(pr.n) || 'Player';
     if (name !== rp.name) this.removeModel(rp);
     rp.name = name;
@@ -280,9 +294,13 @@ const Net = {
 
   /* everyone else on the page, for the title screen and pause menu */
   describeOthers() {
-    const list = [...this.peers.values()].filter(p => p.name);
-    if (!list.length) return 'Nobody else has the game open right now.';
-    return 'Online now: ' + list.map(p => p.name + (p.world ? ' (seed ' + p.world.slice(1) + ')' : ' (on the title screen)')).join(', ') + '.';
+    const all = [...this.peers.values()];
+    const list = all.filter(p => p.name);
+    const old = all.filter(p => p.kind === 'old').length, loading = all.filter(p => p.kind === 'loading').length;
+    let t = list.length ? 'Online now: ' + list.map(p => p.name + (p.world ? ' (seed ' + p.world.slice(1) + ')' : ' (on the title screen)')).join(', ') + '.' : 'Nobody else is connected right now.';
+    if (old) t += ' ' + old + ' player' + (old > 1 ? 's are' : ' is') + ' using an old copy of the game: close the game completely and open the link again.';
+    if (loading) t += ' ' + loading + ' player' + (loading > 1 ? 's are' : ' is') + ' still loading.';
+    return t;
   },
 
   render() {
@@ -325,6 +343,6 @@ const Net = {
     on.classList.toggle('off', !live);
     on.textContent = !live ? 'Playing alone: multiplayer not connected (see title screen)'
       : n ? (n === 1 ? '1 friend in your world' : n + ' friends in your world')
-      : 'Multiplayer on: waiting for friends on seed ' + G.seed;
+      : 'Multiplayer on: waiting for friends on seed ' + G.seed + (this.peers.size ? ' · ' + this.otherSummary() : ' · nobody else connected');
   },
 };
