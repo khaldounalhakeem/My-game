@@ -27,7 +27,7 @@ function nameTag(text) {
 
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
-  world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0,
+  world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0,
   nick: '', color: SHIRT_COLORS[0],
 
   async init() {
@@ -46,15 +46,16 @@ const Net = {
     room.onConnection(c => { this.connected = c; this.render(); }, e => this.fail(e));
     const st = perms ? await perms.state('room').catch(() => 'granted') : 'granted';
     if (st === 'denied') { this.status = 'denied'; this.render(); return; }
-    if (st === 'unavailable') { this.status = 'unavailable'; this.render(); return; }
-    this.status = st === 'prompt' ? 'prompt' : 'on';
-    if (this.status === 'on') this.announce();
+    // try to connect right away; claude.ai asks for permission itself if it needs to
+    this.status = 'on';
+    this.announce();
     this.render();
   },
 
   fail(e) {
     const code = e && e.code;
     if (code === 'not_granted' || code === 'revoked' || code === 'capability_disabled' || code === 'capability_removed') this.status = 'unavailable';
+    if (code === 'denied' || code === 'permission_denied') this.status = 'denied';
     this.error = code || 'error';
     this.render();
   },
@@ -65,11 +66,12 @@ const Net = {
     if (this.status === 'denied') {
       try { await this.perms.manage(); } catch (e) { G.ui.message('Open the Permissions menu at the top of this page and switch multiplayer on.'); }
     }
+    this.status = 'prompt';
     await this.askPermission();
   },
 
   async askPermission() {
-    if (!this.room || this.status === 'on' || this.status === 'unavailable') return;
+    if (!this.room || this.status === 'on' || this.status === 'unavailable' || !this.perms) return;
     let st = 'granted';
     if (this.perms) { try { st = (await this.perms.request(['room'])).room || 'granted'; } catch (e) { st = 'granted'; } }
     this.status = st === 'denied' ? 'denied' : st === 'unavailable' ? 'unavailable' : 'on';
@@ -124,9 +126,9 @@ const Net = {
       const P = G.player, held = P.heldSlot();
       Object.assign(base, {
         d: G.dim === 'nether' ? 1 : 0, p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
-        s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring,
+        s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
       });
-    } else Object.assign(base, { d: null, p: null, r: null, s: null, h: null, x: null, e: null });
+    } else Object.assign(base, { d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null });
     this.room.presence(base).then(() => { if (this.error) { this.error = ''; this.render(); } }, e => this.fail(e));
   },
 
@@ -136,6 +138,23 @@ const Net = {
     this.ring.push([this.seq, dim === 'nether' ? 1 : 0, x, y, z, id]);
     if (this.ring.length > 60) this.ring.shift();
     this.sendT = Math.min(this.sendT, 0.03);
+  },
+
+  myPeer() {
+    if (!this.room) return null;
+    const me = this.room.peers().find(p => p.sameTab);
+    return me ? me.peer : null;
+  },
+
+  /* punch another player: they read it from our presence and take the damage themselves */
+  hit(rp, dmg, kb) {
+    this.hitSeq++;
+    this.hits.push([String(rp.peer), this.hitSeq, dmg, kb]);
+    if (this.hits.length > 6) this.hits.shift();
+    this.sendT = 0;
+    rp.flashT = 0.3;
+    G.sound.play('hurtMob', rp.model ? rp.model.group.position : null);
+    if (rp.model) { const q = rp.model.group.position; G.particles.burst(q.x, q.y + 1.2, q.z, [0xff4040, 0xffffff], 6, 2, 0.1); }
   },
 
   names() { return [...this.peers.values()].filter(p => p.name && p.inWorld).map(p => p.name); },
@@ -165,6 +184,9 @@ const Net = {
       parts.legs[0].rotation.x = sw; parts.legs[1].rotation.x = -sw;
       parts.arms[0].rotation.x = -sw; parts.arms[1].rotation.x = sw - Math.sin((rp.swing || 0) * Math.PI) * 1.4;
       parts.head.rotation.x = -rp.pitch * 0.8;
+      rp.flashT = (rp.flashT || 0) - dt;
+      const red = rp.flashT > 0 ? 0.6 : 0;
+      if (rp.red !== red) { rp.red = red; for (const m of rp.mats) m.emissive.setRGB(red, 0, 0); }
     }
   },
 
@@ -211,6 +233,21 @@ const Net = {
       if (!rp.model) this.makeModel(rp, SHIRT_COLORS.includes(pr.c) ? pr.c : SHIRT_COLORS[0]);
       if (first) rp.model.group.position.set(pos[0], pos[1], pos[2]);
     }
+    if (Array.isArray(pr.a)) {
+      const me = this.myPeer(), P = G.player;
+      let top = rp.lastHit || 0;
+      for (const h of pr.a) {
+        if (!Array.isArray(h) || h.length !== 4 || !Number.isInteger(h[1])) continue;
+        if (rp.hitReady && h[1] > (rp.lastHit || 0) && h[0] === me && rp.dim === G.dim && P.mode === 'survival' && !P.dead) {
+          const from = { x: rp.target ? rp.target[0] : P.pos.x, z: rp.target ? rp.target[2] : P.pos.z };
+          P.hurt(clamp(+h[2] || 1, 1, 10), from, clamp(+h[3] || 6, 0, 12), true);
+          if (P.dead) G.ui.message(name + ' knocked you out!', 'purple');
+        }
+        if (h[1] > top) top = h[1];
+      }
+      rp.lastHit = top;
+    }
+    rp.hitReady = true;
     if (Array.isArray(pr.e) && G.worlds) {
       let top = rp.last;
       for (const e of pr.e) {
@@ -227,6 +264,9 @@ const Net = {
   makeModel(rp, color) {
     const m = buildMobModel('player');
     m.group.traverse(o => { if (o.isMesh) for (const mat of [].concat(o.material)) if (mat.color && mat.color.getHex() === 0x2fb5c8) mat.color.setHex(color); });
+    rp.mats = [];
+    m.group.traverse(o => { if (o.isMesh) for (const mat of [].concat(o.material)) if (mat.emissive) rp.mats.push(mat); });
+    rp.red = 0;
     const tag = nameTag(rp.name);
     tag.position.set(0, 2.25, 0);
     m.group.add(tag);
@@ -264,7 +304,11 @@ const Net = {
     btn.textContent = this.status === 'denied' ? 'Open permissions' : 'Turn on multiplayer';
     const n = this.names().length;
     const on = $('online');
-    on.hidden = !n || G.state === 'title';
-    on.textContent = n === 1 ? '1 friend in your world' : n + ' friends in your world';
+    on.hidden = G.state === 'title';
+    const live = this.status === 'on' && this.connected;
+    on.classList.toggle('off', !live);
+    on.textContent = !live ? 'Playing alone: multiplayer not connected (see title screen)'
+      : n ? (n === 1 ? '1 friend in your world' : n + ' friends in your world')
+      : 'Multiplayer on: waiting for friends on seed ' + G.seed;
   },
 };

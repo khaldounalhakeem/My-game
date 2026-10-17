@@ -224,6 +224,12 @@ class Player {
       const t = dr.hitTest(o, d, 7);
       if (t !== null && t < mobT + 3) { mob = dr; mobT = t; }
     }
+    for (const rp of Net.peers.values()) {
+      if (!rp.model || !rp.model.group.visible) continue;
+      const q = rp.model.group.position;
+      const t = rayAABB(o, d, q.x - 0.4, q.y, q.z - 0.4, q.x + 0.4, q.y + 1.9, q.z + 0.4);
+      if (t !== null && t < mobT) { mob = { remote: rp, pos: q }; mobT = t; }
+    }
     if (mob && block && block.dist < mobT) mob = null;
     return { block: mob ? null : block, mob };
   }
@@ -250,7 +256,8 @@ class Player {
     const crit = !this.onGround && this.vel.y < -1 && !this.flying;
     if (crit) dmg = Math.round(dmg * 1.5);
     this.attackCd = 0.45; this.swing = 1;
-    if (target instanceof Dragon) target.hurt(dmg);
+    if (target.remote) Net.hit(target.remote, dmg, this.sprinting ? 10 : 6);
+    else if (target instanceof Dragon) target.hurt(dmg);
     else target.hurt(dmg, this.pos, this.sprinting ? 10 : 6, true);
     if (crit) G.particles.burst(target.pos.x, target.pos.y + 1, target.pos.z, [0xffffff, 0xdddddd], 8, 3, 0.1);
     this.hungerDrain(0.1);
