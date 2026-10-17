@@ -321,8 +321,10 @@ const UI = {
     $('btn-survival').addEventListener('click', () => G.startNew('survival'));
     $('btn-creative').addEventListener('click', () => G.startNew('creative'));
     $('btn-continue').addEventListener('click', () => G.continueSaved());
-    $('btn-reseed').addEventListener('click', () => { const v = $('seed').value.trim(); G.previewWorld(v || null); });
-    $('seed').addEventListener('keydown', e => { if (e.key === 'Enter') $('btn-reseed').click(); e.stopPropagation(); });
+    $('btn-random').addEventListener('click', () => G.previewWorld(null));
+    $('btn-play-seed-s').addEventListener('click', () => G.startNew('survival'));
+    $('btn-play-seed-c').addEventListener('click', () => G.startNew('creative'));
+    $('seed').addEventListener('keydown', e => { if (e.key === 'Enter') G.startNew('survival'); e.stopPropagation(); });
     $('btn-resume').addEventListener('click', () => G.resume());
     $('btn-mode').addEventListener('click', () => {
       const P = G.player;

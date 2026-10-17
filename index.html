@@ -60,9 +60,13 @@
     <div class="seed-row">
       <label for="seed">World seed</label>
       <input id="seed" type="text" inputmode="text" autocomplete="off" spellcheck="false">
-      <button id="btn-reseed" class="btn" type="button">New world</button>
+      <button id="btn-random" class="btn" type="button">Random seed</button>
     </div>
-    <div class="net-row"><p id="net-status" class="net-status"></p><button id="net-btn" class="btn gold" type="button" hidden>Turn on multiplayer</button></div>
+    <div class="play-row">
+      <button id="btn-play-seed-s" class="btn" type="button">Play this seed in Survival</button>
+      <button id="btn-play-seed-c" class="btn" type="button">Play this seed in Creative</button>
+    </div>
+    <div class="net-row"><p id="net-status" class="net-status"></p><button id="net-btn" class="btn gold" type="button" hidden>Turn on multiplayer</button><div id="net-friends" class="net-friends"></div></div>
     <div class="howto">
       <div><kbd>W A S D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>Shift</kbd> sprint &middot; <kbd>C</kbd> sneak</div>
       <div><kbd>Left click</kbd> mine / attack &middot; <kbd>Right click</kbd> place / use / eat</div>

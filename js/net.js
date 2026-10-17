@@ -125,10 +125,10 @@ const Net = {
     if (this.world && G.player) {
       const P = G.player, held = P.heldSlot();
       Object.assign(base, {
-        d: G.dim === 'nether' ? 1 : 0, p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
+        m: P.mode === 'creative' ? 1 : 0, d: G.dim === 'nether' ? 1 : 0, p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
         s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
       });
-    } else Object.assign(base, { d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null });
+    } else Object.assign(base, { m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null });
     this.room.presence(base).then(() => { if (this.error) { this.error = ''; this.render(); } }, e => this.fail(e));
   },
 
@@ -217,6 +217,7 @@ const Net = {
     if (name !== rp.name) this.removeModel(rp);
     rp.name = name;
     rp.world = typeof pr.w === 'string' ? pr.w.slice(0, 24) : null;
+    rp.mode = pr.m === 1 ? 'creative' : 'survival';
     const wasIn = rp.inWorld;
     rp.inWorld = !!this.world && rp.world === this.world && G.state !== 'title';
     if (!rp.inWorld) { this.removeModel(rp); if (wasIn) G.ui.message(name + ' left the world'); return; }
@@ -295,13 +296,28 @@ const Net = {
     let text = msgs[this.status] || '';
     if (this.status === 'on') {
       text = (this.connected ? 'Multiplayer is on. ' : 'Multiplayer is reconnecting... ') + this.describeOthers();
-      text += ' To play together, everyone types the same world seed, then picks Survival or Creative.';
+      text += ' To play together, press Join next to your friend, or both type the same seed and press Play this seed.';
     }
     if (this.error && this.status !== 'unavailable') text += ' (connection problem: ' + this.error + ')';
     el.textContent = text;
     el.classList.toggle('on', this.status === 'on' && this.connected);
     btn.hidden = !(this.status === 'prompt' || (this.status === 'denied' && this.perms));
     btn.textContent = this.status === 'denied' ? 'Open permissions' : 'Turn on multiplayer';
+    // a Join button for every friend who is already playing
+    const box = $('net-friends');
+    const joinable = this.status === 'on' ? [...this.peers.values()].filter(rp => rp.name && rp.world && /^w-?\d+$/.test(rp.world)) : [];
+    const sig = joinable.map(rp => rp.peer + rp.name + rp.world + rp.mode).join('|');
+    if (sig !== this.friendSig) {
+      this.friendSig = sig;
+      box.innerHTML = '';
+      for (const rp of joinable) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'btn gold';
+        b.textContent = 'Join ' + rp.name + ' (seed ' + rp.world.slice(1) + ')';
+        b.addEventListener('click', () => { $('seed').value = rp.world.slice(1); G.startNew(rp.mode); });
+        box.appendChild(b);
+      }
+    }
     const n = this.names().length;
     const on = $('online');
     on.hidden = G.state === 'title';

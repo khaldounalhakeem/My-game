@@ -281,3 +281,5 @@ body.pad #tooltip[hidden] { display: none !important; }
 .net-row { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; background: rgba(0, 0, 0, 0.45); padding: 8px 12px; width: 100%; box-sizing: border-box; }
 .net-row .net-status { flex: 1 1 260px; min-width: 0; text-align: left; }
 #online.off { color: #ffb0a0; }
+.net-friends { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; }
+.net-friends:empty { display: none; }
