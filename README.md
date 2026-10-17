@@ -26,7 +26,7 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 
 **Ranked:** every mode has its own rank: Soccar Duel, Doubles and Standard, plus Hoops, Rumble, Heatseeker, Dropshot and Snow Day. Each starts with 10 placement matches: win all 10 for Supersonic Legend, and every loss places you lower (bots get harder as you win during placements). After that, wins climb you and losses drop you (two or three losses in a row drop a rank). Ranks run from Bronze I to Supersonic Legend with divisions I–IV, and bots play at your rank: higher-ranked bots react faster, aim better and make better decisions, with the same cars, boost and physics as you. Leaving a ranked match early counts as a loss. Results are saved the instant a match ends.
 
-**Online parties:** tap ONLINE → CREATE PARTY to get a 5-letter code; friends tap JOIN PARTY and type it. Pick teams, mode (Soccar, Hoops, Snow Day, Heatseeker, Dropshot), 1v1–3v3 and arena; bots fill empty spots. The party leader's device runs the match (ball, score, bots) and each player's device drives their own car. Works when the game is opened as a Claude artifact shared with your friends (signed in; not by public link).
+**Online parties:** tap ONLINE → CREATE PARTY to get a 5-letter code; friends tap JOIN PARTY and type it. Works for anyone with the game link, with or without a Claude account: devices connect directly (WebRTC via PeerJS), with the Claude room as a fallback. Pick teams, mode (Soccar, Hoops, Snow Day, Heatseeker, Dropshot), 1v1–3v3 and arena; bots fill empty spots. The party leader's device runs the match (ball, score, bots) and each player's device drives their own car.
 
 **Casual:** Adaptive bots by default. A hidden rating goes up when you win and down when you lose, and the bots follow it. Fixed Rookie, Pro and All-Star bots are still available.
 
@@ -59,7 +59,7 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 | `src/ball.js` | ball physics, car↔ball and car↔car collisions, ball prediction |
 | `src/ai.js` | bots |
 | `src/game.js` | match flow and all game modes |
-| `src/net.js` | online parties: party codes, lobby, host/guest match sync |
+| `src/net.js` | online parties: party codes, lobby, host/guest match sync, direct (PeerJS) and Claude-room connections |
 | `src/render.js`, `src/fx.js` | three.js scene, models, camera and particles |
 | `src/audio.js`, `src/input.js`, `src/ui.js`, `src/main.js` | sound, controls, menus and HUD, main loop |
 

@@ -385,7 +385,7 @@ const UI = {
           h('div', { class: 'pbox' }, h('h3', null, 'Join a party'), h('p', null, 'Type the code your friend sees.'),
             input, this.btn('JOIN PARTY', () => N.join(input.value))),
         ),
-        N.available() ? null : h('div', { class: 'pnote' }, 'Online play works when the game is opened on claude.ai while signed in, and shared with your friends.'),
+        h('div', { class: 'pnote' }, N.available() ? 'Works for anyone with the game link, with or without a Claude account.' : 'This browser can\'t do online play. Try Safari or Chrome.'),
       );
     }
     const ms = N.members();

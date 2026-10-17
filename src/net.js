@@ -33,7 +33,7 @@ const Net = {
     })();
     return this._init;
   },
-  available() { return !!this.room; },
+  available() { return !!this.room || P2P.available(); },
   inParty() { return !!this.party; },
 
   genCode() {
@@ -47,34 +47,41 @@ const Net = {
 
   async create() {
     await this.init();
-    if (!this.room) { this.error = 'Online play needs the game opened on claude.ai while signed in.'; UI.show('party'); return; }
+    if (!this.available()) { this.error = 'Online play isn\'t supported in this browser.'; UI.show('party'); return; }
     this.status = 'connecting'; this.error = ''; UI.show('party');
-    try {
-      const code = this.genCode();
-      await this.enter(code, true);
-      this.pushParty();
-    } catch (e) { this.fail(e); }
+    let lastErr = null;
+    // direct connection first (works for everyone, no account needed); a few tries in case a code is taken
+    if (P2P.available()) for (let i = 0; i < 3; i++) {
+      try { const code = this.genCode(); await this.enter(code, true, 'p2p'); this.pushParty(); return; } catch (e) { lastErr = e; if (e.code !== 'unavailable-id') break; }
+    }
+    // otherwise the Claude room (signed-in people the game is shared with)
+    if (this.room) try { const code = this.genCode(); await this.enter(code, true, 'room'); this.pushParty(); return; } catch (e) { lastErr = e; }
+    this.fail(lastErr);
   },
 
   async join(code) {
     await this.init();
     code = String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length < 4) { this.error = 'Type the party code your friend sees.'; UI.show('party'); return; }
-    if (!this.room) { this.error = 'Online play needs the game opened on claude.ai while signed in.'; UI.show('party'); return; }
+    if (!this.available()) { this.error = 'Online play isn\'t supported in this browser.'; UI.show('party'); return; }
     this.status = 'connecting'; this.error = ''; UI.show('party');
-    try {
-      await this.enter(code, false);
-      // wait for the host to show up
-      const t0 = Date.now();
-      while (Date.now() - t0 < 12000 && !this.hostPeerObj()) await new Promise(r => setTimeout(r, 250));
-      if (!this.hostPeerObj()) { await this.leave(true); this.error = `No party found with code ${code}.`; UI.show('party'); return; }
-      UI.show('party');
-    } catch (e) { this.fail(e); }
+    const waitHost = async (ms) => { const t0 = Date.now(); while (Date.now() - t0 < ms && !this.hostPeerObj()) await new Promise(r => setTimeout(r, 200)); return !!this.hostPeerObj(); };
+    let lastErr = null;
+    if (P2P.available()) {
+      try { await this.enter(code, false, 'p2p'); if (await waitHost(6000)) { UI.show('party'); return; } await this.leave(true); } catch (e) { lastErr = e; }
+    }
+    if (this.room) {
+      try { await this.enter(code, false, 'room'); if (await waitHost(10000)) { UI.show('party'); return; } await this.leave(true); } catch (e) { lastErr = e; }
+    }
+    if (lastErr && lastErr.code && !['peer-unavailable', 'timeout'].includes(lastErr.code)) { this.fail(lastErr); return; }
+    this.status = 'idle'; this.error = `No party found with code ${code}. Check the code, and that your friend's game is still open on the party screen.`;
+    UI.show('party');
   },
 
-  async enter(code, host) {
+  async enter(code, host, via) {
     if (this.party) await this.leave(true);
-    const party = await this.room.join('bl-' + code.toLowerCase());
+    const party = via === 'p2p' ? await P2P.open(code, host) : await this.room.join('bl-' + code.toLowerCase());
+    this.via = via;
     this.party = party; this.code = code; this.isHost = host; this.status = 'party';
     this.myTeam = 0; this.match = null; this.startedId = null; this.hostMissingT = 0;
     this.unsubs = [
@@ -86,14 +93,16 @@ const Net = {
   fail(e) {
     this.status = 'idle'; this.party = null;
     const c = e && e.code;
-    this.error = c === 'not_permitted' || c === 'not_granted' ? 'Online play isn\'t available for you on this page. The game must be shared with you (not by public link) and you must be signed in.'
+    this.error = c === 'browser-incompatible' ? 'This browser can\'t do online play. Try Safari or Chrome.'
       : c === 'limit_reached' ? 'Too many rooms open right now. Try again in a moment.'
-      : 'Couldn\'t connect. Check your internet and try again.';
+      : 'Couldn\'t reach the online service. Check your internet and try again.';
     UI.show('party');
   },
   onRoomError(e) {
     if (!this.party) return;
-    this.party = null; this.status = 'idle'; this.error = 'Lost connection to the party.';
+    const p = this.party;
+    this.party = null; this.status = 'idle'; this.error = e && e.message === 'host left' ? 'The party leader left the party.' : 'Lost connection to the party.';
+    if (p) try { p.leave(); } catch (x) { /* ignore */ }
     if (CUR.game && CUR.game.online) { quitToMenu('party'); } else if (UI.screen === 'party') UI.show('party');
   },
 
@@ -253,7 +262,7 @@ const Net = {
       const o = { q: ++this.evSeq, at: g.time };
       for (const k in ev) {
         const v = ev[k];
-        if (v instanceof Car) o[k] = { $c: v.id };
+        if (v instanceof Car) o[k] = { cid: v.id };
         else if (v && v.isVector3) o[k] = [r0(v.x), r0(v.y), r0(v.z)];
         else if (v === null || typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean') o[k] = typeof v === 'number' ? r2(v) : v;
       }
@@ -411,7 +420,7 @@ const NetSync = {
       for (const k in e) {
         if (k === 'q' || k === 'at') continue;
         const v = e[k];
-        if (v && typeof v === 'object' && v.$c !== undefined) ev[k] = g.cars[v.$c] || null;
+        if (v && typeof v === 'object' && !Array.isArray(v) && v.cid !== undefined) ev[k] = g.cars[v.cid] || null;
         else if (Array.isArray(v) && v.length === 3) ev[k] = new V3(v[0], v[1], v[2]);
         else ev[k] = v;
       }
@@ -432,3 +441,101 @@ const NetSync = {
   },
 };
 const _nq = new Q4(), _nv = new V3(), _nv2 = new V3();
+
+// ============================================================================
+// Direct device-to-device parties (WebRTC through PeerJS). Works for anyone,
+// with or without a Claude account: the host's device is the hub, guests connect
+// to it and it relays everyone's state. Same interface as a named room.
+// ============================================================================
+const P2P = {
+  available() { return typeof window.Peer === 'function'; },
+  opts() { return Object.assign({ debug: 0 }, window.__peerOpts || {}); },
+  hostId(code) { return 'boostleague-v1-' + code.toLowerCase(); },
+  open(code, host) {
+    return new Promise((resolve, reject) => {
+      let peer;
+      try { peer = host ? new Peer(this.hostId(code), this.opts()) : new Peer(this.opts()); } catch (e) { reject({ code: 'browser-incompatible' }); return; }
+      const party = new P2PParty(peer, host);
+      let done = false;
+      const fail = (e) => { if (done) return; done = true; clearTimeout(timer); try { peer.destroy(); } catch (x) { /* ignore */ } reject(e); };
+      const timer = setTimeout(() => fail({ code: host ? 'timeout' : 'peer-unavailable' }), host ? 12000 : 9000);
+      peer.on('error', (e) => { if (!done) fail({ code: e.type || 'network' }); });
+      peer.on('open', (myId) => {
+        party.me = myId;
+        if (host) { done = true; clearTimeout(timer); party.listen(); resolve(party); return; }
+        const conn = peer.connect(this.hostId(code), { reliable: true, serialization: 'json' });
+        conn.on('open', () => { if (done) return; done = true; clearTimeout(timer); party.attach(conn); resolve(party); });
+        conn.on('error', () => fail({ code: 'peer-unavailable' }));
+      });
+    });
+  },
+};
+function _p2pFreeze(o) { if (o && typeof o === 'object') { Object.values(o).forEach(_p2pFreeze); Object.freeze(o); } return o; }
+class P2PParty {
+  constructor(peer, host) {
+    this.peer = peer; this.host = host; this.me = null; this.map = new Map(); this.mine = {};
+    this.subs = []; this.errSubs = []; this.conns = new Map(); this.snap = Object.freeze([]); this.hostConn = null;
+    this.sendT = null; this.notifyQ = false; this.closed = false;
+    peer.on('disconnected', () => { if (!this.closed) try { peer.reconnect(); } catch (e) { /* ignore */ } });
+  }
+  listen() {
+    this.put(this.me, {}, true);
+    this.peer.on('connection', (conn) => {
+      conn.on('open', () => {
+        this.conns.set(conn.peer, conn);
+        conn.send({ t: 'all', list: [...this.map.values()].map(p => ({ peer: p.peer, presence: p.presence })) });
+      });
+      conn.on('data', (d) => this.recv(conn.peer, d));
+      const drop = () => { if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); this.remove(conn.peer); this.broadcast({ t: 'bye', peer: conn.peer }); } };
+      conn.on('close', drop); conn.on('error', drop);
+    });
+  }
+  attach(conn) {
+    this.hostConn = conn;
+    this.put(this.me, {}, true);
+    conn.on('data', (d) => this.recv(null, d));
+    const lost = () => { if (this.closed) return; for (const k of [...this.map.keys()]) if (k !== this.me) this.remove(k); this.errSubs.forEach(f => { try { f({ code: 'upstream_error', message: 'host left' }); } catch (e) { /* ignore */ } }); };
+    conn.on('close', lost); conn.on('error', lost);
+  }
+  recv(from, d) {
+    if (!d || typeof d !== 'object') return;
+    if (this.host) {
+      if (d.t === 'p' && from && d.presence && typeof d.presence === 'object') { this.put(from, d.presence, false); this.broadcast({ t: 'p', peer: from, presence: d.presence }, from); }
+    } else if (d.t === 'all' && Array.isArray(d.list)) { for (const x of d.list) if (x.peer !== this.me) this.put(x.peer, x.presence || {}, false); }
+    else if (d.t === 'p' && d.peer !== this.me) this.put(d.peer, d.presence || {}, false);
+    else if (d.t === 'bye') this.remove(d.peer);
+  }
+  broadcast(msg, except) { for (const [id, c] of this.conns) if (id !== except && c.open) try { c.send(msg); } catch (e) { /* ignore */ } }
+  put(peer, presence, isMe) {
+    this.map.set(peer, Object.freeze({ peer, by: null, isMe, sameTab: isMe, kind: 'viewer', guest: false, presence: _p2pFreeze(JSON.parse(JSON.stringify(presence))), updatedAt: Date.now() }));
+    this.changed();
+  }
+  remove(peer) { if (this.map.delete(peer)) this.changed(); }
+  changed() {
+    this.snap = Object.freeze([...this.map.values()]);
+    if (this.notifyQ) return;
+    this.notifyQ = true;
+    setTimeout(() => { this.notifyQ = false; const ch = { peers: this.snap, joined: [], left: [], updated: [] }; this.subs.forEach(f => { try { f(ch); } catch (e) { console.error(e); } }); }, 0);
+  }
+  // --- room-like interface used by Net ---
+  presence(patch) {
+    for (const k in patch) { if (patch[k] === null) delete this.mine[k]; else this.mine[k] = patch[k]; }
+    this.put(this.me, this.mine, true);
+    // send at most ~30 times a second
+    if (!this.sendT) this.sendT = setTimeout(() => {
+      this.sendT = null;
+      if (this.host) this.broadcast({ t: 'p', peer: this.me, presence: this.mine });
+      else if (this.hostConn && this.hostConn.open) try { this.hostConn.send({ t: 'p', presence: this.mine }); } catch (e) { /* ignore */ }
+    }, 33);
+    return Promise.resolve();
+  }
+  peers() { return this.snap; }
+  onPeers(f, onErr) { this.subs.push(f); if (onErr) this.errSubs.push(onErr); setTimeout(() => f({ peers: this.snap, joined: this.snap, left: [], updated: [] }), 0); return () => { this.subs = this.subs.filter(x => x !== f); }; }
+  connected() { return !this.closed; }
+  async leave() {
+    this.closed = true;
+    try { if (this.hostConn) this.hostConn.close(); } catch (e) { /* ignore */ }
+    for (const c of this.conns.values()) try { c.close(); } catch (e) { /* ignore */ }
+    try { this.peer.destroy(); } catch (e) { /* ignore */ }
+  }
+}
