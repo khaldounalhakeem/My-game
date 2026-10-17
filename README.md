@@ -4,9 +4,16 @@ A Minecraft-style voxel sandbox that runs in your web browser. Dig for gold, bui
 
 ## How to play
 
-Open `index.html` in a browser (Chrome, Edge, Firefox or Safari). Nothing to install.
+**Website (works for everyone, no account needed):**
+https://raw.githack.com/khaldounalhakeem/My-game/blockrealm-game/index.html
 
-To share it with friends, turn on GitHub Pages for this repository (Settings → Pages → deploy from the `main` branch). The game is then at `https://<your-name>.github.io/My-game/`.
+This link only works while this repository is **public**. To make it public: on github.com open this repository, go to **Settings**, scroll to **Danger Zone**, choose **Change visibility**, then **Make public**.
+
+You can also open `index.html` on your own computer, but multiplayer needs the website.
+
+### Playing together online
+
+Everyone opens the website, types the **same world seed** (for example `413`), and presses **Play this seed**. The game connects through two free public servers (broker.emqx.io and broker.hivemq.com), so nobody needs an account. The corner badge says "1 friend in your world" when it works. Anyone who knows your seed can join, so pick an unusual one if you only want your friends.
 
 ### Controls (keyboard and mouse)
 
@@ -80,9 +87,10 @@ Left stick moves, drag on the screen to look around, **tap** to place or use, **
 | `js/entities.js` | Mobs, dragons, arrows/fireballs, dropped items, TNT, particles |
 | `js/player.js` | Player movement, mining, building, combat and inventory |
 | `js/ui.js` | HUD, inventory, crafting screens, menus and controls |
-| `js/net.js` | Multiplayer: other players and shared block changes |
+| `js/net.js` | Multiplayer: other players, shared block changes and PvP, over public MQTT servers (website) or the claude.ai room |
 | `js/gamepad.js` | PS4 / game controller support |
 | `js/main.js` | Rendering, sky, sounds, spawning, explosions, saving and the game loop |
 | `lib/three.min.js` | [three.js](https://threejs.org) r128 3D library (MIT licence) |
+| `lib/mqtt.min.js` | [MQTT.js](https://github.com/mqttjs/MQTT.js) 5.10.1 for online multiplayer (MIT licence) |
 
 BlockRealm is a fan-made game inspired by Minecraft. It is not affiliated with Mojang or Microsoft.

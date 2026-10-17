@@ -25,6 +25,95 @@ function nameTag(text) {
   return s;
 }
 
+/* Internet multiplayer for the stand-alone website: talks to free public MQTT servers and
+   offers the same calls as the claude.ai room (presence, onPeers, onConnection, peers).
+   Players are grouped by world seed, so only people who type the same seed meet. */
+const INTERNET_BROKERS = window.BLOCKREALM_BROKERS || ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+const TOPIC_PREFIX = 'blockrealm/v2/';
+function makeInternetRoom(brokers) {
+  const me = 'p' + Math.random().toString(36).slice(2, 10);
+  const peers = new Map(), lastSeen = new Map(), peerL = [], connL = [];
+  const clients = [];
+  let topic = null, mine = Object.freeze({}), connected = false, lastPub = 0, pubTimer = null, fireT = null;
+  const snapshot = () => [...peers.values(), Object.freeze({ peer: me, sameTab: true, isMe: true, kind: 'viewer', presence: mine })];
+  const fire = () => {
+    if (fireT) return;
+    fireT = setTimeout(() => { fireT = null; const all = snapshot(); for (const f of peerL) f({ peers: all, joined: [], left: [], updated: all }); }, 50);
+  };
+  const updateConn = () => {
+    const c = clients.some(x => x.connected);
+    if (c !== connected) { connected = c; for (const f of connL) f(c); }
+  };
+  const sendNow = () => {
+    pubTimer = null;
+    if (!topic) return;
+    lastPub = Date.now();
+    const body = JSON.stringify(mine);
+    for (const c of clients) if (c.connected) c.publish(TOPIC_PREFIX + topic + '/' + me, body, { qos: 0 });
+  };
+  const schedule = () => {
+    if (pubTimer) return;
+    pubTimer = setTimeout(sendNow, Math.max(0, 90 - (Date.now() - lastPub)));
+  };
+  const onMessage = (t, buf) => {
+    if (!topic || !t.startsWith(TOPIC_PREFIX + topic + '/')) return;
+    const pid = t.slice(t.lastIndexOf('/') + 1);
+    if (pid === me || !/^p[a-z0-9]{1,12}$/.test(pid)) return;
+    if (!buf || !buf.length) { if (peers.delete(pid)) fire(); lastSeen.delete(pid); return; }
+    if (buf.length > 8192) return;
+    const raw = buf.toString();
+    lastSeen.set(pid, Date.now());
+    const prev = peers.get(pid);
+    if (prev && prev.raw === raw) return; // the same message arriving through the second server
+    let obj;
+    try { obj = JSON.parse(raw); } catch (e) { return; }
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return;
+    peers.set(pid, Object.freeze({ peer: pid, sameTab: false, isMe: false, kind: 'viewer', raw, presence: Object.freeze(obj) }));
+    fire();
+  };
+  for (const url of brokers) {
+    try {
+      const c = mqtt.connect(url, { clientId: 'br_' + me + '_' + clients.length, keepalive: 20, reconnectPeriod: 3000, connectTimeout: 10000, clean: true });
+      c.on('connect', () => { updateConn(); if (topic) { c.subscribe(TOPIC_PREFIX + topic + '/+'); schedule(); } });
+      c.on('close', updateConn); c.on('offline', updateConn); c.on('error', () => {});
+      c.on('message', onMessage);
+      clients.push(c);
+    } catch (e) { /* this server could not start; the other one may still work */ }
+  }
+  setInterval(() => {
+    const now = Date.now();
+    let changed = false;
+    for (const [pid, t] of lastSeen) if (now - t > 7000) { lastSeen.delete(pid); peers.delete(pid); changed = true; }
+    if (changed) fire();
+    if (topic && now - lastPub > 1500) schedule();
+    updateConn();
+  }, 1000);
+  window.addEventListener('pagehide', () => { if (topic) for (const c of clients) if (c.connected) c.publish(TOPIC_PREFIX + topic + '/' + me, '', { qos: 0 }); });
+  return {
+    internet: true,
+    presence(patch) {
+      const next = Object.assign({}, mine);
+      for (const k in patch) { if (patch[k] === null) delete next[k]; else next[k] = patch[k]; }
+      mine = Object.freeze(next);
+      schedule();
+      return Promise.resolve();
+    },
+    onPeers(f) { peerL.push(f); fire(); return () => {}; },
+    onConnection(f) { connL.push(f); setTimeout(() => f(connected), 0); return () => {}; },
+    peers: snapshot,
+    connected: () => connected,
+    setTopic(key) {
+      if (key === topic) return;
+      for (const c of clients) if (c.connected && topic) { c.publish(TOPIC_PREFIX + topic + '/' + me, '', { qos: 0 }); c.unsubscribe(TOPIC_PREFIX + topic + '/+'); }
+      topic = key;
+      peers.clear(); lastSeen.clear();
+      for (const c of clients) if (c.connected && topic) c.subscribe(TOPIC_PREFIX + topic + '/+');
+      fire();
+      if (topic) schedule();
+    },
+  };
+}
+
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
   world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0,
@@ -40,8 +129,13 @@ const Net = {
     $('net-btn').addEventListener('click', () => this.onButton());
     this.render();
     const use = name => (window.claude && window.claude.use ? window.claude.use(name).catch(() => null) : Promise.resolve(null));
-    const [room, perms] = await Promise.all([use('room'), use('permissions')]);
+    let [room, perms] = await Promise.all([use('room'), use('permissions')]);
+    if (!room && window.mqtt && location.protocol !== 'file:') {
+      // stand-alone website: use the public internet servers instead of claude.ai
+      try { room = makeInternetRoom(INTERNET_BROKERS); perms = null; this.internet = true; } catch (e) { room = null; }
+    }
     this.room = room; this.perms = perms;
+    $('web-link').hidden = !!this.internet;
     if (!room) { this.status = 'unavailable'; this.render(); return; }
     room.onPeers(ch => this.onPeers(ch), e => this.fail(e));
     room.onConnection(c => { this.connected = c; this.render(); }, e => this.fail(e));
@@ -95,6 +189,7 @@ const Net = {
   joinWorld(seed) {
     const key = this.worldKey(seed);
     if (this.world !== key) { this.world = key; this.ring = []; this.clearModels(); }
+    if (this.room && this.room.setTopic) this.room.setTopic(key);
     this.askPermission();
     this.announce();
     this.recheck();
@@ -102,6 +197,7 @@ const Net = {
 
   leave() {
     this.world = null; this.ring = [];
+    if (this.room && this.room.setTopic) this.room.setTopic(null);
     this.clearModels();
     this.announce();
     this.recheck();
@@ -173,7 +269,7 @@ const Net = {
   /* one short line for screenshots: what this device can see of the room */
   diag() {
     const ago = this.heardAt ? Math.round((Date.now() - this.heardAt) / 1000) + 's' : 'never';
-    return 'v8 · link ' + (this.connected ? 'up' : 'down') + ' · others in room ' + this.rawPeers + ' · sent ' + this.sendOk + (this.sendErr ? ' · send error ' + this.sendErr : '') + ' · heard ' + ago + ' ago · ' + this.status;
+    return 'v9 ' + (this.internet ? 'web' : 'claude') + ' · link ' + (this.connected ? 'up' : 'down') + ' · others in room ' + this.rawPeers + ' · sent ' + this.sendOk + (this.sendErr ? ' · send error ' + this.sendErr : '') + ' · heard ' + ago + ' ago · ' + this.status;
   },
 
   otherSummary() {
@@ -335,7 +431,9 @@ const Net = {
       denied: 'Multiplayer is switched off for this game.',
     };
     let text = msgs[this.status] || '';
-    if (this.status === 'on') {
+    if (this.status === 'on' && this.internet) {
+      text = this.connected ? 'Online multiplayer is on. Anyone who opens this website and types the same world seed plays with you, no account needed.' : 'Connecting to the multiplayer servers...';
+    } else if (this.status === 'on') {
       text = (this.connected ? 'Multiplayer is on. ' : 'Multiplayer is reconnecting... ') + this.describeOthers();
       text += ' To play together, press Join next to your friend, or both type the same seed and press Play this seed.';
     }
