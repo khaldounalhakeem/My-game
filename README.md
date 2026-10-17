@@ -13,7 +13,7 @@ You can also open `index.html` on your own computer, but multiplayer needs the w
 
 ### Playing together online
 
-Everyone opens the website, types the **same world seed** (for example `413`), and presses **Play this seed**. The game connects through two free public servers (broker.emqx.io and broker.hivemq.com), so nobody needs an account. The corner badge says "1 friend in your world" when it works. Anyone who knows your seed can join, so pick an unusual one if you only want your friends.
+Everyone opens the website, types the **same world seed** (for example `413`), and presses **Play this seed**. The game connects through three free public servers (broker.emqx.io, broker.hivemq.com and test.mosquitto.org), so nobody needs an account. The corner badge says "1 friend in your world" when it works. Anyone who knows your seed can join, so pick an unusual one if you only want your friends.
 
 ### Controls (keyboard and mouse)
 

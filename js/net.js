@@ -28,13 +28,14 @@ function nameTag(text) {
 /* Internet multiplayer for the stand-alone website: talks to free public MQTT servers and
    offers the same calls as the claude.ai room (presence, onPeers, onConnection, peers).
    Players are grouped by world seed, so only people who type the same seed meet. */
-const INTERNET_BROKERS = window.BLOCKREALM_BROKERS || ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt'];
+const INTERNET_BROKERS = window.BLOCKREALM_BROKERS || ['wss://broker.emqx.io:8084/mqtt', 'wss://broker.hivemq.com:8884/mqtt', 'wss://test.mosquitto.org:8081/mqtt'];
 const TOPIC_PREFIX = 'blockrealm/v2/';
 function makeInternetRoom(brokers) {
   const me = 'p' + Math.random().toString(36).slice(2, 10);
   const peers = new Map(), lastSeen = new Map(), peerL = [], connL = [];
   const clients = [];
   let topic = null, mine = Object.freeze({}), connected = false, lastPub = 0, pubTimer = null, fireT = null;
+  const stats = { got: 0 };
   const snapshot = () => [...peers.values(), Object.freeze({ peer: me, sameTab: true, isMe: true, kind: 'viewer', presence: mine })];
   const fire = () => {
     if (fireT) return;
@@ -53,7 +54,7 @@ function makeInternetRoom(brokers) {
   };
   const schedule = () => {
     if (pubTimer) return;
-    pubTimer = setTimeout(sendNow, Math.max(0, 90 - (Date.now() - lastPub)));
+    pubTimer = setTimeout(sendNow, Math.max(0, 200 - (Date.now() - lastPub)));
   };
   const onMessage = (t, buf) => {
     if (!topic || !t.startsWith(TOPIC_PREFIX + topic + '/')) return;
@@ -63,6 +64,7 @@ function makeInternetRoom(brokers) {
     if (buf.length > 8192) return;
     const raw = buf.toString();
     lastSeen.set(pid, Date.now());
+    stats.got++;
     const prev = peers.get(pid);
     if (prev && prev.raw === raw) return; // the same message arriving through the second server
     let obj;
@@ -77,6 +79,7 @@ function makeInternetRoom(brokers) {
       c.on('connect', () => { updateConn(); if (topic) { c.subscribe(TOPIC_PREFIX + topic + '/+'); schedule(); } });
       c.on('close', updateConn); c.on('offline', updateConn); c.on('error', () => {});
       c.on('message', onMessage);
+      c.label = url.includes('emqx') ? 'emqx' : url.includes('hivemq') ? 'hivemq' : url.includes('mosquitto') ? 'mosq' : 'srv' + clients.length;
       clients.push(c);
     } catch (e) { /* this server could not start; the other one may still work */ }
   }
@@ -91,6 +94,7 @@ function makeInternetRoom(brokers) {
   window.addEventListener('pagehide', () => { if (topic) for (const c of clients) if (c.connected) c.publish(TOPIC_PREFIX + topic + '/' + me, '', { qos: 0 }); });
   return {
     internet: true,
+    servers() { return clients.map(c => c.label + (c.connected ? ' ok' : ' no')).join(' ') + ' · got ' + stats.got; },
     presence(patch) {
       const next = Object.assign({}, mine);
       for (const k in patch) { if (patch[k] === null) delete next[k]; else next[k] = patch[k]; }
@@ -269,7 +273,8 @@ const Net = {
   /* one short line for screenshots: what this device can see of the room */
   diag() {
     const ago = this.heardAt ? Math.round((Date.now() - this.heardAt) / 1000) + 's' : 'never';
-    return 'v9 ' + (this.internet ? 'web' : 'claude') + ' · link ' + (this.connected ? 'up' : 'down') + ' · others in room ' + this.rawPeers + ' · sent ' + this.sendOk + (this.sendErr ? ' · send error ' + this.sendErr : '') + ' · heard ' + ago + ' ago · ' + this.status;
+    if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
+    return 'v10 claude · link ' + (this.connected ? 'up' : 'down') + ' · others in room ' + this.rawPeers + ' · sent ' + this.sendOk + (this.sendErr ? ' · send error ' + this.sendErr : '') + ' · heard ' + ago + ' ago · ' + this.status;
   },
 
   otherSummary() {
@@ -431,6 +436,7 @@ const Net = {
       denied: 'Multiplayer is switched off for this game.',
     };
     let text = msgs[this.status] || '';
+    if (!this.internet) text += ' For playing with friends who are not signed in, everyone must use the website instead (gold button above). The website and this claude.ai page can\'t see each other.';
     if (this.status === 'on' && this.internet) {
       text = this.connected ? 'Online multiplayer is on. Anyone who opens this website and types the same world seed plays with you, no account needed.' : 'Connecting to the multiplayer servers...';
     } else if (this.status === 'on') {
