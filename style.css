@@ -283,3 +283,8 @@ body.pad #tooltip[hidden] { display: none !important; }
 #online.off { color: #ffb0a0; }
 .net-friends { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; width: 100%; }
 .net-friends:empty { display: none; }
+#online-diag {
+  position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(40px + env(safe-area-inset-top, 0px));
+  font-family: var(--font-body); font-size: 15px; color: #d8d0e8; background: rgba(0, 0, 0, 0.45); padding: 1px 6px;
+}
+body:not([data-state="play"]) #online-diag { display: none; }

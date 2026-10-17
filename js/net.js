@@ -28,6 +28,7 @@ function nameTag(text) {
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
   world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0,
+  ringMax: 60, sendOk: 0, sendErr: '', heardAt: 0, rawPeers: 0,
   nick: '', color: SHIRT_COLORS[0],
 
   async init() {
@@ -129,14 +130,26 @@ const Net = {
         s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
       });
     } else Object.assign(base, { m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null });
-    this.room.presence(base).then(() => { if (this.error) { this.error = ''; this.render(); } }, e => this.fail(e));
+    this.room.presence(base).then(() => {
+      this.sendOk++;
+      if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
+    }, e => {
+      const code = (e && e.code) || 'error';
+      if (code === 'invalid_argument' && this.ringMax > 4) {
+        // too big for the platform: share fewer recent block changes
+        this.ringMax = Math.max(4, this.ringMax >> 1);
+        this.ring = this.ring.slice(-this.ringMax);
+      }
+      if (this.sendErr !== code) { this.sendErr = code; this.render(); }
+      this.fail(e);
+    });
   },
 
   edit(dim, x, y, z, id) {
     if (!this.world) return;
     this.seq++;
     this.ring.push([this.seq, dim === 'nether' ? 1 : 0, x, y, z, id]);
-    if (this.ring.length > 60) this.ring.shift();
+    while (this.ring.length > this.ringMax) this.ring.shift();
     this.sendT = Math.min(this.sendT, 0.03);
   },
 
@@ -157,6 +170,12 @@ const Net = {
     if (rp.model) { const q = rp.model.group.position; G.particles.burst(q.x, q.y + 1.2, q.z, [0xff4040, 0xffffff], 6, 2, 0.1); }
   },
 
+  /* one short line for screenshots: what this device can see of the room */
+  diag() {
+    const ago = this.heardAt ? Math.round((Date.now() - this.heardAt) / 1000) + 's' : 'never';
+    return 'v8 · link ' + (this.connected ? 'up' : 'down') + ' · others in room ' + this.rawPeers + ' · sent ' + this.sendOk + (this.sendErr ? ' · send error ' + this.sendErr : '') + ' · heard ' + ago + ' ago · ' + this.status;
+  },
+
   otherSummary() {
     const all = [...this.peers.values()];
     const elsewhere = all.filter(p => p.name && !p.inWorld);
@@ -172,6 +191,8 @@ const Net = {
     if (!this.room || this.status !== 'on' || !this.world) return;
     this.sendT -= dt;
     if (this.sendT <= 0) { this.sendT = 0.1; this.announce(); }
+    this.diagT = (this.diagT || 0) - dt;
+    if (this.diagT <= 0) { this.diagT = 1; this.render(); }
     for (const rp of this.peers.values()) {
       if (!rp.model || !rp.target) continue;
       const show = rp.inWorld && rp.dim === G.dim && !rp.dead && G.state !== 'title';
@@ -200,6 +221,8 @@ const Net = {
   },
 
   onPeers(ch) {
+    this.rawPeers = ch.peers.filter(p => !p.sameTab).length;
+    this.heardAt = Date.now();
     const seen = new Set();
     for (const p of ch.peers) {
       if (p.sameTab) continue;
@@ -317,6 +340,7 @@ const Net = {
       text += ' To play together, press Join next to your friend, or both type the same seed and press Play this seed.';
     }
     if (this.error && this.status !== 'unavailable') text += ' (connection problem: ' + this.error + ')';
+    if (this.room) text += ' [' + this.diag() + ']';
     el.textContent = text;
     el.classList.toggle('on', this.status === 'on' && this.connected);
     btn.hidden = !(this.status === 'prompt' || (this.status === 'denied' && this.perms));
@@ -344,5 +368,6 @@ const Net = {
     on.textContent = !live ? 'Playing alone: multiplayer not connected (see title screen)'
       : n ? (n === 1 ? '1 friend in your world' : n + ' friends in your world')
       : 'Multiplayer on: waiting for friends on seed ' + G.seed + (this.peers.size ? ' · ' + this.otherSummary() : ' · nobody else connected');
+    $('online-diag').textContent = this.room ? this.diag() : 'no room';
   },
 };
