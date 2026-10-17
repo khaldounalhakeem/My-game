@@ -236,6 +236,17 @@ function pTool(kind, mat) {
       P.pts([[4, 2], [5, 2], [6, 2], [7, 2], [8, 3], [9, 3], [10, 4], [11, 5], [12, 6], [12, 7], [13, 8], [13, 9], [13, 10]], hi);
       P.pts([[3, 3], [4, 3], [5, 3], [6, 3], [7, 3], [8, 4], [9, 4], [10, 5], [11, 6], [11, 7], [12, 8], [12, 9], [12, 10], [12, 11]], c);
       P.pts([[3, 4], [11, 8], [11, 9], [12, 12]], lo);
+    } else if (kind === 'shovel') {
+      for (let i = 0; i < 8; i++) { P.put(2 + i, 13 - i, stick); P.put(3 + i, 13 - i, stickD); }
+      for (let y = 1; y <= 8; y++) for (let x = 8; x <= 15; x++) {
+        const d = Math.abs(x - 11.5) + Math.abs(y - 4.5);
+        if (d <= 3.6) P.put(x, y, d > 2.8 ? (x + y < 16 ? hi : lo) : c);
+      }
+      P.pts([[10, 3], [11, 3]], hi);
+    } else if (kind === 'axe') {
+      for (let i = 0; i < 10; i++) { P.put(2 + i, 13 - i, stick); P.put(3 + i, 13 - i, stickD); }
+      const rows = [[1, 8, 11], [2, 6, 11], [3, 5, 10], [4, 5, 9], [5, 5, 8], [6, 6, 7]];
+      for (const [y, a, b] of rows) for (let x = a; x <= b; x++) P.put(x, y, x === a ? hi : x === b ? lo : c);
     } else {
       for (let i = 0; i < 10; i++) { P.put(5 + i, 10 - i, hi); P.put(6 + i, 10 - i, c); P.put(6 + i, 11 - i, lo); }
       P.pts([[3, 8], [4, 9], [5, 10], [6, 11], [7, 12], [8, 13]], 0x3b3b3b);
@@ -395,6 +406,8 @@ makeTile('i_flint_and_steel', pPlant(P => { P.disc(6, 6, 3.5, 0x9a9a9a); P.disc(
 for (const [k, c] of [['wooden', 0xa8834f], ['stone', 0x8a8a8a], ['iron', 0xdcdcdc], ['golden', 0xf5cc2e], ['diamond', 0x5decf5]]) {
   makeTile('i_' + k + '_pickaxe', pTool('pick', c));
   makeTile('i_' + k + '_sword', pTool('sword', c));
+  makeTile('i_' + k + '_shovel', pTool('shovel', c));
+  makeTile('i_' + k + '_axe', pTool('axe', c));
 }
 
 /* ---------- registry ---------- */
@@ -424,16 +437,16 @@ const PICK = (tier, hardness, extra) => Object.assign({ tool: 'pick', tier, hard
 const CROSS = { solid: false, opaque: false, cutout: true, cross: true, hardness: 0 };
 const LEAVES = { opaque: false, cutout: true, leaves: true, hardness: 0.2 };
 
-block('grass', 'Grass Block', { top: 'grass_top', side: 'grass_side', bottom: 'dirt' }, { hardness: 0.6, drop: 'dirt', colorFace: 2 });
-block('dirt', 'Dirt', 'dirt', { hardness: 0.5 });
+block('grass', 'Grass Block', { top: 'grass_top', side: 'grass_side', bottom: 'dirt' }, { tool: 'shovel', hardness: 0.6, drop: 'dirt', colorFace: 2 });
+block('dirt', 'Dirt', 'dirt', { tool: 'shovel', hardness: 0.5 });
 block('stone', 'Stone', 'stone', PICK(1, 1.5, { drop: 'cobblestone' }));
 block('cobblestone', 'Cobblestone', 'cobblestone', PICK(1, 2));
-block('oak_log', 'Oak Log', { top: 'log_oak_top', side: 'log_oak' }, { hardness: 2 });
+block('oak_log', 'Oak Log', { top: 'log_oak_top', side: 'log_oak' }, { tool: 'axe', hardness: 2 });
 block('oak_leaves', 'Oak Leaves', 'leaves_oak', Object.assign({ drop: (r) => (r() < 0.06 ? [['apple', 1]] : r() < 0.08 ? [['stick', 1]] : r() < 0.1 ? [['oak_leaves', 1]] : []) }, LEAVES));
-block('oak_planks', 'Oak Planks', 'planks_oak', { hardness: 2 });
-block('sand', 'Sand', 'sand', { hardness: 0.5 });
+block('oak_planks', 'Oak Planks', 'planks_oak', { tool: 'axe', hardness: 2 });
+block('sand', 'Sand', 'sand', { tool: 'shovel', hardness: 0.5 });
 block('water', 'Water', 'water', { solid: false, opaque: false, translucent: true, liquid: true, hardness: Infinity });
-block('gravel', 'Gravel', 'gravel', { hardness: 0.6, drop: (r) => (r() < 0.2 ? [['flint', 1]] : [['gravel', 1]]) });
+block('gravel', 'Gravel', 'gravel', { tool: 'shovel', hardness: 0.6, drop: (r) => (r() < 0.2 ? [['flint', 1]] : [['gravel', 1]]) });
 block('coal_ore', 'Coal Ore', 'coal_ore', PICK(1, 3, { drop: 'coal', xp: 1 }));
 block('iron_ore', 'Iron Ore', 'iron_ore', PICK(2, 3, { xp: 1 }));
 block('gold_ore', 'Gold Ore', 'gold_ore', PICK(3, 3, { xp: 2 }));
@@ -444,8 +457,8 @@ block('lapis_ore', 'Lapis Lazuli Ore', 'lapis_ore', PICK(2, 3, { drop: (r) => [[
 block('bedrock', 'Bedrock', 'bedrock', { hardness: Infinity });
 block('glass', 'Glass', 'glass', { opaque: false, cutout: true, hardness: 0.3, drop: null });
 block('bricks', 'Bricks', 'bricks', PICK(1, 2));
-block('snow_grass', 'Snowy Grass', { top: 'snow', side: 'snow_side', bottom: 'dirt' }, { hardness: 0.6, drop: 'dirt', colorFace: 2 });
-block('snow', 'Snow Block', 'snow', { hardness: 0.2 });
+block('snow_grass', 'Snowy Grass', { top: 'snow', side: 'snow_side', bottom: 'dirt' }, { tool: 'shovel', hardness: 0.6, drop: 'dirt', colorFace: 2 });
+block('snow', 'Snow Block', 'snow', { tool: 'shovel', hardness: 0.2 });
 block('ice', 'Ice', 'ice', { opaque: false, translucent: true, hardness: 0.5, drop: null });
 block('cactus', 'Cactus', { top: 'cactus_top', side: 'cactus_side' }, { hardness: 0.4 });
 block('sandstone', 'Sandstone', { top: 'sandstone_top', side: 'sandstone_side' }, PICK(1, 0.8));
@@ -455,16 +468,16 @@ block('gold_block', 'Block of Gold', 'gold_block', PICK(3, 3));
 block('iron_block', 'Block of Iron', 'iron_block', PICK(2, 5));
 block('diamond_block', 'Block of Diamond', 'diamond_block', PICK(3, 5));
 block('tnt', 'TNT', { top: 'tnt_top', side: 'tnt_side', bottom: 'tnt_bottom' }, { hardness: 0 });
-block('bookshelf', 'Bookshelf', { top: 'planks_oak', side: 'bookshelf' }, { hardness: 1.5 });
-block('crafting_table', 'Crafting Table', { top: 'ct_top', side: 'ct_side', front: 'ct_front', bottom: 'planks_oak' }, { hardness: 2.5 });
+block('bookshelf', 'Bookshelf', { top: 'planks_oak', side: 'bookshelf' }, { tool: 'axe', hardness: 1.5 });
+block('crafting_table', 'Crafting Table', { top: 'ct_top', side: 'ct_side', front: 'ct_front', bottom: 'planks_oak' }, { tool: 'axe', hardness: 2.5 });
 block('furnace', 'Furnace', { top: 'furnace_top', side: 'furnace_side', front: 'furnace_front', bottom: 'furnace_top' }, PICK(1, 3.5));
-block('pumpkin', 'Jack o\'Pumpkin', { top: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_face' }, { hardness: 1 });
-block('birch_log', 'Birch Log', { top: 'log_birch_top', side: 'log_birch' }, { hardness: 2 });
+block('pumpkin', 'Jack o\'Pumpkin', { top: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_face' }, { tool: 'axe', hardness: 1 });
+block('birch_log', 'Birch Log', { top: 'log_birch_top', side: 'log_birch' }, { tool: 'axe', hardness: 2 });
 block('birch_leaves', 'Birch Leaves', 'leaves_birch', Object.assign({ drop: (r) => (r() < 0.06 ? [['stick', 1]] : r() < 0.1 ? [['birch_leaves', 1]] : []) }, LEAVES));
-block('birch_planks', 'Birch Planks', 'planks_birch', { hardness: 2 });
-block('spruce_log', 'Spruce Log', { top: 'log_spruce_top', side: 'log_spruce' }, { hardness: 2 });
+block('birch_planks', 'Birch Planks', 'planks_birch', { tool: 'axe', hardness: 2 });
+block('spruce_log', 'Spruce Log', { top: 'log_spruce_top', side: 'log_spruce' }, { tool: 'axe', hardness: 2 });
 block('spruce_leaves', 'Spruce Leaves', 'leaves_spruce', Object.assign({ drop: (r) => (r() < 0.06 ? [['stick', 1]] : r() < 0.1 ? [['spruce_leaves', 1]] : []) }, LEAVES));
-block('spruce_planks', 'Spruce Planks', 'planks_spruce', { hardness: 2 });
+block('spruce_planks', 'Spruce Planks', 'planks_spruce', { tool: 'axe', hardness: 2 });
 block('netherrack', 'Netherrack', 'netherrack', PICK(1, 0.4));
 block('glowstone', 'Glowstone', 'glowstone', { hardness: 0.3, light: true });
 block('end_stone', 'End Stone', 'end_stone', PICK(1, 3));
@@ -477,7 +490,7 @@ block('wool_black', 'Black Wool', 'wool_black', { hardness: 0.8 });
 block('wool_orange', 'Orange Wool', 'wool_orange', { hardness: 0.8 });
 block('wool_purple', 'Purple Wool', 'wool_purple', { hardness: 0.8 });
 block('mossy_cobblestone', 'Mossy Cobblestone', 'mossy_cobblestone', PICK(1, 2));
-block('clay', 'Clay', 'clay', { hardness: 0.6 });
+block('clay', 'Clay', 'clay', { tool: 'shovel', hardness: 0.6 });
 block('terracotta', 'Terracotta', 'terracotta', PICK(1, 1.25));
 block('emerald_block', 'Block of Emerald', 'emerald_block', PICK(3, 5));
 block('lapis_block', 'Block of Lapis', 'lapis_block', PICK(2, 3));
@@ -486,7 +499,7 @@ block('redstone_block', 'Block of Redstone', 'redstone_block', PICK(1, 5));
 block('quartz_block', 'Block of Quartz', 'quartz_block', PICK(1, 0.8));
 block('stone_bricks', 'Stone Bricks', 'stone_bricks', PICK(1, 1.5));
 block('dragon_egg', 'Dragon Egg', 'dragon_egg', { hardness: 3, light: true });
-block('melon', 'Melon', { top: 'melon_top', side: 'melon_side' }, { hardness: 1, drop: (r) => [['melon_slice', 3 + (r() * 5 | 0)]] });
+block('melon', 'Melon', { top: 'melon_top', side: 'melon_side' }, { tool: 'axe', hardness: 1, drop: (r) => [['melon_slice', 3 + (r() * 5 | 0)]] });
 block('hay_bale', 'Hay Bale', { top: 'hay_top', side: 'hay_side' }, { hardness: 0.5 });
 block('rose', 'Rose', 'rose', CROSS);
 block('dandelion', 'Dandelion', 'dandelion', CROSS);
@@ -494,7 +507,7 @@ block('tall_grass', 'Tall Grass', 'tall_grass', Object.assign({ drop: null, repl
 block('dead_bush', 'Dead Bush', 'dead_bush', Object.assign({ drop: (r) => (r() < 0.5 ? [['stick', 1]] : []), replaceable: true }, CROSS));
 block('red_mushroom', 'Red Mushroom', 'red_mushroom', CROSS);
 block('brown_mushroom', 'Brown Mushroom', 'brown_mushroom', CROSS);
-block('soul_sand', 'Soul Sand', 'soul_sand', { hardness: 0.5 });
+block('soul_sand', 'Soul Sand', 'soul_sand', { tool: 'shovel', hardness: 0.5 });
 block('nether_bricks', 'Nether Bricks', 'nether_bricks', PICK(1, 2));
 block('nether_quartz_ore', 'Nether Quartz Ore', 'nether_quartz_ore', PICK(1, 3, { drop: 'quartz', xp: 2 }));
 block('nether_gold_ore', 'Nether Gold Ore', 'nether_gold_ore', PICK(1, 3, { drop: 'gold_ingot', xp: 1 }));
@@ -549,6 +562,10 @@ for (const [k, n, tier, speed, dmg] of TOOL_MATS) {
 item('quartz', 'Nether Quartz', 'quartz');
 item('blaze_rod', 'Blaze Rod', 'blaze_rod');
 item('ghast_tear', 'Ghast Tear', 'ghast_tear');
+for (const [k, n, tier, speed, dmg] of TOOL_MATS) {
+  item(k + '_shovel', n + ' Shovel', k + '_shovel', { stack: 1, tool: { type: 'shovel', tier, speed }, damage: dmg - 3 });
+  item(k + '_axe', n + ' Axe', k + '_axe', { stack: 1, tool: { type: 'axe', tier, speed }, damage: dmg + 1 });
+}
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -578,6 +595,16 @@ const RECIPES = [
   ['iron_sword', 1, { iron_ingot: 2, stick: 1 }, 'table'],
   ['golden_sword', 1, { gold_ingot: 2, stick: 1 }, 'table'],
   ['diamond_sword', 1, { diamond: 2, stick: 1 }, 'table'],
+  ['wooden_shovel', 1, { '#planks': 1, stick: 2 }, 'table'],
+  ['wooden_axe', 1, { '#planks': 3, stick: 2 }, 'table'],
+  ['stone_shovel', 1, { cobblestone: 1, stick: 2 }, 'table'],
+  ['stone_axe', 1, { cobblestone: 3, stick: 2 }, 'table'],
+  ['iron_shovel', 1, { iron_ingot: 1, stick: 2 }, 'table'],
+  ['iron_axe', 1, { iron_ingot: 3, stick: 2 }, 'table'],
+  ['golden_shovel', 1, { gold_ingot: 1, stick: 2 }, 'table'],
+  ['golden_axe', 1, { gold_ingot: 3, stick: 2 }, 'table'],
+  ['diamond_shovel', 1, { diamond: 1, stick: 2 }, 'table'],
+  ['diamond_axe', 1, { diamond: 3, stick: 2 }, 'table'],
   ['bow', 1, { stick: 3, string: 3 }, 'table'],
   ['arrow', 4, { flint: 1, stick: 1, feather: 1 }, 'table'],
   ['flint_and_steel', 1, { iron_ingot: 1, flint: 1 }],

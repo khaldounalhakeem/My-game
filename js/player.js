@@ -232,13 +232,13 @@ class Player {
     if (def.hardness === Infinity) return Infinity;
     if (def.hardness === 0) return 0.05;
     const held = this.heldDef(), tool = held && held.tool;
-    const canHarvest = !def.tool || (tool && tool.type === def.tool && tool.tier >= def.tier);
+    const canHarvest = !def.tool || !def.tier || (tool && tool.type === def.tool && tool.tier >= def.tier);
     const speed = def.tool && tool && tool.type === def.tool ? tool.speed : 1;
     return def.hardness * (canHarvest ? 1.5 : 5) / speed;
   }
 
   canHarvest(def) {
-    if (!def.tool) return true;
+    if (!def.tool || !def.tier) return true;
     const held = this.heldDef(), tool = held && held.tool;
     return !!(tool && tool.type === def.tool && tool.tier >= def.tier);
   }

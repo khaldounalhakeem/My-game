@@ -56,7 +56,7 @@ Left stick moves, drag on the screen to look around, **tap** to place or use, **
 - **Infinite world** with biomes: plains, forests, birch forests, taiga, snowy tundra, deserts, beaches, oceans and mountains. Caves, lava lakes deep down, and ore veins.
 - **76 blocks**, including every ore: coal, iron, **gold**, diamond, redstone, lapis and emerald (emerald in mountains). Also gold, iron, diamond, emerald, lapis, coal, redstone and quartz blocks, TNT, glass, bricks, obsidian, glowstone, wool in 8 colours, flowers, mushrooms, cactus, pumpkins, melons and more.
 - **Desert pyramids** with gold-capped tops and a treasure room of gold blocks and a diamond block. Watch out for the TNT hidden underneath.
-- **Crafting** at a Crafting Table and **smelting** in a Furnace: planks, sticks, pickaxes and swords from wood to diamond (gold tools are the fastest), bow and arrows, flint and steel, TNT, golden apples, storage blocks, dyed wool and more.
+- **Crafting** at a Crafting Table and **smelting** in a Furnace: planks, sticks, pickaxes, axes, shovels and swords from wood to diamond (gold tools are the fastest; axes chop wood fast and hit hard, shovels dig dirt, sand and gravel fast), bow and arrows, flint and steel, TNT, golden apples, storage blocks, dyed wool and more.
 - **Mobs**:
   - Friendly: pigs, cows, sheep, chickens
   - Hostile: zombies and skeletons (they burn in daylight), creepers (they explode), spiders, endermen (they teleport)
