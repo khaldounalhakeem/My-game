@@ -41,7 +41,9 @@ class Chunk {
 }
 
 class World {
-  constructor(seed, materials) {
+  constructor(seed, materials, dim) {
+    this.dim = dim || 'overworld';
+    if (this.dim === 'nether') seed = (seed ^ 0x2f6e2b1) + 7;
     this.seed = seed >>> 0;
     this.noise = new Noise(this.seed);
     this.noiseB = new Noise((this.seed ^ 0x5bd1e995) >>> 0);
@@ -107,6 +109,7 @@ class World {
       let m = this.edits.get(k);
       if (!m) { m = new Map(); this.edits.set(k, m); }
       m.set(i, id);
+      if (this.onEdit && !this.applyingRemote) this.onEdit(x, y, z, id);
     }
     this.urgent.add(c);
     const ex = lx === 0 ? -1 : lx === 15 ? 1 : 0, ez = lz === 0 ? -1 : lz === 15 ? 1 : 0;
@@ -129,6 +132,105 @@ class World {
       this.setBlock(x, ny, z, id);
       y++;
     }
+  }
+
+  /* an edit made by another player: apply it now, or remember it for when the chunk loads */
+  applyRemote(x, y, z, id) {
+    if (y < 0 || y >= WH || !DEFS[id]) return;
+    const k = this.key(x >> 4, z >> 4), i = (x & 15) + ((z & 15) << 4) + (y << 8);
+    if (this.chunks.has(k)) {
+      if (this.getBlock(x, y, z) === id) return;
+      this.applyingRemote = true;
+      this.setBlock(x, y, z, id);
+      this.applyingRemote = false;
+    } else {
+      let m = this.edits.get(k);
+      if (!m) { m = new Map(); this.edits.set(k, m); }
+      m.set(i, id);
+    }
+  }
+
+  /* ground height for mobs and dragons (the Nether has a roof, so skip it) */
+  groundY(x, z) {
+    if (this.dim !== 'nether') return this.surfaceY(x, z);
+    x = Math.floor(x); z = Math.floor(z);
+    if (!this.isLoaded(x, z)) return 40;
+    for (let y = 70; y > 0; y--) {
+      const id = this.getBlock(x, y, z);
+      if (id && (DEFS[id].solid || DEFS[id].liquid)) return y;
+    }
+    return 31;
+  }
+
+  /* remove every portal block connected to (x,y,z) */
+  breakPortal(x, y, z) {
+    const stack = [[x, y, z]], seen = new Set();
+    while (stack.length && seen.size < 600) {
+      const [a, b, c] = stack.pop();
+      const k = a + ',' + b + ',' + c;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      if (this.getBlock(a, b, c) !== ID.nether_portal) continue;
+      this.setBlock(a, b, c, 0);
+      stack.push([a + 1, b, c], [a - 1, b, c], [a, b + 1, c], [a, b - 1, c], [a, b, c + 1], [a, b, c - 1]);
+    }
+  }
+
+  findPortal(x, z, r) {
+    let best = null, bd = Infinity;
+    for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+      if (!this.isLoaded(x + dx, z + dz)) continue;
+      for (let y = 1; y < WH - 1; y++) {
+        if (this.getBlock(x + dx, y, z + dz) === ID.nether_portal && this.getBlock(x + dx, y - 1, z + dz) !== ID.nether_portal) {
+          const d = dx * dx + dz * dz;
+          if (d < bd) { bd = d; best = [x + dx, y, z + dz]; }
+        }
+      }
+    }
+    return best;
+  }
+
+  /* build an obsidian frame (2 wide, 3 tall inside) along x with its bottom-left inside corner at (x,y,z) */
+  buildPortal(x, y, z, lit) {
+    for (let dx = -1; dx <= 2; dx++) for (let dz = -1; dz <= 1; dz++) {
+      if (this.dim === 'nether' || !this.isSolid(x + dx, y - 1, z + dz)) this.setBlock(x + dx, y - 1, z + dz, ID.obsidian);
+      for (let dy = 0; dy <= 4; dy++) if (dz !== 0 || dy === 4) this.setBlock(x + dx, y + dy, z + dz, 0);
+    }
+    for (let dy = -1; dy <= 3; dy++) { this.setBlock(x - 1, y + dy, z, ID.obsidian); this.setBlock(x + 2, y + dy, z, ID.obsidian); }
+    for (let dx = 0; dx <= 1; dx++) {
+      this.setBlock(x + dx, y - 1, z, ID.obsidian); this.setBlock(x + dx, y + 3, z, ID.obsidian);
+      for (let dy = 0; dy < 3; dy++) this.setBlock(x + dx, y + dy, z, lit ? ID.nether_portal : 0);
+    }
+  }
+
+  /* fill an empty obsidian frame around (x,y,z) with portal blocks; false if there is no valid frame */
+  lightPortal(x, y, z) {
+    const g = (a, b, c) => this.getBlock(a, b, c), OB = ID.obsidian;
+    if (g(x, y, z) !== 0) return false;
+    let by = y;
+    while (by > 1 && g(x, by - 1, z) === 0 && y - by < 21) by--;
+    if (g(x, by - 1, z) !== OB) return false;
+    for (const [ax, az] of [[1, 0], [0, 1]]) {
+      let x0 = x, z0 = z, k = 0;
+      while (g(x0 - ax, by, z0 - az) === 0 && k < 21) { x0 -= ax; z0 -= az; k++; }
+      if (g(x0 - ax, by, z0 - az) !== OB) continue;
+      let w = 0;
+      while (g(x0 + ax * w, by, z0 + az * w) === 0 && w < 22) w++;
+      if (g(x0 + ax * w, by, z0 + az * w) !== OB || w < 2 || w > 21) continue;
+      let h = 0;
+      while (g(x0, by + h, z0) === 0 && h < 22) h++;
+      if (h < 3 || h > 21) continue;
+      let ok = true;
+      for (let i = 0; i < w && ok; i++) {
+        for (let j = 0; j < h && ok; j++) if (g(x0 + ax * i, by + j, z0 + az * i) !== 0) ok = false;
+        if (g(x0 + ax * i, by - 1, z0 + az * i) !== OB || g(x0 + ax * i, by + h, z0 + az * i) !== OB) ok = false;
+      }
+      for (let j = 0; j < h && ok; j++) if (g(x0 - ax, by + j, z0 - az) !== OB || g(x0 + ax * w, by + j, z0 + az * w) !== OB) ok = false;
+      if (!ok) continue;
+      for (let i = 0; i < w; i++) for (let j = 0; j < h; j++) this.setBlock(x0 + ax * i, by + j, z0 + az * i, ID.nether_portal);
+      return true;
+    }
+    return false;
   }
 
   markUrgent(cx, cz) { const c = this.chunks.get(this.key(cx, cz)); if (c && c.meshes.length) this.urgent.add(c); }
@@ -154,6 +256,7 @@ class World {
 
   /* ---------- generation ---------- */
   generate(cx, cz) {
+    if (this.dim === 'nether') return this.generateNether(cx, cz);
     const c = new Chunk(cx, cz);
     const d = c.data;
     const rng = mulberry32(hash3(cx, cz, this.seed));
@@ -265,6 +368,88 @@ class World {
     const m = this.edits.get(this.key(cx, cz));
     if (m) for (const [i, id] of m) d[i] = id;
 
+    c.heights = heights;
+    this.chunks.set(this.key(cx, cz), c);
+    return c;
+  }
+
+  generateNether(cx, cz) {
+    const c = new Chunk(cx, cz);
+    const d = c.data;
+    const rng = mulberry32(hash3(cx, cz, this.seed));
+    const heights = new Int16Array(256), roofs = new Int16Array(256);
+    const set = (x, y, z, id) => { if (x >= 0 && x < 16 && z >= 0 && z < 16 && y > 0 && y < WH - 1) d[x + (z << 4) + (y << 8)] = id; };
+    const get = (x, y, z) => (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= 0 && y < WH) ? d[x + (z << 4) + (y << 8)] : -1;
+    const LAVA_Y = 31;
+    for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+      const wx = cx * 16 + x, wz = cz * 16 + z;
+      const floor = Math.floor(31 + this.noise.fbm2(wx / 55, wz / 55, 3) * 30);
+      const roof = Math.floor(80 + this.noiseB.fbm2(wx / 38, wz / 38, 3) * 16);
+      heights[x + z * 16] = floor; roofs[x + z * 16] = roof;
+      const soul = this.noiseC.noise2(wx / 18, wz / 18) > 0.22;
+      for (let y = 0; y < WH; y++) {
+        let id = 0;
+        if (y === 0 || y === WH - 1) id = ID.bedrock;
+        else if ((y <= 3 || y >= WH - 4) && rng() < 0.45) id = ID.bedrock;
+        else if (y <= floor) id = (soul && y >= floor - 2 && floor > LAVA_Y) ? ID.soul_sand : ID.netherrack;
+        else if (y >= roof) id = ID.netherrack;
+        else {
+          if (y > floor + 3 && y < roof - 3 && this.noiseC.noise3(wx / 26, y / 16, wz / 26) > 0.36) id = ID.netherrack;
+          if (!id && y <= LAVA_Y) id = ID.lava;
+        }
+        d[x + (z << 4) + (y << 8)] = id;
+      }
+      if (floor >= LAVA_Y - 1 && floor <= LAVA_Y + 1 && this.noiseB.noise2(wx / 12, wz / 12) > 0.2) d[x + (z << 4) + (floor << 8)] = ID.gravel;
+    }
+    const ORE = [[ID.nether_quartz_ore, 16, 8, 88, 8], [ID.nether_gold_ore, 10, 8, 88, 6], [ID.magma, 4, 26, 34, 8]];
+    for (const [ore, count, y0, y1, size] of ORE) {
+      for (let v = 0; v < count; v++) {
+        let x = rng() * 16, y = y0 + rng() * (y1 - y0), z = rng() * 16;
+        for (let s = 0; s < size; s++) {
+          const xi = x | 0, yi = y | 0, zi = z | 0;
+          if (get(xi, yi, zi) === ID.netherrack) set(xi, yi, zi, ore);
+          x += rng() * 2 - 1; y += rng() * 2 - 1; z += rng() * 2 - 1;
+        }
+      }
+    }
+    // glowstone hanging from the roof
+    for (let g = 0; g < 2; g++) {
+      if (rng() < 0.35) continue;
+      const x0 = 2 + (rng() * 12 | 0), z0 = 2 + (rng() * 12 | 0);
+      let x = x0, y = roofs[x0 + z0 * 16] - 1, z = z0;
+      for (let s = 0; s < 40; s++) {
+        if (get(x, y, z) === 0) set(x, y, z, ID.glowstone);
+        x = clamp(x + (rng() * 3 | 0) - 1, 0, 15); z = clamp(z + (rng() * 3 | 0) - 1, 0, 15);
+        y -= rng() < 0.4 ? 1 : 0;
+        if (rng() < 0.15) { x = x0; z = z0; y = roofs[x0 + z0 * 16] - 1; }
+      }
+    }
+    // nether fortress bridges running east-west and north-south
+    const BY = 52;
+    const bridgeZ = ((cz % 6) + 6) % 6 === 0, bridgeX = ((cx % 6) + 6) % 6 === 0;
+    const bridge = (alongX) => {
+      for (let a = 0; a < 16; a++) {
+        for (let w = 6; w <= 9; w++) {
+          const x = alongX ? a : w, z = alongX ? w : a;
+          set(x, BY, z, ID.nether_bricks);
+          for (let y = BY + 1; y <= BY + 4; y++) set(x, y, z, (w === 6 || w === 9) && y === BY + 1 ? ID.nether_bricks : 0);
+        }
+        if (a % 8 === 3) for (let y = BY - 1; y > 1; y--) {
+          for (let w = 7; w <= 8; w++) {
+            const x = alongX ? a : w, z = alongX ? w : a;
+            const cur = get(x, y, z);
+            if (cur === ID.netherrack || cur === ID.soul_sand) { y = 0; break; }
+            set(x, y, z, ID.nether_bricks);
+          }
+        }
+      }
+    };
+    if (bridgeZ) bridge(true);
+    if (bridgeX) bridge(false);
+    if (bridgeZ && bridgeX) for (let x = 5; x <= 10; x++) for (let z = 5; z <= 10; z++) { set(x, BY, z, ID.nether_bricks); for (let y = BY + 1; y <= BY + 4; y++) set(x, y, z, 0); }
+
+    const m = this.edits.get(this.key(cx, cz));
+    if (m) for (const [i, id] of m) d[i] = id;
     c.heights = heights;
     this.chunks.set(this.key(cx, cz), c);
     return c;

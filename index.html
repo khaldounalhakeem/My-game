@@ -16,6 +16,7 @@
   <div id="bossbar" hidden><div id="bossname">Ender Dragon</div><div class="bar"><div id="bossfill"></div></div></div>
   <div id="messages" aria-live="polite"></div>
   <pre id="debug" hidden></pre>
+  <div id="online" hidden></div>
   <div id="bottom">
     <div id="itemname"></div>
     <div id="stats">
@@ -29,6 +30,8 @@
 <div id="fx-water" class="fx"></div>
 <div id="fx-fire" class="fx"></div>
 <div id="fx-hurt" class="fx"></div>
+<div id="fx-portal" class="fx"></div>
+<div id="padcursor" aria-hidden="true"></div>
 
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
@@ -51,16 +54,22 @@
     </div>
     <button id="btn-continue" class="btn wide" type="button" hidden>Continue saved world</button>
     <div class="seed-row">
+      <label for="nick">Your name</label>
+      <input id="nick" type="text" maxlength="16" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="seed-row">
       <label for="seed">World seed</label>
       <input id="seed" type="text" inputmode="text" autocomplete="off" spellcheck="false">
       <button id="btn-reseed" class="btn" type="button">New world</button>
     </div>
+    <p id="net-status" class="net-status"></p>
     <div class="howto">
       <div><kbd>W A S D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>Shift</kbd> sprint &middot; <kbd>C</kbd> sneak</div>
       <div><kbd>Left click</kbd> mine / attack &middot; <kbd>Right click</kbd> place / use / eat</div>
       <div><kbd>E</kbd> inventory &amp; crafting &middot; <kbd>1-9</kbd> or wheel: hotbar &middot; <kbd>Q</kbd> drop</div>
       <div>Creative: double-tap <kbd>Space</kbd> or <kbd>F</kbd> to fly &middot; <kbd>V</kbd> camera &middot; <kbd>Esc</kbd> pause</div>
       <div class="touch-only">Touch: left stick moves, drag to look, tap to place, hold to dig.</div>
+      <div class="pad-line">PS4 controller: connect it by Bluetooth and press any button.</div>
     </div>
   </div>
 </section>
@@ -73,6 +82,14 @@
     <button id="btn-dragon" class="btn wide gold" type="button">Summon a dragon</button>
     <button id="btn-time" class="btn wide" type="button">Make it night</button>
     <button id="btn-cam" class="btn wide" type="button">Camera: First person</button>
+    <p id="players" class="players"></p>
+    <div id="pad-help" class="pad-help" hidden>
+      <div><b>R2</b> mine / attack</div><div><b>L2</b> place / use / eat</div>
+      <div><b>Cross</b> jump (twice to fly)</div><div><b>Circle</b> drop item</div>
+      <div><b>Triangle / Square</b> inventory</div><div><b>L1 / R1</b> hotbar</div>
+      <div><b>L3</b> sprint &middot; <b>R3</b> sneak</div><div><b>D-pad up</b> camera</div>
+      <div class="wide">In menus: left stick moves the pointer, Cross clicks, Square quick-moves, Circle goes back.</div>
+    </div>
     <label class="slider" for="rd">View distance <span id="rd-val">5</span><input id="rd" type="range" min="2" max="9" step="1" value="5"></label>
     <label class="slider" for="sens">Look speed <span id="sens-val">1.0</span><input id="sens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
     <div class="row2">
@@ -126,6 +143,8 @@
 <script src="js/entities.js"></script>
 <script src="js/player.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/net.js"></script>
+<script src="js/gamepad.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>

@@ -353,6 +353,16 @@ makeTile('dead_bush', pPlant(P => { P.line(8, 15, 8, 9, 0x7a5a32); P.line(8, 11,
 makeTile('red_mushroom', pMushroom(0xc8221c, 0xf0f0f0));
 makeTile('brown_mushroom', pMushroom(0x9a6a48, null));
 for (let s = 0; s < 8; s++) makeTile('destroy_' + s, pCrack(s));
+const pNetherrack = P => { P.fill(0x6e2b2b, 14); P.speck(0x8a3a3a, 0.2, 6); P.speck(0x4e1c1c, 0.15, 6); };
+makeTile('soul_sand', P => { P.fill(0x5a4436, 10); P.speck(0x3e2e24, 0.25, 5); for (let i = 0; i < 4; i++) { const x = 2 + P.rng() * 11 | 0, y = 2 + P.rng() * 10 | 0; P.pts([[x, y], [x + 2, y], [x + 1, y + 2]], 0x2a1e18); } });
+makeTile('nether_bricks', pBricks(0x3a1c22, 0x1e0e12, 8, 4));
+makeTile('nether_quartz_ore', P => { pNetherrack(P); for (let i = 0; i < 6; i++) { const x = 1 + P.rng() * 13 | 0, y = 1 + P.rng() * 13 | 0; P.pts([[x, y], [x + 1, y], [x + 1, y + 1]], 0xeee8dc); P.put(x, y + 1, 0xc8c0b0); } });
+makeTile('nether_gold_ore', P => { pNetherrack(P); for (let i = 0; i < 7; i++) { const x = 1 + P.rng() * 13 | 0, y = 1 + P.rng() * 13 | 0; P.pts([[x, y], [x + 1, y]], 0xfcd33c); P.put(x, y + 1, 0xfff3a0); } });
+makeTile('magma', P => { P.fill(0x5a1a0a, 8); for (let i = 0; i < 7; i++) { const x = P.rng() * 14 | 0, y = P.rng() * 14 | 0; P.line(x, y, x + 2 + (P.rng() * 3 | 0), y + (P.rng() * 3 | 0), 0xff7a1a, 20); } });
+makeTile('portal', P => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = Math.sin(x * 0.9 + y * 0.5) + Math.sin(y * 1.3 - x * 0.4); P.put(x, y, v > 0.6 ? [190, 90, 255] : v > -0.4 ? [120, 30, 210] : [70, 10, 150], 210); } });
+makeTile('i_quartz', pGem(0xece6dc));
+makeTile('i_blaze_rod', pPlant(P => { for (let i = 0; i < 10; i++) { P.put(3 + i, 12 - i, 0xffc020); P.put(4 + i, 12 - i, 0xe08010); } P.pts([[3, 12], [13, 2]], 0xfff080); }));
+makeTile('i_ghast_tear', pPlant(P => { for (let y = 3; y <= 13; y++) { const w = y < 8 ? (y - 3) / 2 : 3 - (y - 8) * 0.5; for (let x = Math.round(8 - w); x <= Math.round(8 + w); x++) P.put(x, y, x < 8 ? 0xffffff : 0xc8e0f0); } }));
 
 makeTile('i_stick', pPlant(P => { for (let i = 0; i < 10; i++) { P.put(3 + i, 12 - i, 0x7a5a32); P.put(4 + i, 12 - i, 0x4e3a20); } }));
 makeTile('i_coal', pBlob(0x2a2a2a, 5, 0x555555));
@@ -484,6 +494,12 @@ block('tall_grass', 'Tall Grass', 'tall_grass', Object.assign({ drop: null, repl
 block('dead_bush', 'Dead Bush', 'dead_bush', Object.assign({ drop: (r) => (r() < 0.5 ? [['stick', 1]] : []), replaceable: true }, CROSS));
 block('red_mushroom', 'Red Mushroom', 'red_mushroom', CROSS);
 block('brown_mushroom', 'Brown Mushroom', 'brown_mushroom', CROSS);
+block('soul_sand', 'Soul Sand', 'soul_sand', { hardness: 0.5 });
+block('nether_bricks', 'Nether Bricks', 'nether_bricks', PICK(1, 2));
+block('nether_quartz_ore', 'Nether Quartz Ore', 'nether_quartz_ore', PICK(1, 3, { drop: 'quartz', xp: 2 }));
+block('nether_gold_ore', 'Nether Gold Ore', 'nether_gold_ore', PICK(1, 3, { drop: 'gold_ingot', xp: 1 }));
+block('magma', 'Magma Block', 'magma', PICK(1, 0.5, { light: true }));
+block('nether_portal', 'Nether Portal', 'portal', { solid: false, opaque: false, translucent: true, hardness: 0, drop: null, light: true, portal: true });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -530,6 +546,9 @@ for (const [k, n, tier, speed, dmg] of TOOL_MATS) {
   item(k + '_pickaxe', n + ' Pickaxe', k + '_pickaxe', { stack: 1, tool: { type: 'pick', tier, speed }, damage: dmg - 2 });
   item(k + '_sword', n + ' Sword', k + '_sword', { stack: 1, damage: dmg });
 }
+item('quartz', 'Nether Quartz', 'quartz');
+item('blaze_rod', 'Blaze Rod', 'blaze_rod');
+item('ghast_tear', 'Ghast Tear', 'ghast_tear');
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -573,6 +592,10 @@ const RECIPES = [
   ['redstone_block', 1, { redstone: 9 }, 'table'], ['redstone', 9, { redstone_block: 1 }],
   ['glowstone', 1, { redstone: 4, gold_ingot: 1 }, 'table'],
   ['sandstone', 1, { sand: 4 }],
+  ['quartz_block', 1, { quartz: 4 }],
+  ['nether_bricks', 1, { netherrack: 4 }],
+  ['glowstone', 1, { blaze_rod: 1, netherrack: 1 }],
+  ['golden_apple', 1, { apple: 1, ghast_tear: 1 }, 'table'],
   ['stone_bricks', 4, { stone: 4 }],
   ['bricks', 4, { terracotta: 4 }],
   ['bookshelf', 1, { '#planks': 6, leather: 3 }, 'table'],

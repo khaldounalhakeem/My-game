@@ -273,6 +273,10 @@ class Player {
     const above = W.getBlock(x, y + 1, z);
     if (above && (DEFS[above].cross || above === ID.cactus)) this.breakBlock(x, y + 1, z, above);
     W.settle(x, y + 1, z);
+    if (id === ID.obsidian || id === ID.nether_portal) {
+      for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
+        if (W.getBlock(x + dx, y + dy, z + dz) === ID.nether_portal) W.breakPortal(x + dx, y + dy, z + dz);
+    }
     // water flows in
     if (y <= SEA + 1) {
       for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0, 1, 0]]) {
@@ -324,8 +328,17 @@ class Player {
       }
       if (b.id === ID.dragon_egg) {
         this.useCd = 1;
-        if (!G.dragons.some(d => !d.dead)) { W.setBlock(b.x, b.y, b.z, 0); G.summonDragon(); }
+        if (G.dim !== 'nether') G.ui.message('Dragons can only be summoned in the Nether.', 'purple');
+        else if (!G.dragons.some(d => !d.done)) { W.setBlock(b.x, b.y, b.z, 0); G.summonDragon(); }
         else G.ui.message('A dragon is already in the sky.', 'purple');
+        return;
+      }
+      if (hd && hd.key === 'flint_and_steel') {
+        this.useCd = 0.3; this.swing = 1;
+        if (W.lightPortal(b.x + b.nx, b.y + b.ny, b.z + b.nz)) {
+          G.sound.play('teleport');
+          G.ui.message('The portal is open! Stand inside it to travel.', 'purple');
+        } else if (b.id === ID.obsidian) G.ui.message('A portal needs a full obsidian frame: 4 wide and 5 tall, with an empty 2 by 3 middle.');
         return;
       }
     }

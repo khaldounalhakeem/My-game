@@ -253,3 +253,27 @@ body.touch #tooltip { display: none; }
   #fx-hurt.on { animation: none; }
   #itemname.show { animation: none; opacity: 1; }
 }
+
+/* ---------- portal, multiplayer, controller ---------- */
+#fx-portal { background: radial-gradient(ellipse at center, rgba(150, 40, 230, 0.35), rgba(80, 0, 160, 0.85)); transition: none; }
+#online {
+  position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(12px + env(safe-area-inset-top, 0px));
+  font-family: var(--font-display); font-size: 12px; color: var(--gold); background: rgba(0, 0, 0, 0.5); padding: 4px 8px;
+}
+.net-status { margin: 0; font-size: 19px; color: var(--muted); text-shadow: 1px 1px 0 #000; }
+.net-status.on { color: #9df07a; }
+.players { margin: 0; font-size: 19px; color: var(--muted); text-align: center; }
+.pad-line { color: #9fc8ff; }
+.pad-help { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; font-size: 18px; color: var(--muted); background: rgba(0, 0, 0, 0.3); padding: 8px 10px; }
+.pad-help b { color: var(--gold); font-weight: normal; font-family: var(--font-display); font-size: 11px; }
+.pad-help .wide { grid-column: 1 / -1; }
+body.pad #touch { display: none !important; }
+#padcursor {
+  position: fixed; left: 0; top: 0; width: 0; height: 0; z-index: 60; pointer-events: none; display: none;
+  border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 22px solid #fff;
+  margin: -2px 0 0 -9px; transform-origin: 9px 0; filter: drop-shadow(1px 2px 0 #000);
+}
+#padcursor::after { content: ""; }
+body.pad:not([data-state="play"]) #padcursor { display: block; }
+body.pad #tooltip { display: block; }
+body.pad #tooltip[hidden] { display: none !important; }

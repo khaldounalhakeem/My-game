@@ -6,7 +6,7 @@ const DAY_LENGTH = 600; // seconds for a full day
 
 const G = {
   state: 'title', mobs: [], dragons: [], projectiles: [], drops: [], tnts: [],
-  time: 0.05, shake: 0, spawnT: 0, dragonTimer: 45, saveT: 0, fps: 0, underground: 0,
+  time: 0.05, shake: 0, spawnT: 0, dragonTimer: 30, saveT: 0, fps: 0, underground: 0, dim: 'overworld',
 };
 
 /* ---------- sound ---------- */
@@ -194,7 +194,19 @@ G.applyFog = () => {
   G.fogFar = far; G.fogNear = far * 0.55;
 };
 
+const C_NETHER = new THREE.Color(0x3a0c0c);
 function updateSky(dt) {
+  const netherView = G.dim === 'nether' && G.state !== 'title';
+  G.sky.visible = !netherView; G.clouds.visible = !netherView;
+  if (netherView) {
+    const P = G.player;
+    G.scene.background = C_NETHER;
+    G.scene.fog.color.copy(P.inLava ? C_LAVA : C_NETHER);
+    G.scene.fog.near = P.inLava ? 0.2 : G.fogNear * 0.35; G.scene.fog.far = P.inLava ? 3 : G.fogFar * 0.85;
+    for (const k of ['opaque', 'trans', 'item', 'held']) G.mats[k].color.setScalar(0.88);
+    G.ambient.intensity = 0.75; G.sunLight.intensity = 0.15;
+    return;
+  }
   const sh = G.sunHeight(), dl = G.daylight();
   skyCol.copy(C_NIGHT).lerp(C_DAY, clamp((sh + 0.15) * 2.5, 0, 1));
   const dusk = clamp(1 - Math.abs(sh) * 5, 0, 1) * 0.55;
@@ -280,14 +292,16 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors) => {
 };
 
 G.summonDragon = (kind) => {
-  if (G.dragons.some(d => !d.done)) { G.ui.message('A dragon is already flying around!', 'purple'); return; }
+  if (G.dim !== 'nether') { G.ui.message('Dragons can only be summoned in the Nether. Build an obsidian portal and light it with Flint and Steel.', 'purple'); return false; }
+  if (G.dragons.some(d => !d.done)) { G.ui.message('A dragon is already flying around!', 'purple'); return false; }
   kind = kind || ['ender', 'fire', 'ice'][(Math.random() * 3) | 0];
   const P = G.player;
-  const center = new THREE.Vector3(P.pos.x, G.world.surfaceY(P.pos.x, P.pos.z), P.pos.z);
+  const center = new THREE.Vector3(P.pos.x, G.world.groundY(P.pos.x, P.pos.z), P.pos.z);
   const d = new Dragon(kind, center);
   G.dragons.push(d);
-  G.ui.message('The ' + d.name + ' has appeared in the sky!', 'purple');
+  G.ui.message('The ' + d.name + ' has appeared!', 'purple');
   Sound.play('dragonRoar');
+  return true;
 };
 
 /* ---------- mob spawning ---------- */
@@ -312,6 +326,7 @@ function spawnTick() {
     if (d > (m.T.passive ? 96 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
   }
+  if (G.dim === 'nether') { if (hostile < 12) netherSpawn(); return; }
   if (passive < 12 && Math.random() < 0.4) {
     const a = Math.random() * Math.PI * 2, r = 20 + Math.random() * 25;
     const x = Math.floor(P.pos.x + Math.cos(a) * r) + 0.5, z = Math.floor(P.pos.z + Math.sin(a) * r) + 0.5;
@@ -347,6 +362,34 @@ function spawnTick() {
   }
 }
 
+const NETHER_POOL = [['zombified_piglin', 40], ['wither_skeleton', 14], ['blaze', 16], ['ghast', 7]];
+function netherSpawn() {
+  const P = G.player, W = G.world;
+  for (let tries = 0; tries < 4; tries++) {
+    const a = Math.random() * Math.PI * 2, r = 14 + Math.random() * 22;
+    const x = Math.floor(P.pos.x + Math.cos(a) * r), z = Math.floor(P.pos.z + Math.sin(a) * r);
+    if (!W.isLoaded(x, z)) continue;
+    const type = pick(NETHER_POOL), T = MOB_TYPES[type];
+    let y = -1;
+    if (T.fly) {
+      const need = type === 'ghast' ? 6 : 3;
+      for (let yy = 34; yy < 70 && y < 0; yy++) {
+        let ok = true;
+        for (let k = 0; k < need && ok; k++) if (W.getBlock(x, yy + k, z)) ok = false;
+        if (ok) y = yy + (type === 'ghast' ? 1 : 0);
+      }
+    } else {
+      for (let yy = 30 + Math.floor(Math.random() * 40); yy > 20; yy--) {
+        const below = W.getBlock(x, yy - 1, z);
+        if (!W.getBlock(x, yy, z) && !W.getBlock(x, yy + 1, z) && below && DEFS[below].solid) { y = yy; break; }
+      }
+    }
+    if (y < 0) continue;
+    spawnMob(type, x + 0.5, y, z + 0.5);
+    break;
+  }
+}
+
 /* ---------- world lifecycle ---------- */
 function clearEntities() {
   for (const list of [G.mobs, G.projectiles, G.drops, G.tnts]) { for (const e of list) { if (e.mesh) G.scene.remove(e.mesh); } list.length = 0; }
@@ -355,18 +398,77 @@ function clearEntities() {
 }
 
 function makeWorld(seed) {
-  if (G.world) {
+  if (G.worlds) {
     G.scene.remove(G.world.group);
-    for (const c of G.world.chunks.values()) for (const m of c.meshes) m.geometry.dispose();
+    for (const w of Object.values(G.worlds)) for (const c of w.chunks.values()) for (const m of c.meshes) m.geometry.dispose();
   }
   clearEntities();
   const rd = G.world ? G.world.renderDist : (Input.touch ? 4 : 5);
-  G.world = new World(seed, G.mats);
-  G.world.renderDist = rd;
+  G.worlds = {};
+  for (const dim of ['overworld', 'nether']) {
+    const w = new World(seed, G.mats, dim);
+    w.renderDist = rd;
+    w.onEdit = (x, y, z, id) => Net.edit(dim, x, y, z, id);
+    G.worlds[dim] = w;
+  }
+  G.dim = 'overworld';
+  G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
   G.applyFog();
 }
+
+function useDim(to) {
+  if (G.dim === to) return;
+  if (to === 'overworld' && G.dragons.some(d => !d.dead)) G.dragonTimer = 20;
+  clearEntities();
+  G.scene.remove(G.world.group);
+  G.dim = to;
+  G.world = G.worlds[to];
+  G.world.queue = [];
+  G.scene.add(G.world.group);
+  G.applyFog();
+}
+
+G.switchDimension = (to) => {
+  const P = G.player;
+  const scale = to === 'nether' ? 1 / 8 : 8;
+  const tx = Math.floor(P.pos.x * scale), tz = Math.floor(P.pos.z * scale);
+  useDim(to);
+  loadAround(tx, tz, 2);
+  let p = G.world.findPortal(tx, tz, 20);
+  if (!p) {
+    const y = to === 'nether' ? clamp(G.world.groundY(tx, tz) + 1, 33, 64) : Math.max(G.world.surfaceY(tx, tz), SEA) + 1;
+    G.world.buildPortal(tx, y, tz, true);
+    p = [tx, y, tz];
+  }
+  P.pos.set(p[0] + 0.5, p[1], p[2] + 0.5);
+  // step out in front of the portal onto solid ground
+  const W = G.world, alongX = W.getBlock(p[0] + 1, p[1], p[2]) === ID.nether_portal || W.getBlock(p[0] - 1, p[1], p[2]) === ID.nether_portal;
+  for (const s of [1, -1]) {
+    const ox = alongX ? 0 : s, oz = alongX ? s : 0;
+    const bx = p[0] + ox, bz = p[2] + oz;
+    if (!W.isSolid(bx, p[1], bz) && !W.isSolid(bx, p[1] + 1, bz) && W.isSolid(bx, p[1] - 1, bz)) {
+      P.pos.set(bx + 0.5, p[1], bz + 0.5);
+      P.yaw = Math.atan2(-ox, -oz);
+      break;
+    }
+  }
+  P.vel.set(0, 0, 0); P.fallStart = null; P.portalT = 0; P.portalCd = true;
+  Sound.play('teleport');
+  if (to === 'nether') {
+    G.ui.message('Welcome to the Nether! Watch out for lava, ghasts and blazes.', 'purple');
+    if (!G.netherVisited) { G.ui.message('You hear a dragon roaring somewhere in the darkness...', 'purple'); G.dragonTimer = Math.min(G.dragonTimer, 25); }
+    G.netherVisited = true;
+  } else G.ui.message('Back in the Overworld.', 'gold');
+  G.save();
+};
+
+G.respawnPlayer = () => {
+  useDim('overworld');
+  G.player.respawn();
+  loadAround(G.player.pos.x, G.player.pos.z, 1);
+};
 
 function seedFromText(t) {
   if (!t) return (Math.random() * 2 ** 31) | 0;
@@ -386,6 +488,7 @@ function findSpawn(world) {
 }
 
 function loadAround(x, z, r) {
+  G.world.queue = [];
   for (let i = 0; i < 400 && G.world.pendingNear(x, z, r); i++) G.world.update(x, z, 50);
 }
 
@@ -410,7 +513,10 @@ G.startNew = (mode) => {
   const sy = G.world.surfaceY(sx, sz) + 1;
   P.spawn.set(sx, sy, sz); P.pos.copy(P.spawn); P.vel.set(0, 0, 0);
   P.yaw = 0; P.pitch = -0.1;
-  G.time = 0.03; G.dragonTimer = 60;
+  G.time = 0.03; G.dragonTimer = 30; G.netherVisited = false;
+  const fx = Math.floor(sx) + 4, fz = Math.floor(sz) + 4;
+  const fy = G.world.surfaceY(fx, fz);
+  if (G.world.getBlock(fx, fy, fz) !== ID.water) G.world.buildPortal(fx, fy + 1, fz, false);
   if (mode === 'creative') {
     ['grass', 'stone', 'oak_planks', 'glass', 'bricks', 'gold_block', 'diamond_block', 'tnt', 'flint_and_steel'].forEach((k, i) => { P.inv.slots[i] = { id: ID[k], count: DEFS[ID[k]].stack }; });
     P.inv.changed();
@@ -422,9 +528,11 @@ G.startNew = (mode) => {
   }
   $('menu-start').hidden = true;
   G.ui.message(mode === 'creative' ? 'Creative mode: unlimited blocks, double-tap jump to fly.' : 'Survival mode: punch trees, craft tools, survive the night!', 'gold');
-  G.ui.message((Input.touch ? 'Tap Items' : 'Press E') + ' for inventory and crafting. A dragon will arrive soon...');
+  G.ui.message((Input.touch ? 'Tap Items' : 'Press E') + ' for inventory and crafting.');
+  G.ui.message('There is an obsidian portal frame near you. Light it with Flint and Steel to enter the Nether, where the dragons live.', 'purple');
   G.resume();
   G.save();
+  Net.joinWorld(G.seed);
 };
 
 G.continueSaved = () => {
@@ -433,19 +541,24 @@ G.continueSaved = () => {
   try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
   if (!s) { G.ui.message('No saved world found.'); return; }
   makeWorld(s.seed);
-  G.world.loadEdits(s.edits || {});
+  G.worlds.overworld.loadEdits(s.edits || {});
+  G.worlds.nether.loadEdits(s.netherEdits || {});
+  G.netherVisited = !!s.netherVisited;
+  if (s.dim === 'nether') useDim('nether');
   const P = G.player;
   P.reset(); P.mode = s.mode || 'survival';
   P.inv = new Inventory(); P.inv.load(s.inv || []);
   P.health = s.health ?? 20; P.hunger = s.hunger ?? 20; P.xp = s.xp || 0; P.level = s.level || 0;
   P.spawn.fromArray(s.spawn); P.pos.fromArray(s.pos); P.yaw = s.yaw || 0; P.pitch = s.pitch || 0;
-  G.time = s.time || 0.1; G.dragonTimer = s.dragonTimer ?? 60;
+  G.time = s.time || 0.1; G.dragonTimer = s.dragonTimer ?? 30;
   loadAround(P.pos.x, P.pos.z, 2);
-  if (G.world.collides(P.pos.x, P.pos.y, P.pos.z, P.w, P.h)) P.pos.y = G.world.surfaceY(P.pos.x, P.pos.z) + 1;
+  if (G.world.collides(P.pos.x, P.pos.y, P.pos.z, P.w, P.h)) P.pos.y = G.world.groundY(P.pos.x, P.pos.z) + 1;
+  P.portalCd = true;
   $('seed').value = s.seed;
   $('menu-start').hidden = true;
   G.ui.message('Welcome back!', 'gold');
   G.resume();
+  Net.joinWorld(G.seed);
 };
 
 G.save = () => {
@@ -455,7 +568,8 @@ G.save = () => {
     v: 1, seed: G.seed, mode: P.mode, time: G.time, dragonTimer: G.dragonTimer,
     pos: P.pos.toArray(), spawn: P.spawn.toArray(), yaw: P.yaw, pitch: P.pitch,
     health: P.dead ? 20 : P.health, hunger: P.hunger, xp: P.xp, level: P.level,
-    inv: P.inv.toJSON(), edits: G.world.serializeEdits(),
+    inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(),
+    dim: G.dim, netherVisited: !!G.netherVisited,
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
 };
@@ -468,6 +582,7 @@ G.toTitle = () => {
   $('menu-start').hidden = false;
   $('btn-continue').hidden = !hasSave();
   G.unlock();
+  Net.leave();
   G.previewWorld(String(G.seed));
 };
 
@@ -476,7 +591,7 @@ G.setState = (s) => {
   document.body.dataset.state = s;
 };
 G.lock = () => {
-  if (Input.touch || Input.fallback) return;
+  if (Input.touch || Input.fallback || Pad.active) return;
   try {
     const p = G.renderer.domElement.requestPointerLock();
     if (p && p.catch) p.catch(() => G.lockFailed());
@@ -516,6 +631,7 @@ function frame(now) {
   fpsAcc += dt; fpsN++;
   if (fpsAcc > 0.5) { G.fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
   const P = G.player;
+  Pad.poll(dt);
 
   if (G.state === 'title') {
     G.titleAngle = (G.titleAngle || 0) + dt * 0.05;
@@ -544,8 +660,8 @@ function frame(now) {
 
     // interaction
     const tgt = P.dead ? { block: null, mob: null } : P.target();
-    if (Input.left || Input.leftPressed) P.primary(dt, Input.leftPressed, tgt); else P.breaking = null;
-    if (Input.rightPressed || (Input.right && P.useCd <= 0)) P.use(tgt);
+    if (Input.left || Input.padLeft || Input.leftPressed) P.primary(dt, Input.leftPressed, tgt); else P.breaking = null;
+    if (Input.rightPressed || ((Input.right || Input.padRight) && P.useCd <= 0)) P.use(tgt);
     if (Input.middlePressed) P.pickBlock(tgt);
     Input.leftPressed = Input.rightPressed = Input.middlePressed = false;
     if (tgt.block) {
@@ -572,9 +688,18 @@ function frame(now) {
     for (const t of G.tnts) t.update(dt);
     G.tnts = G.tnts.filter(t => !t.done);
 
+    // nether portal travel
+    if (!P.dead && G.world.touching(P, ID.nether_portal, 0)) {
+      if (!P.portalCd) {
+        P.portalT = (P.portalT || 0) + dt;
+        if (P.portalT > (P.mode === 'creative' ? 0.8 : 2.2)) G.switchDimension(G.dim === 'nether' ? 'overworld' : 'nether');
+      }
+    } else { P.portalT = 0; P.portalCd = false; }
+    $('fx-portal').style.opacity = clamp((P.portalT || 0) / 2, 0, 0.85);
+
     G.spawnT -= dt;
     if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); }
-    if (!G.dragons.length) {
+    if (!G.dragons.length && G.dim === 'nether') {
       G.dragonTimer -= dt;
       if (G.dragonTimer <= 0) { G.dragonTimer = 240; G.summonDragon(G.firstDragonDone ? null : 'ender'); G.firstDragonDone = true; }
     }
@@ -584,6 +709,7 @@ function frame(now) {
   Input.lookDX = Input.lookDY = 0;
   G.particles.update(active ? dt : 0);
   G.world.update(P.pos.x, P.pos.z, active ? 6 : 12);
+  Net.tick(dt);
 
   // camera
   const eye = P.eyePos();
@@ -650,6 +776,7 @@ function boot() {
   G.player = new Player();
   G.ui = UI;
   UI.init();
+  Net.init();
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { saved = null; }
   $('btn-continue').hidden = !saved;

@@ -237,7 +237,7 @@ const UI = {
     box.innerHTML = '';
     const ids = [];
     for (const d of DEFS) {
-      if (!d || d.id === 0 || d.liquid) continue;
+      if (!d || d.id === 0 || d.liquid || d.portal) continue;
       if (q ? !d.name.toLowerCase().includes(q) : (this.tab === 'blocks') !== d.isBlock) continue;
       ids.push(d.id);
     }
@@ -331,14 +331,16 @@ const UI = {
       this.syncPause();
       this.message('Game mode: ' + (P.mode === 'survival' ? 'Survival' : 'Creative'));
     });
-    $('btn-dragon').addEventListener('click', () => { G.summonDragon(); G.resume(); });
+    $('btn-dragon').addEventListener('click', () => { if (G.summonDragon()) G.resume(); });
     $('btn-time').addEventListener('click', () => { G.time = G.isNight() ? 0.02 : 0.52; this.message(G.isNight() ? 'Night falls.' : 'The sun rises.'); });
     $('btn-cam').addEventListener('click', () => { G.camMode = (G.camMode + 1) % 3; this.syncPause(); });
     $('btn-save').addEventListener('click', () => { G.save(); this.message('World saved in this browser.'); });
     $('btn-quit').addEventListener('click', () => { G.save(); G.toTitle(); });
-    $('rd').addEventListener('input', () => { G.world.renderDist = +$('rd').value; G.world.queue = []; $('rd-val').textContent = $('rd').value; G.applyFog(); });
+    $('rd').addEventListener('input', () => { for (const w of Object.values(G.worlds)) { w.renderDist = +$('rd').value; w.queue = []; } $('rd-val').textContent = $('rd').value; G.applyFog(); });
     $('sens').addEventListener('input', () => { Input.sens = +$('sens').value; $('sens-val').textContent = (+$('sens').value).toFixed(1); });
-    $('btn-respawn').addEventListener('click', () => { $('menu-dead').hidden = true; G.player.respawn(); G.resume(); });
+    $('btn-respawn').addEventListener('click', () => { $('menu-dead').hidden = true; G.respawnPlayer(); G.resume(); });
+    $('nick').addEventListener('change', () => Net.setNick($('nick').value));
+    $('nick').addEventListener('keydown', e => e.stopPropagation());
     $('btn-inv-close').addEventListener('click', () => { this.closeInventory(); G.lock(); });
   },
 
@@ -349,6 +351,11 @@ const UI = {
     $('sens').value = Input.sens; $('sens-val').textContent = Input.sens.toFixed(1);
     $('btn-time').textContent = G.isNight() ? 'Make it day' : 'Make it night';
     $('btn-cam').textContent = 'Camera: ' + ['First person', 'Behind', 'Front'][G.camMode];
+    $('btn-dragon').textContent = G.dim === 'nether' ? 'Summon a dragon' : 'Summon a dragon (Nether only)';
+    $('btn-dragon').classList.toggle('gold', G.dim === 'nether');
+    const names = Net.names();
+    $('players').textContent = Net.wroom ? (names.length ? 'Playing with: ' + names.join(', ') : 'Nobody else is in this world yet. Friends who open this page and use seed ' + G.seed + ' will join you.') : '';
+    $('pad-help').hidden = !Pad.active;
   },
 
   showDeath() {
@@ -379,7 +386,7 @@ const UI = {
     document.addEventListener('pointerlockchange', () => {
       Input.locked = document.pointerLockElement === cv;
       if (Input.locked) G.lockFails = 0;
-      if (!Input.locked && G.state === 'play' && !Input.fallback && !Input.touch) G.pause();
+      if (!Input.locked && G.state === 'play' && !Input.fallback && !Input.touch && !Pad.active) G.pause();
     });
     document.addEventListener('pointerlockerror', () => G.lockFailed());
 
@@ -483,10 +490,12 @@ const UI = {
     if (K.KeyA || K.ArrowLeft) x -= 1;
     if (K.KeyD || K.ArrowRight) x += 1;
     if (Input.joy.id !== null) { x += Input.joy.x; z -= Input.joy.y; }
+    const pd = Input.pad;
+    if (pd) { x += pd.mx; z += pd.mz; }
     Input.moveX = x; Input.moveZ = z;
-    Input.jump = !!(K.Space || Input.tJump);
+    Input.jump = !!(K.Space || Input.tJump || (pd && pd.jump));
     const flying = G.player.flying;
-    Input.sneak = !!(K.KeyC || K.KeyZ || Input.tSneak || (flying && (K.ShiftLeft || K.ShiftRight)));
-    Input.sprint = !flying && !!(K.ShiftLeft || K.ShiftRight || (Input.joy.id !== null && Math.hypot(Input.joy.x, Input.joy.y) > 0.95));
+    Input.sneak = !!(K.KeyC || K.KeyZ || Input.tSneak || (pd && pd.sneak) || (flying && (K.ShiftLeft || K.ShiftRight)));
+    Input.sprint = !flying && !!(K.ShiftLeft || K.ShiftRight || (pd && pd.sprint) || (Input.joy.id !== null && Math.hypot(Input.joy.x, Input.joy.y) > 0.95));
   },
 };
