@@ -89,6 +89,7 @@ class Bot {
 
   think(game) {
     const car = this.car, ball = game.ball;
+    this.arriveSlow = false;
     const pred = game.prediction;
     const dir = this.attackDir();
     // kickoff
@@ -183,7 +184,7 @@ class Bot {
       if (mySide && ball.vel.length() < 700 && Math.abs(ball.pos.z - own.z) < 2200 && ball.pos.y < 250) { this.mode = 'attack'; this.role = 'attack'; }
     } else if (this.role === 'striker') {
       // ball coming at our net: wait just past the half line for the save, then finish it (in the air if needed)
-      if (game.heat.target === car.team) {
+      if (game.heat.target === car.team || (this.saving && game.ballThreat && game.ballThreat.team === car.team)) {
         this.mode = 'position';
         this.target.set(clamp(ball.pos.x * 0.4, -1500, 1500), 0, dir * 900);
       } else this.role = 'attack';
@@ -216,16 +217,37 @@ class Bot {
       const behind = (ball.pos.z - car.pos.z) * dir;
       const ballD = (ball.pos.z - own.z) * dir, carD = (car.pos.z - own.z) * dir;
       const skilled = (this.lv.skill || 0) > 0.8;
-      if (skilled && carD > ballD + 250 && car.pos.distanceTo(ball.pos) > 700 && (ballD < 4200 || threat) && ballD > 600) {
+      // near our own net, never hit the ball from the wrong side (that's how own goals happen): get goal-side first,
+      // unless the ball is already rolling into the net and we're the only hope
+      this.arriveSlow = false;
+      const wrongSide = carD > ballD - 60;
+      const nearOwn = ballD < 2600;
+      const lastChance = threat && game.ballThreat.t < 0.9;
+      if (skilled && wrongSide && ((nearOwn && !lastChance) || (carD > ballD + 250 && car.pos.distanceTo(ball.pos) > 700 && (ballD < 4200 || threat))) && ballD > 450) {
         // ball between us and our own net: race back to the far post and face the play, don't chase it from behind
         this.mode = 'rotate';
         const side = -Math.sign(ball.pos.x || car.pos.x || 1);
         this.target.set(side * 650, 0, own.z + dir * 350);
-      } else if (behind < (this.lv.aggro ? -1200 : -250) && !threat) {
+        // a shot is on its way in: get to where it will cross the line instead, and stop there (no overshooting into the net)
+        if (threat && ARENA.goal) {
+          const cr = pred.slices.slice(0, pred.count).find(sl => (sl.pos.z - own.z) * dir < 250);
+          if (cr) this.target.set(clamp(cr.pos.x, -ARENA.goal.w + 120, ARENA.goal.w - 120), 0, own.z + dir * 200);
+          this.arriveSlow = true;
+        }
+      } else if (behind < -250 && !threat) {
         this.mode = 'rotate';
         const side = car.pos.x > 0 ? 1 : -1;
         this.target.set(side * 900, 0, own.z + dir * 900);
         if ((ball.pos.z - own.z) * dir > 4500) this.target.set(ball.pos.x * 0.3, 0, ball.pos.z - dir * 1600);
+      }
+      // a shot is coming and we're between the ball and our net: stand in the goal and make the save
+      this.saving = false;
+      // driving towards our own net next to the ball: any touch now would push it in, so block on the line instead
+      const towardOwn = -car.vel.z * dir;
+      if (skilled && ARENA.goal && !this.heatMode && ballD < 2200 && towardOwn > 300 && carD < ballD + 200 && carD > 150) { this.mode = 'keeper'; this.saving = true; }
+      if (this.lv.saver && threat && game.ballThreat.t < 1.8 && carD < ballD - 200 && carD < 1400 && !this.heatMode && ARENA.goal) {
+        // only if we can't simply reach the ball first
+        if (!(chosen && chosen.t < game.ballThreat.t - 0.4)) { this.mode = 'keeper'; this.saving = true; }
       }
       // stuck inside our own net: drive straight out
       if (Math.abs(car.pos.z) > ARENA.L - 40 && Math.sign(car.pos.z) === Math.sign(own.z)) { this.mode = 'rotate'; this.target.set(car.pos.x * 0.5, 0, own.z + dir * 700); }
@@ -334,7 +356,9 @@ class Bot {
       // timing: slow down if early
       const e = this.eta(tgt);
       const lead = I.t - e;
-      if (lead > 0.35) wantSpeed = clamp(car.pos.distanceTo(tgt) / Math.max(0.3, I.t) * 1.15, 350, 2300);
+      // timing: weaker players crawl to the ball; strong ones only ease off when they're very early, and hit it at speed
+      const early = this.lv.commit ? 0.9 : 0.35;
+      if (lead > early) wantSpeed = clamp(car.pos.distanceTo(tgt) / Math.max(0.3, I.t) * (this.lv.commit ? 1.5 : 1.15), this.lv.commit ? 900 : 350, 2300);
       // jump / aerial decision
       const localB = this.local(I.pos, _ai3);
       const flatD = Math.hypot(localB.x, localB.z);
@@ -355,12 +379,15 @@ class Bot {
       }
       // power flip into a ground ball
       const dToBall = car.pos.distanceTo(ball.pos);
-      if (dToBall < 380 && ball.pos.y < 175 && aligned && this.flipCd <= 0 && Math.random() < this.lv.flip * 0.25 && car.vel.length() > 600) {
+      const ownGoalDanger = (this.lv.skill || 0) > 0.8 && (-car.vel.z * this.attackDir()) > 200 && Math.abs(ball.pos.z - this.ownGoal(_ai4).z) < 2400;
+      if (!ownGoalDanger && dToBall < 380 && ball.pos.y < 175 && aligned && this.flipCd <= 0 && Math.random() < (this.lv.pflip || this.lv.flip * 0.25) && car.vel.length() > 600) {
         const side = clamp(localB.z / 120, -1, 1);
         this.seq = [{ d: 0.05, c: { jump: true, throttle: 1 } }, { d: 0.04, c: { jump: false, throttle: 1 } }, { d: 0.5, c: { jump: true, pitch: 1, steer: side } }];
         this.flipCd = 1.5; this.seqT = 0; return;
       }
     }
+    // racing back to block a shot: brake into the spot instead of flying past it into our own net
+    if (this.mode === 'rotate' && this.arriveSlow) wantSpeed = Math.min(wantSpeed, clamp(car.pos.distanceTo(tgt) * 2, 250, 2300));
     this.steerTo(tgt, wantSpeed, c, game);
 
     // speed flip when no boost and long distance

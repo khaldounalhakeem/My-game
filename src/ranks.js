@@ -8,9 +8,10 @@ const PLACEMENT_GAMES = 10;
 const PLAYLISTS = { 1: 'Duel', 2: 'Doubles', 3: 'Standard', hoops: 'Hoops', rumble: 'Rumble', heatseeker: 'Heatseeker', dropshot: 'Dropshot', snowday: 'Snow Day' };
 const RANKED_KEYS = ['1', '2', '3', 'hoops', 'rumble', 'heatseeker', 'dropshot', 'snowday'];
 // placements: your rank after 10 games comes from how many you won (10/10 = Supersonic Legend)
+const PLACE_BOTS = 1350; // placement bots start at Champion level and move towards your record
 const PLACEMENT_MMR = [40, 120, 220, 380, 600, 820, 1040, 1270, 1480, 1630, 1760];
 function placementMMR(wins, games) {
-  if (!games) return 1000; // first placement game: bots start in the middle (Diamond)
+  if (!games) return PLACE_BOTS; // first placement game
   const x = wins / games * PLACEMENT_GAMES, i = Math.floor(x), f = x - i;
   return i >= PLACEMENT_GAMES ? PLACEMENT_MMR[PLACEMENT_GAMES] : PLACEMENT_MMR[i] + (PLACEMENT_MMR[i + 1] - PLACEMENT_MMR[i]) * f;
 }
@@ -47,13 +48,13 @@ function rankFor(mmr) { return rankInfo(mmr).name; }
 const SKILL_ANCHORS = [
   // better reactions, aim and decisions as the rank rises — same car, same boost, same physics as you.
   // pass: how often they set up teammates; mech: air dribbles, double touches and follow-ups in the air
-  [0, { react: 0.4, skill: 0.3, aerial: 0, maxBoost: 0.35, flip: 0.25, aim: 0.45, assist: 0.04, aggro: 0, pass: 0, mech: 0 }],
-  [300, { react: 0.28, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0, pass: 0, mech: 0 }],
-  [740, { react: 0.14, skill: 0.75, aerial: 0.55, maxBoost: 0.9, flip: 0.85, aim: 0.88, assist: 0.25, aggro: 0, pass: 0.25, mech: 0.2 }],
-  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.27, aggro: 0, pass: 0.5, mech: 0.5 }],
-  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.3, aggro: 1, pass: 0.7, mech: 0.75 }],
-  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.85, mech: 0.9 }],
-  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.4, aggro: 1, pass: 0.95, mech: 1 }],
+  [0, { react: 0.4, skill: 0.3, aerial: 0, maxBoost: 0.35, flip: 0.25, aim: 0.45, assist: 0.04, aggro: 0, pass: 0, mech: 0, pflip: 0 }],
+  [300, { react: 0.28, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0, pass: 0, mech: 0, pflip: 0 }],
+  [740, { react: 0.14, skill: 0.75, aerial: 0.55, maxBoost: 0.9, flip: 0.85, aim: 0.88, assist: 0.25, aggro: 0, pass: 0.25, mech: 0.2, pflip: 0 }],
+  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.27, aggro: 0, pass: 0.5, mech: 0.4, pflip: 0.3 }],
+  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.3, aggro: 1, pass: 0.7, mech: 0.45, pflip: 0.5 }],
+  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.85, mech: 0.5, pflip: 0.7 }],
+  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.4, aggro: 1, pass: 0.95, mech: 0.55, pflip: 0.8 }],
 ];
 function levelForMMR(mmr) {
   const A = SKILL_ANCHORS;
@@ -74,7 +75,9 @@ function ensureRatings() {
   if (!P.ranked || P.rankVer !== 3) { P.ranked = {}; P.rankVer = 3; } // placements are back: everyone re-places
   if (!P.casual) P.casual = {};
   for (const k of RANKED_KEYS) if (!P.ranked[k]) P.ranked[k] = { mmr: placementMMR(0, 0), games: 0, wins: 0, losses: 0, placed: false, peak: 0, streak: 0 };
-  for (const k of ['1', '2', '3']) if (!P.casual[k]) P.casual[k] = { mmr: 250, games: 0, wins: 0, losses: 0, streak: 0 };
+  for (const k of ['1', '2', '3']) if (!P.casual[k]) P.casual[k] = { mmr: 900, games: 0, wins: 0, losses: 0, streak: 0 };
+  // casual adaptive bots now start at Platinum/Diamond level (they used to start at Silver)
+  if (P.casualVer !== 2) { P.casualVer = 2; for (const k of ['1', '2', '3']) P.casual[k].mmr = Math.max(P.casual[k].mmr, 900); }
 }
 function rankedState(key) { ensureRatings(); return Profile.ranked[String(key)]; }
 function casualState(size) { ensureRatings(); return Profile.casual[String(size)]; }
@@ -97,7 +100,7 @@ function matchRating(cfg) {
     if (r.placed) return r.mmr;
     // placements: bots start in the middle and move towards your record a bit more every game
     const k = Math.min(1, r.games / PLACEMENT_GAMES);
-    return 1000 + (placementMMR(r.pw || 0, r.games) - 1000) * (0.35 + 0.65 * k) * (r.games ? 1 : 0);
+    return PLACE_BOTS + (placementMMR(r.pw || 0, r.games) - PLACE_BOTS) * (0.35 + 0.65 * k) * (r.games ? 1 : 0);
   }
   if (cfg.level === 'adaptive') return casualState(cfg.teamSize).mmr;
   return null;
@@ -139,7 +142,7 @@ function applyRatingResult(cfg, won, goalDiff) {
     const c = casualState(size);
     c.games++; if (won) c.wins++; else c.losses++;
     c.streak = won ? Math.max(1, c.streak + 1) : Math.min(-1, c.streak - 1);
-    const delta = (won ? 18 : -14) + clamp(goalDiff, -3, 3) * 2;
+    const delta = (won ? 30 : -20) + clamp(goalDiff, -3, 3) * 3;
     c.mmr = clamp(c.mmr + delta, 0, 2000);
     return { ranked: false, delta, casualMmr: c.mmr };
   }
