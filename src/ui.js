@@ -76,7 +76,8 @@ const UI = {
     const P = Profile;
     const card = h('div', { class: 'pcard' },
       h('div', { class: 'pc-name' }, P.name), h('div', { class: 'pc-title' }, P.title),
-      h('div', { class: 'pc-row' }, h('span', { class: 'pc-lvl' }, 'LVL ' + P.level), (() => { const b = bestRank(); return h('span', { class: 'pc-rank', style: b ? `color:${b.color}` : '' }, b ? b.name : 'Unranked'); })()),
+      h('div', { class: 'pc-row' }, h('span', { class: 'pc-lvl' }, 'LVL ' + P.level)),
+      h('div', { class: 'pc-ranks' }, [['1', '1v1'], ['2', '2v2'], ['3', '3v3']].map(([k, t]) => { const l = rankLabel(k); return h('div', null, h('small', null, t + ' '), h('b', { style: l.placed ? `color:${l.color}` : '' }, l.placed ? l.text.split(' · ')[0] : `Placements ${rankedState(k).games}/${PLACEMENT_GAMES}`)); })),
       h('div', { class: 'pc-pad', id: 'cloudstatus' }, Cloud.label()),
       Cloud.canConnect() ? h('button', { class: 'ghost cloudbtn', onclick: async (e) => { e.target.textContent = 'Connecting…'; const ok = await Cloud.connect(); this.toast(ok ? 'Connected: your account progress is loaded' : 'Still not connected. Make sure you are signed in to Claude in this browser.'); this.show('main'); } }, 'CONNECT TO MY CLAUDE ACCOUNT') : null,
       h('div', { class: 'xpbar' }, h('i', { style: `width:${Math.min(100, P.xp / xpForLevel(P.level) * 100)}%` })),
@@ -143,7 +144,8 @@ const UI = {
       h('div', { class: 'mhead' }, this.back('main'), h('h2', null, 'Play')),
       h('div', { class: 'opts' },
         seg('Playlist', 'competitive', [[false, 'Casual'], [true, 'Ranked']], true),
-        seg('Team Size', 'teamSize', [[1, '1v1 Duel'], [2, '2v2 Doubles'], [3, '3v3 Standard']], true),
+        // in ranked, every Soccar team size shows its own rank right on its button
+        seg('Team Size', 'teamSize', [[1, '1v1 Duel'], [2, '2v2 Doubles'], [3, '3v3 Standard']].map(([v, t]) => [v, ranked && (C.mode || 'soccar') === 'soccar' ? `${t} · ${rankLabel(String(v)).text.split(' · ')[0]}` : t]), true),
         ranked ? null : seg('Bots', 'level', [['adaptive', 'Adaptive'], ['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star']], true),
         h('div', { class: 'field' }, h('label', { for: 'mapsel' }, 'Arena'), mapSel),
       ),
