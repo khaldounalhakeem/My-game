@@ -78,6 +78,7 @@ const UI = {
       h('div', { class: 'pc-name' }, P.name), h('div', { class: 'pc-title' }, P.title),
       h('div', { class: 'pc-row' }, h('span', { class: 'pc-lvl' }, 'LVL ' + P.level), (() => { const b = bestRank(); return h('span', { class: 'pc-rank', style: b ? `color:${b.color}` : '' }, b ? b.name : 'Unranked'); })()),
       h('div', { class: 'pc-pad', id: 'cloudstatus' }, Cloud.label()),
+      Cloud.canConnect() ? h('button', { class: 'ghost cloudbtn', onclick: async (e) => { e.target.textContent = 'Connecting…'; const ok = await Cloud.connect(); this.toast(ok ? 'Connected: your account progress is loaded' : 'Still not connected. Make sure you are signed in to Claude in this browser.'); this.show('main'); } }, 'CONNECT TO MY CLAUDE ACCOUNT') : null,
       h('div', { class: 'xpbar' }, h('i', { style: `width:${Math.min(100, P.xp / xpForLevel(P.level) * 100)}%` })),
       h('div', { class: 'pc-pad', id: 'padstatus' }, padStatusText()),
       P.newItems.length ? h('div', { class: 'pc-new' }, `${P.newItems.length} new item${P.newItems.length > 1 ? 's' : ''} in the Garage`) : null,

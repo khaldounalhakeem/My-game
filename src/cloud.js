@@ -10,26 +10,53 @@ const Cloud = {
   status: 'local', // local | connecting | cloud | error
   doc: null, timer: null, writing: false, dirty: false, lastSaved: 0,
 
+  // why we're not connected (shown on the menus): standalone | signedout | permission | error
+  reason: '',
   async init() {
+    if (this.status === 'cloud' || this._busy) return;
+    this._busy = true;
+    try { await this._connect(); } finally { this._busy = false; }
+    if (typeof UI !== 'undefined' && (UI.screen === 'main' || UI.screen === 'profile')) UI.show(UI.screen);
+  },
+  async _connect() {
     const api = window.claude;
-    if (!api || !api.use) { this.status = 'local'; return; }
+    if (!api || !api.use) { this.status = 'local'; this.reason = 'standalone'; return; }
     this.status = 'connecting';
     try {
-      const [user, db] = await Promise.all([api.use('user'), api.use('db')]);
-      const id = user ? await user.id() : null;
-      if (!db || !id) { this.status = 'local'; return; }
+      const [user, db, perms] = await Promise.all([api.use('user'), api.use('db'), api.use('permissions').catch(() => null)]);
+      this.perms = perms;
+      if (!user || !db) { this.status = 'local'; this.reason = 'signedout'; return; }
+      if (perms) {
+        let st = {};
+        try { st = await perms.state(); } catch (e) { /* older platform */ }
+        if (st.db === 'denied' || st.user === 'denied') { this.status = 'local'; this.reason = 'permission'; return; }
+      }
+      const id = await user.id();
+      if (!id) { this.status = 'local'; this.reason = 'signedout'; return; }
       const doc = db.doc('data/users/' + id + '/save');
       const snap = await doc.get();
       if (snap.exists) this.merge(snap.data());
       // only start writing once the account copy has been read, so a fresh device can never overwrite it
       this.doc = doc;
-      this.status = 'cloud';
-      // first save (or local progress made before the cloud answered)
+      this.status = 'cloud'; this.reason = '';
       this.dirty = true; this.flush();
     } catch (e) {
-      this.status = 'error';
+      const c = e && e.code;
+      this.status = 'local';
+      this.reason = c === 'not_granted' || c === 'denied' ? 'permission' : c === 'unauthenticated' || c === 'signed_out' ? 'signedout' : 'error';
     }
-    if (typeof UI !== 'undefined' && UI.screen === 'main') UI.show('main');
+  },
+  // the "connect to my account" button: ask for permission, then try again
+  async connect() {
+    if (this.perms) {
+      try {
+        const st = await this.perms.request(['db', 'user']);
+        if ((st.db === 'denied' || st.user === 'denied')) { try { await this.perms.manage(); } catch (e) { /* menu fallback */ } }
+      } catch (e) { /* ignore */ }
+    }
+    this.status = 'local';
+    await this.init();
+    return this.status === 'cloud';
   },
 
   // cloud copy wins when it is newer than what this device has
@@ -72,18 +99,21 @@ const Cloud = {
     if (this.dirty) this.schedule();
   },
   label() {
-    if (this.status === 'cloud') return '☁ Progress saved to your Claude account';
-    if (this.status === 'connecting') return '☁ Connecting to your account…';
+    if (this.status === 'cloud') return '☁ Synced with your Claude account';
+    if (this.status === 'connecting') return '☁ Connecting to your Claude account…';
+    if (this.reason === 'permission') return '⚠ Not connected: allow access to your Claude account (button below)';
+    if (this.reason === 'signedout') return '⚠ Not signed in to Claude in this browser, so progress here is NOT your account progress. Sign in at claude.ai and reopen the game.';
     if (!Store.works()) return '⚠ Not saving here: sign in to Claude (or use a save code in Profile)';
-    if (this.status === 'error') return '⚠ Saved on this device only (account save unavailable)';
-    return '⚠ Saved on this device only: sign in to Claude to save to your account';
+    if (this.reason === 'error') return '⚠ Couldn\'t reach your Claude account. Saved on this device for now.';
+    return '⚠ Saved on this device only (the offline file can\'t reach your Claude account)';
   },
+  canConnect() { return this.status !== 'cloud' && this.status !== 'connecting' && this.reason !== 'standalone'; },
 };
 
 // save hooks: stamp the time, keep a local copy, and sync to the cloud
 function saveProfile() { Profile.savedAt = Date.now(); Store.set('profile', Profile); Cloud.schedule(); }
 function saveSettings() { Profile.savedAt = Date.now(); Store.set('settings', Settings); Store.set('profile', Profile); Cloud.schedule(); }
-document.addEventListener('visibilitychange', () => { if (document.hidden) Cloud.flush(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) Cloud.flush(); else if (Cloud.status !== 'cloud') Cloud.init(); });
 window.addEventListener('pagehide', () => Cloud.flush());
 
 // save codes: copy your whole progress as text and load it anywhere
