@@ -182,6 +182,11 @@ class Bot {
       // only leave the net to clear a slow ball sitting near our goal (with two keepers, the one on that side)
       const mySide = !this.keeperSide || Math.sign(ball.pos.x || 1) === this.keeperSide;
       if (mySide && ball.vel.length() < 700 && Math.abs(ball.pos.z - own.z) < 2200 && ball.pos.y < 250) { this.mode = 'attack'; this.role = 'attack'; }
+      // the ball is flying at the other goal: top up boost from a pad near our net, so there's enough to fly for a save
+      else if (this.heatMode && game.heat.target !== car.team && car.boost < 60) {
+        const pad = this.nearestPad(game, false);
+        if (pad && Math.abs(pad.z - own.z) < 2600 && pad.dist < 2200) { this.mode = 'boost'; this.target.set(pad.x, 0, pad.z); }
+      }
     } else if (this.role === 'striker') {
       // ball coming at our net: wait just past the half line for the save, then finish it (in the air if needed)
       if (game.heat.target === car.team || (this.saving && game.ballThreat && game.ballThreat.team === car.team)) {
@@ -328,9 +333,12 @@ class Bot {
       if (cross && car.onGround && Math.abs(car.pos.z - lineZ) < 400) {
         const H = cross.pos.y, T = cross.t;
         // jump early enough that the car is up at the ball's height as it arrives (hold longer for higher balls)
-        const lead = H < 200 ? 0.25 : H < 260 ? 0.45 : 0.7;
-        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < (this.lv.aggro ? 300 : 200)) {
+        // high ball out of double-jump reach: take off early and fly up to it with boost
+        const fly = H > 440 && car.boost > 8 && this.aerialSkill(game) > 0.3;
+        const lead = H < 200 ? 0.25 : H < 260 ? 0.45 : fly ? 0.55 + H / 1000 : 0.7;
+        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < (fly ? 450 : this.lv.aggro ? 340 : 220)) {
           this.aimPoint = cross.pos.clone();
+          if (fly) { this.aerial = { t: 0, target: cross.pos.clone(), arrive: T, dj: false, save: true }; c.jump = true; return; }
           if (H < 260) this.seq = [{ d: clamp((H - 100) / 700, 0.05, 0.2), c: { jump: true } }, { d: 0.6, c: { jump: false } }];
           else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.5, c: { boost: car.boost > 5 }, aim: true }];
           this.seqT = 0; return;
@@ -338,7 +346,8 @@ class Bot {
       }
       // drive onto the middle of the goal line and stop there (any facing works for a block)
       // two keepers split the goal: one covers each half
-      const px = this.keeperSide < 0 ? clamp(tx, -650, -110) : this.keeperSide > 0 ? clamp(tx, 110, 650) : clamp(tx, -220, 220);
+      // shots can go anywhere in the goal: slide across to where the ball will cross
+      const px = this.keeperSide < 0 ? clamp(tx, -650, -110) : this.keeperSide > 0 ? clamp(tx, 110, 650) : clamp(tx, cross ? -620 : -220, cross ? 620 : 220);
       const d = Math.hypot(car.pos.x - px, car.pos.z - lineZ);
       if (d < 140 && car.onGround) {
         const vf = car.vel.dot(car.fwd(_ai4));

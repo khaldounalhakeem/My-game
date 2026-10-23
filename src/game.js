@@ -166,7 +166,7 @@ class Game {
         if (this.mode === 'heatseeker' && this.kind === 'match') {
           // heatseeker kickoff: the ball fires off towards a random goal
           const tgt = Math.random() < 0.5 ? 0 : 1;
-          this.heat = { target: tgt, speed: 1500 };
+          this.heat = { target: tgt, speed: 1500 }; heatAim(this.heat);
           const side = Math.random() < 0.5 ? -1 : 1;
           this.ball.vel.set(side * 500, 650, (tgt === 1 ? 1 : -1) * 900);
           this.kickoffPending = false; this.clockRunning = true;
@@ -314,7 +314,7 @@ class Game {
       const g = ARENA.goal, m = ball.radius + 40;
       const onFrame = g && Math.abs(ball.pos.x) < g.w + m && ball.pos.y < g.h + m;
       if (side === this.heat.target && !onFrame) {
-        this.heat.target = 1 - side;
+        this.heat.target = 1 - side; heatAim(this.heat);
         const away = side === 1 ? -1 : 1;
         if (ball.vel.z * away < 500) ball.vel.z = away * Math.max(500, Math.abs(ball.vel.z));
         this.events.push({ type: 'heatwall', team: this.heat.target });
@@ -373,7 +373,7 @@ class Game {
       const ownDir = car.team === 0 ? -1 : 1;
       if (ball.vel.z * ownDir > 0) ball.vel.z = -ball.vel.z * 0.9;
       if (ball.vel.z * ownDir > -500) ball.vel.z = -ownDir * Math.max(500, Math.abs(ball.vel.z));
-      this.heat.target = car.team === 0 ? 1 : 0;
+      this.heat.target = car.team === 0 ? 1 : 0; heatAim(this.heat);
       this.heat.speed = this.heat.speed ? Math.min(4600, this.heat.speed + 200) : 1900;
     }
     // dropshot charge
@@ -880,11 +880,17 @@ function randomLoadout() {
   };
 }
 
-// Heatseeker: steer the ball towards the target goal and bring it up to the heat speed
+// Heatseeker: every new target picks a random spot inside the goal (high, low, either side, the corners)
+function heatAim(heat) {
+  const g = ARENA.goal || { w: 893, h: 643 };
+  heat.ax = rand(-g.w + 170, g.w - 170);
+  heat.ay = rand(130, g.h - 130);
+}
+// steer the ball towards that spot and bring it up to the heat speed
 function heatHome(ball, heat, gravity, dt) {
   if (!heat || heat.target < 0) return;
   const gz = heat.target === 1 ? ARENA.L : -ARENA.L;
-  const to = tmpV(0, 320, gz).sub(ball.pos);
+  const to = tmpV(heat.ax || 0, heat.ay || 320, gz).sub(ball.pos);
   if (to.length() <= 300) return;
   to.normalize();
   const sp0 = ball.vel.length();

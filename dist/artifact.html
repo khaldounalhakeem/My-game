@@ -1541,7 +1541,7 @@ const Predict = {
     const dt = 1 / hz, n = Math.floor(seconds * hz);
     while (this.slices.length < n) this.slices.push({ t: 0, pos: new V3(), vel: new V3() });
     this.count = n;
-    const h = heat && heat.target >= 0 && typeof heatHome === 'function' ? { target: heat.target, speed: heat.speed } : null;
+    const h = heat && heat.target >= 0 && typeof heatHome === 'function' ? { target: heat.target, speed: heat.speed, ax: heat.ax, ay: heat.ay } : null;
     for (let i = 0; i < n; i++) {
       if (h) heatHome(b, h, mut.gravity, dt);
       b.step(dt, mut, null);
@@ -2075,6 +2075,11 @@ class Bot {
       // only leave the net to clear a slow ball sitting near our goal (with two keepers, the one on that side)
       const mySide = !this.keeperSide || Math.sign(ball.pos.x || 1) === this.keeperSide;
       if (mySide && ball.vel.length() < 700 && Math.abs(ball.pos.z - own.z) < 2200 && ball.pos.y < 250) { this.mode = 'attack'; this.role = 'attack'; }
+      // the ball is flying at the other goal: top up boost from a pad near our net, so there's enough to fly for a save
+      else if (this.heatMode && game.heat.target !== car.team && car.boost < 60) {
+        const pad = this.nearestPad(game, false);
+        if (pad && Math.abs(pad.z - own.z) < 2600 && pad.dist < 2200) { this.mode = 'boost'; this.target.set(pad.x, 0, pad.z); }
+      }
     } else if (this.role === 'striker') {
       // ball coming at our net: wait just past the half line for the save, then finish it (in the air if needed)
       if (game.heat.target === car.team || (this.saving && game.ballThreat && game.ballThreat.team === car.team)) {
@@ -2221,9 +2226,12 @@ class Bot {
       if (cross && car.onGround && Math.abs(car.pos.z - lineZ) < 400) {
         const H = cross.pos.y, T = cross.t;
         // jump early enough that the car is up at the ball's height as it arrives (hold longer for higher balls)
-        const lead = H < 200 ? 0.25 : H < 260 ? 0.45 : 0.7;
-        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < (this.lv.aggro ? 300 : 200)) {
+        // high ball out of double-jump reach: take off early and fly up to it with boost
+        const fly = H > 440 && car.boost > 8 && this.aerialSkill(game) > 0.3;
+        const lead = H < 200 ? 0.25 : H < 260 ? 0.45 : fly ? 0.55 + H / 1000 : 0.7;
+        if (T < lead && Math.abs(car.pos.x - cross.pos.x) < (fly ? 450 : this.lv.aggro ? 340 : 220)) {
           this.aimPoint = cross.pos.clone();
+          if (fly) { this.aerial = { t: 0, target: cross.pos.clone(), arrive: T, dj: false, save: true }; c.jump = true; return; }
           if (H < 260) this.seq = [{ d: clamp((H - 100) / 700, 0.05, 0.2), c: { jump: true } }, { d: 0.6, c: { jump: false } }];
           else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.5, c: { boost: car.boost > 5 }, aim: true }];
           this.seqT = 0; return;
@@ -2231,7 +2239,8 @@ class Bot {
       }
       // drive onto the middle of the goal line and stop there (any facing works for a block)
       // two keepers split the goal: one covers each half
-      const px = this.keeperSide < 0 ? clamp(tx, -650, -110) : this.keeperSide > 0 ? clamp(tx, 110, 650) : clamp(tx, -220, 220);
+      // shots can go anywhere in the goal: slide across to where the ball will cross
+      const px = this.keeperSide < 0 ? clamp(tx, -650, -110) : this.keeperSide > 0 ? clamp(tx, 110, 650) : clamp(tx, cross ? -620 : -220, cross ? 620 : 220);
       const d = Math.hypot(car.pos.x - px, car.pos.z - lineZ);
       if (d < 140 && car.onGround) {
         const vf = car.vel.dot(car.fwd(_ai4));
@@ -2618,7 +2627,7 @@ class Game {
         if (this.mode === 'heatseeker' && this.kind === 'match') {
           // heatseeker kickoff: the ball fires off towards a random goal
           const tgt = Math.random() < 0.5 ? 0 : 1;
-          this.heat = { target: tgt, speed: 1500 };
+          this.heat = { target: tgt, speed: 1500 }; heatAim(this.heat);
           const side = Math.random() < 0.5 ? -1 : 1;
           this.ball.vel.set(side * 500, 650, (tgt === 1 ? 1 : -1) * 900);
           this.kickoffPending = false; this.clockRunning = true;
@@ -2766,7 +2775,7 @@ class Game {
       const g = ARENA.goal, m = ball.radius + 40;
       const onFrame = g && Math.abs(ball.pos.x) < g.w + m && ball.pos.y < g.h + m;
       if (side === this.heat.target && !onFrame) {
-        this.heat.target = 1 - side;
+        this.heat.target = 1 - side; heatAim(this.heat);
         const away = side === 1 ? -1 : 1;
         if (ball.vel.z * away < 500) ball.vel.z = away * Math.max(500, Math.abs(ball.vel.z));
         this.events.push({ type: 'heatwall', team: this.heat.target });
@@ -2825,7 +2834,7 @@ class Game {
       const ownDir = car.team === 0 ? -1 : 1;
       if (ball.vel.z * ownDir > 0) ball.vel.z = -ball.vel.z * 0.9;
       if (ball.vel.z * ownDir > -500) ball.vel.z = -ownDir * Math.max(500, Math.abs(ball.vel.z));
-      this.heat.target = car.team === 0 ? 1 : 0;
+      this.heat.target = car.team === 0 ? 1 : 0; heatAim(this.heat);
       this.heat.speed = this.heat.speed ? Math.min(4600, this.heat.speed + 200) : 1900;
     }
     // dropshot charge
@@ -3332,11 +3341,17 @@ function randomLoadout() {
   };
 }
 
-// Heatseeker: steer the ball towards the target goal and bring it up to the heat speed
+// Heatseeker: every new target picks a random spot inside the goal (high, low, either side, the corners)
+function heatAim(heat) {
+  const g = ARENA.goal || { w: 893, h: 643 };
+  heat.ax = rand(-g.w + 170, g.w - 170);
+  heat.ay = rand(130, g.h - 130);
+}
+// steer the ball towards that spot and bring it up to the heat speed
 function heatHome(ball, heat, gravity, dt) {
   if (!heat || heat.target < 0) return;
   const gz = heat.target === 1 ? ARENA.L : -ARENA.L;
-  const to = tmpV(0, 320, gz).sub(ball.pos);
+  const to = tmpV(heat.ax || 0, heat.ay || 320, gz).sub(ball.pos);
   if (to.length() <= 300) return;
   to.normalize();
   const sp0 = ball.vel.length();
@@ -3628,7 +3643,7 @@ const Net = {
     const b = g.ball;
     const s = {
       id: this.matchId, st: g.state, sT: r2(g.stateT), cl: r2(g.clock), sc: g.score.slice(), ot: g.overtime ? 1 : 0, oT: r2(g.otTime || 0),
-      bh: g.ballHidden ? 1 : 0, ht: g.heat.target, hs: r0(g.heat.speed),
+      bh: g.ballHidden ? 1 : 0, ht: g.heat.target, hs: r0(g.heat.speed), hx: r0(g.heat.ax || 0), hy: r0(g.heat.ay || 320),
       c: g.cars.map(c => [r0(c.pos.x), r0(c.pos.y), r0(c.pos.z), r3(c.quat.x), r3(c.quat.y), r3(c.quat.z), r3(c.quat.w),
         r0(c.vel.x), r0(c.vel.y), r0(c.vel.z), r2(c.angVel.x), r2(c.angVel.y), r2(c.angVel.z), r0(c.boost),
         (c.demolished ? 1 : 0) | (c.boosting ? 2 : 0) | (c.onGround ? 4 : 0) | (c.supersonic ? 8 : 0), c.spawnSeq || 0]),
@@ -3722,7 +3737,7 @@ const NetSync = {
   applySnapshot(g, s) {
     const prevState = g.state;
     g.state = s.st; g.stateT = s.sT; g.clock = s.cl; g.score = s.sc.slice(); g.overtime = !!s.ot; g.otTime = s.oT;
-    g.ballHidden = !!s.bh; g.heat.target = s.ht; g.heat.speed = s.hs;
+    g.ballHidden = !!s.bh; g.heat.target = s.ht; g.heat.speed = s.hs; g.heat.ax = s.hx; g.heat.ay = s.hy;
     g.clockRunning = true; g.kickoffPending = false;
     if (s.st === 'ended') { g.winner = s.w; g.mvp = g.cars[s.mvp] || null; }
     // cars

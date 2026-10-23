@@ -286,7 +286,7 @@ const Predict = {
     const dt = 1 / hz, n = Math.floor(seconds * hz);
     while (this.slices.length < n) this.slices.push({ t: 0, pos: new V3(), vel: new V3() });
     this.count = n;
-    const h = heat && heat.target >= 0 && typeof heatHome === 'function' ? { target: heat.target, speed: heat.speed } : null;
+    const h = heat && heat.target >= 0 && typeof heatHome === 'function' ? { target: heat.target, speed: heat.speed, ax: heat.ax, ay: heat.ay } : null;
     for (let i = 0; i < n; i++) {
       if (h) heatHome(b, h, mut.gravity, dt);
       b.step(dt, mut, null);

@@ -277,7 +277,7 @@ const Net = {
     const b = g.ball;
     const s = {
       id: this.matchId, st: g.state, sT: r2(g.stateT), cl: r2(g.clock), sc: g.score.slice(), ot: g.overtime ? 1 : 0, oT: r2(g.otTime || 0),
-      bh: g.ballHidden ? 1 : 0, ht: g.heat.target, hs: r0(g.heat.speed),
+      bh: g.ballHidden ? 1 : 0, ht: g.heat.target, hs: r0(g.heat.speed), hx: r0(g.heat.ax || 0), hy: r0(g.heat.ay || 320),
       c: g.cars.map(c => [r0(c.pos.x), r0(c.pos.y), r0(c.pos.z), r3(c.quat.x), r3(c.quat.y), r3(c.quat.z), r3(c.quat.w),
         r0(c.vel.x), r0(c.vel.y), r0(c.vel.z), r2(c.angVel.x), r2(c.angVel.y), r2(c.angVel.z), r0(c.boost),
         (c.demolished ? 1 : 0) | (c.boosting ? 2 : 0) | (c.onGround ? 4 : 0) | (c.supersonic ? 8 : 0), c.spawnSeq || 0]),
@@ -371,7 +371,7 @@ const NetSync = {
   applySnapshot(g, s) {
     const prevState = g.state;
     g.state = s.st; g.stateT = s.sT; g.clock = s.cl; g.score = s.sc.slice(); g.overtime = !!s.ot; g.otTime = s.oT;
-    g.ballHidden = !!s.bh; g.heat.target = s.ht; g.heat.speed = s.hs;
+    g.ballHidden = !!s.bh; g.heat.target = s.ht; g.heat.speed = s.hs; g.heat.ax = s.hx; g.heat.ay = s.hy;
     g.clockRunning = true; g.kickoffPending = false;
     if (s.st === 'ended') { g.winner = s.w; g.mvp = g.cars[s.mvp] || null; }
     // cars
