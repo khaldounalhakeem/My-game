@@ -2225,15 +2225,18 @@ class Bot {
       // save: leave the ground in time to meet the ball at its height
       if (cross && car.onGround && Math.abs(car.pos.z - lineZ) < 400) {
         const H = cross.pos.y, T = cross.t;
-        // jump early enough that the car is up at the ball's height as it arrives (hold longer for higher balls)
-        // high ball out of double-jump reach: take off early and fly up to it with boost
-        const fly = H > 440 && car.boost > 8 && this.aerialSkill(game) > 0.3;
-        const lead = H < 200 ? 0.25 : H < 260 ? 0.45 : fly ? 0.55 + H / 1000 : 0.7;
+        // jump exactly early enough to meet the ball at its height (measured jump curve), and only fly
+        // when the ball is above double-jump reach
+        const reachT = (y) => { const tab = [[0, 19], [0.1, 52], [0.2, 92], [0.3, 153], [0.4, 217], [0.5, 274], [0.6, 324], [0.7, 369], [0.8, 406], [0.9, 437], [1.0, 462], [1.1, 480], [1.2, 492]];
+          for (let i = 1; i < tab.length; i++) if (tab[i][1] >= y) { const a = tab[i - 1], b = tab[i]; return a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]); } return 1.2; };
+        const want = H - 110; // car height that puts its roof/nose on the ball
+        const fly = H > 420 && car.boost > 12 && this.aerialSkill(game) > 0.3;
+        const lead = H < 200 ? 0.25 : H < 260 ? 0.45 : fly ? 0.55 + H / 1000 : Math.max(0.45, reachT(want));
         if (T < lead && Math.abs(car.pos.x - cross.pos.x) < (fly ? 450 : this.lv.aggro ? 340 : 220)) {
           this.aimPoint = cross.pos.clone();
           if (fly) { this.aerial = { t: 0, target: cross.pos.clone(), arrive: T, dj: false, save: true }; c.jump = true; return; }
           if (H < 260) this.seq = [{ d: clamp((H - 100) / 700, 0.05, 0.2), c: { jump: true } }, { d: 0.6, c: { jump: false } }];
-          else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.5, c: { boost: car.boost > 5 }, aim: true }];
+          else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.6, c: {}, aim: true }];
           this.seqT = 0; return;
         }
       }
