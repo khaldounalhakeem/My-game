@@ -422,7 +422,7 @@ class Game {
     const zf = ball.pos.z * dir; // how far up the field the ball is
     if (zf < -500) return false;
     const v = ball.vel, S = v.length();
-    if (S < 900) return false;
+    if (S < 700) return false;
     // a teammate free in front of goal, closer to it than the ball
     let best = null, bs = -1e9;
     for (const m of this.cars) {

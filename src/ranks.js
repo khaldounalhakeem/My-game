@@ -51,10 +51,10 @@ const SKILL_ANCHORS = [
   [0, { react: 0.4, skill: 0.3, aerial: 0, maxBoost: 0.35, flip: 0.25, aim: 0.45, assist: 0.04, aggro: 0, pass: 0, mech: 0, pflip: 0 }],
   [300, { react: 0.28, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0, pass: 0, mech: 0, pflip: 0 }],
   [740, { react: 0.14, skill: 0.75, aerial: 0.55, maxBoost: 0.9, flip: 0.85, aim: 0.88, assist: 0.25, aggro: 0, pass: 0.25, mech: 0.2, pflip: 0 }],
-  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.27, aggro: 0, pass: 0.5, mech: 0.4, pflip: 0.3 }],
-  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.3, aggro: 1, pass: 0.7, mech: 0.45, pflip: 0.5 }],
-  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.85, mech: 0.5, pflip: 0.7 }],
-  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.4, aggro: 1, pass: 0.95, mech: 0.55, pflip: 0.8 }],
+  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.27, aggro: 0, pass: 0.5, mech: 0.45, pflip: 0.3 }],
+  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.3, aggro: 1, pass: 0.7, mech: 0.7, pflip: 0.5 }],
+  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.85, mech: 0.9, pflip: 0.7 }],
+  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.4, aggro: 1, pass: 0.95, mech: 1, pflip: 0.8 }],
 ];
 function levelForMMR(mmr) {
   const A = SKILL_ANCHORS;

@@ -85,7 +85,7 @@ const BOT_NAMES = ['Armstrong', 'Bandit', 'Beast', 'Boomer', 'Buzz', 'Casper', '
 const BOT_LEVELS = {
   rookie: { name: 'Rookie', react: 0.3, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0, pass: 0, mech: 0 },
   pro: { name: 'Pro', react: 0.1, skill: 0.85, aerial: 0.75, maxBoost: 1, flip: 0.95, aim: 0.93, assist: 0.32, aggro: 0, pass: 0.4, mech: 0.4 },
-  allstar: { name: 'All-Star', react: 0.035, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.8, mech: 0.5, pflip: 0.65 },
+  allstar: { name: 'All-Star', react: 0.035, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.8, mech: 0.85, pflip: 0.65 },
 };
 
 const TRAINING_PACKS = {

@@ -171,9 +171,18 @@ const Input = {
       if (typeof UI !== 'undefined') UI.toast('🎮 ' + prettyPadName(this.padName) + ' connected');
       Sound.init();
     });
+    // iPads sometimes report a controller as disconnected for a moment (a Bluetooth hiccup) while it keeps
+    // working. Only react if it's still gone 2 seconds later, and never throw the player out of the match.
     window.addEventListener('gamepaddisconnected', () => {
-      if (typeof UI !== 'undefined') UI.toast('Controller disconnected');
-      if (CUR.game && !CUR.attract && !UI.screen) pauseGame();
+      clearTimeout(this._padGoneT);
+      this._padGoneT = setTimeout(() => {
+        let any = false;
+        try { for (const p of navigator.getGamepads ? navigator.getGamepads() : []) if (p && p.connected) any = true; } catch (e) { /* ignore */ }
+        if (any) return;
+        if (typeof UI !== 'undefined') UI.toast('Controller disconnected. Reconnect it or use touch controls');
+        // pause (not quit) so the match waits for you, except online where the others keep playing
+        if (CUR.game && !CUR.attract && !UI.screen && !CUR.game.online && CUR.game.state === 'play') pauseGame();
+      }, 2000);
     });
   },
   pollGamepad(dt) {

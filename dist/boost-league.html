@@ -1668,7 +1668,7 @@ const BOT_NAMES = ['Armstrong', 'Bandit', 'Beast', 'Boomer', 'Buzz', 'Casper', '
 const BOT_LEVELS = {
   rookie: { name: 'Rookie', react: 0.3, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0, pass: 0, mech: 0 },
   pro: { name: 'Pro', react: 0.1, skill: 0.85, aerial: 0.75, maxBoost: 1, flip: 0.95, aim: 0.93, assist: 0.32, aggro: 0, pass: 0.4, mech: 0.4 },
-  allstar: { name: 'All-Star', react: 0.035, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.8, mech: 0.5, pflip: 0.65 },
+  allstar: { name: 'All-Star', react: 0.035, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.8, mech: 0.85, pflip: 0.65 },
 };
 
 const TRAINING_PACKS = {
@@ -1778,10 +1778,10 @@ const SKILL_ANCHORS = [
   [0, { react: 0.4, skill: 0.3, aerial: 0, maxBoost: 0.35, flip: 0.25, aim: 0.45, assist: 0.04, aggro: 0, pass: 0, mech: 0, pflip: 0 }],
   [300, { react: 0.28, skill: 0.45, aerial: 0.15, maxBoost: 0.5, flip: 0.45, aim: 0.6, assist: 0.1, aggro: 0, pass: 0, mech: 0, pflip: 0 }],
   [740, { react: 0.14, skill: 0.75, aerial: 0.55, maxBoost: 0.9, flip: 0.85, aim: 0.88, assist: 0.25, aggro: 0, pass: 0.25, mech: 0.2, pflip: 0 }],
-  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.27, aggro: 0, pass: 0.5, mech: 0.4, pflip: 0.3 }],
-  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.3, aggro: 1, pass: 0.7, mech: 0.45, pflip: 0.5 }],
-  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.85, mech: 0.5, pflip: 0.7 }],
-  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.4, aggro: 1, pass: 0.95, mech: 0.55, pflip: 0.8 }],
+  [1180, { react: 0.055, skill: 0.97, aerial: 0.95, maxBoost: 1, flip: 1, aim: 0.99, assist: 0.27, aggro: 0, pass: 0.5, mech: 0.45, pflip: 0.3 }],
+  [1420, { react: 0.035, skill: 1, aerial: 1, maxBoost: 1, flip: 1, aim: 1, assist: 0.3, aggro: 1, pass: 0.7, mech: 0.7, pflip: 0.5 }],
+  [1700, { react: 0.022, skill: 1, aerial: 1.05, maxBoost: 1, flip: 1, aim: 1, assist: 0.35, aggro: 1, pass: 0.85, mech: 0.9, pflip: 0.7 }],
+  [2000, { react: 0.015, skill: 1, aerial: 1.1, maxBoost: 1, flip: 1, aim: 1, assist: 0.4, aggro: 1, pass: 0.95, mech: 1, pflip: 0.8 }],
 ];
 function levelForMMR(mmr) {
   const A = SKILL_ANCHORS;
@@ -1952,6 +1952,7 @@ class Bot {
       return;
     }
 
+    if (this.dribble) { if (this.doDribble(game, dt)) return; }
     if (this.aerial) { this.doAerial(game, dt); return; }
     // wedged against something (a goal post, the back of the net): back out
     if (car.onGround && Math.abs(c.throttle) < 0.01) {
@@ -1962,6 +1963,10 @@ class Bot {
     if (!car.onGround) {
       // still flying with boost: go for the next touch (air dribble, double touch off the wall/backboard)
       this.followCd = (this.followCd || 0) - dt;
+      if (this.popUntil && game.time < this.popUntil && !this.dribble) {
+        const rel = _ai1.copy(game.ball.pos).sub(car.pos);
+        if (rel.length() < 420 && rel.y > 40 && game.ball.vel.y - car.vel.y > -250 && car.boost > 10) { this.dribble = { t: 0 }; this.popUntil = 0; if (this.doDribble(game, dt)) return; }
+      }
       if (this.followCd <= 0 && this.airFollow(game)) { this.doAerial(game, dt); return; }
       this.recover(game, c); return;
     }
@@ -2272,7 +2277,8 @@ class Bot {
       const localB = this.local(I.pos, _ai3);
       const flatD = Math.hypot(localB.x, localB.z);
       const h = I.pos.y;
-      const aligned = Math.abs(Math.atan2(localB.z, localB.x)) < 0.35;
+      const receiving = game.pass && game.pass.to === car && game.time - game.pass.t < 2.6;
+      const aligned = Math.abs(Math.atan2(localB.z, localB.x)) < (receiving ? 0.9 : 0.35);
       const air = this.aerialSkill(game);
       if (h > 300 && air > 0 && car.boost > (this.heatMode ? 12 : 25) && aligned && I.t < 1.3 + air * 0.6 && I.t > 0.4 && car.groundN.y > 0.9) {
         this.startAerial(I);
@@ -2288,6 +2294,18 @@ class Bot {
       }
       // power flip into a ground ball
       const dToBall = car.pos.distanceTo(ball.pos);
+      // air dribble setup: the ball is rolling slowly just ahead of us in midfield with nobody close: pop it up and carry it
+      if ((this.lv.mech || 0) >= 0.6 && !this.heatMode && car.boost > 45 && this.flipCd <= 0 && game.time > (this.popCd || 0)) {
+        const og = this.oppGoal(_ai4), gd = Math.abs(og.z - ball.pos.z);
+        const rv = _ai1.copy(ball.vel).sub(car.vel);
+        const opp = Math.min(...game.cars.filter(o => o.team !== car.team && !o.demolished).map(o => o.pos.distanceTo(ball.pos)), 1e9);
+        if (dToBall < 260 && ball.pos.y < 140 && aligned && gd > 2800 && gd < 7000 && rv.length() < 700 && opp > 1400 && Math.random() < this.lv.mech * 0.5) {
+          this.popCd = game.time + 4;
+          this.popUntil = game.time + 1.2;
+          this.seq = [{ d: 0.16, c: { jump: true, throttle: 1 } }, { d: 0.12, c: { jump: false, throttle: 1, pitch: -0.4 } }];
+          this.seqT = 0; return;
+        }
+      }
       const ownGoalDanger = (this.lv.skill || 0) > 0.8 && (-car.vel.z * this.attackDir()) > 200 && Math.abs(ball.pos.z - this.ownGoal(_ai4).z) < 2400;
       if (!ownGoalDanger && dToBall < 380 && ball.pos.y < 175 && aligned && this.flipCd <= 0 && Math.random() < (this.lv.pflip || this.lv.flip * 0.25) && car.vel.length() > 600) {
         const side = clamp(localB.z / 120, -1, 1);
@@ -2352,26 +2370,80 @@ class Bot {
   airFollow(game) {
     const car = this.car, mech = this.lv.mech || 0;
     if (!mech || car.boost < 6 || car.contactRoof > 0) return false;
-    if (Math.random() > mech) { this.followCd = 0.3; return false; } // weaker bots often just land
-    this.followCd = 0.12;
     const pred = game.prediction, g = PHYS.GRAVITY * game.mutators.gravity;
-    const og = this.oppGoal(_ai1);
-    // only worth it going forwards: the ball must be on the way to (or near) their goal, not ours
-    if ((game.ball.pos.z - og.z) * (og.z > 0 ? -1 : 1) > 6500) return false;
+    const og = this.oppGoal(_ai1), dir = og.z > 0 ? 1 : -1;
+    const sinceTouch = game.time - (car.lastBallHit || -10);
+    let pick = null;
     for (let i = 2; i < pred.count; i += 2) {
       const s = pred.slices[i];
       if (s.t > 1.6) break;
       if (s.pos.y < 200) continue;
+      // only touches that matter: a rebound / second touch in front of their goal (double touch),
+      // or the next touch right after our own while flying with the ball (air dribble)
+      const scoring = (og.z - s.pos.z) * dir < 2600 && Math.abs(s.pos.x) < 2300;
+      const dribble = sinceTouch < 0.7 && s.t < 0.9 && (s.pos.z - car.pos.z) * dir > -150;
+      if (!scoring && !dribble) continue;
       const need = _ai2.copy(s.pos).sub(car.pos).addScaledVector(car.vel, -s.t);
       need.y += 0.5 * g * s.t * s.t;
-      const a = need.length() / (0.5 * s.t * s.t);
-      if (a < 850 && s.t * 33.3 < car.boost + 5) {
-        this.aerial = { t: 0.35, target: s.pos.clone(), arrive: s.t + 0.35, dj: true, follow: true };
-        return true;
-      }
+      const acc = need.length() / (0.5 * s.t * s.t);
+      if (acc < 900 && s.t * 33.3 < car.boost + 5) { pick = s; break; }
     }
-    this.followCd = 0.25;
-    return false;
+    if (!pick) { this.followCd = 0.12; return false; }
+    // weaker players often don't see it
+    if (Math.random() > mech) { this.followCd = 0.6; return false; }
+    this.followCd = 0.12;
+    this.aerial = { t: 0.35, target: pick.pos.clone(), arrive: pick.t + 0.35, dj: true, follow: true };
+    return true;
+  }
+  // air dribble: after a touch in the air, stay under the ball and carry it towards their goal with soft touches
+  maybeDribble(game) {
+    const car = this.car, ball = game.ball, mech = this.lv.mech || 0;
+    if (mech < 0.6 || car.onGround || car.boost < 15 || this.heatMode) return;
+    const rel = _ai1.copy(ball.pos).sub(car.pos);
+    if (rel.length() > 380 || rel.y < 40 || ball.vel.y - car.vel.y < -250) return; // the ball has to be above us, not dropping away
+    if (_ai3.copy(ball.vel).sub(car.vel).length() > 900) return;        // and not flying away
+    const og = this.oppGoal(_ai2), dir = og.z > 0 ? 1 : -1;
+    if (ball.vel.z * dir < -300) return;                 // not while the ball is heading back to our net
+    if (Math.abs(og.z - ball.pos.z) < 1500) return;      // already at their goal: just shoot
+    if (Math.random() > mech) return;
+    this.dribble = { t: 0 };
+  }
+  wantsCarry(game) {
+    const mech = this.lv.mech || 0, ball = game.ball;
+    if (mech < 0.6 || this.heatMode || this.car.boost < 40) return false;
+    const og = this.oppGoal(_ai2), dir = og.z > 0 ? 1 : -1;
+    const toGoal = Math.abs(og.z - ball.pos.z);
+    // a ball in the middle of the field, not coming back at us, slow enough to control
+    if (toGoal < 2500 || toGoal > 7500 || ball.vel.z * dir < -200 || ball.vel.length() > 1700) return false;
+    return Math.random() < mech * 0.8;
+  }
+  doDribble(game, dt) {
+    const car = this.car, c = car.ctrl, ball = game.ball, D = this.dribble;
+    D.t += dt;
+    const og = this.oppGoal(_ai2);
+    const toGoal = _ai3.copy(og).sub(ball.pos); toGoal.y = 0;
+    const goalDist = toGoal.length(); toGoal.normalize();
+    const dist = ball.pos.distanceTo(car.pos);
+    if (car.onGround || dist > 520 || car.boost < 1 || D.t > 4.5 || ball.pos.y < 120) { this.dribble = null; return false; }
+    if (goalDist < 1900) {
+      // close enough: stop carrying and hit it through the middle at the goal
+      this.dribble = null;
+      this.aerial = { t: 0.35, target: ball.pos.clone().addScaledVector(ball.vel, 0.2), arrive: 0.55, dj: true, follow: true };
+      return false;
+    }
+    // hold the car just under and behind the ball (relative to their goal), nose up into it, moving with the ball
+    // plus a small push: each contact is a soft tap on the nose that lifts the ball and nudges it towards the goal
+    const g = PHYS.GRAVITY * game.mutators.gravity;
+    const pdes = new V3().copy(ball.pos).addScaledVector(toGoal, -80); pdes.y -= 125;
+    const vdes = new V3().copy(ball.vel).addScaledVector(toGoal, 220);
+    const a = pdes.sub(car.pos).multiplyScalar(7).add(vdes.sub(car.vel).multiplyScalar(3.2));
+    a.y += g;
+    const need = a.length();
+    const n = a.multiplyScalar(1 / Math.max(1, need));
+    this.airAimDir(n, c);
+    c.boost = car.fwd(_ai1).dot(n) > 0.75 && need > 420;
+    c.throttle = 1;
+    return true;
   }
   startAerial(I) {
     this.aerial = { t: 0, target: I.pos.clone(), arrive: I.t, dj: false };
@@ -2381,7 +2453,18 @@ class Bot {
     const car = this.car, c = car.ctrl, A = this.aerial;
     A.t += dt;
     const T = A.arrive - A.t;
-    if (T < -0.25 || (car.onGround && A.t > 0.3) || car.pos.distanceTo(game.ball.pos) < 60 + PHYS.BALL_RADIUS * 0.4) { this.aerial = null; return; }
+    // going up for a ball we want to carry: switch to the soft dribble control before the first touch
+    if (A.carry === undefined) A.carry = !A.save && this.wantsCarry(game);
+    if (A.carry && !car.onGround && A.t > 0.3) {
+      const rel = _ai1.copy(game.ball.pos).sub(car.pos);
+      const rvy = game.ball.vel.y - car.vel.y;
+      if (rel.length() < 430 && rel.y > 40 && rvy > -250) { this.aerial = null; this.dribble = { t: 0 }; return; }
+    }
+    if (T < -0.25 || (car.onGround && A.t > 0.3) || car.pos.distanceTo(game.ball.pos) < 60 + PHYS.BALL_RADIUS * 0.4) {
+      this.aerial = null;
+      this.maybeDribble(game);
+      return;
+    }
     // refresh target from prediction
     const pred = game.prediction;
     for (let i = 0; i < pred.count; i++) if (pred.slices[i].t >= T) { A.target.copy(pred.slices[i].pos); break; }
@@ -2890,7 +2973,7 @@ class Game {
     const zf = ball.pos.z * dir; // how far up the field the ball is
     if (zf < -500) return false;
     const v = ball.vel, S = v.length();
-    if (S < 900) return false;
+    if (S < 700) return false;
     // a teammate free in front of goal, closer to it than the ball
     let best = null, bs = -1e9;
     for (const m of this.cars) {
@@ -5606,9 +5689,18 @@ const Input = {
       if (typeof UI !== 'undefined') UI.toast('🎮 ' + prettyPadName(this.padName) + ' connected');
       Sound.init();
     });
+    // iPads sometimes report a controller as disconnected for a moment (a Bluetooth hiccup) while it keeps
+    // working. Only react if it's still gone 2 seconds later, and never throw the player out of the match.
     window.addEventListener('gamepaddisconnected', () => {
-      if (typeof UI !== 'undefined') UI.toast('Controller disconnected');
-      if (CUR.game && !CUR.attract && !UI.screen) pauseGame();
+      clearTimeout(this._padGoneT);
+      this._padGoneT = setTimeout(() => {
+        let any = false;
+        try { for (const p of navigator.getGamepads ? navigator.getGamepads() : []) if (p && p.connected) any = true; } catch (e) { /* ignore */ }
+        if (any) return;
+        if (typeof UI !== 'undefined') UI.toast('Controller disconnected. Reconnect it or use touch controls');
+        // pause (not quit) so the match waits for you, except online where the others keep playing
+        if (CUR.game && !CUR.attract && !UI.screen && !CUR.game.online && CUR.game.state === 'play') pauseGame();
+      }, 2000);
     });
   },
   pollGamepad(dt) {
