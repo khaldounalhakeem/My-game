@@ -16,3 +16,4 @@
 16 1674 advantage,quietMove a2b2 b4a5 b2b5 a5a6
 17 1665 advantage,quietMove g2f1 e4e3 e6e3 f5d5
 18 723 mate,mateIn1,capture e8e7 f2c5
+19 1656 advantage,quietMove g5g4 f1e1 g4h3 c3f3

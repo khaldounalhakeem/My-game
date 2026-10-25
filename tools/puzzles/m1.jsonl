@@ -8,3 +8,4 @@
 {"fen":"r5k1/1p6/p2n1p1p/6p1/5nq1/3PQN2/PP3PPP/3RR2K w - - 3 30","moves":["e3a7","g4g2"],"rating":513,"themes":["mate","mateIn1","capture"]}
 {"fen":"k7/p1p3p1/N2r3r/RB1bp2p/5n1p/3P4/3K3P/1R6 b - - 16 41","moves":["d5f7","b5c6","d6c6","b1b8"],"rating":1189,"themes":["mate","mateIn2","check"]}
 {"fen":"r3k1r1/p1p1pp1p/6p1/3n4/1q1P4/2N1BP2/Pp1KPP1P/3R1B1R w q - 2 18","moves":["a2a3","b4c3"],"rating":780,"themes":["mate","mateIn1","capture"]}
+{"fen":"r1b1kb1r/pp3ppp/4p3/2ppPn2/5q1P/8/PPPPQ1K1/RNB2B1R w kq - 7 14","moves":["e2e4","f4g3"],"rating":893,"themes":["mate","mateIn1","quietMove"]}

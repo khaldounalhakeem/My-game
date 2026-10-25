@@ -8,3 +8,4 @@
 8 513 mate,mateIn1,capture e3a7 g4g2
 9 1189 mate,mateIn2,check d5f7 b5c6 d6c6 b1b8
 10 780 mate,mateIn1,capture a2a3 b4c3
+11 893 mate,mateIn1,quietMove e2e4 f4g3
