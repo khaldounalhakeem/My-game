@@ -1,9 +1,10 @@
 import { store } from '../storage.js';
 import { go } from '../app.js';
 import { Board } from '../board.js';
-import { BOTS } from '../bots.js';
+import { BOTS, botById } from '../bots.js';
 import { avatar, esc } from '../ui.js';
 import { coachById } from '../coaches.js';
+import { dailyPuzzle } from './puzzles.js';
 
 export function render(main) {
   const st = store.stats;
@@ -22,6 +23,7 @@ export function render(main) {
       </div>
       <div class="hero-board" id="hero-board"></div>
     </div>
+    ${resumable() ? `<div class="list-item" style="margin-bottom:16px;border:2px solid var(--green)"><div class="big-ico" style="font-size:26px">♟️</div><div class="meta"><b>You have a game in progress</b><span>${esc(resumable())}</span></div><button class="btn primary" style="font-size:15px;padding:10px 16px" data-act="resume">▶ Resume</button></div>` : ''}
     <div class="stat-row">
       <div class="stat"><b>${st.rating}</b><span>Bot rating</span></div>
       <div class="stat"><b>${st.puzzleRating}</b><span>Puzzle rating</span></div>
@@ -33,6 +35,7 @@ export function render(main) {
       ${card('bots', '🤖', 'Play vs Bots', 'From Random Randy (100) to Nova (3000) and Stockfish levels 1–10.')}
       ${card('coach', '🧑‍🏫', 'Play with a Coach', `${esc(coach.name)} gives live feedback, warns about threats and lets you retry mistakes.`)}
       ${card('friend', '👥', 'Play a Friend', 'Pass-and-play on one device with chess clocks.')}
+      ${card('daily', '📅', 'Daily Puzzle', `Today's puzzle (rated ${dailyPuzzle().rating}). A new one every day.`)}
       ${card('puzzles', '🧩', 'Puzzles', 'Rated tactics, Puzzle Rush and themed training.')}
       ${card('learn', '🎓', 'Lessons', 'Interactive lessons: piece moves, mates, tactics, openings, endgames.')}
       ${card('analysis', '🔍', 'Analysis Board', 'Stockfish 19 with multiple lines. Import PGN or FEN.')}
@@ -65,11 +68,22 @@ export function render(main) {
   main.querySelectorAll('[data-act]').forEach(el => el.onclick = () => {
     const a = el.dataset.act;
     if (a === 'coach') go('bots', { coach: true });
+    else if (a === 'resume') go('play');
+    else if (a === 'daily') go('puzzles', { mode: 'themes', daily: true });
     else if (a === 'review') go('analysis', { reviewPrompt: true });
     else go(a);
   });
   main.querySelectorAll('[data-review]').forEach(el => el.onclick = () => go('review/' + el.dataset.review));
   return () => clearInterval(timer);
+}
+
+function resumable() {
+  try {
+    const g = JSON.parse(sessionStorage.getItem('chesshub.current'));
+    if (!g || !g.moves.length) return null;
+    const opp = g.cfg.mode === 'bot' ? (botById(g.cfg.botId)?.name || 'a bot') : 'a friend';
+    return `vs ${opp} · ${Math.ceil(g.moves.length / 2)} moves played`;
+  } catch { return null; }
 }
 
 const card = (act, ico, title, text) => `<div class="card" data-act="${act}"><div class="big-ico">${ico}</div><div><h3>${title}</h3><p>${text}</p></div></div>`;

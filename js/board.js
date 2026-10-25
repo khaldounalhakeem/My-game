@@ -292,10 +292,12 @@ export class Board {
   }
 
   bindEvents() {
+    // Pointer capture keeps move/up events on the board element while dragging.
     this.el.addEventListener('contextmenu', e => e.preventDefault());
     this.el.addEventListener('pointerdown', e => this.onDown(e));
-    window.addEventListener('pointermove', e => this.onMoveEv(e));
-    window.addEventListener('pointerup', e => this.onUp(e));
+    this.el.addEventListener('pointermove', e => this.onMoveEv(e));
+    this.el.addEventListener('pointerup', e => this.onUp(e));
+    this.el.addEventListener('pointercancel', e => this.onUp(e));
   }
 
   onDown(e) {
@@ -305,6 +307,7 @@ export class Board {
     if (e.button === 2) {
       if (!store.settings.rightClickArrows) return;
       this.rightStart = sq;
+      this.el.setPointerCapture?.(e.pointerId);
       return;
     }
     if (e.button !== 0) return;

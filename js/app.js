@@ -62,4 +62,7 @@ document.addEventListener('click', e => {
 document.addEventListener('pointerdown', () => sound.unlock(), { once: true });
 window.addEventListener('hashchange', render);
 applySettings();
+if (location.protocol === 'file:') {
+  document.body.insertAdjacentHTML('afterbegin', '<div style="background:#c33;color:#fff;padding:10px 16px;font-weight:700;text-align:center">The chess engine cannot start from a local file. Serve this folder over HTTP, e.g. <code>python3 -m http.server</code>, then open http://localhost:8000</div>');
+}
 render();

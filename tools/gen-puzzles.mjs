@@ -87,8 +87,14 @@ while (found < target) {
     const evalBefore = a[0].score;
     g.move(uci(pick.pv[0]));
     if (g.isGameOver()) break;
-    // Only consider blunders from a not-yet-lost position
-    if (Math.abs(evalBefore) < 400) {
+    // Only consider blunders from a not-yet-lost position.
+    // MODE=mate: only positions where a quick search already sees a forced mate.
+    let consider = Math.abs(evalBefore) < 400;
+    if (process.env.MODE === 'mate') {
+      const q = await analyse(g.fen(), 10, 1);
+      consider = !!(q[0] && q[0].mate && q[0].mate > 0 && q[0].mate <= 4) && Math.abs(evalBefore) < 1500;
+    }
+    if (consider) {
       const res = await buildSolution(g.fen());
       if (res && res.sol.length >= 1) {
         const c = new Chess(g.fen());
@@ -96,7 +102,7 @@ while (found < target) {
         // skip trivial recaptures of an equal trade
         const hard = process.env.MODE === 'hard';
         const trivial = (!res.mate && res.sol.length === 1 && first.captured && VAL[first.captured] <= 1) ||
-          (hard && !res.mate && res.sol.length === 1);
+          (hard && !res.mate && res.sol.length === 1) || (process.env.MODE === 'mate' && !res.mate);
         if (!trivial) {
           const moves = [pick.pv[0], ...res.sol];
           const solverMoves = Math.ceil(res.sol.length / 2);

@@ -16,20 +16,26 @@ const THEMES = [
 
 const P = PUZZLES.map(([id, fen, moves, rating, themes]) => ({ id, fen, moves: moves.split(' '), rating, themes: themes.split(' ') }));
 
+export function dailyPuzzle() {
+  const day = Math.floor(Date.now() / 86400000);
+  const pool = P.filter(p => p.rating >= 900 && p.rating <= 1700);
+  return pool[(day * 7919) % pool.length];
+}
+
 export function render(main, { payload }) {
-  const pz = new PuzzleScreen(main, payload?.mode || 'rated');
+  const pz = new PuzzleScreen(main, payload?.mode || 'rated', payload?.daily ? dailyPuzzle() : null);
   return () => pz.destroy();
 }
 
 class PuzzleScreen {
-  constructor(main, mode) {
+  constructor(main, mode, first) {
     this.main = main;
     this.mode = mode;
     this.theme = 'all';
     this.coach = coachById(store.settings.coachId);
     this.timers = [];
     this.build();
-    this.setMode(mode);
+    this.setMode(mode, first);
   }
 
   build() {
@@ -46,14 +52,14 @@ class PuzzleScreen {
     this.main.querySelectorAll('.tabs button').forEach(b => b.onclick = () => this.setMode(b.dataset.m));
   }
 
-  setMode(mode) {
+  setMode(mode, first) {
     this.mode = mode;
     this.clearTimers();
     this.main.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.m === mode));
     this.$('#pz-top').innerHTML = '';
     this.$('#pz-bottom').innerHTML = '';
     if (mode === 'rush') return this.rushIntro();
-    this.next();
+    this.next(first);
   }
 
   pickPuzzle() {

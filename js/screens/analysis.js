@@ -100,8 +100,9 @@ class Analysis {
     const box = this.$('#lines');
     this.board.setArrows([]);
     this.$('.evalbar').classList.toggle('hidden', !this.engineOn);
-    if (!this.engineOn) { box.innerHTML = '<span class="muted">Engine off</span>'; this.engine.stopAll(); return; }
+    if (!this.engineOn) { this.token = null; box.innerHTML = '<span class="muted">Engine off</span>'; this.engine.stopAll(); return; }
     if (c.isGameOver()) {
+      this.token = null;
       box.innerHTML = `<b>${c.isCheckmate() ? 'Checkmate' : 'Draw'}</b>`;
       updateEvalBar(this.$('.evalbar'), c.isCheckmate() ? (c.turn() === 'w' ? -100000 : 100000) : 0, this.board.flipped);
       this.engine.stopAll();
