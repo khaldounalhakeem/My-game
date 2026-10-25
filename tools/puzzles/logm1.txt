@@ -1,0 +1,10 @@
+1 608 mate,mateIn1,capture e2c1 f1c1
+2 1582 mate,mateIn4,check,capture d2c3 f8f3 h1f3 e5e4 c3b4 h2d2 b4b5 d2a5
+3 840 mate,mateIn1,quietMove g8h8 g6h7
+4 552 mate,mateIn1,capture e6f6 d4f6
+5 665 mate,mateIn1,capture d4e6 h8h2
+6 1145 mate,mateIn2,check e2e5 b8h8 f1h3 h8h3
+7 762 mate,mateIn1,quietMove e7d7 h7f6
+8 513 mate,mateIn1,capture e3a7 g4g2
+9 1189 mate,mateIn2,check d5f7 b5c6 d6c6 b1b8
+10 780 mate,mateIn1,capture a2a3 b4c3

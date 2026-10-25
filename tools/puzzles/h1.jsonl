@@ -12,3 +12,7 @@
 {"fen":"rnbqkb1r/pp2pppp/2p2n2/3P4/8/1QN1P3/PP1P1PBP/R1B1K1NR b KQkq - 2 7","moves":["b8d7","d5c6","b7c6","g2c6"],"rating":1319,"themes":["advantage","capture"]}
 {"fen":"2N1r1k1/5pp1/p7/1p1Pp2p/P5b1/1q6/1P1Q1PPP/R2R2K1 b - - 0 23","moves":["g4d1","c8d6","e8d8","d6f5"],"rating":1607,"themes":["advantage","quietMove"]}
 {"fen":"r2q1k1r/3bnpb1/1p2p2p/pNpp1p2/3P3N/1PPB4/5PPP/R1BQK2R b - - 0 18","moves":["c5c4","b3c4","d5c4","d3c4"],"rating":1286,"themes":["advantage","capture"]}
+{"fen":"r2q1rk1/pp3ppp/4Pb2/4N3/bP1p4/PnnQ2P1/1B2PPBP/R4RK1 w - - 1 17","moves":["e6f7","g8h8","e5g6","h7g6"],"rating":1648,"themes":["advantage","quietMove"]}
+{"fen":"r5r1/1p1kb1pp/1Pn1p3/2PpBp2/pq1P3P/4P3/R1R1QPPK/8 w - - 9 26","moves":["a2b2","b4a5","b2b5","a5a6"],"rating":1674,"themes":["advantage","quietMove"]}
+{"fen":"8/8/3pQ3/3P1qp1/4p1k1/3p4/5PK1/8 w - - 0 45","moves":["g2f1","e4e3","e6e3","f5d5"],"rating":1665,"themes":["advantage","quietMove"]}
+{"fen":"r3k2R/1p1b1p2/p3pn2/2b1p3/P1P4P/2NQ1p2/1q3B2/3RK3 b q - 0 24","moves":["e8e7","f2c5"],"rating":723,"themes":["mate","mateIn1","capture"]}

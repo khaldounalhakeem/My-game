@@ -120,3 +120,17 @@
 120 1117 winMaterial,capture d8c7 g2a8
 121 1055 winMaterial,capture c5b4 c3b4
 122 1043 winMaterial,capture d1d4 g7d4
+123 1127 winMaterial,capture g6f4 e3f4
+124 1454 winMaterial,quietMove e5d4 f6f7
+125 1065 winMaterial,capture f6d5 c3d5
+126 1358 advantage,capture d3b2 g7b2 f1b5 e8f8
+127 1043 winMaterial,check,capture e7f7 c6d8
+128 1373 winMaterial,quietMove b7f3 d1c1
+129 1029 winMaterial,capture f3e5 d6e5
+130 1102 winMaterial,capture f8g7 g5g7
+131 1112 winMaterial,capture d2f4 e8f7
+132 1076 winMaterial,capture c3d5 c6d5
+133 1094 winMaterial,capture f3e5 a6c4
+134 1073 winMaterial,capture b7b5 a3b4
+135 1036 winMaterial,capture d2c2 e6d5
+136 1093 winMaterial,capture g8f6 d3f5
