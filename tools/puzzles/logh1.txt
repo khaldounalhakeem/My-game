@@ -1,0 +1,14 @@
+1 1348 advantage,capture d7e6 f7e7 e6d5 e4d5
+2 1271 advantage,capture g5e3 e4d6 c6g2 h1g2
+3 885 mate,mateIn1,quietMove h2g1 f4g4
+4 1672 advantage,quietMove d8e8 f2f4 g4e3 f4e5
+5 1668 advantage,quietMove f4d6 g4f3 g2e1 f3e2
+6 1278 advantage,check h2h3 d8a5 b1c3 d5d4
+7 1637 advantage,quietMove a5b6 a8a6 b6d6 a6d6
+8 1666 advantage,quietMove a4b3 a5a4 b3f7 e8f7
+9 1684 advantage,quietMove a4c6 a8f8 d6d7 h1d1
+10 1622 advantage,quietMove g1e2 d4d3 c2a4 c8d7
+11 1241 advantage,check,capture c8g4 d5c6 b7c6 f3g4
+12 1319 advantage,capture b8d7 d5c6 b7c6 g2c6
+13 1607 advantage,quietMove g4d1 c8d6 e8d8 d6f5
+14 1286 advantage,capture c5c4 b3c4 d5c4 d3c4

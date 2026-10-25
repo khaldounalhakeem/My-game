@@ -1,0 +1,66 @@
+1 1046 winMaterial,capture d5g2 b1b7
+2 1073 winMaterial,capture a4b5 a6b5
+3 1485 winMaterial,quietMove f6e8 d1d5
+4 1454 winMaterial,quietMove f4e5 c3e4
+5 1037 winMaterial,capture f6e4 e3a7
+6 913 mate,mateIn1,quietMove d7d6 g8d8
+7 1665 advantage,quietMove f8b8 b1c2 b8e8 c2c3
+8 1020 winMaterial,capture f4h6 g7h6
+9 1115 winMaterial,capture e7g5 f3g5
+10 1040 winMaterial,capture a2a4 d4c3
+11 1253 advantage,capture d5e3 f4e3 b2g2 g3f5
+12 1049 winMaterial,capture d4e4 f3e4
+13 1253 advantage,capture e1f2 d7c6 d2d4 e7f6
+14 1130 winMaterial,capture h2h3 a6b5
+15 1126 winMaterial,capture e8e2 h6g7
+16 1084 winMaterial,capture f5d7 c1h6
+17 1646 advantage,quietMove c3b4 c6e5 f3g3 e5d3
+18 1646 advantage,quietMove g2g3 h4h6 h1g1 h6h2
+19 1100 winMaterial,capture f8d6 e5d6
+20 1024 winMaterial,capture c4d5 d3e2
+21 1072 winMaterial,capture e4c5 f8c5
+22 1138 winMaterial,capture d8d7 e5d6
+23 1315 advantage,capture b1c3 f3e2 c3d5 e2d1
+24 1089 winMaterial,capture c8b7 a3b4
+25 1064 winMaterial,capture a6b4 a3b4
+26 1485 winMaterial,quietMove f3b7 f8b8
+27 1098 winMaterial,capture d6h2 h1h2
+28 1091 winMaterial,capture d8h8 a1h8
+29 1032 winMaterial,check a5a4 g3h2
+30 1126 winMaterial,capture b2b4 b5a4
+31 1121 winMaterial,capture e7g6 g1g6
+32 1285 advantage,capture e6e3 c1e3 h6g5 c5b6
+33 1028 winMaterial,capture c8d7 d5c6
+34 1105 winMaterial,capture e2d2 d4e6
+35 1477 winMaterial,quietMove e4b7 a8b8
+36 1065 winMaterial,capture c5c4 e4f3
+37 1130 winMaterial,capture c4e2 g2e2
+38 783 mate,mateIn1,capture b2b3 d2f3
+39 1029 winMaterial,capture e7e5 h3g4
+40 1302 advantage,capture f6e4 d2e4 d5e4 d3e4
+41 1128 winMaterial,capture a5c3 b2c3
+42 1052 winMaterial,capture f6e4 e1e4
+43 1120 winMaterial,capture g1e2 h6g5
+44 1054 winMaterial,capture g6e5 f4e5
+45 1300 advantage,capture c6c5 d4c5 e7c5 e4d5
+46 1090 winMaterial,capture b5a6 b7a6
+47 1049 winMaterial,capture f6h7 d5c6
+48 1107 winMaterial,capture b7b6 g5d8
+49 1437 winMaterial,quietMove f8e8 e1f1
+50 1663 advantage,quietMove h5h7 e5e6 h7g7 d1d7
+51 1175 mate,mateIn2,check,capture c4d3 d7f7 g8h8 f7h7
+52 994 mate,mateIn1,quietMove e8f8 d7d8
+53 1122 winMaterial,capture g2e4 f6e4
+54 1066 winMaterial,capture h2h3 e4c3
+55 1092 winMaterial,capture f6g4 h3g4
+56 1457 winMaterial,quietMove d8a5 b2b4
+57 1089 winMaterial,capture c2c3 e5d4
+58 1075 winMaterial,capture d1a4 e4f3
+59 1462 winMaterial,quietMove f3f7 e8d8
+60 1105 winMaterial,capture d4f3 g2f3
+61 1298 advantage,check,capture e2f3 d4f3 g2f3 e4c6
+62 1134 winMaterial,capture c4f1 d5e4
+63 1658 advantage,quietMove d1g4 d7d5 g4g7 f8f7
+64 1115 winMaterial,capture e8g8 e5f6
+65 1451 winMaterial,quietMove f6h4 g2g3
+66 1065 winMaterial,capture c8f5 f3f5

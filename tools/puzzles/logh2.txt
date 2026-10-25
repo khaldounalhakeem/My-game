@@ -1,0 +1,8 @@
+1 1323 advantage,check d7f5 d6c7 f6e7 h8d8
+2 1262 advantage,capture a5b6 d8b6 d2e3 b6b2
+3 1166 mate,mateIn2,check c1d1 e3d3 d1c1 e7e1
+4 1231 mate,mateIn2,check e7g5 e1e6 d7c7 e6d6
+5 1249 advantage,check a5c7 e5d7 b8c8 d6e7
+6 1276 advantage,capture f2e3 b4c2 e3f2 c2a1
+7 1696 advantage,quietMove e6d6 b2b8 d6g3 b8g3
+8 826 mate,mateIn1,quietMove d5d6 g3g4

@@ -1,0 +1,18 @@
+{
+  "name": "chess-arena",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A full chess website: bots, game review, coaches, puzzles, lessons and analysis — powered by Stockfish 19 in the browser.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "build:openings": "node tools/build-openings.mjs",
+    "build:puzzles": "node tools/build-puzzles.mjs",
+    "gen:puzzles": "node tools/gen-puzzles.mjs tools/puzzles/new.jsonl 50",
+    "verify:lessons": "node tools/verify-lessons.mjs"
+  },
+  "devDependencies": {
+    "stockfish": "19.0.1"
+  },
+  "license": "GPL-3.0-or-later"
+}
