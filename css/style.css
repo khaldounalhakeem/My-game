@@ -380,7 +380,9 @@ input[type=range] { width: 100%; accent-color: var(--green); }
   .side-foot, .side-profile { display: none; }
   .main { padding: 10px 16px; }
   .play-layout { flex-direction: column; align-items: stretch; gap: 10px; }
-  .board-col { width: 100%; min-width: 0; }
+  /* The board must fit the visible height so both player bars stay on screen. */
+  .sidebar { position: static; }
+  .board-col { width: min(100%, calc(100vh - 116px)); width: min(100%, calc(100dvh - 116px)); min-width: 0; align-self: center; }
   .side-panel { width: 100%; height: auto; min-height: 0; max-height: none; }
   .panel-body { max-height: 50vh; }
   .bots-layout, .settings-grid, .home-hero { grid-template-columns: minmax(0, 1fr); }

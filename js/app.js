@@ -45,6 +45,9 @@ async function render() {
   app.pending = null;
   window.scrollTo(0, 0);
   cleanup = (await mod.render(main, { params: rest, payload, route })) || null;
+  // On narrow screens, start with the board (not the navigation) in view.
+  const boardCol = main.querySelector('.board-col');
+  if (boardCol && innerWidth <= 860) requestAnimationFrame(() => boardCol.scrollIntoView({ block: 'start' }));
 }
 
 export function applySettings() {
