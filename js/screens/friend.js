@@ -1,7 +1,7 @@
 import { store } from '../storage.js';
 import { go } from '../app.js';
 import { TIME_CONTROLS } from './bots.js';
-import { $, toggle, esc } from '../ui.js';
+import { $, toggle, esc, toast } from '../ui.js';
 
 export function render(main) {
   let tc = 'none';
@@ -27,7 +27,7 @@ export function render(main) {
     if (fen) {
       const { validateFen } = await import('../../vendor/chess.js');
       const v = validateFen(fen);
-      if (!v.ok) { alert('Invalid FEN: ' + v.error); return; }
+      if (!v.ok) { toast('Invalid FEN: ' + v.error); return; }
     }
     go('play', {
       mode: 'friend', playerColor: 'w', startFen: fen || undefined,

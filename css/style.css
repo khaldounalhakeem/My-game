@@ -20,6 +20,7 @@
   --last: rgba(255, 255, 51, 0.5);
   --sel: rgba(255, 255, 51, 0.5);
   --radius: 6px;
+  color-scheme: dark;
   --font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 * { box-sizing: border-box; }
