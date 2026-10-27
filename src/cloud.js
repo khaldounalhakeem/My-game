@@ -16,6 +16,7 @@ const Cloud = {
     if (this.status === 'cloud' || this._busy) return;
     this._busy = true;
     try { await this._connect(); } finally { this._busy = false; }
+    if (this.mergedOffline && typeof UI !== 'undefined') { const n = this.mergedOffline; this.mergedOffline = 0; setTimeout(() => UI.toast(`${n} match${n > 1 ? 'es' : ''} played before connecting ${n > 1 ? 'were' : 'was'} added to your account`), 400); }
     if (typeof UI !== 'undefined' && (UI.screen === 'main' || UI.screen === 'profile')) UI.show(UI.screen);
   },
   async _connect() {
@@ -41,6 +42,7 @@ const Cloud = {
       this.status = 'cloud'; this.reason = '';
       this.dirty = true; this.flush();
     } catch (e) {
+      console.warn('cloud save:', e && (e.code || e.message || e));
       const c = e && e.code;
       this.status = 'local';
       this.reason = c === 'not_granted' || c === 'denied' ? 'permission' : c === 'unauthenticated' || c === 'signed_out' ? 'signedout' : 'error';
@@ -62,11 +64,13 @@ const Cloud = {
   // cloud copy wins when it is newer than what this device has
   merge(data) {
     if (!data || !data.profile) return;
+    // matches finished on this device before the account loaded
+    const pending = (Profile.offline || []).slice();
     // keep whichever copy has more progress; on a tie, the newer one
     const games = (p) => (p.wins || 0) + (p.losses || 0) + (p.level || 1) * 0.001 + (p.xp || 0) * 1e-9;
     const localG = games(Profile), cloudG = games(data.profile);
     const localAt = Profile.savedAt || 0, cloudAt = data.savedAt || 0;
-    if (localG > cloudG + 1e-12 || (Math.abs(localG - cloudG) < 1e-12 && cloudAt < localAt)) return;
+    if (localG > cloudG + 1e-12 || (Math.abs(localG - cloudG) < 1e-12 && cloudAt < localAt)) { Profile.offline = []; return; }
     const p = data.profile;
     for (const k of Object.keys(Profile)) delete Profile[k];
     Object.assign(Profile, JSON.parse(JSON.stringify(DEFAULT_PROFILE)), p);
@@ -74,6 +78,20 @@ const Cloud = {
     Profile.unlocked = Object.assign({}, DEFAULT_PROFILE.unlocked, p.unlocked || {});
     for (const k of ['octane', 'dominus', 'fennec']) if (!Profile.unlocked.body.includes(k)) Profile.unlocked.body.unshift(k);
     if (data.settings) Object.assign(Settings, data.settings);
+    // add the matches played here before the account loaded, so none are lost
+    Profile.offline = [];
+    for (const r of pending) {
+      try {
+        if (typeof applyRatingResult === 'function') applyRatingResult(r.cfg, r.won, r.gd);
+        if (r.won) Profile.wins = (Profile.wins || 0) + 1; else Profile.losses = (Profile.losses || 0) + 1;
+        Profile.goals = (Profile.goals || 0) + (r.goals || 0); Profile.assists = (Profile.assists || 0) + (r.assists || 0);
+        Profile.saves = (Profile.saves || 0) + (r.saves || 0); Profile.demos = (Profile.demos || 0) + (r.demos || 0);
+        if (r.mvp) Profile.mvps = (Profile.mvps || 0) + 1;
+        Profile.xp = (Profile.xp || 0) + (r.xp || 0);
+        while (Profile.xp >= xpForLevel(Profile.level || 1)) { Profile.xp -= xpForLevel(Profile.level || 1); Profile.level = (Profile.level || 1) + 1; }
+      } catch (e) { console.error(e); }
+    }
+    if (pending.length) this.mergedOffline = pending.length;
     try { localStorage.setItem('boostleague.profile', JSON.stringify(Profile)); localStorage.setItem('boostleague.settings', JSON.stringify(Settings)); } catch (e) { /* ignore */ }
     if (typeof applySettings === 'function') applySettings(true);
   },

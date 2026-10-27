@@ -261,6 +261,13 @@ function finishMatchProgress(g) {
   P.goals = (P.goals || 0) + me.stats.goals; P.assists = (P.assists || 0) + me.stats.assists;
   P.saves = (P.saves || 0) + me.stats.saves; P.demos = (P.demos || 0) + me.stats.demos;
   if (g.mvp === me) P.mvps = (P.mvps || 0) + 1;
+  // not connected to the account (yet): remember this result so it's added to the account copy when it loads
+  const xpEarned = Math.round(150 + me.stats.score * 0.6 + (won ? 150 : 0) + (g.mvp === me ? 75 : 0));
+  if (Cloud.status !== 'cloud') {
+    P.offline = (P.offline || []).slice(-49);
+    P.offline.push({ cfg: { mode: g.cfg.mode, teamSize: g.cfg.teamSize, competitive: !!g.cfg.competitive, level: g.cfg.level }, won, gd: goalDiff, xp: xpEarned,
+      goals: me.stats.goals, assists: me.stats.assists, saves: me.stats.saves, demos: me.stats.demos, mvp: g.mvp === me, at: Date.now() });
+  }
   saveProfile();
   // XP, levels and item drops
   if (!(P.level >= 1)) P.level = 1;

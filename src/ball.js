@@ -43,7 +43,8 @@ class Ball {
     this.vel.y -= PHYS.GRAVITY * mut.gravity * this.gravMul * dt;
     this.vel.multiplyScalar(1 - this.drag * dt);
     // a spinning ball bends a little in the air (and much more when it bounces, see collide)
-    if (!this.puck && this.angVel.lengthSq() > 0.01) this.vel.addScaledVector(_b1.crossVectors(this.angVel, this.vel), PHYS.BALL_CURVE * dt);
+    // sideways only: backspin must not make ground shots float up over the crossbar
+    if (!this.puck && this.angVel.lengthSq() > 0.01) { _b1.crossVectors(this.angVel, this.vel); _b1.y = 0; this.vel.addScaledVector(_b1, PHYS.BALL_CURVE * dt); }
     const maxS = PHYS.BALL_MAX_SPEED * (mut.ballSpeed || 1);
     const s = this.vel.length();
     if (s > maxS) this.vel.multiplyScalar(maxS / s);
