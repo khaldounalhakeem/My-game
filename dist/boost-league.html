@@ -5963,7 +5963,7 @@ const UI = {
     const modes = h('div', { class: 'modes' }, Object.entries(MODES).map(([k, m]) => h('button', {
       class: 'mode ' + (C.mode === k ? 'on' : ''),
       onclick: (e) => { C.mode = k; save(); Sound.play('click'); if (ranked) { rerender(m.name + (m.desc ? '' : '')); return; } [...modes.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); },
-    }, h('b', null, m.name), h('small', null, ranked ? rankLabel(rankedKey({ mode: k, teamSize: C.teamSize })).text.split(' · ')[0] : m.desc))));
+    }, h('b', null, m.name), h('small', null, ranked ? shortRank(rankedKey({ mode: k, teamSize: C.teamSize })) : m.desc))));
     const mapSel = h('select', { id: 'mapsel', onchange: (e) => { C.map = e.target.value; save(); } },
       h('option', { value: 'auto' }, 'Random arena'), Object.entries(MAPS).map(([k, m]) => h('option', { value: k }, `${m.name} (${m.sub})`)));
     mapSel.value = C.map;
@@ -5993,7 +5993,7 @@ const UI = {
       h('div', { class: 'opts' },
         seg('Playlist', 'competitive', [[false, 'Casual'], [true, 'Ranked']], true),
         // in ranked, every Soccar team size shows its own rank right on its button
-        seg('Team Size', 'teamSize', [[1, '1v1 Duel'], [2, '2v2 Doubles'], [3, '3v3 Standard']].map(([v, t]) => [v, ranked && (C.mode || 'soccar') === 'soccar' ? `${t} · ${rankLabel(String(v)).text.split(' · ')[0]}` : t]), true),
+        seg('Team Size', 'teamSize', [[1, '1v1 Duel'], [2, '2v2 Doubles'], [3, '3v3 Standard']].map(([v, t]) => [v, ranked && (C.mode || 'soccar') === 'soccar' ? `${t} · ${shortRank(String(v))}` : t]), true),
         ranked ? null : seg('Bots', 'level', [['adaptive', 'Adaptive'], ['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star']], true),
         h('div', { class: 'field' }, h('label', { for: 'mapsel' }, 'Arena'), mapSel),
       ),
@@ -6656,6 +6656,12 @@ const Garage = {
     R.renderer.render(this.scene, this.cam);
   },
 };
+
+// a rank for buttons and tiles: the rank once placed, otherwise how far the placements are
+function shortRank(key) {
+  const r = rankedState(key);
+  return r.placed ? rankInfo(r.mmr).name : `Placements ${r.games}/${PLACEMENT_GAMES}`;
+}
 
 </script>
 <script>/* src/main.js */
