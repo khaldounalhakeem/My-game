@@ -285,6 +285,8 @@ function finishMatchProgress(g) {
     if (won && Math.random() < 0.35) { const d = rollDrop(); if (d) drops.push(d); }
   } catch (e) { console.error(e); }
   saveProfile();
+  // send the result to the account right away, don't wait for the usual short delay
+  try { Cloud.dirty = true; Cloud.flush(); } catch (e) { /* retried by the cloud code */ }
   if (leveled) try { Sound.play('levelup'); } catch (e) { /* audio is optional */ }
   const xpTo = Math.min(100, P.xp / xpForLevel(P.level) * 100);
   return { game: g, xp, xpFrom: leveled ? 0 : xpFrom, xpTo, leveled, drops, rating };

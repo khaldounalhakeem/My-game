@@ -106,17 +106,31 @@ const Cloud = {
   async flush() {
     if (!this.doc || !this.dirty || this.writing) return;
     this.dirty = false; this.writing = true;
+    const payload = { v: 1, savedAt: Profile.savedAt || Date.now(), profile: JSON.parse(JSON.stringify(Profile)), settings: JSON.parse(JSON.stringify(Settings)) };
     try {
-      await this.doc.set({ v: 1, savedAt: Profile.savedAt || Date.now(), profile: JSON.parse(JSON.stringify(Profile)), settings: JSON.parse(JSON.stringify(Settings)) });
-      this.lastSaved = Date.now(); this.status = 'cloud';
+      // a write that never answers (e.g. the app was in the background) mustn't block every later save
+      await Promise.race([this.doc.set(payload), new Promise((_, rej) => setTimeout(() => rej({ code: 'timeout' }), 10000))]);
+      this.lastSaved = Date.now(); this.status = 'cloud'; this.failures = 0; this.lastError = '';
     } catch (e) {
-      if (e && e.code === 'unavailable') { this.dirty = true; setTimeout(() => this.flush(), 2500 + Math.random() * 2000); }
-      else this.status = 'error';
+      const c = (e && e.code) || 'error';
+      console.warn('cloud save failed:', c, e && e.message);
+      this.lastError = c;
+      this.dirty = true; // never drop progress: keep trying
+      if (c === 'not_granted' || c === 'revoked' || c === 'permission-denied') { this.status = 'local'; this.reason = 'permission'; }
+      else {
+        this.failures = (this.failures || 0) + 1;
+        clearTimeout(this.retryT);
+        this.retryT = setTimeout(() => { this.writing = false; this.flush(); }, Math.min(30000, 1500 * Math.pow(2, Math.min(this.failures, 5))));
+        this.writing = false;
+        return;
+      }
     }
     this.writing = false;
     if (this.dirty) this.schedule();
   },
+
   label() {
+    if (this.status === 'cloud' && this.failures) return '⚠ Having trouble saving to your Claude account, retrying…';
     if (this.status === 'cloud') return '☁ Synced with your Claude account';
     if (this.status === 'connecting') return '☁ Connecting to your Claude account…';
     if (this.reason === 'permission') return '⚠ Not connected: allow access to your Claude account (button below)';
