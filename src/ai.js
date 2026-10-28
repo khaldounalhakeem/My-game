@@ -49,7 +49,13 @@ class Bot {
     if (this.seq.length) {
       const s = this.seq[0];
       Object.assign(c, s.c);
-      if (s.aim && this.aimPoint) this.airAim(this.aimPoint, c, true);
+      if (s.track && !car.onGround) {
+        // keeper save in progress: keep turning towards the ball itself (it keeps curving), and nudge with boost
+        const bp = game.ball.pos;
+        this.airAim(bp, c, true);
+        const to = _ai1.copy(bp).sub(car.pos); const dd = to.length(); to.multiplyScalar(1 / Math.max(1, dd));
+        c.boost = car.boost > 0 && dd > 140 && car.fwd(_ai2).dot(to) > 0.7;
+      } else if (s.aim && this.aimPoint) this.airAim(this.aimPoint, c, true);
       this.seqT += dt;
       if (this.seqT >= s.d) { this.seq.shift(); this.seqT = 0; }
       return;
@@ -348,7 +354,7 @@ class Bot {
           this.aimPoint = cross.pos.clone();
           if (fly) { this.aerial = { t: 0, target: cross.pos.clone(), arrive: T, dj: false, save: true }; c.jump = true; return; }
           if (H < 260) this.seq = [{ d: clamp((H - 100) / 700, 0.05, 0.2), c: { jump: true } }, { d: 0.6, c: { jump: false } }];
-          else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.6, c: {}, aim: true }];
+          else this.seq = [{ d: 0.2, c: { jump: true } }, { d: 0.04, c: { jump: false } }, { d: 0.05, c: { jump: true } }, { d: 0.6, c: {}, track: true }];
           this.seqT = 0; return;
         }
       }
@@ -357,8 +363,29 @@ class Bot {
       // shots can go anywhere in the goal: slide across to where the ball will cross
       const px = this.keeperSide < 0 ? clamp(tx, -650, -110) : this.keeperSide > 0 ? clamp(tx, 110, 650) : clamp(tx, cross ? -620 : -220, cross ? 620 : 220);
       const d = Math.hypot(car.pos.x - px, car.pos.z - lineZ);
+      const fw = car.fwd(_ai4);
+      const onLine = car.onGround && Math.abs(car.pos.z - lineZ) < 260;
+      if ((this.lv.sideOn ?? (this.lv.skill || 0) > 0.8) && onLine && Math.abs(fw.x) > 0.8) {
+        // side-on on the goal line: slide left/right with forward/reverse, no turning needed
+        const sgn = Math.sign(fw.x), vf = car.vel.dot(fw);
+        const want = clamp((px - car.pos.x) * sgn * 3.2, -1500, 1500);
+        c.throttle = clamp((want - vf) / 350, -1, 1);
+        // keep on the line (steering works backwards when reversing)
+        const zErr = (car.pos.z - lineZ) * dir;            // + means in front of the line
+        const st = -clamp(zErr / 120, -1, 1) * sgn * dir * (vf >= 0 ? 1 : -1);
+        c.steer = Math.abs(vf) > 60 ? st : 0; c.boost = false;
+        return;
+      }
+      if ((this.lv.sideOn ?? (this.lv.skill || 0) > 0.8) && onLine && d < 900 && (!cross || cross.t > 2.2)) {
+        // on the line but facing the field: swing round to lie along the line
+        const side = car.pos.x > px ? -1 : 1;
+        tgt = T0.set(clamp(car.pos.x + side * 700, -ARENA.goal.w + 100, ARENA.goal.w - 100), 0, lineZ);
+        wantSpeed = 700;
+        this.steerTo(tgt, wantSpeed, c, game);
+        return;
+      }
       if (d < 140 && car.onGround) {
-        const vf = car.vel.dot(car.fwd(_ai4));
+        const vf = car.vel.dot(fw);
         c.throttle = Math.abs(vf) > 40 ? -sign(vf) * Math.min(1, Math.abs(vf) / 250) : 0;
         c.steer = 0; c.boost = false;
         return;
