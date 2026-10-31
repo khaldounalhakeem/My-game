@@ -63,4 +63,6 @@ Rocket-powered car soccer that runs in the browser and is built for iPad touch c
 | `src/render.js`, `src/fx.js` | three.js scene, models, camera and particles |
 | `src/audio.js`, `src/input.js`, `src/ui.js`, `src/main.js` | sound, controls, menus and HUD, main loop |
 
-`node tools/build.js` rebuilds `dist/`. `node tools/sim-test.js <path-to-three.cjs>` runs headless bot matches as a physics smoke test.
+`node tools/build.js` rebuilds `dist/` and the App Store version in `app/www/`.
+
+**iPhone/iPad app:** `app/` holds a Capacitor iOS project with the icon, screenshots and privacy policy. See `app/APP_STORE.md` for the steps to build it on a Mac and submit it. `node tools/sim-test.js <path-to-three.cjs>` runs headless bot matches as a physics smoke test.

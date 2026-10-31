@@ -135,6 +135,8 @@ const Cloud = {
     if (this.status === 'connecting') return '☁ Connecting to your Claude account…';
     if (this.reason === 'permission') return '⚠ Not connected: allow access to your Claude account (button below)';
     if (this.reason === 'signedout') return '⚠ Not signed in to Claude in this browser, so progress here is NOT your account progress. Sign in at claude.ai and reopen the game.';
+    // the App Store app / offline file: there's no Claude account here, progress lives on the device
+    if (this.reason === 'standalone' && Store.works()) return '💾 Progress saved on this device';
     if (!Store.works()) return '⚠ Not saving here: sign in to Claude (or use a save code in Profile)';
     if (this.reason === 'error') return '⚠ Couldn\'t reach your Claude account. Saved on this device for now.';
     return '⚠ Saved on this device only (the offline file can\'t reach your Claude account)';

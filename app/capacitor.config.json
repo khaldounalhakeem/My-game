@@ -1,0 +1,10 @@
+{
+  "appId": "com.boostleague.game",
+  "appName": "Boost League",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#05091400",
+    "scrollEnabled": false
+  }
+}

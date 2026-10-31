@@ -388,7 +388,7 @@ const UI = {
           h('div', { class: 'pbox' }, h('h3', null, 'Join a party'), h('p', null, 'Type the code your friend sees.'),
             input, this.btn('JOIN PARTY', () => N.join(input.value))),
         ),
-        h('div', { class: 'pnote' }, N.available() ? 'Works for anyone with the game link, with or without a Claude account.' : 'This browser can\'t do online play. Try Safari or Chrome.'),
+        h('div', { class: 'pnote' }, N.available() ? (window.claude ? 'Works for anyone with the game link, with or without a Claude account.' : 'Play with friends on any device that has the game.') : 'This browser can\'t do online play. Try Safari or Chrome.'),
       );
     }
     const ms = N.members();

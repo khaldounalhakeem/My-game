@@ -1,0 +1,18 @@
+{
+  "name": "boost-league-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Boost League for iPad and iPhone (Capacitor wrapper around the web game)",
+  "scripts": {
+    "build:web": "node ../tools/build.js",
+    "sync": "node ../tools/build.js && npx cap sync ios",
+    "open": "npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/core": "^7.6.10",
+    "@capacitor/ios": "^7.6.10"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^7.6.10"
+  }
+}
