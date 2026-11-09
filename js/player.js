@@ -50,7 +50,7 @@ class Player {
   }
 
   reset() {
-    this.health = 20; this.hunger = 20; this.air = 10; this.fire = 0;
+    this.health = 20; this.hunger = 20; this.air = 15; this.fire = 0; this.deathCause = ''; this.airWarned = false;
     this.xp = 0; this.level = 0; this.dead = false; this.flying = false;
     this.hurtCd = 0; this.attackCd = 0; this.useCd = 0; this.breakCd = 0;
     this.regenT = 0; this.starveT = 0; this.drownT = 0; this.lavaT = 0; this.cactusT = 0; this.fireT = 0;
@@ -66,11 +66,14 @@ class Player {
     return new THREE.Vector3(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
   }
 
-  hurt(amount, from, kb = 6, force = false) {
+  hurt(amount, from, kb = 6, force = false, cause = '') {
     if (this.dead || this.mode === 'creative') return;
     if (this.hurtCd > 0 && !force) return;
     // armor softens hits from mobs, players, arrows and explosions (4% per armor point)
     if (from) amount = Math.max(1, Math.round(amount * (1 - Math.min(0.8, this.inv.armorPoints() * 0.04))));
+    this.deathCause = cause || (from ? 'You were defeated by a monster or an explosion.' : 'You died.');
+    if (from && G.lastAttacker && !G.lastAttacker.dead) for (const m of G.mobs) if (m.tame && m.type === 'wolf') m.petTarget = G.lastAttacker;
+    G.lastAttacker = null;
     this.health -= amount; this.hurtCd = 0.5;
     G.ui.hurtFlash();
     G.sound.play('hurt');
@@ -82,6 +85,7 @@ class Player {
   }
 
   die() {
+    if (this.riding) this.dismount();
     this.health = 0; this.dead = true;
     for (let i = 0; i < 40; i++) {
       const s = this.inv.slots[i];
@@ -111,6 +115,21 @@ class Player {
     this.swing = Math.max(0, this.swing - dt * 3.5);
     const creative = this.mode === 'creative';
     if (!creative) this.flying = false;
+    if (this.riding) {
+      const h = this.riding;
+      if (h.dead || h.removed || input.sneak) { this.dismount(); return; }
+      // steer the horse with the same controls as walking
+      let mx = input.moveX, mz = input.moveZ;
+      const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
+      const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
+      const wx = -s * mz + c * mx, wz = -c * mz - s * mx;
+      h.drive = { x: wx, z: wz, jump: input.jump, yaw: Math.atan2(-s, -c) };
+      this.pos.set(h.pos.x, h.pos.y + 0.95, h.pos.z);
+      this.vel.set(0, 0, 0); this.onGround = true; this.fallStart = null; this.flying = false;
+      this.headInWater = false; this.inWater = false; this.inLava = false;
+      if (!creative) this.survivalTick(dt, false);
+      return;
+    }
 
     // liquids
     const feet = W.liquidAt(this.pos.x, this.pos.y + 0.1, this.pos.z);
@@ -164,7 +183,7 @@ class Player {
     else if (!this.onGround) this.fallStart = this.fallStart === null ? this.pos.y : Math.max(this.fallStart, this.pos.y);
     if (this.onGround && !wasGround && this.fallStart !== null) {
       const d = this.fallStart - this.pos.y;
-      if (d > 3.4) this.hurt(Math.floor(d - 3), null, 0, true);
+      if (d > 3.4) this.hurt(Math.floor(d - 3), null, 0, true, 'You fell from too high.');
       if (d > 1) G.sound.play('land');
       this.fallStart = null;
     }
@@ -180,6 +199,19 @@ class Player {
     }
   }
 
+  mount(h) {
+    this.riding = h; h.rider = this;
+    this.flying = false;
+    G.ui.message('Riding! Steer like walking, jump to leap, and press sneak (C, the down button, or R3) to get off.', 'gold');
+  }
+
+  dismount() {
+    const h = this.riding;
+    this.riding = null;
+    if (h) { h.rider = null; h.drive = null; this.pos.set(h.pos.x + 1.2, h.pos.y + 0.2, h.pos.z); }
+    this.vel.set(0, 4, 0);
+  }
+
   hungerDrain(n) { if (this.mode === 'survival') this.hunger = Math.max(0, this.hunger - n); }
 
   survivalTick(dt, swimming) {
@@ -191,24 +223,28 @@ class Player {
     } else this.regenT = 0;
     if (this.hunger <= 0) {
       this.starveT += dt;
-      if (this.starveT > 4) { this.starveT = 0; if (this.health > 2) this.hurt(1, null, 0, true); }
+      if (this.starveT > 4) { this.starveT = 0; if (this.health > 2) this.hurt(1, null, 0, true, 'You starved. Eat food when your hunger bar gets low.'); }
     }
     if (this.headInWater) {
       this.air -= dt;
-      if (this.air < 0) { this.drownT += dt; if (this.drownT > 1) { this.drownT = 0; this.hurt(2, null, 0, true); } }
-    } else this.air = Math.min(10, this.air + dt * 4);
+      if (this.air < 5 && !this.airWarned) { this.airWarned = true; G.ui.message('You are running out of air! Swim up to the surface!', 'purple'); }
+      if (this.air < 0) {
+        this.drownT += dt;
+        if (this.drownT > 1) { this.drownT = 0; this.hurt(2, null, 0, true, 'You drowned. Under water, watch the bubbles above your hearts and swim up before they run out.'); }
+      }
+    } else { this.air = Math.min(15, this.air + dt * 5); if (this.air > 8) this.airWarned = false; }
     if (this.inLava) {
       this.fire = 6;
       this.lavaT -= dt;
-      if (this.lavaT <= 0) { this.lavaT = 0.5; this.hurt(4, null, 0, true); }
+      if (this.lavaT <= 0) { this.lavaT = 0.5; this.hurt(4, null, 0, true, 'You fell into lava.'); }
     }
     if (this.inWater) this.fire = 0;
     if (this.fire > 0) {
       this.fire -= dt; this.fireT -= dt;
-      if (this.fireT <= 0) { this.fireT = 1; this.hurt(1, null, 0, true); }
+      if (this.fireT <= 0) { this.fireT = 1; this.hurt(1, null, 0, true, 'You burned to death. Jump into water to put out the fire.'); }
     }
     this.cactusT -= dt;
-    if (this.cactusT <= 0 && W.touching(this, ID.cactus, 0.06)) { this.cactusT = 0.5; this.hurt(1, null, 0, true); }
+    if (this.cactusT <= 0 && W.touching(this, ID.cactus, 0.06)) { this.cactusT = 0.5; this.hurt(1, null, 0, true, 'You were pricked to death by a cactus.'); }
   }
 
   /* ---------- targeting ---------- */
@@ -218,7 +254,7 @@ class Player {
     const block = G.world.raycast(o.x, o.y, o.z, d.x, d.y, d.z, reach, false);
     let mob = null, mobT = this.mode === 'creative' ? 6 : 3.8;
     for (const m of G.mobs) {
-      if (m.dead) continue;
+      if (m.dead || m === this.riding) continue;
       const t = rayAABB(o, d, m.pos.x - m.w / 2 - 0.05, m.pos.y, m.pos.z - m.w / 2 - 0.05, m.pos.x + m.w / 2 + 0.05, m.pos.y + m.h, m.pos.z + m.w / 2 + 0.05);
       if (t !== null && t < mobT) { mob = m; mobT = t; }
     }
@@ -259,6 +295,7 @@ class Player {
     const crit = !this.onGround && this.vel.y < -1 && !this.flying;
     if (crit) dmg = Math.round(dmg * 1.5);
     this.attackCd = 0.45; this.swing = 1;
+    if (target instanceof Mob && !target.tame) for (const m of G.mobs) if (m.tame && m.type === 'wolf' && m !== target) m.petTarget = target;
     if (target.remote) Net.hit(target.remote, dmg, this.sprinting ? 10 : 6);
     else if (target instanceof Dragon) target.hurt(dmg);
     else target.hurt(dmg, this.pos, this.sprinting ? 10 : 6, true);
@@ -331,6 +368,7 @@ class Player {
     if (this.useCd > 0) return;
     const W = G.world, held = this.heldSlot(), hd = held ? DEFS[held.id] : null;
     const b = tgt.block;
+    if (tgt.mob && tgt.mob.interact && tgt.mob.interact(this, hd)) { this.useCd = 0.35; this.swing = 1; return; }
     if (b && !this.sneaking) {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
       if (b.id === ID.bed) { this.useCd = 1; G.sleep(b); return; }

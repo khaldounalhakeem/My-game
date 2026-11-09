@@ -378,6 +378,7 @@ function spawnTick() {
   for (const m of G.mobs) {
     if (m.dead) continue;
     const d = Math.hypot(m.pos.x - P.pos.x, m.pos.z - P.pos.z);
+    if (m.tame || m.rider) continue;
     if (d > (m.T.passive ? 96 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
   }
@@ -389,7 +390,10 @@ function spawnTick() {
     if (W.isLoaded(x, z)) {
       const y = W.surfaceY(x, z);
       if (W.getBlock(Math.floor(x), y, Math.floor(z)) === ID.grass) {
-        const type = pick(PASSIVE_POOL), n = 1 + (Math.random() * 3 | 0);
+        const b = W.biomeAt(x, z, W.heightAt(x, z));
+        let type = pick(PASSIVE_POOL), n = 1 + (Math.random() * 3 | 0);
+        if (b === BIOME.PLAINS && Math.random() < 0.35) { type = 'horse'; n = 2 + (Math.random() * 2 | 0); }
+        if ((b === BIOME.FOREST || b === BIOME.TAIGA || b === BIOME.BIRCH || b === BIOME.SNOWY) && Math.random() < 0.3) { type = 'wolf'; n = 2 + (Math.random() * 2 | 0); }
         for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y + 1, z + (Math.random() - 0.5) * 2);
       }
     }
@@ -505,14 +509,33 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
+  G.pets = {}; G.pendingPets = [];
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
   G.applyFog();
 }
 
+/* tamed animals are kept in the save, one list per dimension */
+function serializePets() {
+  return G.mobs.filter(m => m.tame && !m.dead).map(m => [m.type, +m.pos.x.toFixed(1), +m.pos.y.toFixed(1), +m.pos.z.toFixed(1), m.sitting ? 1 : 0]);
+}
+function restorePets(list) {
+  for (const p of list || []) {
+    if (!Array.isArray(p) || !MOB_TYPES[p[0]]) continue;
+    const m = spawnMob(p[0], p[1], p[2] + 0.2, p[3]);
+    m.tame = true; m.sitting = !!p[4];
+    if (m.parts.collar) m.parts.collar.visible = true;
+    if (m.parts.saddle) m.parts.saddle.visible = true;
+    if (m.type === 'wolf') m.hp = 20;
+  }
+}
+
 function useDim(to) {
   if (G.dim === to) return;
+  if (G.player.riding) G.player.dismount();
+  G.pets = G.pets || {};
+  G.pets[G.dim] = serializePets().concat(G.pendingPets || []);
   if (to === 'overworld' && G.dragons.some(d => !d.dead)) G.dragonTimer = 20;
   clearEntities();
   G.scene.remove(G.world.group);
@@ -521,6 +544,8 @@ function useDim(to) {
   G.world.queue = [];
   G.scene.add(G.world.group);
   G.applyFog();
+  G.pendingPets = G.pets[to] || [];
+  G.pets[to] = [];
 }
 
 G.switchDimension = (to) => {
@@ -638,6 +663,9 @@ G.continueSaved = () => {
   G.worlds.nether.loadEdits(s.netherEdits || {});
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether') useDim('nether');
+  G.pets = Object.assign({}, s.pets || {});
+  G.pendingPets = G.pets[G.dim] || [];
+  G.pets[G.dim] = [];
   const P = G.player;
   P.reset(); P.mode = s.mode || 'survival';
   P.inv = new Inventory(); P.inv.load(s.inv || []);
@@ -662,6 +690,7 @@ G.save = () => {
     pos: P.pos.toArray(), spawn: P.spawn.toArray(), yaw: P.yaw, pitch: P.pitch,
     health: P.dead ? 20 : P.health, hunger: P.hunger, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(),
+    pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
     dim: G.dim, netherVisited: !!G.netherVisited, gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
@@ -768,7 +797,10 @@ function frame(now) {
     // interaction
     const aimPt = Input.tap || Input.aim;
     const tgt = P.dead ? { block: null, mob: null } : P.target(aimPt ? screenRay(aimPt) : null);
-    if (Input.tap) { if (tgt.mob) Input.leftPressed = true; else Input.rightPressed = true; Input.tap = null; }
+    if (Input.tap) {
+      if (tgt.mob && !(tgt.mob.wantsInteract && tgt.mob.wantsInteract(P))) Input.leftPressed = true; else Input.rightPressed = true;
+      Input.tap = null;
+    }
     if (Input.left || Input.padLeft || Input.leftPressed) P.primary(dt, Input.leftPressed, tgt); else P.breaking = null;
     if (Input.rightPressed || ((Input.right || Input.padRight) && P.useCd <= 0)) P.use(tgt);
     if (Input.middlePressed) P.pickBlock(tgt);
@@ -806,6 +838,11 @@ function frame(now) {
     } else { P.portalT = 0; P.portalCd = false; }
     $('fx-portal').style.opacity = clamp((P.portalT || 0) / 2, 0, 0.85);
 
+    if (G.pendingPets && G.pendingPets.length && G.world.isLoaded(P.pos.x, P.pos.z)) {
+      const ready = G.pendingPets.filter(p => G.world.isLoaded(p[1], p[3]));
+      G.pendingPets = G.pendingPets.filter(p => !G.world.isLoaded(p[1], p[3]));
+      restorePets(ready);
+    }
     G.spawnT -= dt;
     if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); }
     if (!G.dragons.length && G.dim === 'nether') {

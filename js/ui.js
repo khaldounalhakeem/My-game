@@ -97,8 +97,8 @@ const UI = {
       $('hearts').innerHTML = this.row(P.health, 'heart');
       $('armor').innerHTML = armorPts ? this.row(armorPts, 'armor') : '';
       $('food').innerHTML = this.row(P.hunger, 'food');
-      const air = P.headInWater || P.air < 10;
-      $('air').innerHTML = air ? Array.from({ length: Math.ceil(P.air) }, () => `<img src="${ICONS.bubble}" alt="">`).join('') : '';
+      const air = P.headInWater || P.air < 15;
+      $('air').innerHTML = air ? Array.from({ length: Math.ceil(Math.max(0, P.air) / 1.5) }, () => `<img src="${ICONS.bubble}" alt="">`).join('') : '';
       $('xpfill').style.width = (P.xp / (7 + P.level * 2) * 100) + '%';
       $('level').textContent = P.level > 0 ? P.level : '';
     }
@@ -382,7 +382,8 @@ const UI = {
 
   showDeath() {
     G.setState('dead');
-    $('death-info').textContent = 'You reached level ' + G.player.level + '. Your items are on the ground where you fell.';
+    G.unlock(); // free the mouse so the Respawn button can be clicked
+    $('death-info').textContent = (G.player.deathCause ? G.player.deathCause + ' ' : '') + 'You reached level ' + G.player.level + '. Your items are on the ground where you fell.';
     $('menu-dead').hidden = false;
   },
 

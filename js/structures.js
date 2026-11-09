@@ -174,10 +174,17 @@ World.prototype.buildDungeon = function (S) {
 World.prototype.buildMineshaft = function (S, ms) {
   const { set, get, rng, c } = S;
   const y = ms.y;
+  // only dig where the tunnel is safely underground: never through the sea floor, lakes or lava
+  const safe = (x, z) => {
+    if (y + 5 >= S.H(x, z)) return false;
+    for (let dy = -1; dy <= 3; dy++) { const id = get(x, y + dy, z); if (id > 0 && DEFS[id].liquid) return false; }
+    return true;
+  };
   const carve = (x, z) => {
+    if (!safe(x, z)) return;
     for (let dy = 0; dy <= 2; dy++) { const id = get(x, y + dy, z); if (id !== ID.bedrock) set(x, y + dy, z, 0); }
     const below = get(x, y - 1, z);
-    if (!below || DEFS[below].liquid) set(x, y - 1, z, ID.oak_planks);
+    if (!below) set(x, y - 1, z, ID.oak_planks);
   };
   // tunnels along both axes of the chunk, joining neighbours into a network
   for (let a = 0; a < 16; a++) for (let w = 7; w <= 9; w++) { carve(a, w); carve(w, a); }
@@ -185,6 +192,7 @@ World.prototype.buildMineshaft = function (S, ms) {
   for (let a = 1; a < 16; a += 4) {
     if (a >= 6 && a <= 10) continue;
     for (const [x, z, bx, bz] of [[a, 7, a, 9], [7, a, 9, a]]) {
+      if (!safe(x, z) || !safe(bx, bz)) continue;
       set(x, y, z, ID.oak_log); set(x, y + 1, z, ID.oak_log);
       set(bx, y, bz, ID.oak_log); set(bx, y + 1, bz, ID.oak_log);
       const beam = x === bx ? [[x, 7], [x, 8], [x, 9]] : [[7, z], [8, z], [9, z]];
@@ -196,6 +204,7 @@ World.prototype.buildMineshaft = function (S, ms) {
   if (c.cx === ms.cx && c.cz === ms.cz) {
     // a spiral staircase from the surface down to the tunnels, around a log pillar
     const top = S.H(12, 12);
+    if (top <= SEA + 1) return; // no staircase up into the sea
     const ring = [[11, 11], [12, 11], [13, 11], [13, 12], [13, 13], [12, 13], [11, 13], [11, 12]];
     for (let yy = y; yy <= top + 2; yy++) {
       for (const [x, z] of ring) set(x, yy, z, 0);

@@ -59,6 +59,8 @@ const FACES_DRAW = {
   blaze: px => { noisyFill(px, 8, ['#f8c828', '#f0b020', '#ffd840'], 23); px(1, 3, '#3a2000', 2, 1); px(5, 3, '#3a2000', 2, 1); px(1, 2, '#ffe880', 2, 1); px(5, 2, '#ffe880', 2, 1); px(2, 6, '#c86010', 4, 1); },
   ghast: px => { px(0, 0, '#f0f0f0', 8, 8); px(1, 2, '#8a8a8a', 2, 1); px(5, 2, '#8a8a8a', 2, 1); px(2, 3, '#c8c8c8', 1, 1); px(5, 3, '#c8c8c8', 1, 1); px(3, 5, '#6a6a6a', 2, 2); },
   iron_golem: px => { noisyFill(px, 8, ['#d6cfc4', '#cbc3b6', '#ddd7cc'], 31); px(0, 0, '#b8b0a2', 8, 2); px(1, 3, '#7a1f1f', 2, 1); px(5, 3, '#7a1f1f', 2, 1); px(2, 6, '#9a9286', 4, 1); px(0, 5, '#4f7a2a', 1, 3); },
+  wolf: px => { px(0, 0, '#d8d4cc', 8, 8); px(1, 2, '#222', 1, 1); px(6, 2, '#222', 1, 1); px(2, 4, '#c8c2b8', 4, 4); px(3, 5, '#222', 2, 1); },
+  horse: px => { px(0, 0, '#8a5a32', 8, 8); px(1, 2, '#1a1a1a', 1, 1); px(6, 2, '#1a1a1a', 1, 1); px(2, 5, '#6a4224', 4, 3); px(3, 6, '#3a2412', 2, 1); },
   villager: px => { px(0, 0, '#c8a07a', 8, 8); px(0, 0, '#5a3a1e', 8, 2); px(1, 3, '#fff', 1, 1); px(2, 3, '#2a6a2a', 1, 1); px(5, 3, '#2a6a2a', 1, 1); px(6, 3, '#fff', 1, 1); px(1, 2, '#3a2512', 2, 1); px(5, 2, '#3a2512', 2, 1); px(3, 6, '#7a5040', 2, 1); },
   enderman: px => { noisyFill(px, 8, ['#161616', '#1c1c1c', '#121212'], 5); px(0, 4, '#e079fa', 3, 1); px(5, 4, '#e079fa', 3, 1); px(1, 4, '#cc00fa', 1, 1); px(6, 4, '#cc00fa', 1, 1); },
 };
@@ -81,6 +83,8 @@ const MOB_TYPES = {
   blaze: { name: 'Blaze', hp: 20, w: 0.6, h: 1.8, speed: 2.4, hostile: true, fly: 3, ranged: 'blaze', xp: 10, fireproof: true, drops: [['blaze_rod', 0, 1]] },
   ghast: { name: 'Ghast', hp: 10, w: 3.6, h: 4, speed: 1.8, hostile: true, fly: 8, ranged: 'ghast', xp: 5, fireproof: true, drops: [['ghast_tear', 0, 1], ['gunpowder', 0, 2]] },
   iron_golem: { name: 'Iron Golem', hp: 100, w: 1.4, h: 2.7, speed: 1.6, neutral: true, golem: true, dmg: 10, xp: 0, drops: [['iron_ingot', 3, 5], ['rose', 0, 2]] },
+  wolf: { name: 'Wolf', hp: 8, w: 0.6, h: 0.85, speed: 3.2, neutral: true, dmg: 3, xp: 1, drops: [], tameWith: 'bone' },
+  horse: { name: 'Horse', hp: 22, w: 1.3, h: 1.6, speed: 2.2, passive: true, rideable: true, xp: 1, drops: [['leather', 0, 2]] },
   villager: { name: 'Villager', hp: 20, w: 0.6, h: 1.95, speed: 1.2, passive: true, xp: 0, drops: [] },
   pig: { name: 'Pig', hp: 10, w: 0.9, h: 0.9, speed: 1.5, passive: true, xp: 2, drops: [['porkchop', 1, 3]] },
   cow: { name: 'Cow', hp: 10, w: 0.9, h: 1.4, speed: 1.4, passive: true, xp: 2, drops: [['beef', 1, 3], ['leather', 0, 2]] },
@@ -158,6 +162,29 @@ function buildMobModel(type) {
     const head = new THREE.Mesh(boxGeo(...S.head), headMats(type, type === 'sheep' ? 0xd8c4a8 : S.col));
     head.position.set(0, S.hy, S.hz); g.add(head); P.head = head;
     if (type === 'cow') { addBox(head, 0.08, 0.15, 0.08, lam(0xd8d0c0), -0.28, 0.25, 0); addBox(head, 0.08, 0.15, 0.08, lam(0xd8d0c0), 0.28, 0.25, 0); }
+  } else if (type === 'wolf') {
+    const fur = lam(0xd8d4cc), dark = lam(0xb8b2a8);
+    addBox(g, 0.42, 0.42, 0.85, fur, 0, 0.62, 0);
+    addBox(g, 0.5, 0.5, 0.42, fur, 0, 0.68, 0.22);
+    for (const [x, z] of [[-0.12, 0.28], [0.12, 0.28], [-0.12, -0.3], [0.12, -0.3]]) P.legs.push(limb(g, 0.14, 0.42, 0.14, dark, x, 0.42, z));
+    const head = new THREE.Mesh(boxGeo(0.38, 0.36, 0.3), headMats('wolf', 0xd8d4cc));
+    head.position.set(0, 0.85, 0.55); g.add(head); P.head = head;
+    addBox(head, 0.2, 0.15, 0.2, dark, 0, -0.07, 0.22);
+    addBox(head, 0.1, 0.12, 0.06, dark, -0.12, 0.23, -0.05); addBox(head, 0.1, 0.12, 0.06, dark, 0.12, 0.23, -0.05);
+    const tail = addBox(g, 0.12, 0.12, 0.5, fur, 0, 0.72, -0.62); tail.rotation.x = 0.6; P.tail = tail;
+    const collar = addBox(g, 0.44, 0.1, 0.44, lam(0xc8202a), 0, 0.84, 0.32); collar.visible = false; P.collar = collar;
+  } else if (type === 'horse') {
+    const coat = lam(0x8a5a32), mane = lam(0x3a2412);
+    addBox(g, 0.7, 0.7, 1.5, coat, 0, 1.3, 0);
+    for (const [x, z] of [[-0.24, 0.58], [0.24, 0.58], [-0.24, -0.58], [0.24, -0.58]]) P.legs.push(limb(g, 0.2, 0.98, 0.2, coat, x, 0.98, z));
+    const neck = new THREE.Group(); neck.position.set(0, 1.45, 0.7); neck.rotation.x = -0.6; g.add(neck);
+    addBox(neck, 0.32, 0.8, 0.42, coat, 0, 0.35, 0);
+    addBox(neck, 0.12, 0.8, 0.12, mane, 0, 0.35, -0.24);
+    const head = new THREE.Mesh(boxGeo(0.32, 0.32, 0.65), headMats('horse', 0x8a5a32));
+    head.position.set(0, 0.75, 0.22); head.rotation.x = 0.6; neck.add(head); P.head = head;
+    addBox(head, 0.08, 0.14, 0.06, coat, -0.1, 0.2, -0.22); addBox(head, 0.08, 0.14, 0.06, coat, 0.1, 0.2, -0.22);
+    const tail = addBox(g, 0.14, 0.7, 0.14, mane, 0, 1.15, -0.8); tail.rotation.x = 0.3;
+    const saddle = addBox(g, 0.74, 0.12, 0.6, lam(0x5a3a1a), 0, 1.68, -0.05); saddle.visible = false; P.saddle = saddle;
   } else if (type === 'iron_golem') {
     const tex = faceTex('golem_body', 8, px => { noisyFill(px, 8, ['#d6cfc4', '#cbc3b6', '#ddd7cc', '#c4bcae'], 33); px(1, 2, '#4f7a2a', 1, 4); px(6, 4, '#4f7a2a', 1, 3); px(5, 1, '#5e8a32', 2, 1); });
     const body = lam(0xffffff, { map: tex });
@@ -235,6 +262,64 @@ class Mob {
     if (this.hp <= 0) this.die(byPlayer);
   }
 
+  /* right-click (or tap) on an animal: feed, tame, sit or ride. Returns true if something happened. */
+  interact(P, hd) {
+    if (this.dead) return false;
+    const meat = hd && ['porkchop', 'cooked_porkchop', 'beef', 'steak', 'chicken', 'cooked_chicken', 'rotten_flesh'].includes(hd.key);
+    if (this.type === 'wolf') {
+      if (!this.tame && hd && hd.key === 'bone') {
+        if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1);
+        if (Math.random() < 0.35 || P.mode === 'creative') this.makeTame();
+        else G.particles.burst(this.pos.x, this.pos.y + 1, this.pos.z, [0x555555, 0x888888], 8, 1.5, 0.12);
+        return true;
+      }
+      if (this.tame && meat && this.hp < 20) {
+        if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1);
+        this.hp = Math.min(20, this.hp + 6); this.hearts();
+        return true;
+      }
+      if (this.tame) { this.sitting = !this.sitting; G.ui.message(this.sitting ? 'Your wolf sits and waits.' : 'Your wolf follows you again.'); return true; }
+      return false;
+    }
+    if (this.type === 'horse') {
+      if (hd && (hd.key === 'apple' || hd.key === 'golden_apple' || hd.key === 'hay_bale' || hd.key === 'melon_slice')) {
+        if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1);
+        this.hp = Math.min(30, this.hp + 4);
+        this.tameProgress = (this.tameProgress || 0) + 0.35;
+        if (this.tameProgress >= 1 && !this.tame) this.makeTame(); else this.hearts();
+        return true;
+      }
+      if (P.riding) return false;
+      if (this.tame || P.mode === 'creative') { P.mount(this); return true; }
+      // an untamed horse lets you try to ride it, then often throws you off
+      this.tameProgress = (this.tameProgress || 0) + 0.25 + Math.random() * 0.2;
+      if (this.tameProgress >= 1) { this.makeTame(); P.mount(this); return true; }
+      P.vel.set((Math.random() - 0.5) * 6, 6, (Math.random() - 0.5) * 6);
+      G.particles.burst(this.pos.x, this.pos.y + 1.6, this.pos.z, [0x555555, 0x888888], 8, 1.5, 0.12);
+      G.ui.message('The horse threw you off! Keep trying, or feed it apples.');
+      return true;
+    }
+    return false;
+  }
+
+  /* on touch screens a tap on this animal should feed/ride it instead of hitting it */
+  wantsInteract(P) {
+    const hd = P.heldDef();
+    if (this.type === 'horse') return true;
+    if (this.type === 'wolf') return this.tame || !!(hd && hd.key === 'bone');
+    return false;
+  }
+
+  makeTame() {
+    this.tame = true; this.angry = false;
+    if (this.type === 'wolf') { this.hp = 20; if (this.parts.collar) this.parts.collar.visible = true; G.ui.message('You tamed a wolf! It follows you and fights monsters. Tap it to make it sit.', 'gold'); }
+    if (this.type === 'horse') { if (this.parts.saddle) this.parts.saddle.visible = true; G.ui.message('You tamed the horse! Tap it to ride, and press sneak to get off.', 'gold'); }
+    this.hearts();
+    G.sound.play('levelup', this.pos);
+  }
+
+  hearts() { G.particles.burst(this.pos.x, this.pos.y + this.h + 0.2, this.pos.z, [0xff3a5a, 0xff8aa0], 10, 1.5, 0.14, -1); }
+
   teleport() {
     for (let i = 0; i < 10; i++) {
       const x = this.pos.x + (Math.random() - 0.5) * 24, z = this.pos.z + (Math.random() - 0.5) * 24;
@@ -292,7 +377,26 @@ class Mob {
         if (d < golemDist) { golemDist = d; golemTarget = m; }
       }
     }
-    if (golemTarget) {
+    if (this.rider) {
+      // the player is steering this horse
+      const dv = this.drive || { x: 0, z: 0 };
+      moveX = dv.x; moveZ = dv.z; speed = 8;
+      if (dv.yaw !== undefined) this.yaw = dv.yaw;
+      if (dv.jump && this.onGround) this.vel.y = 10;
+    } else if (this.tame && this.type === 'wolf') {
+      // a tamed wolf follows you, teleports back if left behind, and fights whatever you fight
+      const tgt = this.petTarget;
+      if (tgt && (tgt.dead || tgt.pos.distanceTo(this.pos) > 20)) this.petTarget = null;
+      if (this.petTarget && !this.sitting) {
+        const t = this.petTarget, dx = t.pos.x - this.pos.x, dz = t.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
+        moveX = dx / l; moveZ = dz / l; speed = 4.5; this.yaw = Math.atan2(moveX, moveZ);
+        if (l < 1.6 && this.attackCd <= 0) { this.attackCd = 0.8; t.hurt(4, this.pos, 5, false); }
+      } else if (!this.sitting && !P.dead) {
+        const dx = P.pos.x - this.pos.x, dz = P.pos.z - this.pos.z, l = Math.hypot(dx, dz);
+        if (l > 24) { this.pos.set(P.pos.x + (Math.random() - 0.5) * 2, P.pos.y, P.pos.z + (Math.random() - 0.5) * 2); this.vel.set(0, 0, 0); }
+        else if (l > 3) { moveX = dx / l; moveZ = dz / l; speed = l > 8 ? 5 : 3.5; this.yaw = Math.atan2(moveX, moveZ); }
+      }
+    } else if (golemTarget) {
       const dx = golemTarget.pos.x - this.pos.x, dz = golemTarget.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
       moveX = dx / l; moveZ = dz / l;
       this.yaw = Math.atan2(moveX, moveZ);
@@ -345,6 +449,7 @@ class Mob {
         if (this.fuse > 1.5) { this.removeSilently(); G.explode(this.pos.x, this.pos.y + 0.8, this.pos.z, 3, true); return; }
       } else if (dist < 1.4 + this.w / 2 && Math.abs(toP.y) < 1.6 && this.attackCd <= 0) {
         this.attackCd = 1;
+        G.lastAttacker = this;
         P.hurt(T.dmg, this.pos, 6);
       }
     } else {
@@ -412,6 +517,10 @@ class Mob {
     if (this.type === 'ghast') this.parts.legs.forEach((L, i) => { L.rotation.x = Math.sin(performance.now() / 400 + i * 1.7) * 0.35; L.rotation.z = Math.cos(performance.now() / 500 + i) * 0.2; });
     else if (this.type === 'spider') this.parts.legs.forEach((L, i) => { L.rotation.y = L.userData.baseY + Math.sin(this.walk * 1.5 + i) * 0.3 * Math.min(1, hs); });
     else this.parts.legs.forEach((L, i) => { L.rotation.x = (i % 2 === (i < 2 ? 0 : 1) ? sw : -sw); });
+    if (this.type === 'wolf') {
+      if (this.parts.tail) this.parts.tail.rotation.y = this.tame ? Math.sin(performance.now() / 120) * 0.5 : 0;
+      if (this.sitting) this.parts.legs.forEach((L, i) => { L.rotation.x = i >= 2 ? -1.2 : 0; });
+    }
     if (this.type === 'iron_golem') {
       this.swingT = Math.max(0, (this.swingT || 0) - dt);
       const lift = this.swingT > 0 ? -1.6 * Math.sin(this.swingT / 0.5 * Math.PI) : 0;
