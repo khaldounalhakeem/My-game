@@ -366,6 +366,7 @@ class World {
       if (rng() < 0.07) this.pyramid(set, get, heights, rng);
     }
     if ((center === BIOME.PLAINS || center === BIOME.FOREST) && rng() < 0.08) plant(3, [ID.pumpkin, ID.melon], ID.grass);
+    if (this.buildStructures) this.buildStructures(c, set, get, heights, biomes, rng);
 
     // apply player edits
     const m = this.edits.get(this.key(cx, cz));
@@ -503,6 +504,7 @@ class World {
     for (let y = base + 1; y <= base + 2; y++) { set(8, y, 2, 0); set(8, y, 3, 0); }
     for (let z = 6; z <= 10; z++) for (let x = 6; x <= 10; x++) set(x, base, z, (x + z) % 2 ? ID.gold_block : ID.wool_orange);
     set(8, base, 8, ID.diamond_block);
+    set(4, base + 1, 8, ID.chest_loot); set(12, base + 1, 8, ID.chest_loot);
     set(7, base + 1, 7, ID.gold_block); set(9, base + 1, 9, ID.gold_block);
     for (const [x, z] of [[7, 8], [9, 8], [8, 7], [8, 9]]) set(x, base - 2, z, ID.tnt);
   }

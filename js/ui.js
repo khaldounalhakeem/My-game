@@ -450,15 +450,16 @@ const UI = {
       const dx = e.clientX - look.x, dy = e.clientY - look.y;
       look.x = e.clientX; look.y = e.clientY;
       if (Math.hypot(e.clientX - look.sx, e.clientY - look.sy) > 10) look.moved = true;
-      if (look.holding) { Input.aim = { x: e.clientX, y: e.clientY }; return; } // keep mining wherever the finger slides
       const f = Input.touch ? 2.2 : 1.6;
+      // the camera always turns with the finger, also while mining, and mining follows the finger
       Input.lookDX += dx * f; Input.lookDY += dy * f;
+      if (look.holding) Input.aim = { x: e.clientX, y: e.clientY };
     });
     const endLook = e => {
       if (!look || e.pointerId !== look.id) return;
       clearTimeout(look.hold);
       if (look.holding) { Input.left = false; Input.aim = null; }
-      else if (!look.moved && performance.now() - look.t < 300) {
+      else if (!look.moved) {
         // a quick tap on a block places/uses on that block; a tap on a mob hits it
         Input.tap = { x: e.clientX, y: e.clientY };
       }

@@ -314,6 +314,16 @@ G.sleep = (b) => {
   }, 1600);
 };
 
+/* open a treasure chest found in a structure: the loot pops out and the chest is left empty */
+G.openChest = (x, y, z, broken) => {
+  if (!broken) G.world.setBlock(x, y, z, ID.chest);
+  const items = rollLoot(Math.random);
+  for (const [id, n] of items) G.spawnDrop(id, n, x + 0.5, y + 1.1, z + 0.5, new THREE.Vector3((Math.random() - 0.5) * 3, 4 + Math.random() * 2, (Math.random() - 0.5) * 3));
+  G.particles.burst(x + 0.5, y + 1, z + 0.5, [0xf5cc2e, 0xffffff, 0xfff3a0], 16, 2.5, 0.12);
+  Sound.play('levelup');
+  G.ui.message('Treasure! ' + items.map(([id, n]) => n + ' ' + DEFS[id].name).join(', '), 'gold');
+};
+
 G.summonDragon = (kind) => {
   if (G.dim !== 'nether') { G.ui.message('Dragons can only be summoned in the Nether. Build an obsidian portal and light it with Flint and Steel.', 'purple'); return false; }
   if (G.dragons.some(d => !d.done)) { G.ui.message('A dragon is already flying around!', 'purple'); return false; }
@@ -350,6 +360,7 @@ function spawnTick() {
     if (m.T.passive) passive++; else hostile++;
   }
   if (G.dim === 'nether') { if (hostile < 12) netherSpawn(); return; }
+  structureSpawns();
   if (passive < 12 && Math.random() < 0.4) {
     const a = Math.random() * Math.PI * 2, r = 20 + Math.random() * 25;
     const x = Math.floor(P.pos.x + Math.cos(a) * r) + 0.5, z = Math.floor(P.pos.z + Math.sin(a) * r) + 0.5;
@@ -410,6 +421,38 @@ function netherSpawn() {
     if (y < 0) continue;
     spawnMob(type, x + 0.5, y, z + 0.5);
     break;
+  }
+}
+
+/* villagers around villages, and monsters from dungeon spawners */
+function structureSpawns() {
+  const P = G.player, W = G.world;
+  const pcx = Math.floor(P.pos.x) >> 4, pcz = Math.floor(P.pos.z) >> 4;
+  for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) {
+    const c = W.chunks.get(W.key(pcx + dx, pcz + dz));
+    if (!c) continue;
+    if (c.village) {
+      const v = c.village;
+      const villagers = G.mobs.filter(m => !m.dead && m.type === 'villager' && Math.hypot(m.pos.x - v.x, m.pos.z - v.z) < 48).length;
+      if (villagers < 6 && Math.random() < 0.5) {
+        const x = v.x + (Math.random() - 0.5) * 30, z = v.z + (Math.random() - 0.5) * 30;
+        if (W.isLoaded(x, z)) {
+          const y = W.surfaceY(x, z);
+          const top = W.getBlock(Math.floor(x), y, Math.floor(z));
+          if (top && DEFS[top].solid && !DEFS[top].leaves && y > SEA) spawnMob('villager', x, y + 1, z);
+        }
+      }
+    }
+    for (const [sx, sy, sz] of c.spawners || []) {
+      if (W.getBlock(sx, sy, sz) !== ID.spawner) continue;
+      if (Math.hypot(P.pos.x - sx, P.pos.y - sy, P.pos.z - sz) > 16 || P.mode !== 'survival') continue;
+      G.particles.burst(sx + 0.5, sy + 0.8, sz + 0.5, [0xff7a20, 0x553322], 3, 0.8, 0.1, -1);
+      const near = G.mobs.filter(m => !m.dead && Math.hypot(m.pos.x - sx, m.pos.z - sz) < 8).length;
+      if (near >= 4 || Math.random() > 0.3) continue;
+      const x = sx + (Math.random() < 0.5 ? -2 : 2) + 0.5, z = sz + Math.round((Math.random() - 0.5) * 4) + 0.5;
+      if (!W.getBlock(Math.floor(x), sy, Math.floor(z)) && !W.getBlock(Math.floor(x), sy + 1, Math.floor(z)))
+        spawnMob(['zombie', 'skeleton', 'spider'][Math.random() * 3 | 0], x, sy, z);
+    }
   }
 }
 

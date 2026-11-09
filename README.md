@@ -56,13 +56,18 @@ In menus, the left stick moves a pointer. Cross clicks, Square quick-moves a sta
 
 ### Touch controls (phones and tablets)
 
-Just like Minecraft on a phone: **tap a block** to place a block there (or use it, like a crafting table or bed), **hold your finger on a block** to mine it, **tap a mob** to hit it, and **drag** to look around. The left stick moves. Buttons for jump, sneak/fly down, items, drop and menu.
+Just like Minecraft on a phone: **tap a block** to place a block there (or use it, like a crafting table or bed), **hold your finger on a block** to mine it (the camera keeps turning as your finger moves), **tap a mob** to hit it, and **drag** to look around. The left stick moves. Buttons for jump, sneak/fly down, items, drop and menu.
 
 ## What's in it
 
 - **Infinite world** with biomes: plains, forests, birch forests, taiga, snowy tundra, deserts, beaches, oceans and mountains. Caves, lava lakes deep down, and ore veins.
 - **76 blocks**, including every ore: coal, iron, **gold**, diamond, redstone, lapis and emerald (emerald in mountains). Also gold, iron, diamond, emerald, lapis, coal, redstone and quartz blocks, TNT, glass, bricks, obsidian, glowstone, wool in 8 colours, flowers, mushrooms, cactus, pumpkins, melons and more.
 - **Desert pyramids** with gold-capped tops and a treasure room of gold blocks and a diamond block. Watch out for the TNT hidden underneath.
+- **Structures**, each with **treasure chests** (tap or right-click to open):
+  - **Villages** in plains, forests, deserts, snowy plains and taiga: houses with beds, a well, farms, a street grid, lamp posts and **villagers**
+  - **Dungeons** underground with a **monster spawner** that keeps spawning zombies, skeletons and spiders
+  - **Mineshafts**: tunnel networks with wooden supports, and a spiral staircase down from the surface
+  - **Igloos** in snowy plains, **ruined portals** (with spare obsidian to fix them), **shipwrecks** on the ocean floor, and rare underground **stronghold libraries** full of bookshelves
 - **Crafting** at a Crafting Table and **smelting** in a Furnace: planks, sticks, pickaxes, axes, shovels and swords from wood to diamond (gold tools are the fastest; axes chop wood fast and hit hard, shovels dig dirt, sand and gravel fast), bow and arrows, flint and steel, TNT, golden apples, storage blocks, dyed wool and more.
 - **Mobs**:
   - Friendly: pigs, cows, sheep, chickens

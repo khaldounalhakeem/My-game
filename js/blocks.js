@@ -400,6 +400,14 @@ const ARMOR_MATS = [['leather', 'Leather', 0x8a4f2a, [1, 3, 2, 1]], ['golden', '
 const ARMOR_PIECES = [['helmet', 'Helmet', 5], ['chestplate', 'Chestplate', 8], ['leggings', 'Leggings', 7], ['boots', 'Boots', 4]];
 for (const [k, , c] of ARMOR_MATS) for (const [piece] of ARMOR_PIECES) makeTile('i_' + k + '_' + piece, pArmor(piece, c));
 makeTile('i_armor_icon', pArmor('chestplate', 0xdcdcdc));
+const pChest = top => P => {
+  pPlanks(0x9a6a32)(P);
+  for (let i = 0; i < 16; i++) { P.put(i, 0, 0x4a2f12); P.put(0, i, 0x4a2f12); P.put(i, 15, 0x4a2f12); P.put(15, i, 0x4a2f12); }
+  if (!top) { for (let x = 1; x < 15; x++) P.put(x, 5, 0x4a2f12); P.rect(7, 4, 2, 4, 0xd8c040); P.put(7, 6, 0x3a2a10); }
+};
+makeTile('chest_side', pChest(false));
+makeTile('chest_top', pChest(true));
+makeTile('spawner', P => { P.clear(); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (x % 4 === 0 || y % 4 === 0 || x === 15 || y === 15) P.put(x, y, P.vary(0x2a3038, 10)); P.rect(6, 6, 4, 4, 0xff7a20, 30); });
 makeTile('i_ghast_tear', pPlant(P => { for (let y = 3; y <= 13; y++) { const w = y < 8 ? (y - 3) / 2 : 3 - (y - 8) * 0.5; for (let x = Math.round(8 - w); x <= Math.round(8 + w); x++) P.put(x, y, x < 8 ? 0xffffff : 0xc8e0f0); } }));
 
 makeTile('i_stick', pPlant(P => { for (let i = 0; i < 10; i++) { P.put(3 + i, 12 - i, 0x7a5a32); P.put(4 + i, 12 - i, 0x4e3a20); } }));
@@ -540,6 +548,9 @@ block('nether_quartz_ore', 'Nether Quartz Ore', 'nether_quartz_ore', PICK(1, 3, 
 block('nether_gold_ore', 'Nether Gold Ore', 'nether_gold_ore', PICK(1, 3, { drop: 'gold_ingot', xp: 1 }));
 block('magma', 'Magma Block', 'magma', PICK(1, 0.5, { light: true }));
 block('bed', 'Bed', { top: 'bed_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2 });
+block('chest_loot', 'Treasure Chest', { top: 'chest_top', side: 'chest_side', front: 'chest_side' }, { tool: 'axe', hardness: 2.5, drop: null });
+block('chest', 'Chest', { top: 'chest_top', side: 'chest_side' }, { tool: 'axe', hardness: 2.5 });
+block('spawner', 'Monster Spawner', 'spawner', PICK(1, 5, { opaque: false, cutout: true, drop: null, light: true }));
 block('nether_portal', 'Nether Portal', 'portal', { solid: false, opaque: false, translucent: true, hardness: 0, drop: null, light: true, portal: true });
 
 let nextItemId = 128;
