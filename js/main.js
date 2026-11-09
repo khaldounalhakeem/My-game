@@ -651,6 +651,14 @@ G.resume = () => {
   G.lock();
 };
 
+/* direction from the camera through a point on the screen (where a finger touched) */
+const rayV = new THREE.Vector3();
+function screenRay(pt) {
+  const r = G.renderer.domElement.getBoundingClientRect();
+  rayV.set(((pt.x - r.left) / r.width) * 2 - 1, -((pt.y - r.top) / r.height) * 2 + 1, 0.5).unproject(G.camera);
+  return rayV.sub(G.camera.position).normalize().clone();
+}
+
 /* ---------- main loop ---------- */
 let last = performance.now(), fpsAcc = 0, fpsN = 0;
 function frame(now) {
@@ -688,7 +696,9 @@ function frame(now) {
     if (ready) P.update(dt, Input);
 
     // interaction
-    const tgt = P.dead ? { block: null, mob: null } : P.target();
+    const aimPt = Input.tap || Input.aim;
+    const tgt = P.dead ? { block: null, mob: null } : P.target(aimPt ? screenRay(aimPt) : null);
+    if (Input.tap) { if (tgt.mob) Input.leftPressed = true; else Input.rightPressed = true; Input.tap = null; }
     if (Input.left || Input.padLeft || Input.leftPressed) P.primary(dt, Input.leftPressed, tgt); else P.breaking = null;
     if (Input.rightPressed || ((Input.right || Input.padRight) && P.useCd <= 0)) P.use(tgt);
     if (Input.middlePressed) P.pickBlock(tgt);

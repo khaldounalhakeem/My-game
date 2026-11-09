@@ -56,7 +56,7 @@ In menus, the left stick moves a pointer. Cross clicks, Square quick-moves a sta
 
 ### Touch controls (phones and tablets)
 
-Left stick moves, drag on the screen to look around, **tap** to place or use, **hold** to dig. Buttons for jump, sneak/fly down, items, drop and menu.
+Just like Minecraft on a phone: **tap a block** to place a block there (or use it, like a crafting table or bed), **hold your finger on a block** to mine it, **tap a mob** to hit it, and **drag** to look around. The left stick moves. Buttons for jump, sneak/fly down, items, drop and menu.
 
 ## What's in it
 

@@ -441,7 +441,8 @@ const UI = {
       if (e.pointerType === 'mouse' && e.button === 1) { Input.middlePressed = true; return; }
       if (look) return;
       look = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: false, hold: null };
-      look.hold = setTimeout(() => { if (look && !look.moved) { Input.left = true; Input.leftPressed = true; look.holding = true; } }, 280);
+      // like Minecraft on a phone: hold your finger on a block to mine the block under your finger
+      look.hold = setTimeout(() => { if (look && !look.moved) { Input.aim = { x: look.x, y: look.y }; Input.left = true; Input.leftPressed = true; look.holding = true; } }, 300);
       try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
     });
     cv.addEventListener('pointermove', e => {
@@ -449,16 +450,17 @@ const UI = {
       const dx = e.clientX - look.x, dy = e.clientY - look.y;
       look.x = e.clientX; look.y = e.clientY;
       if (Math.hypot(e.clientX - look.sx, e.clientY - look.sy) > 10) look.moved = true;
+      if (look.holding) { Input.aim = { x: e.clientX, y: e.clientY }; return; } // keep mining wherever the finger slides
       const f = Input.touch ? 2.2 : 1.6;
       Input.lookDX += dx * f; Input.lookDY += dy * f;
     });
     const endLook = e => {
       if (!look || e.pointerId !== look.id) return;
       clearTimeout(look.hold);
-      if (look.holding) Input.left = false;
-      else if (!look.moved && performance.now() - look.t < 280) {
-        const tgt = G.player.target();
-        if (tgt.mob) { Input.leftPressed = true; } else { Input.rightPressed = true; }
+      if (look.holding) { Input.left = false; Input.aim = null; }
+      else if (!look.moved && performance.now() - look.t < 300) {
+        // a quick tap on a block places/uses on that block; a tap on a mob hits it
+        Input.tap = { x: e.clientX, y: e.clientY };
       }
       look = null;
     };

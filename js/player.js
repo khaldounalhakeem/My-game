@@ -212,8 +212,8 @@ class Player {
   }
 
   /* ---------- targeting ---------- */
-  target() {
-    const o = this.eyePos(), d = this.lookDir();
+  target(aimDir) {
+    const o = this.eyePos(), d = aimDir || this.lookDir();
     const reach = this.mode === 'creative' ? 6 : 4.6;
     const block = G.world.raycast(o.x, o.y, o.z, d.x, d.y, d.z, reach, false);
     let mob = null, mobT = this.mode === 'creative' ? 6 : 3.8;
