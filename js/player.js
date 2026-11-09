@@ -412,6 +412,7 @@ class Player {
     }
     W.setBlock(px, py, pz, hd.id);
     W.settle(px, py, pz);
+    if (hd.id === ID.pumpkin) G.tryBuildGolem(px, py, pz);
     G.sound.play('place', null, hd.id);
     if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
     this.useCd = 0.22; this.swing = 1;

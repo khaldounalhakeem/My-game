@@ -41,7 +41,7 @@ class Chunk {
 }
 
 class World {
-  constructor(seed, materials, dim) {
+  constructor(seed, materials, dim, legacy) {
     this.dim = dim || 'overworld';
     if (this.dim === 'nether') seed = (seed ^ 0x2f6e2b1) + 7;
     this.seed = seed >>> 0;
@@ -53,6 +53,15 @@ class World {
     this.urgent = new Set();
     this.group = new THREE.Group();
     this.mats = materials;
+    // every seed gets its own personality: where you start, how high and wild the land is,
+    // how many mountains, how hot or cold and how many trees (legacy keeps old saved worlds unchanged)
+    this.legacy = !!legacy;
+    const sr = mulberry32((this.seed ^ 0x9e3779b9) >>> 0);
+    this.style = this.legacy ? { amp: 1, hills: 1, mnt: 1, cont: 260, temp: 0, moist: 0, trees: 1, ox: 0, oz: 0 } : {
+      amp: 0.6 + sr() * 0.9, hills: 0.5 + sr() * 1.1, mnt: 0.4 + sr() * 1.6, cont: 160 + sr() * 260,
+      temp: (sr() - 0.5) * 0.36, moist: (sr() - 0.5) * 0.36, trees: 0.5 + sr() * 1.3,
+      ox: Math.round((sr() - 0.5) * 20000), oz: Math.round((sr() - 0.5) * 20000),
+    };
     this.renderDist = 5;
     this.lastCx = null; this.lastCz = null;
     this.queue = [];
@@ -62,18 +71,21 @@ class World {
 
   /* ---------- terrain shape ---------- */
   heightAt(x, z) {
-    const n = this.noise;
-    const cont = n.fbm2(x / 260, z / 260, 4);
+    const n = this.noise, S = this.style;
+    x += S.ox; z += S.oz;
+    const cont = n.fbm2(x / S.cont, z / S.cont, 4);
     const hills = this.noiseB.fbm2(x / 70, z / 70, 4);
     const mnt = this.noiseC.fbm2(x / 200 + 31.7, z / 200 - 12.3, 3);
-    let h = SEA + 4 + cont * 70 + hills * 20;
+    let h = SEA + 4 + cont * 70 * S.amp + hills * 20 * S.hills;
     const m = Math.max(0, mnt - 0.02);
-    h += m * m * 600;
+    h += m * m * 600 * S.mnt;
     return clamp(Math.floor(h), 4, WH - 14);
   }
 
   climate(x, z) {
-    return [this.noiseB.fbm2(x / 420 + 500, z / 420, 2), this.noiseC.fbm2(x / 380, z / 380 + 700, 2)];
+    const S = this.style;
+    x += S.ox; z += S.oz;
+    return [this.noiseB.fbm2(x / 420 + 500, z / 420, 2) + S.temp, this.noiseC.fbm2(x / 380, z / 380 + 700, 2) + S.moist];
   }
 
   biomeAt(x, z, h) {
@@ -335,7 +347,8 @@ class World {
     // decorations
     const center = biomes[136];
     const treeCount = { [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
-    for (let t = 0; t < treeCount; t++) {
+    const trees = Math.floor(treeCount * this.style.trees + rng());
+    for (let t = 0; t < trees; t++) {
       const x = 2 + (rng() * 12 | 0), z = 2 + (rng() * 12 | 0), h = heights[x + z * 16];
       const ground = get(x, h, z);
       if (ground !== ID.grass && ground !== ID.snow_grass) continue;

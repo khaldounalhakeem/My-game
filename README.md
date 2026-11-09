@@ -60,6 +60,7 @@ Just like Minecraft on a phone: **tap a block** to place a block there (or use i
 
 ## What's in it
 
+- **Every seed is its own world**: a different starting place, different land height, more or fewer mountains, a hotter or colder climate and more or fewer trees.
 - **Infinite world** with biomes: plains, forests, birch forests, taiga, snowy tundra, deserts, beaches, oceans and mountains. Caves, lava lakes deep down, and ore veins.
 - **76 blocks**, including every ore: coal, iron, **gold**, diamond, redstone, lapis and emerald (emerald in mountains). Also gold, iron, diamond, emerald, lapis, coal, redstone and quartz blocks, TNT, glass, bricks, obsidian, glowstone, wool in 8 colours, flowers, mushrooms, cactus, pumpkins, melons and more.
 - **Desert pyramids** with gold-capped tops and a treasure room of gold blocks and a diamond block. Watch out for the TNT hidden underneath.
@@ -71,6 +72,7 @@ Just like Minecraft on a phone: **tap a block** to place a block there (or use i
 - **Crafting** at a Crafting Table and **smelting** in a Furnace: planks, sticks, pickaxes, axes, shovels and swords from wood to diamond (gold tools are the fastest; axes chop wood fast and hit hard, shovels dig dirt, sand and gravel fast), bow and arrows, flint and steel, TNT, golden apples, storage blocks, dyed wool and more.
 - **Mobs**:
   - Friendly: pigs, cows, sheep, chickens
+  - **Villagers** live in villages, guarded by an **Iron Golem** that fights monsters (and you, if you hit it). Kill one for 3-5 iron ingots. Build your own golem: a T of 4 iron blocks with a pumpkin on top.
   - Hostile: zombies and skeletons (they burn in daylight), creepers (they explode), spiders, endermen (they teleport)
   - Hostile mobs come out at night and in dark caves.
 - **The Nether**: every new world has an empty obsidian portal frame near spawn. Light it with Flint and Steel (iron ingot + flint), stand inside, and you're in the Nether: lava seas, floating netherrack islands, glowstone, soul sand, quartz and gold ore, and nether-brick fortress bridges. You can also build your own frame: 4 wide by 5 tall, with a 2 by 3 empty middle. One block in the Nether equals 8 in the Overworld.

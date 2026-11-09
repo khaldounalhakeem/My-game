@@ -58,6 +58,7 @@ const FACES_DRAW = {
   wither_skeleton: px => { noisyFill(px, 8, ['#2a2a2a', '#242424', '#303030'], 22); px(1, 3, '#050505', 2, 2); px(5, 3, '#050505', 2, 2); px(3, 5, '#151515', 2, 1); px(1, 6, '#101010', 6, 1); },
   blaze: px => { noisyFill(px, 8, ['#f8c828', '#f0b020', '#ffd840'], 23); px(1, 3, '#3a2000', 2, 1); px(5, 3, '#3a2000', 2, 1); px(1, 2, '#ffe880', 2, 1); px(5, 2, '#ffe880', 2, 1); px(2, 6, '#c86010', 4, 1); },
   ghast: px => { px(0, 0, '#f0f0f0', 8, 8); px(1, 2, '#8a8a8a', 2, 1); px(5, 2, '#8a8a8a', 2, 1); px(2, 3, '#c8c8c8', 1, 1); px(5, 3, '#c8c8c8', 1, 1); px(3, 5, '#6a6a6a', 2, 2); },
+  iron_golem: px => { noisyFill(px, 8, ['#d6cfc4', '#cbc3b6', '#ddd7cc'], 31); px(0, 0, '#b8b0a2', 8, 2); px(1, 3, '#7a1f1f', 2, 1); px(5, 3, '#7a1f1f', 2, 1); px(2, 6, '#9a9286', 4, 1); px(0, 5, '#4f7a2a', 1, 3); },
   villager: px => { px(0, 0, '#c8a07a', 8, 8); px(0, 0, '#5a3a1e', 8, 2); px(1, 3, '#fff', 1, 1); px(2, 3, '#2a6a2a', 1, 1); px(5, 3, '#2a6a2a', 1, 1); px(6, 3, '#fff', 1, 1); px(1, 2, '#3a2512', 2, 1); px(5, 2, '#3a2512', 2, 1); px(3, 6, '#7a5040', 2, 1); },
   enderman: px => { noisyFill(px, 8, ['#161616', '#1c1c1c', '#121212'], 5); px(0, 4, '#e079fa', 3, 1); px(5, 4, '#e079fa', 3, 1); px(1, 4, '#cc00fa', 1, 1); px(6, 4, '#cc00fa', 1, 1); },
 };
@@ -79,6 +80,7 @@ const MOB_TYPES = {
   wither_skeleton: { name: 'Wither Skeleton', hp: 20, w: 0.7, h: 2.35, speed: 2.7, hostile: true, dmg: 6, xp: 5, fireproof: true, drops: [['coal', 0, 1], ['bone', 0, 2]] },
   blaze: { name: 'Blaze', hp: 20, w: 0.6, h: 1.8, speed: 2.4, hostile: true, fly: 3, ranged: 'blaze', xp: 10, fireproof: true, drops: [['blaze_rod', 0, 1]] },
   ghast: { name: 'Ghast', hp: 10, w: 3.6, h: 4, speed: 1.8, hostile: true, fly: 8, ranged: 'ghast', xp: 5, fireproof: true, drops: [['ghast_tear', 0, 1], ['gunpowder', 0, 2]] },
+  iron_golem: { name: 'Iron Golem', hp: 100, w: 1.4, h: 2.7, speed: 1.6, neutral: true, golem: true, dmg: 10, xp: 0, drops: [['iron_ingot', 3, 5], ['rose', 0, 2]] },
   villager: { name: 'Villager', hp: 20, w: 0.6, h: 1.95, speed: 1.2, passive: true, xp: 0, drops: [] },
   pig: { name: 'Pig', hp: 10, w: 0.9, h: 0.9, speed: 1.5, passive: true, xp: 2, drops: [['porkchop', 1, 3]] },
   cow: { name: 'Cow', hp: 10, w: 0.9, h: 1.4, speed: 1.4, passive: true, xp: 2, drops: [['beef', 1, 3], ['leather', 0, 2]] },
@@ -156,6 +158,16 @@ function buildMobModel(type) {
     const head = new THREE.Mesh(boxGeo(...S.head), headMats(type, type === 'sheep' ? 0xd8c4a8 : S.col));
     head.position.set(0, S.hy, S.hz); g.add(head); P.head = head;
     if (type === 'cow') { addBox(head, 0.08, 0.15, 0.08, lam(0xd8d0c0), -0.28, 0.25, 0); addBox(head, 0.08, 0.15, 0.08, lam(0xd8d0c0), 0.28, 0.25, 0); }
+  } else if (type === 'iron_golem') {
+    const tex = faceTex('golem_body', 8, px => { noisyFill(px, 8, ['#d6cfc4', '#cbc3b6', '#ddd7cc', '#c4bcae'], 33); px(1, 2, '#4f7a2a', 1, 4); px(6, 4, '#4f7a2a', 1, 3); px(5, 1, '#5e8a32', 2, 1); });
+    const body = lam(0xffffff, { map: tex });
+    addBox(g, 1.1, 1.0, 0.7, body, 0, 1.85, 0);
+    addBox(g, 0.8, 0.45, 0.5, body, 0, 1.15, 0);
+    for (const x of [-0.26, 0.26]) P.legs.push(limb(g, 0.42, 0.95, 0.42, body, x, 0.95, 0));
+    for (const x of [-0.75, 0.75]) P.arms.push(limb(g, 0.36, 1.75, 0.4, body, x, 2.25, 0));
+    const head = new THREE.Mesh(boxGeo(0.55, 0.62, 0.55), headMats('iron_golem', 0xd6cfc4));
+    head.position.set(0, 2.6, 0.12); g.add(head); P.head = head;
+    addBox(head, 0.14, 0.28, 0.14, lam(0xc4bcae), 0, -0.12, 0.33);
   } else if (type === 'blaze') {
     const head = new THREE.Mesh(boxGeo(0.5, 0.5, 0.5), headMats('blaze', 0xf8c828));
     head.position.set(0, 1.45, 0); g.add(head); P.head = head;
@@ -270,7 +282,27 @@ class Mob {
     let moveX = 0, moveZ = 0, speed = T.speed;
     const inLiquid = W.liquidAt(this.pos.x, this.pos.y + 0.3, this.pos.z);
 
-    if (hostileNow && canTarget) {
+    // iron golems guard villages: they chase monsters, and the player too once you hit one
+    let golemTarget = null, golemDist = 16;
+    if (T.golem) {
+      if (this.angry && canTarget) { golemTarget = P; golemDist = dist; }
+      else for (const m of G.mobs) {
+        if (m === this || m.dead || !m.T.hostile) continue;
+        const d = m.pos.distanceTo(this.pos);
+        if (d < golemDist) { golemDist = d; golemTarget = m; }
+      }
+    }
+    if (golemTarget) {
+      const dx = golemTarget.pos.x - this.pos.x, dz = golemTarget.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
+      moveX = dx / l; moveZ = dz / l;
+      this.yaw = Math.atan2(moveX, moveZ);
+      if (golemDist < 2.6 && this.attackCd <= 0) {
+        this.attackCd = 1.2; this.swingT = 0.5;
+        if (golemTarget === P) { P.hurt(T.dmg, this.pos, 10, true); P.vel.y = 9; }
+        else { golemTarget.hurt(15, this.pos, 10, false); golemTarget.vel.y = 9; }
+        G.sound.play('golem', this.pos);
+      }
+    } else if (hostileNow && canTarget && !T.golem) {
       const l = Math.hypot(toP.x, toP.z) || 1;
       moveX = toP.x / l; moveZ = toP.z / l;
       this.yaw = Math.atan2(moveX, moveZ);
@@ -380,6 +412,11 @@ class Mob {
     if (this.type === 'ghast') this.parts.legs.forEach((L, i) => { L.rotation.x = Math.sin(performance.now() / 400 + i * 1.7) * 0.35; L.rotation.z = Math.cos(performance.now() / 500 + i) * 0.2; });
     else if (this.type === 'spider') this.parts.legs.forEach((L, i) => { L.rotation.y = L.userData.baseY + Math.sin(this.walk * 1.5 + i) * 0.3 * Math.min(1, hs); });
     else this.parts.legs.forEach((L, i) => { L.rotation.x = (i % 2 === (i < 2 ? 0 : 1) ? sw : -sw); });
+    if (this.type === 'iron_golem') {
+      this.swingT = Math.max(0, (this.swingT || 0) - dt);
+      const lift = this.swingT > 0 ? -1.6 * Math.sin(this.swingT / 0.5 * Math.PI) : 0;
+      this.parts.arms.forEach((a, i) => { a.rotation.x = (i ? sw : -sw) * 0.6 + lift; });
+    }
     if (this.type === 'enderman') this.parts.arms.forEach((a, i) => { a.rotation.x = i ? sw : -sw; });
     if (this.type === 'chicken') this.parts.wings.forEach((w, i) => { w.rotation.z = (this.onGround ? 0 : Math.sin(performance.now() / 50) * 0.8) * (i ? 1 : -1); });
     let ry = this.mesh.rotation.y, d = this.yaw - ry;

@@ -74,6 +74,9 @@ const Sound = {
       case 'mob_zombie': this.tone(115, 0.7, 'sawtooth', 0.09 * v, 80); break;
       case 'mob_skeleton': for (let i = 0; i < 4; i++) this.noise(0.04, 0.2 * v, 2500, 'bandpass', i * 0.07); break;
       case 'mob_creeper': break;
+      case 'golem': this.noise(0.25, 0.5 * v, 300, 'lowpass'); this.tone(90, 0.3, 'square', 0.15 * v, 50); break;
+      case 'mob_iron_golem': this.tone(70, 0.4, 'triangle', 0.1 * v, 60); break;
+      case 'mob_villager': this.tone(260, 0.12, 'square', 0.05 * v, 200); this.tone(220, 0.15, 'square', 0.05 * v, 300, 0.14); break;
       case 'mob_spider': this.noise(0.4, 0.12 * v, 3000, 'highpass'); break;
       case 'mob_enderman': this.tone(330, 0.5, 'sine', 0.08 * v, 180); this.tone(240, 0.5, 'sine', 0.06 * v, 420, 0.2); break;
       case 'mob_pig': this.tone(330, 0.12, 'square', 0.06 * v, 220); this.tone(300, 0.12, 'square', 0.06 * v, 200, 0.16); break;
@@ -314,6 +317,25 @@ G.sleep = (b) => {
   }, 1600);
 };
 
+/* a pumpkin placed on a T of four iron blocks comes alive as an iron golem */
+G.tryBuildGolem = (x, y, z) => {
+  const W = G.world;
+  if (W.getBlock(x, y - 1, z) !== ID.iron_block || W.getBlock(x, y - 2, z) !== ID.iron_block) return false;
+  for (const [ax, az] of [[1, 0], [0, 1]]) {
+    if (W.getBlock(x + ax, y - 1, z + az) === ID.iron_block && W.getBlock(x - ax, y - 1, z - az) === ID.iron_block) {
+      for (const [bx, by, bz] of [[x, y, z], [x, y - 1, z], [x, y - 2, z], [x + ax, y - 1, z + az], [x - ax, y - 1, z - az]]) {
+        W.setBlock(bx, by, bz, 0);
+        G.particles.blockBreak(bx, by, bz, ID.iron_block);
+      }
+      spawnMob('iron_golem', x + 0.5, y - 2, z + 0.5);
+      G.ui.message('You built an Iron Golem! It will protect you from monsters.', 'gold');
+      Sound.play('golem');
+      return true;
+    }
+  }
+  return false;
+};
+
 /* open a treasure chest found in a structure: the loot pops out and the chest is left empty */
 G.openChest = (x, y, z, broken) => {
   if (!broken) G.world.setBlock(x, y, z, ID.chest);
@@ -434,6 +456,11 @@ function structureSpawns() {
     if (c.village) {
       const v = c.village;
       const villagers = G.mobs.filter(m => !m.dead && m.type === 'villager' && Math.hypot(m.pos.x - v.x, m.pos.z - v.z) < 48).length;
+      const golems = G.mobs.filter(m => !m.dead && m.type === 'iron_golem' && Math.hypot(m.pos.x - v.x, m.pos.z - v.z) < 48).length;
+      if (!golems && Math.random() < 0.15) {
+        const y = W.surfaceY(v.x + 4, v.z + 4);
+        if (y > SEA && !W.getBlock(Math.floor(v.x + 4), y + 1, Math.floor(v.z + 4)) && !W.getBlock(Math.floor(v.x + 4), y + 2, Math.floor(v.z + 4))) spawnMob('iron_golem', v.x + 4, y + 1, v.z + 4);
+      }
       if (villagers < 6 && Math.random() < 0.5) {
         const x = v.x + (Math.random() - 0.5) * 30, z = v.z + (Math.random() - 0.5) * 30;
         if (W.isLoaded(x, z)) {
@@ -463,7 +490,7 @@ function clearEntities() {
   G.dragons.length = 0;
 }
 
-function makeWorld(seed) {
+function makeWorld(seed, legacy) {
   if (G.worlds) {
     G.scene.remove(G.world.group);
     for (const w of Object.values(G.worlds)) for (const c of w.chunks.values()) for (const m of c.meshes) m.geometry.dispose();
@@ -472,7 +499,7 @@ function makeWorld(seed) {
   const rd = G.world ? G.world.renderDist : (Input.touch ? 4 : 5);
   G.worlds = {};
   for (const dim of ['overworld', 'nether']) {
-    const w = new World(seed, G.mats, dim);
+    const w = new World(seed, G.mats, dim, legacy);
     w.renderDist = rd;
     w.onEdit = (x, y, z, id) => Net.edit(dim, x, y, z, id);
     G.worlds[dim] = w;
@@ -606,7 +633,7 @@ G.continueSaved = () => {
   let s;
   try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
   if (!s) { G.ui.message('No saved world found.'); return; }
-  makeWorld(s.seed);
+  makeWorld(s.seed, !s.gen); // saves from before seed personalities keep their old landscape
   G.worlds.overworld.loadEdits(s.edits || {});
   G.worlds.nether.loadEdits(s.netherEdits || {});
   G.netherVisited = !!s.netherVisited;
@@ -635,7 +662,7 @@ G.save = () => {
     pos: P.pos.toArray(), spawn: P.spawn.toArray(), yaw: P.yaw, pitch: P.pitch,
     health: P.dead ? 20 : P.health, hunger: P.hunger, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(),
-    dim: G.dim, netherVisited: !!G.netherVisited,
+    dim: G.dim, netherVisited: !!G.netherVisited, gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
 };
