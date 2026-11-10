@@ -257,7 +257,7 @@ G.spawnDrop = (id, count, x, y, z, vel) => {
 G.spawnProjectile = (kind, pos, vel, owner) => { G.projectiles.push(new Projectile(kind, pos, vel, owner)); };
 G.primeTNT = (x, y, z, fuse) => { G.tnts.push(new PrimedTNT(x + 0.5, y, z + 0.5, fuse)); };
 
-G.explode = (x, y, z, power, breakBlocks, harmless, colors) => {
+G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause) => {
   const W = G.world, c = new THREE.Vector3(x, y, z);
   Sound.play('explode', c);
   G.particles.burst(x, y, z, colors || [0x6a6a6a, 0x8a8a8a, 0xd8d8d8, 0xff9a20], 45, power * 2.2, 0.45, 2);
@@ -281,7 +281,7 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors) => {
   const R = power * 2;
   const P = G.player;
   const dp = Math.hypot(P.pos.x - x, P.pos.y + 0.9 - y, P.pos.z - z);
-  if (dp < R) { const f = 1 - dp / R; P.hurt(Math.max(1, Math.round(f * power * 5)), c, f * 16, true); P.vel.y += f * 6; }
+  if (dp < R) { const f = 1 - dp / R; P.hurt(Math.max(1, Math.round(f * power * 5)), c, f * 16, true, cause || 'You were caught in an explosion.'); P.vel.y += f * 6; }
   if (dp < R * 3) G.shake = Math.max(G.shake, 1 - dp / (R * 3));
   for (const m of G.mobs) {
     if (m.dead) continue;
@@ -300,7 +300,7 @@ G.sleep = (b) => {
   if (G.dim === 'nether') {
     G.world.setBlock(b.x, b.y, b.z, 0);
     G.ui.message('Beds explode in the Nether!', 'purple');
-    G.explode(b.x + 0.5, b.y + 0.5, b.z + 0.5, 4, true);
+    G.explode(b.x + 0.5, b.y + 0.5, b.z + 0.5, 4, true, false, null, 'Your bed exploded. Beds blow up in the Nether.');
     return;
   }
   P.spawn.set(b.x + 0.5, b.y + 1, b.z + 0.5);

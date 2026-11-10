@@ -379,7 +379,7 @@ const Net = {
         if (!Array.isArray(h) || h.length !== 4 || !Number.isInteger(h[1])) continue;
         if (rp.hitReady && h[1] > (rp.lastHit || 0) && h[0] === me && rp.dim === G.dim && P.mode === 'survival' && !P.dead) {
           const from = { x: rp.target ? rp.target[0] : P.pos.x, z: rp.target ? rp.target[2] : P.pos.z };
-          P.hurt(clamp(+h[2] || 1, 1, 10), from, clamp(+h[3] || 6, 0, 12), true);
+          P.hurt(clamp(+h[2] || 1, 1, 10), from, clamp(+h[3] || 6, 0, 12), true, name + ' hit you.');
           if (P.dead) G.ui.message(name + ' knocked you out!', 'purple');
         }
         if (h[1] > top) top = h[1];

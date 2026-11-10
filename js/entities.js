@@ -402,7 +402,7 @@ class Mob {
       this.yaw = Math.atan2(moveX, moveZ);
       if (golemDist < 2.6 && this.attackCd <= 0) {
         this.attackCd = 1.2; this.swingT = 0.5;
-        if (golemTarget === P) { P.hurt(T.dmg, this.pos, 10, true); P.vel.y = 9; }
+        if (golemTarget === P) { P.hurt(T.dmg, this.pos, 10, true, 'An Iron Golem smashed you. Golems only fight you if you hit one first.'); P.vel.y = 9; }
         else { golemTarget.hurt(15, this.pos, 10, false); golemTarget.vel.y = 9; }
         G.sound.play('golem', this.pos);
       }
@@ -446,11 +446,11 @@ class Mob {
       } else if (T.explode) {
         if (dist < 3) { this.fuse += dt; moveX *= 0.2; moveZ *= 0.2; if (this.fuse > 0 && this.fuse - dt <= 0) G.sound.play('fuse', this.pos); }
         else this.fuse = Math.max(0, this.fuse - dt);
-        if (this.fuse > 1.5) { this.removeSilently(); G.explode(this.pos.x, this.pos.y + 0.8, this.pos.z, 3, true); return; }
+        if (this.fuse > 1.5) { this.removeSilently(); G.explode(this.pos.x, this.pos.y + 0.8, this.pos.z, 3, true, false, null, 'A Creeper blew up next to you.'); return; }
       } else if (dist < 1.4 + this.w / 2 && Math.abs(toP.y) < 1.6 && this.attackCd <= 0) {
         this.attackCd = 1;
         G.lastAttacker = this;
-        P.hurt(T.dmg, this.pos, 6);
+        P.hurt(T.dmg, this.pos, 6, false, 'A ' + T.name + ' attacked you.');
       }
     } else {
       this.fuse = Math.max(0, this.fuse - dt);
@@ -718,7 +718,7 @@ class Dragon {
       speed = 21 * this.K.speed;
       target = new V3(P.pos.x, P.pos.y + 1.5, P.pos.z);
       if (dP < 5 || this.stateT > 6 || !pAlive || P.mode !== 'survival') {
-        if (dP < 6.5 && pAlive) P.hurt(5, this.pos, 14);
+        if (dP < 6.5 && pAlive) P.hurt(5, this.pos, 14, false, 'The ' + this.name + ' swooped down on you.');
         this.state = 'climb'; this.stateT = 0; this.nextAttack = 10 + Math.random() * 8;
       }
     } else {
@@ -826,7 +826,7 @@ class Projectile {
       const t = rayAABB(this.pos, dir, P.pos.x - 0.4, P.pos.y, P.pos.z - 0.4, P.pos.x + 0.4, P.pos.y + 1.8, P.pos.z + 0.4);
       if (t !== null && t < step + 0.2) {
         if (this.kind === 'fireball') { this.pos.addScaledVector(dir, t); return this.explodeHere(); }
-        P.hurt(this.kind === 'arrow' ? 3 : this.kind === 'smallfire' ? 4 : 2, this.pos, 4);
+        P.hurt(this.kind === 'arrow' ? 3 : this.kind === 'smallfire' ? 4 : 2, this.pos, 4, false, this.kind === 'arrow' ? 'You were shot by an arrow.' : this.kind === 'smallfire' ? 'A Blaze fireball hit you.' : 'You were hit.');
         if (this.kind === 'smallfire' && P.mode === 'survival') P.fire = Math.max(P.fire, 3);
         return this.finish();
       }
@@ -841,7 +841,7 @@ class Projectile {
         G.particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xcc00fa, 0x1d6b5c], 15, 2);
         P.pos.set(hit.x + 0.5 + hit.nx, hit.ny === 1 ? hit.y + 1 : hit.ny === -1 ? hit.y - 1.8 : hit.y, hit.z + 0.5 + hit.nz);
         P.vel.set(0, 0, 0);
-        P.hurt(2, null, 0, true);
+        P.hurt(2, null, 0, true, 'The ender pearl teleport hurt you.');
         G.sound.play('teleport', P.pos);
         return this.finish();
       }
@@ -859,7 +859,7 @@ class Projectile {
   }
 
   explodeHere() {
-    G.explode(this.pos.x, this.pos.y, this.pos.z, 1.6, false, false, this.colors);
+    G.explode(this.pos.x, this.pos.y, this.pos.z, 1.6, false, false, this.colors, this.owner && this.owner.name ? 'A fireball from the ' + this.owner.name + ' hit you.' : 'A Ghast fireball hit you.');
     return this.finish();
   }
 
@@ -964,7 +964,7 @@ class PrimedTNT {
     if (Math.random() < 0.5) G.particles.burst(this.pos.x, this.pos.y + 1.1, this.pos.z, [0x777777, 0xaaaaaa], 1, 0.6, 0.3, -2);
     if (this.fuse <= 0) {
       this.done = true; G.scene.remove(this.mesh);
-      G.explode(this.pos.x, this.pos.y + 0.5, this.pos.z, 4, true);
+      G.explode(this.pos.x, this.pos.y + 0.5, this.pos.z, 4, true, false, null, 'TNT exploded next to you.');
     }
   }
 }

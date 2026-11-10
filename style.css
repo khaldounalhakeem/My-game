@@ -298,3 +298,10 @@ body:not([data-state="play"]) #online-diag { display: none; }
 #inv-armor { display: grid; grid-template-columns: repeat(4, minmax(0, 48px)); gap: 3px; }
 #inv-armor .slot.empty::after { content: attr(data-hint); position: absolute; inset: 0; display: grid; place-items: center; font-size: 13px; color: #6a6478; pointer-events: none; }
 body.touch:not(.pad) #crosshair { display: none; }
+#dmg-popup {
+  position: fixed; left: 50%; top: 36%; transform: translateX(-50%); pointer-events: none; z-index: 5;
+  font-family: var(--font-display); font-size: 15px; color: #ffd0c8; text-shadow: 2px 2px 0 #400;
+  background: rgba(60, 0, 0, 0.55); padding: 4px 10px; opacity: 0; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis;
+}
+#dmg-popup.show { animation: dmgpop 2.4s ease-out forwards; }
+@keyframes dmgpop { 0% { opacity: 1; transform: translate(-50%, 0); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -14px); } }

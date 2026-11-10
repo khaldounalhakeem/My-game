@@ -68,6 +68,14 @@ const UI = {
     const all = $('messages').children;
     if (all.length > 6) all[0].remove();
   },
+  /* a short note under the crosshair saying what just hurt you and how many hearts */
+  damagePopup(amount, cause) {
+    const el = $('dmg-popup');
+    const hearts = amount / 2;
+    const short = (cause || '').replace(/^You were |^You |^A |^An |^The /, '').replace(/\..*$/, '');
+    el.textContent = '-' + (hearts % 1 ? hearts.toFixed(1) : hearts) + ' ♥  ' + short;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  },
   hurtFlash() {
     const o = $('fx-hurt');
     o.classList.remove('on'); void o.offsetWidth; o.classList.add('on');

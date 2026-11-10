@@ -75,6 +75,7 @@ class Player {
     if (from && G.lastAttacker && !G.lastAttacker.dead) for (const m of G.mobs) if (m.tame && m.type === 'wolf') m.petTarget = G.lastAttacker;
     G.lastAttacker = null;
     this.health -= amount; this.hurtCd = 0.5;
+    G.ui.damagePopup(amount, this.deathCause);
     G.ui.hurtFlash();
     G.sound.play('hurt');
     if (from && kb) {
