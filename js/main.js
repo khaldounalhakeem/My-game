@@ -255,9 +255,10 @@ function updateSky(dt) {
 }
 
 /* ---------- world helpers exposed to entities ---------- */
-G.spawnDrop = (id, count, x, y, z, vel) => {
-  const d = new ItemDrop(id, count, x, y, z, vel);
+G.spawnDrop = (id, count, x, y, z, vel, opts) => {
+  const d = new ItemDrop(id, count, x, y, z, vel, opts && opts.did ? opts.did : Net.newId());
   G.drops.push(d);
+  if (!(opts && opts.remote)) Net.dropAdded(d); // everyone in the world sees the same items on the ground
   return d;
 };
 G.spawnProjectile = (kind, pos, vel, owner) => { G.projectiles.push(new Projectile(kind, pos, vel, owner)); };
@@ -289,6 +290,10 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause) => {
   const dp = Math.hypot(P.pos.x - x, P.pos.y + 0.9 - y, P.pos.z - z);
   if (dp < R) { const f = 1 - dp / R; P.hurt(Math.max(1, Math.round(f * power * 5)), c, f * 16, true, cause || 'You were caught in an explosion.'); P.vel.y += f * 6; }
   if (dp < R * 3) G.shake = Math.max(G.shake, 1 - dp / (R * 3));
+  for (const q of Net.proxies()) {
+    const d = Math.hypot(q.pos.x - x, q.pos.y + 0.9 - y, q.pos.z - z);
+    if (d < R) { const f = 1 - d / R; q.hurt(Math.max(1, Math.round(f * power * 5)), c, f * 16, true, cause || 'You were caught in an explosion.'); }
+  }
   for (const m of G.mobs) {
     if (m.dead) continue;
     const d = Math.hypot(m.pos.x - x, m.pos.y + m.h / 2 - y, m.pos.z - z);
@@ -380,10 +385,16 @@ function spawnMob(type, x, y, z) {
 }
 function spawnTick() {
   const P = G.player, W = G.world;
+  // in multiplayer only the host runs wild mobs; everyone else shows the host's
+  if (!Net.isHost()) {
+    for (const m of G.mobs) if (!m.remoteCtl && !m.tame && !m.rider && !m.dead) m.removeSilently();
+    return;
+  }
+  const players = [P.pos, ...Net.proxies().map(p => p.pos)];
   let hostile = 0, passive = 0;
   for (const m of G.mobs) {
-    if (m.dead) continue;
-    const d = Math.hypot(m.pos.x - P.pos.x, m.pos.z - P.pos.z);
+    if (m.dead || m.remoteCtl) continue;
+    const d = Math.min(...players.map(q => Math.hypot(m.pos.x - q.x, m.pos.z - q.z)));
     if (m.tame || m.rider) continue;
     if (d > (m.T.passive ? 96 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
@@ -853,7 +864,7 @@ function frame(now) {
     }
     G.spawnT -= dt;
     if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); }
-    if (!G.dragons.length && G.dim === 'nether') {
+    if (!G.dragons.length && G.dim === 'nether' && Net.isHost()) {
       G.dragonTimer -= dt;
       if (G.dragonTimer <= 0) { G.dragonTimer = 240; G.summonDragon(G.firstDragonDone ? null : 'ender'); G.firstDragonDone = true; }
     }

@@ -225,6 +225,17 @@ function buildMobModel(type) {
   return { group: g, parts: P };
 }
 
+/* the player a mob should go after: you, or (in multiplayer) whichever player is nearest */
+function nearestPlayer(pos) {
+  let best = G.player, bd = G.player.dead || G.player.mode !== 'survival' ? Infinity : G.player.pos.distanceTo(pos);
+  for (const p of Net.proxies()) {
+    if (p.dead || p.mode !== 'survival') continue;
+    const d = p.pos.distanceTo(pos);
+    if (d < bd) { bd = d; best = p; }
+  }
+  return best;
+}
+
 /* ---------- entity base ---------- */
 class Mob {
   constructor(type, x, y, z) {
@@ -238,6 +249,7 @@ class Mob {
     this.hurtT = 0; this.attackCd = 0; this.wanderT = 0; this.wanderDir = null;
     this.fleeT = 0; this.angry = false; this.fuse = 0; this.shootCd = 1 + Math.random() * 2;
     this.burnT = 0; this.walk = 0; this.soundT = 3 + Math.random() * 8;
+    this.nid = Net.newId(); this.remoteCtl = null;
     const m = buildMobModel(type);
     this.mesh = m.group; this.parts = m.parts;
     this.mats = [];
@@ -249,6 +261,13 @@ class Mob {
 
   hurt(dmg, from, kb = 7, byPlayer = false) {
     if (this.dead) return;
+    if (this.remoteCtl) {
+      // another player's device runs this mob: send them the hit, just show the flash here
+      if (byPlayer) { Net.mobHit(this, dmg, kb); this.hitByMeAt = Date.now(); }
+      this.hurtT = 0.35;
+      G.sound.play('hurtMob', this.pos);
+      return;
+    }
     this.hp -= dmg; this.hurtT = 0.35;
     if (from) {
       const dx = this.pos.x - from.x, dz = this.pos.z - from.z, l = Math.hypot(dx, dz) || 1;
@@ -265,6 +284,10 @@ class Mob {
   /* right-click (or tap) on an animal: feed, tame, sit or ride. Returns true if something happened. */
   interact(P, hd) {
     if (this.dead) return false;
+    if (this.remoteCtl && (this.type === 'wolf' || this.type === 'horse')) {
+      G.ui.message('This animal belongs to the other player\'s game right now. The player who joined the world first can tame and ride animals.');
+      return true;
+    }
     const meat = hd && ['porkchop', 'cooked_porkchop', 'beef', 'steak', 'chicken', 'cooked_chicken', 'rotten_flesh'].includes(hd.key);
     if (this.type === 'wolf') {
       if (!this.tame && hd && hd.key === 'bone') {
@@ -346,7 +369,8 @@ class Mob {
   }
 
   update(dt) {
-    const W = G.world, P = G.player;
+    if (this.remoteCtl) return this.puppetUpdate(dt);
+    const W = G.world, P = this.tame ? G.player : nearestPlayer(this.pos);
     if (this.dead) {
       this.deathT += dt;
       this.mesh.rotation.z = Math.min(Math.PI / 2, this.deathT * 5);
@@ -544,6 +568,50 @@ class Mob {
     }
   }
 
+  /* a mob run by another player's device: follow its snapshots smoothly and animate */
+  puppetUpdate(dt) {
+    if (this.netDead && !this.dead) {
+      this.dead = true; this.deathT = 0;
+      G.sound.play('deathMob', this.pos);
+      if (this.hitByMeAt && Date.now() - this.hitByMeAt < 4000) G.player.addXp(this.T.xp);
+    }
+    if (this.dead) {
+      this.deathT += dt;
+      this.mesh.rotation.z = Math.min(Math.PI / 2, this.deathT * 5);
+      for (const m of this.mats) m.emissive && m.emissive.setRGB(0.6, 0, 0);
+      if (this.deathT > 0.7) { G.particles.burst(this.pos.x, this.pos.y + this.h / 2, this.pos.z, [0xdddddd, 0xbbbbbb], 12, 1.5); this.remove(); }
+      return;
+    }
+    this.hurtT -= dt;
+    const s = Net.playback(this);
+    if (s) {
+      const dx = s[0] - this.pos.x, dz = s[2] - this.pos.z;
+      const hs = Math.hypot(dx, dz) / Math.max(dt, 0.001);
+      this.pos.set(s[0], s[1], s[2]);
+      this.yaw = s[3];
+      this.walk += Math.min(hs, 8) * dt * 4;
+      const sw = Math.sin(this.walk) * Math.min(1, hs / 2) * 0.8;
+      if (this.type !== 'ghast' && this.type !== 'spider') this.parts.legs.forEach((L, i) => { L.rotation.x = (i % 2 === (i < 2 ? 0 : 1) ? sw : -sw); });
+    }
+    const f = this.netFlags || 0;
+    this.tame = !!(f & 2); this.sitting = !!(f & 4);
+    if (this.parts.collar) this.parts.collar.visible = this.tame;
+    if (this.parts.saddle) this.parts.saddle.visible = this.tame && this.type === 'horse';
+    if (this.parts.ring) this.parts.ring.rotation.y += dt * 3;
+    this.mesh.position.copy(this.pos);
+    let d = this.yaw - this.mesh.rotation.y;
+    while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
+    this.mesh.rotation.y += d * Math.min(1, dt * 10);
+    const fuse = f & 8 ? 1 : 0;
+    this.mesh.scale.setScalar(fuse ? 1.12 : 1);
+    const flash = fuse && Math.floor(performance.now() / 120) % 2 === 0;
+    for (const m of this.mats) if (m.emissive) {
+      if (this.hurtT > 0) m.emissive.setRGB(0.55, 0, 0);
+      else if (flash) m.emissive.setRGB(0.6, 0.6, 0.6);
+      else m.emissive.setRGB(0, 0, 0);
+    }
+  }
+
   canSee(P) {
     const from = new V3(this.pos.x, this.pos.y + this.h * 0.85, this.pos.z);
     const to = new V3(P.pos.x, P.pos.y + 1.5, P.pos.z);
@@ -568,7 +636,7 @@ const DRAGON_KINDS = {
 };
 
 class Dragon {
-  constructor(kind, center) {
+  constructor(kind, center, puppet) {
     const K = DRAGON_KINDS[kind];
     this.kind = kind; this.K = K; this.name = K.name;
     this.center = center.clone();
@@ -579,6 +647,8 @@ class Dragon {
     this.state = 'circle'; this.stateT = 0;
     this.nextAttack = 12; this.fireCd = 5; this.roarT = 2;
     this.dead = false; this.deathT = 0; this.done = false; this.hurtT = 0; this.t = 0;
+    this.nid = Net.newId(); this.remoteCtl = null;
+    if (puppet) { this.remoteCtl = puppet.remote; this.nid = puppet.nid; this.pos.set(puppet.x, puppet.y, puppet.z); }
     this.build();
     G.scene.add(this.mesh);
   }
@@ -648,6 +718,7 @@ class Dragon {
 
   hurt(dmg) {
     if (this.dead) return;
+    if (this.remoteCtl) { Net.mobHit(this, dmg, 0); this.hurtT = 0.3; this.hitByMeAt = Date.now(); G.sound.play('dragonHurt', this.pos); return; }
     this.hp -= dmg; this.hurtT = 0.3;
     G.sound.play('dragonHurt', this.pos);
     if (this.state === 'circle' && Math.random() < 0.3) this.nextAttack = Math.min(this.nextAttack, 2);
@@ -659,8 +730,10 @@ class Dragon {
   }
 
   update(dt) {
-    const P = G.player, W = G.world;
     if (this.done) return;
+    if (this.remoteCtl && !this.netDead) return this.puppetUpdate(dt);
+    if (this.remoteCtl && !this.dead) { this.dead = true; this.deathT = 0; G.sound.play('dragonDeath', this.pos); if (this.hitByMeAt && Date.now() - this.hitByMeAt < 10000) G.player.addXp(60); }
+    const P = nearestPlayer(this.pos), W = G.world;
     this.t += dt;
     if (this.dead) {
       this.deathT += dt;
@@ -669,6 +742,7 @@ class Dragon {
       if (Math.random() < 0.7) G.particles.burst(this.pos.x + (Math.random() - 0.5) * 6, this.pos.y + (Math.random() - 0.5) * 3, this.pos.z + (Math.random() - 0.5) * 6, this.K.fire, 6, 4, 0.5);
       for (const m of this.mats) m.emissive.setRGB(0.4 + Math.sin(this.t * 20) * 0.3, 0.3, 0.5);
       this.mesh.position.copy(this.pos);
+      if (this.deathT > 4 && this.remoteCtl) { this.remove(); return; } // the host drops the loot for everyone
       if (this.deathT > 4) {
         G.scene.remove(this.mesh);
         this.done = true;
@@ -757,6 +831,24 @@ class Dragon {
   }
 
   remove() { G.scene.remove(this.mesh); this.done = true; }
+
+  /* a dragon flown by another player's device: follow its snapshots and flap */
+  puppetUpdate(dt) {
+    this.t += dt; this.hurtT -= dt;
+    const s = Net.playback(this);
+    if (s) {
+      const v = new V3(s[0] - this.pos.x, s[1] - this.pos.y, s[2] - this.pos.z);
+      this.pos.set(s[0], s[1], s[2]);
+      this.mesh.rotation.y = s[3];
+      const hv = Math.hypot(v.x, v.z);
+      if (hv > 0.001) this.mesh.rotation.x = -Math.atan2(v.y, hv) * 0.6;
+    }
+    const flap = Math.sin(this.t * 4.5);
+    for (const { w, tip, side } of this.wings) { w.rotation.z = flap * 0.55 * side; tip.rotation.z = flap * 0.4 * side; }
+    this.tail.forEach((sg, i) => { sg.rotation.y = Math.sin(this.t * 2 - i * 0.6) * 0.12; });
+    for (const m of this.mats) m.emissive.setRGB(this.hurtT > 0 ? 0.6 : 0, 0, 0);
+    this.mesh.position.copy(this.pos);
+  }
 }
 
 function rayAABB(o, d, x0, y0, z0, x1, y1, z1) {
@@ -821,8 +913,8 @@ class Projectile {
         if (best instanceof Dragon) best.hurt(dmg); else best.hurt(dmg, this.pos, 4, true);
         return this.finish();
       }
-    } else if (!G.player.dead) {
-      const P = G.player;
+    } else for (const P of [G.player, ...Net.proxies()]) {
+      if (P.dead) continue;
       const t = rayAABB(this.pos, dir, P.pos.x - 0.4, P.pos.y, P.pos.z - 0.4, P.pos.x + 0.4, P.pos.y + 1.8, P.pos.z + 0.4);
       if (t !== null && t < step + 0.2) {
         if (this.kind === 'fireball') { this.pos.addScaledVector(dir, t); return this.explodeHere(); }
@@ -912,8 +1004,8 @@ function itemGeometry(id) {
 }
 
 class ItemDrop {
-  constructor(id, count, x, y, z, vel) {
-    this.id = id; this.count = count;
+  constructor(id, count, x, y, z, vel, did) {
+    this.id = id; this.count = count; this.did = did;
     this.pos = new V3(x, y, z);
     this.vel = vel ? vel.clone() : new V3((Math.random() - 0.5) * 3, 4 + Math.random() * 2, (Math.random() - 0.5) * 3);
     this.w = 0.3; this.h = 0.3; this.age = 0; this.done = false; this.pickDelay = 0.6;
@@ -941,7 +1033,7 @@ class ItemDrop {
         const left = P.inv.add(this.id, this.count);
         if (left < this.count) G.sound.play('pickup');
         this.count = left;
-        if (left === 0) return this.finish();
+        if (left === 0) { Net.dropPicked(this.did); return this.finish(); }
       } else if (d < 3) {
         this.pos.x += dx / d * dt * 6; this.pos.z += dz / d * dt * 6;
       }

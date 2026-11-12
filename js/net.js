@@ -61,7 +61,7 @@ function makeInternetRoom(brokers) {
     const pid = t.slice(t.lastIndexOf('/') + 1);
     if (pid === me || !/^p[a-z0-9]{1,12}$/.test(pid)) return;
     if (!buf || !buf.length) { if (peers.delete(pid)) fire(); lastSeen.delete(pid); return; }
-    if (buf.length > 8192) return;
+    if (buf.length > 65536) return;
     const raw = buf.toString();
     lastSeen.set(pid, Date.now());
     stats.got++;
@@ -154,7 +154,9 @@ function makeDbRoom(db, me) {
     if (unsub) { unsub(); unsub = null; }
     peers.clear(); fire();
     if (!topic) return;
+    const subTopic = topic;
     unsub = players(topic).onSnapshot(snap => {
+      if (subTopic !== topic) return; // a late answer for a world we already left
       setConn(true); status.readErr = '';
       peers.clear();
       const now = Date.now();
@@ -230,7 +232,7 @@ function makeMultiRoom(rooms, me) {
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
   world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0,
-  ringMax: 60, sendOk: 0, sendErr: '', heardAt: 0, rawPeers: 0,
+  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
   nick: '', color: SHIRT_COLORS[0],
 
   async init() {
@@ -360,13 +362,15 @@ const Net = {
       Object.assign(base, {
         m: P.mode === 'creative' ? 1 : 0, d: G.dim === 'nether' ? 1 : 0, p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
         s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
+        mb: this.slim ? null : this.ownedMobs(), mh: this.mobHits, dr: this.slim ? null : this.dropRing, pk: this.slim ? null : this.pickRing,
       });
-    } else Object.assign(base, { m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null });
+    } else Object.assign(base, { m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
     }, e => {
       const code = (e && e.code) || 'error';
+      if (code === 'invalid_argument') this.slim = true; // too big for this connection: leave out the shared world
       if (code === 'invalid_argument' && this.ringMax > 4) {
         // too big for the platform: share fewer recent block changes
         this.ringMax = Math.max(4, this.ringMax >> 1);
@@ -392,11 +396,14 @@ const Net = {
   },
 
   /* punch another player: they read it from our presence and take the damage themselves */
-  hit(rp, dmg, kb) {
+  hit(rp, dmg, kb, cause) {
     this.hitSeq++;
-    this.hits.push([String(rp.peer), this.hitSeq, dmg, kb]);
-    if (this.hits.length > 6) this.hits.shift();
+    const h = [String(rp.peer), this.hitSeq, dmg, kb];
+    if (cause) h.push(String(cause).slice(0, 80));
+    this.hits.push(h);
+    if (this.hits.length > 12) this.hits.shift();
     this.sendT = 0;
+    if (cause) return; // a mob or explosion hit: no red flash or punch sound from us
     rp.flashT = 0.3;
     G.sound.play('hurtMob', rp.model ? rp.model.group.position : null);
     if (rp.model) { const q = rp.model.group.position; G.particles.burst(q.x, q.y + 1.2, q.z, [0xff4040, 0xffffff], 6, 2, 0.1); }
@@ -490,6 +497,169 @@ const Net = {
 
   /* smooth movement for other players: keep a short history of where they were (with their own
      timestamps) and replay it a little behind real time, sliding between the recorded points */
+  /* ---------- one shared world: mobs, dragons and dropped items ---------- */
+  newId() { return (this.uid || 'u0').slice(1, 6) + (++this.idSeq).toString(36); },
+
+  inShared() { return !!(this.world && this.status === 'on' && this.room); },
+
+  /* the host runs the mobs: whoever has been in this world (and dimension) the longest */
+  isHost() {
+    if (!this.inShared()) return true;
+    let best = { tj: this.joinedAt || 0, u: this.uid };
+    for (const rp of this.peers.values()) {
+      if (!rp.inWorld || rp.dim !== G.dim || rp.dead === undefined) continue;
+      const c = { tj: rp.tj || 0, u: rp.peer };
+      if (c.tj < best.tj || (c.tj === best.tj && c.u < best.u)) best = c;
+    }
+    return best.u === this.uid;
+  },
+
+  /* stand-ins for the other players, so mobs can chase and hit them */
+  proxies() {
+    const out = [];
+    if (!this.inShared()) return out;
+    for (const rp of this.peers.values()) {
+      if (!rp.inWorld || rp.dim !== G.dim || rp.dead || !rp.model) continue;
+      if (!rp.proxy) {
+        const r = rp;
+        rp.proxy = { remote: r, w: 0.6, h: 1.8, vel: new THREE.Vector3(), fire: 0, get pos() { return r.model ? r.model.group.position : new THREE.Vector3(); }, get dead() { return !!r.dead; }, get mode() { return r.mode || 'survival'; }, hurt: (dmg, from, kb, force, cause) => Net.hit(r, Math.round(dmg), kb || 6, cause || 'You were hit.') };
+      }
+      out.push(rp.proxy);
+    }
+    return out;
+  },
+
+  /* what this device simulates: wild mobs if it is the host, plus its own pets, plus its dragons */
+  ownedMobs() {
+    const out = [], P = G.player, players = [P.pos, ...this.proxies().map(p => p.pos)];
+    const near = pos => players.some(q => Math.abs(q.x - pos.x) < 96 && Math.abs(q.z - pos.z) < 96);
+    for (const m of G.mobs) {
+      if (m.remoteCtl || m.removed || !near(m.pos) || out.length >= 45) continue;
+      const flags = (m.dead ? 1 : 0) | (m.tame ? 2 : 0) | (m.sitting ? 4 : 0) | (m.fuse > 0 ? 8 : 0) | (m.angry ? 16 : 0);
+      out.push([m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags]);
+    }
+    for (const d of G.dragons) {
+      if (d.remoteCtl || d.done) continue;
+      out.push([d.nid, 'dragon:' + d.kind, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), r2(d.mesh.rotation.y), Math.round(d.hp), d.dead ? 1 : 0]);
+    }
+    return out;
+  },
+
+  /* a hit on a mob that another device runs: send it to them */
+  mobHit(m, dmg, kb) {
+    this.mhSeq++;
+    const P = G.player;
+    this.mobHits.push([this.mhSeq, m.remoteCtl, m.nid, Math.round(dmg), r2(P.pos.x), r2(P.pos.z), Math.round(kb || 6)]);
+    if (this.mobHits.length > 16) this.mobHits.shift();
+    this.sendT = 0;
+  },
+
+  dropAdded(d) {
+    if (!this.inShared()) return;
+    this.drSeq++;
+    this.seenDrops.add(d.did);
+    this.dropRing.push([this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), G.dim === 'nether' ? 1 : 0]);
+    if (this.dropRing.length > 45) this.dropRing.shift();
+    this.sendT = 0;
+  },
+
+  dropPicked(did) {
+    if (!this.inShared() || !did) return;
+    this.pkSeq++;
+    this.pickedDrops.add(did);
+    this.pickRing.push([this.pkSeq, did]);
+    if (this.pickRing.length > 45) this.pickRing.shift();
+    this.sendT = 0;
+  },
+
+  dropPuppets(owner) {
+    for (const m of G.mobs) if (m.remoteCtl === owner) m.removeSilently();
+    for (const d of G.dragons) if (d.remoteCtl === owner) d.remove();
+  },
+
+  syncShared(rp, pr) {
+    const sameDim = rp.dim === G.dim;
+    // their mobs and dragons, shown as puppets that follow their snapshots
+    if (Array.isArray(pr.mb) && Number.isFinite(pr.ts)) {
+      const live = new Set();
+      if (sameDim) for (const e of pr.mb) {
+        if (!Array.isArray(e) || e.length < 8 || typeof e[0] !== 'string' || typeof e[1] !== 'string' || !e.slice(2, 8).every(Number.isFinite)) continue;
+        const [nid, type, x, y, z, yaw, hp, flags] = e;
+        live.add(nid);
+        if (type.startsWith('dragon:')) {
+          const kind = type.slice(7);
+          if (!DRAGON_KINDS[kind]) continue;
+          let d = G.dragons.find(o => o.remoteCtl === rp.peer && o.nid === nid);
+          if (!d) { d = new Dragon(kind, new THREE.Vector3(x, y, z), { x, y, z, remote: rp.peer, nid }); G.dragons.push(d); }
+          d.hp = hp; d.netSeen = Date.now();
+          if (flags & 1) d.netDead = true;
+          this.noteArrival(d, pr.ts); this.addPoint(d, pr.ts, x, y, z, yaw);
+          continue;
+        }
+        if (!MOB_TYPES[type]) continue;
+        let m = G.mobs.find(o => o.remoteCtl === rp.peer && o.nid === nid);
+        if (!m) {
+          if (flags & 1) continue; // already dying when we first heard of it
+          m = new Mob(type, x, y, z); m.remoteCtl = rp.peer; m.nid = nid; G.mobs.push(m);
+        }
+        m.hp = hp; m.netFlags = flags;
+        if (flags & 1) m.netDead = true;
+        this.noteArrival(m, pr.ts); this.addPoint(m, pr.ts, x, y, z, yaw);
+      }
+      for (const m of G.mobs) if (m.remoteCtl === rp.peer && !live.has(m.nid) && !m.dead) m.removeSilently();
+      for (const d of G.dragons) if (d.remoteCtl === rp.peer && !live.has(d.nid) && !d.dead) d.remove();
+    }
+    // hits they made on mobs this device runs
+    if (Array.isArray(pr.mh)) {
+      let top = rp.lastMh || 0;
+      for (const h of pr.mh) {
+        if (!Array.isArray(h) || h.length < 7 || !Number.isInteger(h[0])) continue;
+        if (rp.mhReady && h[0] > (rp.lastMh || 0) && h[1] === this.uid) {
+          const target = G.mobs.find(m => !m.remoteCtl && m.nid === h[2]) || G.dragons.find(d => !d.remoteCtl && d.nid === h[2]);
+          if (target && !target.dead) {
+            if (target instanceof Dragon) target.hurt(clamp(+h[3] || 1, 1, 20));
+            else target.hurt(clamp(+h[3] || 1, 1, 20), { x: +h[4], z: +h[5] }, clamp(+h[6] || 6, 0, 16), true);
+          }
+        }
+        if (h[0] > top) top = h[0];
+      }
+      rp.lastMh = top;
+    }
+    rp.mhReady = true;
+    // items they dropped, and items they picked up
+    if (Array.isArray(pr.dr)) for (const e of pr.dr) {
+      if (!Array.isArray(e) || e.length < 8 || typeof e[1] !== 'string') continue;
+      const [, did, id, count, x, y, z, dim] = e;
+      if (this.seenDrops.has(did) || this.pickedDrops.has(did)) continue;
+      this.seenDrops.add(did);
+      if ((dim === 1) !== (G.dim === 'nether') || !DEFS[id] || !Number.isFinite(x + y + z) || !(count > 0)) continue;
+      G.spawnDrop(id, Math.min(64, count | 0), x, y, z, new THREE.Vector3(0, 0, 0), { did, remote: true });
+    }
+    if (Array.isArray(pr.pk)) for (const e of pr.pk) {
+      if (!Array.isArray(e) || typeof e[1] !== 'string' || this.pickedDrops.has(e[1])) continue;
+      this.pickedDrops.add(e[1]);
+      for (const d of G.drops) if (d.did === e[1]) d.finish();
+    }
+  },
+
+  noteArrival(o, ts) {
+    const now = Date.now(), off = now - ts;
+    o.offset = o.offset === undefined ? off : Math.min(off, o.offset + 5);
+    if (o.lastArrive && o.lastTs !== ts) {
+      const gap = now - o.lastArrive;
+      if (gap > 20) o.gap = o.gap === undefined ? gap : o.gap * 0.8 + gap * 0.2;
+    }
+    if (o.lastTs !== ts) o.lastArrive = now;
+    o.lastTs = ts;
+  },
+
+  addPoint(o, ts, x, y, z, yaw) {
+    const buf = o.buf || (o.buf = []);
+    if (buf.length && ts <= buf[buf.length - 1][0]) return;
+    buf.push([ts, x, y, z, yaw]);
+    if (buf.length > 60) buf.shift();
+  },
+
   bufferMove(rp, pr, pos, yaw) {
     const now = Date.now();
     const buf = rp.buf || (rp.buf = []);
@@ -563,6 +733,7 @@ const Net = {
     for (const [id, rp] of this.peers) {
       if (seen.has(id)) continue;
       if (rp.inWorld && rp.name) G.ui.message(rp.name + ' left the world');
+      this.dropPuppets(rp.peer);
       this.removeModel(rp);
       this.peers.delete(id);
     }
@@ -588,7 +759,7 @@ const Net = {
     rp.mode = pr.m === 1 ? 'creative' : 'survival';
     const wasIn = rp.inWorld;
     rp.inWorld = !!this.world && rp.world === this.world && G.state !== 'title';
-    if (!rp.inWorld) { this.removeModel(rp); if (wasIn) G.ui.message(name + ' left the world'); return; }
+    if (!rp.inWorld) { this.removeModel(rp); this.dropPuppets(rp.peer); if (wasIn) G.ui.message(name + ' left the world'); return; }
     if (!wasIn) G.ui.message(name + ' joined your world!', 'gold');
     this.syncTime(pr);
     const pos = Array.isArray(pr.p) && pr.p.length === 3 && pr.p.every(Number.isFinite) ? pr.p : null;
@@ -608,10 +779,11 @@ const Net = {
       const me = this.myPeer(), P = G.player;
       let top = rp.lastHit || 0;
       for (const h of pr.a) {
-        if (!Array.isArray(h) || h.length !== 4 || !Number.isInteger(h[1])) continue;
+        if (!Array.isArray(h) || h.length < 4 || !Number.isInteger(h[1])) continue;
         if (rp.hitReady && h[1] > (rp.lastHit || 0) && h[0] === me && rp.dim === G.dim && P.mode === 'survival' && !P.dead) {
           const from = { x: rp.target ? rp.target[0] : P.pos.x, z: rp.target ? rp.target[2] : P.pos.z };
-          P.hurt(clamp(+h[2] || 1, 1, 10), from, clamp(+h[3] || 6, 0, 12), true, name + ' hit you.');
+          const cause = typeof h[4] === 'string' ? h[4].replace(/[^\w .,'!-]/g, '').slice(0, 80) : name + ' hit you.';
+          P.hurt(clamp(+h[2] || 1, 1, 20), from, clamp(+h[3] || 6, 0, 16), true, cause);
           if (P.dead) G.ui.message(name + ' knocked you out!', 'purple');
         }
         if (h[1] > top) top = h[1];
@@ -619,6 +791,9 @@ const Net = {
       rp.lastHit = top;
     }
     rp.hitReady = true;
+    rp.tj = Number.isFinite(pr.tj) ? pr.tj : Date.now();
+    rp.mode = pr.m === 1 ? 'creative' : 'survival';
+    this.syncShared(rp, pr);
     if (Array.isArray(pr.e) && G.worlds) {
       let top = rp.last;
       for (const e of pr.e) {
