@@ -376,6 +376,13 @@ makeTile('i_blaze_rod', pPlant(P => { for (let i = 0; i < 10; i++) { P.put(3 + i
 // beds are half a block tall, so only the lower rows (7-15) of the side picture show
 makeTile('bed_top', P => { P.fill(0xb02626, 8); P.speck(0x8a1a1a, 0.2, 5); for (let i = 0; i < 16; i++) { P.put(0, i, 0x7a5a32); P.put(15, i, 0x7a5a32); } });
 makeTile('bed_head_top', P => { P.fill(0xb02626, 8); P.speck(0x8a1a1a, 0.2, 5); P.rect(2, 2, 12, 7, 0xeeeeee, 4); for (let i = 0; i < 16; i++) { P.put(0, i, 0x7a5a32); P.put(15, i, 0x7a5a32); } });
+makeTile('i_bed', pPlant(P => {
+  P.rect(1, 6, 14, 3, 0xb02626, 8);           // blanket
+  P.rect(1, 5, 4, 4, 0xeeeeee, 4);            // pillow
+  P.rect(1, 9, 14, 2, 0xa8834f, 6);           // wooden frame
+  P.rect(1, 11, 2, 3, 0x5a4228); P.rect(13, 11, 2, 3, 0x5a4228); // legs
+  P.rect(0, 3, 1, 11, 0x7a5a32);              // headboard
+}));
 makeTile('bed_side', P => { pPlanks(0xa8834f)(P); P.rect(0, 7, 16, 4, 0xb02626, 8); P.rect(0, 13, 3, 3, 0x4a3420); P.rect(13, 13, 3, 3, 0x4a3420); });
 function pArmor(piece, mat) {
   return pPlant(P => {
@@ -549,7 +556,7 @@ block('nether_bricks', 'Nether Bricks', 'nether_bricks', PICK(1, 2));
 block('nether_quartz_ore', 'Nether Quartz Ore', 'nether_quartz_ore', PICK(1, 3, { drop: 'quartz', xp: 2 }));
 block('nether_gold_ore', 'Nether Gold Ore', 'nether_gold_ore', PICK(1, 3, { drop: 'gold_ingot', xp: 1 }));
 block('magma', 'Magma Block', 'magma', PICK(1, 0.5, { light: true }));
-block('bed', 'Bed', { top: 'bed_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2, height: 0.5625, opaque: false });
+block('bed', 'Bed', { top: 'bed_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2, height: 0.5625, opaque: false, iconTile: 'i_bed' });
 block('chest_loot', 'Treasure Chest', { top: 'chest_top', side: 'chest_side', front: 'chest_side' }, { tool: 'axe', hardness: 2.5, drop: null });
 block('chest', 'Chest', { top: 'chest_top', side: 'chest_side' }, { tool: 'axe', hardness: 2.5 });
 block('spawner', 'Monster Spawner', 'spawner', PICK(1, 5, { opaque: false, cutout: true, drop: null, light: true }));
@@ -737,7 +744,10 @@ function iconURL(id) {
   cv.width = cv.height = 32;
   const ctx = cv.getContext('2d');
   ctx.imageSmoothingEnabled = false;
-  if (def.isBlock && !def.cross) {
+  if (def.iconTile) {
+    ctx.setTransform(2, 0, 0, 2, 0, 0);
+    drawTileTo(ctx, TILES[def.iconTile], 0);
+  } else if (def.isBlock && !def.cross) {
     const s = 1 / 16;
     ctx.setTransform(14 * s, -7 * s, 14 * s, 7 * s, 2, 8); drawTileTo(ctx, def.faces[2], 0);
     ctx.setTransform(14 * s, 7 * s, 0, 16 * s, 2, 8); drawTileTo(ctx, def.faces[4], 0.22);

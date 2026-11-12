@@ -111,7 +111,7 @@ function setupRenderer() {
     opaque: new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.5 }),
     trans: new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.78, depthWrite: false, side: THREE.DoubleSide }),
     item: new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide }),
-    held: new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide, depthTest: false, depthWrite: false }),
+    held: new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide }),
   };
 
   // selection outline & crack overlay
@@ -130,8 +130,13 @@ function setupRenderer() {
   // held item
   G.hand = new THREE.Group();
   G.hand.position.set(0.6, -0.55, -0.95);
-  G.camera.add(G.hand);
-  G.handArm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.75), new THREE.MeshBasicMaterial({ color: 0xc89878, depthTest: false, depthWrite: false }));
+  // the hand and held item live in their own little scene, drawn after the world on a cleared depth buffer:
+  // they never poke into walls, and solid blocks in the hand still hide their own back faces
+  G.handScene = new THREE.Scene();
+  G.handCam = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 10);
+  G.handScene.add(G.handCam);
+  G.handCam.add(G.hand);
+  G.handArm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.75), new THREE.MeshBasicMaterial({ color: 0xc89878 }));
   G.handArm.rotation.set(0.1, -0.15, 0); G.handArm.position.set(0.05, -0.05, 0.1); G.handArm.renderOrder = 10;
   G.hand.add(G.handArm);
   G.handItem = new THREE.Mesh(itemGeometry(ID.stone), G.mats.held);
@@ -144,6 +149,7 @@ function setupRenderer() {
   buildSky();
   window.addEventListener('resize', () => {
     G.camera.aspect = window.innerWidth / window.innerHeight; G.camera.updateProjectionMatrix();
+    G.handCam.aspect = G.camera.aspect; G.handCam.updateProjectionMatrix();
     G.renderer.setSize(window.innerWidth, window.innerHeight);
   });
 }
@@ -896,7 +902,7 @@ function frame(now) {
     if (hid !== -1) {
       G.handItem.geometry = itemGeometry(hid);
       const flat = G.handItem.geometry.userData.flat;
-      G.handItem.scale.setScalar(flat ? 0.42 : 0.26);
+      G.handItem.scale.setScalar(flat ? 0.42 : DEFS[hid].key === 'bed' ? 0.17 : 0.26);
       G.handItem.rotation.set(flat ? 0 : 0.2, flat ? -1.2 : 0.75, flat ? 0.15 : 0);
       G.handItem.position.set(flat ? 0.02 : 0, flat ? 0.05 : -0.02, 0);
     }
@@ -914,6 +920,12 @@ function frame(now) {
     $('debug').textContent = `${G.fps} fps\nXYZ ${P.pos.x.toFixed(1)} ${P.pos.y.toFixed(1)} ${P.pos.z.toFixed(1)}\nBiome ${BIOME_NAMES[G.world.biomeAt(bx, bz, h)]}\nChunks ${G.world.chunks.size}  Mobs ${G.mobs.length}\nTime ${Math.floor(((G.time + 0.25) % 1) * 24)}:00  Seed ${G.seed}`;
   }
   G.renderer.render(G.scene, G.camera);
+  if (G.hand.visible) {
+    G.renderer.autoClear = false;
+    G.renderer.clearDepth();
+    G.renderer.render(G.handScene, G.handCam);
+    G.renderer.autoClear = true;
+  }
 }
 
 /* ---------- boot ---------- */

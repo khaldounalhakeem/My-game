@@ -873,18 +873,28 @@ function itemGeometry(id) {
   const def = DEFS[id];
   const g = new THREE.BufferGeometry();
   const pos = [], uv = [], col = [], idx = [];
-  if (def.isBlock && !def.cross) {
+  // one box: corner (x0,y0,z0), size (sx,sy,sz); sides of short boxes show the bottom of their picture
+  const box = (d, x0, y0, z0, sx, sy, sz) => {
     for (let f = 0; f < 6; f++) {
-      const F = FACES[f], U = TILE_UV[def.faces[f]], b = pos.length / 3;
+      const F = FACES[f], U = TILE_UV[d.faces[f]], b = pos.length / 3;
+      const vTop = sy < 1 && f !== 2 && f !== 3 ? U[1] + (U[3] - U[1]) * sy : U[3];
       for (let k = 0; k < 4; k++) {
         const c = F.c[k];
-        pos.push(c[0] - 0.5, c[1] - 0.5, c[2] - 0.5);
-        uv.push(FACE_UV[k][0] ? U[2] : U[0], FACE_UV[k][1] ? U[3] : U[1]);
-        const br = def.light ? 1.1 : F.shade;
+        pos.push(x0 + c[0] * sx, y0 + c[1] * sy, z0 + c[2] * sz);
+        uv.push(FACE_UV[k][0] ? U[2] : U[0], FACE_UV[k][1] ? vTop : U[1]);
+        const br = d.light ? 1.1 : F.shade;
         col.push(br, br, br);
       }
       idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
     }
+  };
+  if (def.key === 'bed' || def.key === 'bed_head') {
+    // a real two-block bed: foot in front, head with the pillow behind
+    const h = def.height;
+    box(DEFS[ID.bed], -0.5, -h / 2, 0, 1, h, 1);
+    box(DEFS[ID.bed_head], -0.5, -h / 2, -1, 1, h, 1);
+  } else if (def.isBlock && !def.cross) {
+    box(def, -0.5, -0.5, -0.5, 1, 1, 1);
   } else {
     const U = TILE_UV[tileOf(id)];
     pos.push(-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0);
