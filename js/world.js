@@ -597,7 +597,7 @@ class World {
       const def = DEFS[id];
       if (def.cross) { this.addCross(O, x, y, z, def); continue; }
       const out = def.translucent ? T : O;
-      const topH = def.liquid && get(x, y + 1, z) !== id ? 0.875 : 1;
+      const topH = def.height ? def.height : def.liquid && get(x, y + 1, z) !== id ? 0.875 : 1;
       for (let f = 0; f < 6; f++) {
         const F = FACES[f];
         const nid = get(x + F.n[0], y + F.n[1], z + F.n[2]);
@@ -614,7 +614,9 @@ class World {
           const cc = F.c[k];
           out.pos.push(x + cc[0], y + (cc[1] ? topH : 0), z + cc[2]);
           const fu = FACE_UV[k];
-          out.uv.push(fu[0] ? uv[2] : uv[0], fu[1] ? uv[3] : uv[1]);
+          // on short blocks the sides show only the bottom part of the picture, so it is not squashed
+          const vTop = topH < 1 && f !== 2 && f !== 3 ? uv[1] + (uv[3] - uv[1]) * topH : uv[3];
+          out.uv.push(fu[0] ? uv[2] : uv[0], fu[1] ? vTop : uv[1]);
           let a = 3;
           if (!def.light) {
             const [o1, o2, o3] = F.ao[k];
@@ -693,9 +695,24 @@ class World {
     const x0 = Math.floor(px - r + e), x1 = Math.floor(px + r - e);
     const y0 = Math.floor(py + e), y1 = Math.floor(py + h - e);
     const z0 = Math.floor(pz - r + e), z1 = Math.floor(pz + r - e);
-    for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++)
-      if (this.isSolid(x, y, z)) return true;
+    for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+      if (!this.isSolid(x, y, z)) continue;
+      const hgt = DEFS[this.getBlock(x, y, z)].height;
+      if (hgt && py + e >= y + hgt) continue; // standing on top of a short block like a bed
+      return true;
+    }
     return false;
+  }
+
+  /* the height to stand at when landing: the top of the tallest block under the body */
+  floorTop(px, py, pz, w) {
+    const r = w / 2, e = 1e-4, y = Math.floor(py + e);
+    let top = -1;
+    for (let z = Math.floor(pz - r + e); z <= Math.floor(pz + r - e); z++) for (let x = Math.floor(px - r + e); x <= Math.floor(px + r - e); x++) {
+      if (!this.isSolid(x, y, z)) continue;
+      top = Math.max(top, DEFS[this.getBlock(x, y, z)].height || 1);
+    }
+    return top < 0 ? y + 1 : y + top;
   }
 
   touching(b, id, pad) {
@@ -722,7 +739,7 @@ class World {
       if (dy) {
         b.pos.y += dy;
         if (this.collides(b.pos.x, b.pos.y, b.pos.z, b.w, b.h)) {
-          if (dy < 0) { b.pos.y = Math.floor(b.pos.y) + 1; b.onGround = true; }
+          if (dy < 0) { b.pos.y = this.floorTop(b.pos.x, b.pos.y, b.pos.z, b.w); b.onGround = true; }
           else b.pos.y = Math.floor(b.pos.y + b.h) - b.h - 0.001;
           b.vel.y = 0; dy = 0;
         }

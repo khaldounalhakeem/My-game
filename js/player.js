@@ -321,6 +321,10 @@ class Player {
     const above = W.getBlock(x, y + 1, z);
     if (above && (DEFS[above].cross || above === ID.cactus)) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot) G.openChest(x, y, z, true);
+    if (id === ID.bed || id === ID.bed_head) {
+      const other = id === ID.bed ? ID.bed_head : ID.bed;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (W.getBlock(x + dx, y, z + dz) === other) { W.setBlock(x + dx, y, z + dz, 0); break; }
+    }
     W.settle(x, y + 1, z);
     if (id === ID.obsidian || id === ID.nether_portal) {
       for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]])
@@ -372,7 +376,7 @@ class Player {
     if (tgt.mob && tgt.mob.interact && tgt.mob.interact(this, hd)) { this.useCd = 0.35; this.swing = 1; return; }
     if (b && !this.sneaking) {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
-      if (b.id === ID.bed) { this.useCd = 1; G.sleep(b); return; }
+      if (b.id === ID.bed || b.id === ID.bed_head) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.chest) { this.useCd = 0.5; G.ui.message('This chest is empty.'); return; }
       if (b.id === ID.furnace) { G.ui.openInventory('furnace'); return; }
@@ -449,7 +453,17 @@ class Player {
       if (hitsBody(this)) return;
       if (G.mobs.some(m => !m.dead && hitsBody(m))) return;
     }
+    // a bed takes two blocks: the foot where you tap and the head in the direction you face
+    let bedHead = null;
+    if (hd.id === ID.bed) {
+      const fx = -Math.sin(this.yaw), fz = -Math.cos(this.yaw);
+      const dx = Math.abs(fx) > Math.abs(fz) ? Math.sign(fx) : 0, dz = dx ? 0 : Math.sign(fz);
+      bedHead = [px + dx, py, pz + dz];
+      const there = W.getBlock(...bedHead), under = W.getBlock(bedHead[0], py - 1, bedHead[2]);
+      if ((there && !DEFS[there].replaceable) || !under || !DEFS[under].solid) { G.ui.message('Not enough room for the bed here. It needs two blocks of flat floor.'); return; }
+    }
     W.setBlock(px, py, pz, hd.id);
+    if (bedHead) W.setBlock(bedHead[0], bedHead[1], bedHead[2], ID.bed_head);
     W.settle(px, py, pz);
     if (hd.id === ID.pumpkin) G.tryBuildGolem(px, py, pz);
     G.sound.play('place', null, hd.id);

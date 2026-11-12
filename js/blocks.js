@@ -373,8 +373,10 @@ makeTile('magma', P => { P.fill(0x5a1a0a, 8); for (let i = 0; i < 7; i++) { cons
 makeTile('portal', P => { for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) { const v = Math.sin(x * 0.9 + y * 0.5) + Math.sin(y * 1.3 - x * 0.4); P.put(x, y, v > 0.6 ? [190, 90, 255] : v > -0.4 ? [120, 30, 210] : [70, 10, 150], 210); } });
 makeTile('i_quartz', pGem(0xece6dc));
 makeTile('i_blaze_rod', pPlant(P => { for (let i = 0; i < 10; i++) { P.put(3 + i, 12 - i, 0xffc020); P.put(4 + i, 12 - i, 0xe08010); } P.pts([[3, 12], [13, 2]], 0xfff080); }));
-makeTile('bed_top', P => { P.fill(0xb02626, 8); P.speck(0x8a1a1a, 0.2, 5); P.rect(1, 1, 14, 5, 0xeeeeee, 4); for (let i = 0; i < 16; i++) { P.put(i, 0, 0x7a5a32); P.put(i, 15, 0x7a5a32); } });
-makeTile('bed_side', P => { pPlanks(0xa8834f)(P); P.rect(0, 2, 16, 7, 0xb02626, 8); P.rect(0, 2, 5, 4, 0xeeeeee, 4); P.rect(0, 13, 2, 3, 0x5a4228); P.rect(14, 13, 2, 3, 0x5a4228); for (let x = 2; x < 14; x++) for (let y = 13; y < 16; y++) P.erase(x, y); });
+// beds are half a block tall, so only the lower rows (7-15) of the side picture show
+makeTile('bed_top', P => { P.fill(0xb02626, 8); P.speck(0x8a1a1a, 0.2, 5); for (let i = 0; i < 16; i++) { P.put(0, i, 0x7a5a32); P.put(15, i, 0x7a5a32); } });
+makeTile('bed_head_top', P => { P.fill(0xb02626, 8); P.speck(0x8a1a1a, 0.2, 5); P.rect(2, 2, 12, 7, 0xeeeeee, 4); for (let i = 0; i < 16; i++) { P.put(0, i, 0x7a5a32); P.put(15, i, 0x7a5a32); } });
+makeTile('bed_side', P => { pPlanks(0xa8834f)(P); P.rect(0, 7, 16, 4, 0xb02626, 8); P.rect(0, 13, 3, 3, 0x4a3420); P.rect(13, 13, 3, 3, 0x4a3420); });
 function pArmor(piece, mat) {
   return pPlant(P => {
     const c = rgb(mat), hi = shadeC(c, 1.3), lo = shadeC(c, 0.65);
@@ -547,11 +549,12 @@ block('nether_bricks', 'Nether Bricks', 'nether_bricks', PICK(1, 2));
 block('nether_quartz_ore', 'Nether Quartz Ore', 'nether_quartz_ore', PICK(1, 3, { drop: 'quartz', xp: 2 }));
 block('nether_gold_ore', 'Nether Gold Ore', 'nether_gold_ore', PICK(1, 3, { drop: 'gold_ingot', xp: 1 }));
 block('magma', 'Magma Block', 'magma', PICK(1, 0.5, { light: true }));
-block('bed', 'Bed', { top: 'bed_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2 });
+block('bed', 'Bed', { top: 'bed_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2, height: 0.5625, opaque: false });
 block('chest_loot', 'Treasure Chest', { top: 'chest_top', side: 'chest_side', front: 'chest_side' }, { tool: 'axe', hardness: 2.5, drop: null });
 block('chest', 'Chest', { top: 'chest_top', side: 'chest_side' }, { tool: 'axe', hardness: 2.5 });
 block('spawner', 'Monster Spawner', 'spawner', PICK(1, 5, { opaque: false, cutout: true, drop: null, light: true }));
 block('nether_portal', 'Nether Portal', 'portal', { solid: false, opaque: false, translucent: true, hardness: 0, drop: null, light: true, portal: true });
+block('bed_head', 'Bed', { top: 'bed_head_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2, height: 0.5625, opaque: false, drop: 'bed' });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {

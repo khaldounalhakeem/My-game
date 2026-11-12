@@ -809,7 +809,9 @@ function frame(now) {
       G.selBox.visible = true;
       G.selBox.position.set(tgt.block.x + 0.5, tgt.block.y + 0.5, tgt.block.z + 0.5);
       const def = DEFS[tgt.block.id];
-      if (def.cross) { G.selBox.scale.set(0.7, 1, 0.7); } else G.selBox.scale.set(1, 1, 1);
+      if (def.cross) { G.selBox.scale.set(0.7, 1, 0.7); }
+      else if (def.height) { G.selBox.scale.set(1, def.height, 1); G.selBox.position.y = tgt.block.y + def.height / 2; }
+      else G.selBox.scale.set(1, 1, 1);
     } else G.selBox.visible = false;
     if (P.breaking && P.breaking.p > 0) {
       G.crack.visible = true;

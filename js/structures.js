@@ -132,7 +132,7 @@ World.prototype.buildHouse = function (S, M, qx, qz) {
   for (let k = 0; k < 3; k++) for (let x = x0 - 1 + k; x <= x0 + W - k; x++) for (let z = z0 - 1 + k; z <= z0 + W - k; z++) set(x, floor + 4 + k, z, M.roof);
   // furniture
   const inX = qx === 0 ? x0 + 1 : x0 + 3;
-  set(inX, floor + 1, z0 + 1, ID.bed);
+  set(inX, floor + 1, z0 + 1, ID.bed); set(inX, floor + 1, z0 + 2, ID.bed_head);
   if (rng() < 0.5) set(inX, floor + 1, z0 + 3, ID.crafting_table);
   if (rng() < 0.35) set(x0 + 2, floor + 1, z0 + 3, ID.chest_loot);
   else if (rng() < 0.4) set(x0 + 2, floor + 1, z0 + 3, ID.furnace);
@@ -243,7 +243,7 @@ World.prototype.buildIgloo = function (S) {
   }
   for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) if (dx * dx + dz * dz <= 10) set(8 + dx, h, 8 + dz, ID.snow);
   for (let dz = -5; dz <= -3; dz++) { set(8, h + 1, 8 + dz, 0); set(8, h + 2, 8 + dz, 0); }
-  set(6, h + 1, 9, ID.bed); set(10, h + 1, 9, ID.furnace); set(10, h + 1, 7, ID.crafting_table); set(6, h + 1, 7, ID.chest_loot);
+  set(6, h + 1, 9, ID.bed); set(6, h + 1, 10, ID.bed_head); set(10, h + 1, 9, ID.furnace); set(10, h + 1, 7, ID.crafting_table); set(6, h + 1, 7, ID.chest_loot);
   set(8, h + 4, 8, ID.glowstone);
 };
 
