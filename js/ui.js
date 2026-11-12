@@ -360,7 +360,7 @@ const UI = {
       this.message('Game mode: ' + (P.mode === 'survival' ? 'Survival' : 'Creative'));
     });
     $('btn-dragon').addEventListener('click', () => { if (G.summonDragon()) G.resume(); });
-    $('btn-time').addEventListener('click', () => { G.time = G.isNight() ? 0.02 : 0.52; this.message(G.isNight() ? 'Night falls.' : 'The sun rises.'); });
+    $('btn-time').addEventListener('click', () => { G.time = G.isNight() ? 0.02 : 0.52; G.timeEventAt = Date.now(); this.message(G.isNight() ? 'Night falls.' : 'The sun rises.'); });
     $('btn-cam').addEventListener('click', () => { G.camMode = (G.camMode + 1) % 3; this.syncPause(); });
     $('btn-save').addEventListener('click', () => { G.save(); this.message('World saved in this browser.'); });
     $('btn-quit').addEventListener('click', () => { G.save(); G.toTitle(); });

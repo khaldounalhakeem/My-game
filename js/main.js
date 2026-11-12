@@ -316,7 +316,7 @@ G.sleep = (b) => {
   const fx = $('fx-sleep');
   fx.classList.add('on');
   setTimeout(() => {
-    G.time = 0.02;
+    G.time = 0.02; G.timeEventAt = Date.now();
     fx.classList.remove('on');
     G.ui.message('You slept through the night. Good morning!', 'gold');
     G.save();

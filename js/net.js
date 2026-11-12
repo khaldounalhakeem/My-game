@@ -314,6 +314,7 @@ const Net = {
   joinWorld(seed) {
     const key = this.worldKey(seed);
     if (this.world !== key) { this.world = key; this.ring = []; this.clearModels(); }
+    this.joinedAt = Date.now();
     if (this.room && this.room.setTopic) this.room.setTopic(key);
     this.askPermission();
     this.announce();
@@ -353,6 +354,8 @@ const Net = {
         if (this.trail.length > 8) this.trail.shift();
       }
       base.ts = now;
+      // shared time of day: what time it is here, when we joined, and when someone last changed it
+      base.tm = Math.round(G.time * 100000) / 100000; base.tj = this.joinedAt || now; base.te = G.timeEventAt || 0;
       base.tr = this.trail.map(s => [s[0] - now, s[1], s[2], s[3], s[4]]);
       Object.assign(base, {
         m: P.mode === 'creative' ? 1 : 0, d: G.dim === 'nether' ? 1 : 0, p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
@@ -471,6 +474,20 @@ const Net = {
     }
   },
 
+  /* everyone in a world shares one time of day. The newest bed or "make it day/night" wins;
+     otherwise whoever has been in the world longest keeps the clock and newcomers follow them. */
+  syncTime(pr) {
+    if (!Number.isFinite(pr.tm) || !Number.isFinite(pr.ts) || G.state === 'title') return;
+    const mine = G.timeEventAt || 0, theirs = Number.isFinite(pr.te) ? pr.te : 0;
+    const follow = theirs > mine || (theirs === mine && Number.isFinite(pr.tj) && pr.tj < (this.joinedAt || Date.now()));
+    if (!follow) return;
+    if (theirs > mine) G.timeEventAt = theirs;
+    const age = clamp((Date.now() - pr.ts) / 1000, 0, 5);
+    const t = (((pr.tm + age / DAY_LENGTH) % 1) + 1) % 1;
+    let diff = Math.abs(t - G.time); diff = Math.min(diff, 1 - diff);
+    if (diff > 0.002) G.time = t; // more than about a second apart: jump to the shared time
+  },
+
   /* smooth movement for other players: keep a short history of where they were (with their own
      timestamps) and replay it a little behind real time, sliding between the recorded points */
   bufferMove(rp, pr, pos, yaw) {
@@ -573,6 +590,7 @@ const Net = {
     rp.inWorld = !!this.world && rp.world === this.world && G.state !== 'title';
     if (!rp.inWorld) { this.removeModel(rp); if (wasIn) G.ui.message(name + ' left the world'); return; }
     if (!wasIn) G.ui.message(name + ' joined your world!', 'gold');
+    this.syncTime(pr);
     const pos = Array.isArray(pr.p) && pr.p.length === 3 && pr.p.every(Number.isFinite) ? pr.p : null;
     const rot = Array.isArray(pr.r) && pr.r.length === 2 && pr.r.every(Number.isFinite) ? pr.r : [0, 0];
     rp.dim = pr.d === 1 ? 'nether' : 'overworld';
