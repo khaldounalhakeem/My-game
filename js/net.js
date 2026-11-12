@@ -345,7 +345,15 @@ const Net = {
     if (!this.room || this.status !== 'on') return;
     const base = { v: 2, u: this.uid, n: this.nick, c: this.color, w: this.world };
     if (this.world && G.player) {
-      const P = G.player, held = P.heldSlot();
+      const P = G.player, held = P.heldSlot(), now = Date.now();
+      this.trail = this.trail || [];
+      const lastS = this.trail[this.trail.length - 1];
+      if (!lastS || now - lastS[0] >= 90) {
+        this.trail.push([now, r2(P.pos.x), r2(P.pos.y), r2(P.pos.z), r3(P.yaw)]);
+        if (this.trail.length > 8) this.trail.shift();
+      }
+      base.ts = now;
+      base.tr = this.trail.map(s => [s[0] - now, s[1], s[2], s[3], s[4]]);
       Object.assign(base, {
         m: P.mode === 'creative' ? 1 : 0, d: G.dim === 'nether' ? 1 : 0, p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
         s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
@@ -440,15 +448,16 @@ const Net = {
       const show = rp.inWorld && rp.dim === G.dim && !rp.dead && G.state !== 'title';
       rp.model.group.visible = show;
       if (!show) continue;
-      const g = rp.model.group, k = Math.min(1, dt * 10);
+      const g = rp.model.group;
       const ox = g.position.x, oz = g.position.z;
-      g.position.x += (rp.target[0] - g.position.x) * k;
-      g.position.y += (rp.target[1] - g.position.y) * k;
-      g.position.z += (rp.target[2] - g.position.z) * k;
-      let d = rp.yaw + Math.PI - g.rotation.y;
-      while (d > Math.PI) d -= Math.PI * 2;
-      while (d < -Math.PI) d += Math.PI * 2;
-      g.rotation.y += d * k;
+      const s = this.playback(rp);
+      if (s) {
+        g.position.set(s[0], s[1], s[2]);
+        let d = s[3] + Math.PI - g.rotation.y;
+        while (d > Math.PI) d -= Math.PI * 2;
+        while (d < -Math.PI) d += Math.PI * 2;
+        g.rotation.y += d * Math.min(1, dt * 15);
+      }
       const speed = Math.hypot(g.position.x - ox, g.position.z - oz) / Math.max(dt, 0.001);
       rp.walk = (rp.walk || 0) + speed * dt * 3.2;
       const sw = Math.sin(rp.walk) * Math.min(1, speed / 4) * 0.8;
@@ -460,6 +469,69 @@ const Net = {
       const red = rp.flashT > 0 ? 0.6 : 0;
       if (rp.red !== red) { rp.red = red; for (const m of rp.mats) m.emissive.setRGB(red, 0, 0); }
     }
+  },
+
+  /* smooth movement for other players: keep a short history of where they were (with their own
+     timestamps) and replay it a little behind real time, sliding between the recorded points */
+  bufferMove(rp, pr, pos, yaw) {
+    const now = Date.now();
+    const buf = rp.buf || (rp.buf = []);
+    const add = (ts, x, y, z, ry) => {
+      if (buf.length && ts <= buf[buf.length - 1][0]) return;
+      buf.push([ts, x, y, z, ry]);
+      if (buf.length > 60) buf.shift();
+    };
+    if (Number.isFinite(pr.ts)) {
+      // clock difference between their device and ours (the smallest delay seen, slowly forgotten)
+      const off = now - pr.ts;
+      rp.offset = rp.offset === undefined ? off : Math.min(off, rp.offset + 5);
+      if (rp.lastArrive) {
+        const gap = now - rp.lastArrive;
+        if (gap > 20) rp.gap = rp.gap === undefined ? gap : rp.gap * 0.8 + gap * 0.2;
+      }
+      rp.lastArrive = now;
+      if (Array.isArray(pr.tr)) for (const t of pr.tr) {
+        if (Array.isArray(t) && t.length === 5 && t.every(Number.isFinite)) add(pr.ts + t[0], t[1], t[2], t[3], t[4]);
+      }
+      add(pr.ts, pos[0], pos[1], pos[2], yaw);
+    } else {
+      // an older copy of the game without timestamps: use arrival time
+      rp.offset = 0; add(now, pos[0], pos[1], pos[2], yaw);
+    }
+  },
+
+  playback(rp) {
+    const buf = rp.buf;
+    if (!buf || !buf.length) return rp.target ? [rp.target[0], rp.target[1], rp.target[2], rp.yaw] : null;
+    const delay = clamp((rp.gap || 150) * 1.25 + 60, 120, 1500);
+    const now = Date.now(), want = now - (rp.offset || 0) - delay;
+    // a playback clock that runs at normal speed and only drifts gently (up to 15% faster or
+    // slower) toward where it should be, so changes in network timing never make a jump
+    if (rp.clock === undefined || Math.abs(want - rp.clock) > 2000) rp.clock = want;
+    else {
+      const real = now - (rp.clockAt || now);
+      rp.clock += real * (1 + clamp((want - rp.clock) / 1000, -0.15, 0.15));
+    }
+    rp.clockAt = now;
+    const t = rp.clock;
+    const last = buf[buf.length - 1];
+    if (t >= last[0]) {
+      // ran past the newest point: keep going the same way for a moment instead of freezing
+      const prev = buf.length > 1 ? buf[buf.length - 2] : null;
+      if (prev && last[0] > prev[0]) {
+        const k = Math.min(t - last[0], 350) / (last[0] - prev[0]);
+        return [last[1] + (last[1] - prev[1]) * k, last[2], last[3] + (last[3] - prev[3]) * k, last[4]];
+      }
+      return [last[1], last[2], last[3], last[4]];
+    }
+    while (buf.length > 2 && buf[1][0] <= t) buf.shift();
+    const a = buf[0], b = buf[1];
+    if (!b || t <= a[0]) return [a[1], a[2], a[3], a[4]];
+    const f = clamp((t - a[0]) / Math.max(1, b[0] - a[0]), 0, 1);
+    let dy = b[4] - a[4];
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    return [a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, a[3] + (b[3] - a[3]) * f, a[4] + dy * f];
   },
 
   onPeers(ch) {
@@ -510,6 +582,7 @@ const Net = {
     if (pos) {
       const first = !rp.model;
       rp.target = pos;
+      this.bufferMove(rp, pr, pos, rot[0]);
       if (!rp.model) this.makeModel(rp, SHIRT_COLORS.includes(pr.c) ? pr.c : SHIRT_COLORS[0]);
       if (first) rp.model.group.position.set(pos[0], pos[1], pos[2]);
     }
