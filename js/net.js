@@ -118,6 +118,115 @@ function makeInternetRoom(brokers) {
   };
 }
 
+/* Backup multiplayer through the artifact's claude.ai database: each device keeps one document
+   per world with its latest presence (about two writes a second while moving) and watches the
+   others. It works wherever the viewer may write the database, e.g. the owner on all their devices. */
+function deviceId() {
+  let id = '';
+  try { id = localStorage.getItem('blockrealm-device') || ''; } catch (e) { /* no storage */ }
+  if (!/^d[a-z0-9]{6,16}$/.test(id)) {
+    id = 'd' + Math.random().toString(36).slice(2, 12);
+    try { localStorage.setItem('blockrealm-device', id); } catch (e) { /* no storage */ }
+  }
+  return id;
+}
+function makeDbRoom(db, me) {
+  const dev = deviceId();
+  const peers = new Map(), peerL = [], connL = [];
+  let topic = null, unsub = null, mine = {}, writing = false, lastBody = '', lastWrite = 0, connected = false, fireT = null;
+  const status = { ok: 0, err: '', others: 0, readErr: '' };
+  const setConn = c => { if (c !== connected) { connected = c; for (const f of connL) f(c); } };
+  const snapshot = () => [...peers.values(), { peer: me, sameTab: true, isMe: true, kind: 'viewer', presence: mine }];
+  const fire = () => { if (fireT) return; fireT = setTimeout(() => { fireT = null; const all = snapshot(); for (const f of peerL) f({ peers: all, joined: [], left: [], updated: all }); }, 30); };
+  const players = t => db.collection('mp/' + t + '/players');
+  async function flush() {
+    if (writing || !topic) return;
+    const now = Date.now(), body = JSON.stringify(mine);
+    if (now - lastWrite < 450 || (body === lastBody && now - lastWrite < 5000)) return;
+    writing = true; lastBody = body; lastWrite = now;
+    const t = topic;
+    try { await players(t).doc(dev).set(Object.assign({}, mine, { t: now })); status.ok++; status.err = ''; setConn(true); }
+    catch (e) { status.err = (e && e.code) || 'error'; }
+    writing = false;
+  }
+  setInterval(flush, 150);
+  function subscribe() {
+    if (unsub) { unsub(); unsub = null; }
+    peers.clear(); fire();
+    if (!topic) return;
+    unsub = players(topic).onSnapshot(snap => {
+      setConn(true); status.readErr = '';
+      peers.clear();
+      const now = Date.now();
+      for (const d of snap.docs) {
+        if (d.id === dev) continue;
+        const b = d.data();
+        if (!b || now - (+b.t || 0) > 60000) continue; // gone for a minute: treat as left
+        const id = typeof b.u === 'string' ? b.u : d.id;
+        peers.set(id, { peer: id, sameTab: false, isMe: false, kind: 'viewer', presence: b });
+      }
+      status.others = peers.size;
+      fire();
+    }, e => { status.readErr = (e && e.code) || 'error'; setConn(false); });
+  }
+  window.addEventListener('pagehide', () => { if (topic) players(topic).doc(dev).delete().catch(() => {}); });
+  return {
+    status, dev,
+    presence(patch) {
+      const next = Object.assign({}, mine);
+      for (const k in patch) { if (patch[k] === null) delete next[k]; else next[k] = patch[k]; }
+      mine = next;
+      return Promise.resolve();
+    },
+    onPeers(f) { peerL.push(f); fire(); return () => {}; },
+    onConnection(f) { connL.push(f); setTimeout(() => f(connected), 0); return () => {}; },
+    peers: snapshot,
+    connected: () => connected,
+    setTopic(key) {
+      if (key === topic) return;
+      if (topic) players(topic).doc(dev).delete().catch(() => {});
+      topic = key; lastBody = ''; lastWrite = 0;
+      subscribe();
+    },
+  };
+}
+
+/* several connections at once (the claude.ai room and the database): what one sends goes out on all,
+   and players are matched up by the id inside their presence, so nobody shows up twice */
+function makeMultiRoom(rooms, me) {
+  const lists = rooms.map(() => []), peerL = [];
+  let fireT = null;
+  const merged = () => {
+    const out = new Map();
+    lists.forEach(list => {
+      for (const p of list) {
+        if (p.sameTab) continue;
+        const pr = p.presence || {};
+        const id = typeof pr.u === 'string' ? pr.u : p.peer;
+        if (id === me) continue;
+        if (!out.has(id) || (pr.p && !(out.get(id).presence || {}).p)) out.set(id, { peer: id, sameTab: false, isMe: false, kind: 'viewer', presence: pr });
+      }
+    });
+    return [...out.values(), { peer: me, sameTab: true, isMe: true, kind: 'viewer', presence: {} }];
+  };
+  const fire = () => { if (fireT) return; fireT = setTimeout(() => { fireT = null; const all = merged(); for (const f of peerL) f({ peers: all, joined: [], left: [], updated: all }); }, 30); };
+  rooms.forEach((r, i) => r.onPeers(ch => { lists[i] = ch.peers || []; fire(); }, () => { lists[i] = []; fire(); }));
+  return {
+    rooms,
+    presence(patch) {
+      // fine as long as at least one connection took it
+      return Promise.allSettled(rooms.map(r => r.presence(patch))).then(res => {
+        if (res.every(x => x.status === 'rejected')) throw res[0].reason;
+      });
+    },
+    onPeers(f) { peerL.push(f); fire(); return () => {}; },
+    onConnection(f, err) { let state = rooms.map(() => false); rooms.forEach((r, i) => r.onConnection(c => { state[i] = c; f(state.some(Boolean)); }, err)); return () => {}; },
+    peers: merged,
+    connected: () => rooms.some(r => r.connected()),
+    setTopic(key) { for (const r of rooms) if (r.setTopic) r.setTopic(key); },
+  };
+}
+
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
   world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0,
@@ -137,6 +246,18 @@ const Net = {
     if (!room && window.mqtt && location.protocol !== 'file:') {
       // stand-alone website: use the public internet servers instead of claude.ai
       try { room = makeInternetRoom(INTERNET_BROKERS); perms = null; this.internet = true; } catch (e) { room = null; }
+    }
+    this.uid = 'u' + Math.random().toString(36).slice(2, 12);
+    if (!this.internet) {
+      // add the database as a second way to reach your other devices and invited friends
+      const db = await use('db');
+      if (db) {
+        this.dbRoom = makeDbRoom(db, this.uid);
+        this.lobby = room;
+        room = room ? makeMultiRoom([room, this.dbRoom], this.uid) : this.dbRoom;
+        perms = room === this.dbRoom ? null : perms;
+        this.startDeviceReport(db);
+      }
     }
     this.room = room; this.perms = perms;
     $('web-link').hidden = !!this.internet;
@@ -222,7 +343,7 @@ const Net = {
   /* send who we are and where; in a world this is refreshed ten times a second by tick() */
   announce() {
     if (!this.room || this.status !== 'on') return;
-    const base = { v: 2, n: this.nick, c: this.color, w: this.world };
+    const base = { v: 2, u: this.uid, n: this.nick, c: this.color, w: this.world };
     if (this.world && G.player) {
       const P = G.player, held = P.heldSlot();
       Object.assign(base, {
@@ -271,10 +392,30 @@ const Net = {
   },
 
   /* one short line for screenshots: what this device can see of the room */
+  /* a small 'devices' list in the database saying what each device can see, for troubleshooting */
+  startDeviceReport(db) {
+    const ua = navigator.userAgent;
+    const kind = /iPad/.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document) ? 'iPad' : /iPhone/.test(ua) ? 'iPhone' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'Mac' : 'other';
+    let last = '', lastT = 0;
+    const report = async () => {
+      const d = this.dbRoom;
+      const body = { kind, name: this.nick, world: this.world || 'title', room: this.lobby ? (this.lobby.connected() ? 'up' : 'down') : 'none', roomOthers: this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : -1, dbWrites: d.status.ok, dbErr: d.status.err || d.status.readErr || '', dbOthers: d.status.others, seen: this.names() };
+      const s = JSON.stringify(body), now = Date.now();
+      if (s === last && now - lastT < 60000) return;
+      last = s; lastT = now;
+      try { await db.collection('devices').doc(d.dev).set(Object.assign(body, { t: now })); } catch (e) { /* reporting is best effort */ }
+    };
+    setInterval(report, 5000);
+  },
+
   diag() {
     const ago = this.heardAt ? Math.round((Date.now() - this.heardAt) / 1000) + 's' : 'never';
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
-    return 'v10 claude · link ' + (this.connected ? 'up' : 'down') + ' · others in room ' + this.rawPeers + ' · sent ' + this.sendOk + (this.sendErr ? ' · send error ' + this.sendErr : '') + ' · heard ' + ago + ' ago · ' + this.status;
+    const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
+    const dbs = this.dbRoom ? this.dbRoom.status : null;
+    return 'v11 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+      ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
+      ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
 
   otherSummary() {
