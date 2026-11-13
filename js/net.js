@@ -231,7 +231,7 @@ function makeMultiRoom(rooms, me) {
 
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
-  world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0,
+  world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0, blasts: [], blastSeq: 0,
   ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
   nick: '', color: SHIRT_COLORS[0],
 
@@ -362,9 +362,10 @@ const Net = {
       Object.assign(base, {
         m: P.mode === 'creative' ? 1 : 0, d: G.dim === 'nether' ? 1 : 0, p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
         s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
+        ar: [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0)), ex: this.blasts,
         mb: this.slim ? null : this.ownedMobs(), mh: this.mobHits, dr: this.slim ? null : this.dropRing, pk: this.slim ? null : this.pickRing,
       });
-    } else Object.assign(base, { m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null });
+    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
@@ -543,6 +544,15 @@ const Net = {
       out.push([d.nid, 'dragon:' + d.kind, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), r2(d.mesh.rotation.y), Math.round(d.hp), d.dead ? 1 : 0]);
     }
     return out;
+  },
+
+  /* an explosion here: the others play it too and work out their own damage */
+  blast(x, y, z, power, cause) {
+    if (!this.inShared()) return;
+    this.blastSeq++;
+    this.blasts.push([this.blastSeq, r2(x), r2(y), r2(z), power, G.dim === 'nether' ? 1 : 0, cause || '']);
+    if (this.blasts.length > 6) this.blasts.shift();
+    this.sendT = 0;
   },
 
   /* a hit on a mob that another device runs: send it to them */
@@ -775,6 +785,21 @@ const Net = {
       if (!rp.model) this.makeModel(rp, SHIRT_COLORS.includes(pr.c) ? pr.c : SHIRT_COLORS[0]);
       if (first) rp.model.group.position.set(pos[0], pos[1], pos[2]);
     }
+    if (rp.model) dressModel(rp.model, Array.isArray(pr.ar) && pr.ar.length === 4 ? pr.ar.map(v => (isInt(v) ? v : 0)) : [0, 0, 0, 0]);
+    // explosions on their screen: everyone works out their own damage from where they really are
+    if (Array.isArray(pr.ex)) {
+      let top = rp.lastEx || 0;
+      for (const b of pr.ex) {
+        if (!Array.isArray(b) || b.length < 6 || !Number.isInteger(b[0]) || !b.slice(1, 6).every(Number.isFinite)) continue;
+        if (rp.exReady && b[0] > (rp.lastEx || 0) && (b[5] === 1) === (G.dim === 'nether')) {
+          const cause = typeof b[6] === 'string' ? b[6].replace(/[^\w .,'!-]/g, '').slice(0, 80) : '';
+          G.explode(b[1], b[2], b[3], clamp(b[4], 0.5, 6), false, false, null, cause || undefined, { remote: true });
+        }
+        if (b[0] > top) top = b[0];
+      }
+      rp.lastEx = top;
+    }
+    rp.exReady = true;
     if (Array.isArray(pr.a)) {
       const me = this.myPeer(), P = G.player;
       let top = rp.lastHit || 0;

@@ -139,6 +139,10 @@ function setupRenderer() {
   G.handArm = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 0.75), new THREE.MeshBasicMaterial({ color: 0xc89878 }));
   G.handArm.rotation.set(0.1, -0.15, 0); G.handArm.position.set(0.05, -0.05, 0.1); G.handArm.renderOrder = 10;
   G.hand.add(G.handArm);
+  // the sleeve of your chestplate, seen on your own arm
+  G.handSleeve = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.27, 0.32), new THREE.MeshBasicMaterial({ color: 0xdcdcdc }));
+  G.handSleeve.position.set(0, 0, 0.24); G.handSleeve.renderOrder = 11; G.handSleeve.visible = false;
+  G.handArm.add(G.handSleeve);
   G.handItem = new THREE.Mesh(itemGeometry(ID.stone), G.mats.held);
   G.handItem.renderOrder = 11; G.hand.add(G.handItem);
   G.handId = -2;
@@ -264,7 +268,22 @@ G.spawnDrop = (id, count, x, y, z, vel, opts) => {
 G.spawnProjectile = (kind, pos, vel, owner) => { G.projectiles.push(new Projectile(kind, pos, vel, owner)); };
 G.primeTNT = (x, y, z, fuse) => { G.tnts.push(new PrimedTNT(x + 0.5, y, z + 0.5, fuse)); };
 
-G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause) => {
+/* how much of a body (feet, middle, head) the blast can see: 0 behind a wall, 1 in the open */
+function blastExposure(x, y, z, px, py, pz) {
+  let seen = 0;
+  for (const h of [0.2, 0.9, 1.6]) {
+    const dx = px - x, dy = py + h - y, dz = pz - z, d = Math.hypot(dx, dy, dz);
+    if (d < 0.6) { seen++; continue; }
+    const hit = G.world.raycast(x, y, z, dx / d, dy / d, dz / d, d, false);
+    // the block the blast starts in doesn't count as a wall
+    if (!hit || !DEFS[hit.id].solid || !DEFS[hit.id].opaque || hit.dist >= d - 0.4 || hit.dist < 0.75) seen++;
+  }
+  return seen / 3;
+}
+
+G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause, opts) => {
+  const remote = !!(opts && opts.remote);
+  if (!remote && !harmless) Net.blast(x, y, z, power, cause);
   const W = G.world, c = new THREE.Vector3(x, y, z);
   Sound.play('explode', c);
   G.particles.burst(x, y, z, colors || [0x6a6a6a, 0x8a8a8a, 0xd8d8d8, 0xff9a20], 45, power * 2.2, 0.45, 2);
@@ -288,12 +307,14 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause) => {
   const R = power * 2;
   const P = G.player;
   const dp = Math.hypot(P.pos.x - x, P.pos.y + 0.9 - y, P.pos.z - z);
-  if (dp < R) { const f = 1 - dp / R; P.hurt(Math.max(1, Math.round(f * power * 5)), c, f * 16, true, cause || 'You were caught in an explosion.'); P.vel.y += f * 6; }
-  if (dp < R * 3) G.shake = Math.max(G.shake, 1 - dp / (R * 3));
-  for (const q of Net.proxies()) {
-    const d = Math.hypot(q.pos.x - x, q.pos.y + 0.9 - y, q.pos.z - z);
-    if (d < R) { const f = 1 - d / R; q.hurt(Math.max(1, Math.round(f * power * 5)), c, f * 16, true, cause || 'You were caught in an explosion.'); }
+  if (dp < R) {
+    // like Minecraft: the closer you are the much harder it hits, and walls between you and the blast protect you
+    const f = 1 - dp / R, seen = blastExposure(x, y, z, P.pos.x, P.pos.y, P.pos.z);
+    const dmg = Math.round((f * f + f) / 2 * power * 5 * seen);
+    if (dmg > 0) { P.hurt(dmg, c, f * 16 * seen, true, cause || 'You were caught in an explosion.'); P.vel.y += f * 6 * seen; }
   }
+  if (dp < R * 3) G.shake = Math.max(G.shake, 1 - dp / (R * 3));
+  if (remote) return; // whoever's screen it happened on looks after the mobs
   for (const m of G.mobs) {
     if (m.dead) continue;
     const d = Math.hypot(m.pos.x - x, m.pos.y + m.h / 2 - y, m.pos.z - z);
@@ -549,6 +570,20 @@ function structureSpawns() {
 }
 
 /* ---------- world lifecycle ---------- */
+/* items lying on the ground, kept while you are in the other dimension and saved with the world */
+function serializeDrops() {
+  return G.drops.filter(d => !d.done && d.count > 0).map(d => [d.id, d.count, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), Math.round(d.age), d.did]);
+}
+function restoreDrops(dim) {
+  const list = (G.dimDrops && G.dimDrops[dim]) || [];
+  for (const e of list) {
+    if (!Array.isArray(e) || !DEFS[e[0]] || !(e[1] > 0) || !e.slice(2, 5).every(Number.isFinite)) continue;
+    const d = G.spawnDrop(e[0], e[1], e[2], e[3], e[4], new THREE.Vector3(0, 0, 0), { did: e[6], remote: true });
+    d.age = +e[5] || 0; d.pickDelay = 0;
+  }
+  if (G.dimDrops) G.dimDrops[dim] = [];
+}
+
 function clearEntities() {
   for (const list of [G.mobs, G.projectiles, G.drops, G.tnts]) { for (const e of list) { if (e.mesh) G.scene.remove(e.mesh); } list.length = 0; }
   for (const d of G.dragons) G.scene.remove(d.mesh);
@@ -570,7 +605,7 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.chests = {};
+  G.pets = {}; G.pendingPets = []; G.chests = {}; G.dimDrops = {};
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -598,6 +633,8 @@ function useDim(to) {
   G.pets = G.pets || {};
   G.pets[G.dim] = serializePets().concat(G.pendingPets || []);
   if (to === 'overworld' && G.dragons.some(d => !d.dead)) G.dragonTimer = 20;
+  G.dimDrops = G.dimDrops || {};
+  G.dimDrops[G.dim] = (G.dimDrops[G.dim] || []).concat(serializeDrops());
   clearEntities();
   G.scene.remove(G.world.group);
   G.dim = to;
@@ -607,6 +644,7 @@ function useDim(to) {
   G.applyFog();
   G.pendingPets = G.pets[to] || [];
   G.pets[to] = [];
+  restoreDrops(to);
 }
 
 G.switchDimension = (to) => {
@@ -723,8 +761,9 @@ G.continueSaved = () => {
   G.worlds.overworld.loadEdits(s.edits || {});
   G.worlds.nether.loadEdits(s.netherEdits || {});
   G.netherVisited = !!s.netherVisited;
-  if (s.dim === 'nether') useDim('nether');
+  if (s.dim === 'nether') useDim('nether'); else restoreDrops('overworld');
   G.chests = s.chests || {};
+  G.dimDrops = s.drops && typeof s.drops === 'object' ? s.drops : {};
   G.pets = Object.assign({}, s.pets || {});
   G.pendingPets = G.pets[G.dim] || [];
   G.pets[G.dim] = [];
@@ -753,7 +792,7 @@ G.save = () => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(),
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
 };
@@ -964,6 +1003,11 @@ function frame(now) {
     }
   }
   G.hand.visible = !P.dead && G.camMode === 0;
+  // armor you are wearing: on your body in the other camera views, and the chestplate sleeve on your arm
+  const worn = [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0));
+  dressModel(G.playerModel, worn);
+  G.handSleeve.visible = !!worn[1];
+  if (worn[1]) G.handSleeve.material.color.setHex(ARMOR_COLORS[DEFS[worn[1]].key.split('_')[0]] || 0xdcdcdc);
   const sw = Math.sin(P.swing * Math.PI);
   G.hand.rotation.set(-sw * 0.9, sw * 0.3, 0);
   G.hand.position.set(0.6 - sw * 0.15, -0.55 + Math.sin(G.bob * 2) * bobAmt * 0.6 - sw * 0.1, -0.95 - sw * 0.1);

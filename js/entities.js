@@ -71,6 +71,48 @@ function headMats(type, baseColor) {
   return [side, side, side, side, front, side];
 }
 
+/* ---------- armor on a player model ---------- */
+const ARMOR_COLORS = { leather: 0x8a4f2a, golden: 0xf5cc2e, iron: 0xdcdcdc, diamond: 0x5decf5 };
+const armorMats = {};
+function armorMat(id) {
+  const def = DEFS[id], k = def ? def.key.split('_')[0] : 'iron';
+  return armorMats[k] || (armorMats[k] = lam(ARMOR_COLORS[k] || 0xdcdcdc));
+}
+/* ids: [helmet, chestplate, leggings, boots], 0 or an item id each */
+function dressModel(m, ids) {
+  const sig = ids.join(',');
+  if (m.armorSig === sig) return;
+  m.armorSig = sig;
+  for (const o of m.armorParts || []) if (o.parent) o.parent.remove(o);
+  m.armorParts = [];
+  const P = m.parts, g = m.group;
+  const add = (parent, w, h, d, mt, x, y, z) => m.armorParts.push(addBox(parent, w, h, d, mt, x, y, z));
+  const ok = (id, slot) => id && DEFS[id] && DEFS[id].armor && DEFS[id].armor.slot === slot;
+  const [helmet, chest, legs, boots] = ids;
+  if (ok(helmet, 0)) {
+    const M = armorMat(helmet);
+    add(P.head, 0.6, 0.18, 0.6, M, 0, 0.22, 0);            // top
+    add(P.head, 0.6, 0.42, 0.07, M, 0, 0.02, -0.27);       // back
+    add(P.head, 0.07, 0.42, 0.6, M, -0.27, 0.02, 0);       // sides
+    add(P.head, 0.07, 0.42, 0.6, M, 0.27, 0.02, 0);
+    add(P.head, 0.6, 0.09, 0.07, M, 0, 0.12, 0.27);        // brow above the face
+  }
+  if (ok(chest, 1)) {
+    const M = armorMat(chest);
+    add(g, 0.58, 0.64, 0.33, M, 0, 1.17, 0);
+    for (const a of P.arms) add(a, 0.31, 0.34, 0.31, M, 0, -0.13, 0);
+  }
+  if (ok(legs, 2)) {
+    const M = armorMat(legs);
+    add(g, 0.56, 0.2, 0.31, M, 0, 0.86, 0);
+    for (const l of P.legs) add(l, 0.3, 0.5, 0.3, M, 0, -0.25, 0);
+  }
+  if (ok(boots, 3)) {
+    const M = armorMat(boots);
+    for (const l of P.legs) add(l, 0.31, 0.22, 0.33, M, 0, -0.65, 0.01);
+  }
+}
+
 /* ---------- mob definitions ---------- */
 const MOB_TYPES = {
   zombie: { name: 'Zombie', hp: 20, w: 0.6, h: 1.95, speed: 2.3, hostile: true, dmg: 3, burns: true, xp: 5, drops: [['rotten_flesh', 0, 2]] },
@@ -1016,6 +1058,9 @@ class ItemDrop {
     G.scene.add(this.mesh);
   }
   update(dt) {
+    // far away where the ground isn't loaded: wait there instead of falling out of the world
+    if (!G.world.isLoaded(this.pos.x, this.pos.z)) { this.mesh.visible = false; return; }
+    this.mesh.visible = true;
     this.age += dt;
     const liquid = G.world.liquidAt(this.pos.x, this.pos.y + 0.1, this.pos.z);
     if (liquid) { this.vel.y += 20 * dt; this.vel.multiplyScalar(0.9); }
