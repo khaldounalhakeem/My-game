@@ -350,6 +350,27 @@ G.tryBuildGolem = (x, y, z) => {
 /* chests keep 27 slots each. A treasure chest from a structure gets its loot the first time it is
    opened (it is put inside, ready to take out), then it is an ordinary chest. */
 const chestKey = (x, y, z) => G.dim + ':' + x + ',' + y + ',' + z;
+/* which structure a treasure chest belongs to, so it gets that structure's kind of loot */
+G.chestKind = (x, y, z) => {
+  const W = G.world;
+  let shelves = 0;
+  for (let dy = -3; dy <= 3; dy++) for (let dz = -6; dz <= 6; dz++) for (let dx = -6; dx <= 6; dx++) {
+    const b = W.getBlock(x + dx, y + dy, z + dz);
+    if (b === ID.spawner) return 'dungeon';
+    if (b === ID.bookshelf) shelves++;
+  }
+  if (shelves >= 4) return 'library';
+  if (G.dim === 'nether') return 'ruined_portal';
+  const cx = Math.floor(x / 16), cz = Math.floor(z / 16);
+  if (W.villageAt && W.villageAt(cx, cz)) return 'village';
+  if (W.regionPick) {
+    if (W.regionPick(cx, cz, 'pyramid')) return 'desert';
+    if (W.regionPick(cx, cz, 'igloo')) return 'igloo';
+    if (W.regionPick(cx, cz, 'shipwreck')) return 'shipwreck';
+    if (W.regionPick(cx, cz, 'ruinedPortal')) return 'ruined_portal';
+  }
+  return W.mineshaftAt && W.mineshaftAt(cx, cz) ? 'mineshaft' : 'dungeon';
+};
 G.chestSlots = (x, y, z, create) => {
   G.chests = G.chests || {};
   const k = chestKey(x, y, z);
@@ -363,7 +384,7 @@ G.openChest = (x, y, z) => {
     W.setBlock(x, y, z, ID.chest);
     const rng = mulberry32(hash3(x, y * 31 + z, G.seed + 77)); // same treasure for everyone in this world
     const free = [...Array(27).keys()];
-    for (const [it, n] of rollLoot(rng)) {
+    for (const [it, n] of rollLoot(rng, G.chestKind(x, y, z))) {
       const at = free.splice((rng() * free.length) | 0, 1)[0];
       if (at !== undefined) slots[at] = { id: it, count: n };
     }
@@ -375,7 +396,7 @@ G.openChest = (x, y, z) => {
 /* a chest that is broken spills what is inside */
 G.breakChest = (x, y, z, wasLoot) => {
   let slots = G.chestSlots(x, y, z, false);
-  if (!slots && wasLoot) slots = rollLoot(mulberry32(hash3(x, y * 31 + z, G.seed + 77))).map(([id, count]) => ({ id, count }));
+  if (!slots && wasLoot) slots = rollLoot(mulberry32(hash3(x, y * 31 + z, G.seed + 77)), G.chestKind(x, y, z)).map(([id, count]) => ({ id, count }));
   if (slots) for (const s of slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5);
   if (G.chests) delete G.chests[chestKey(x, y, z)];
 };

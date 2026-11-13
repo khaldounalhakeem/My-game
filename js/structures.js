@@ -147,7 +147,7 @@ World.prototype.buildHouse = function (S, M, qx, qz) {
   const inX = qx === 0 ? x0 + 1 : x0 + 3;
   set(inX, floor + 1, z0 + 1, ID.bed); set(inX, floor + 1, z0 + 2, ID.bed_head);
   if (rng() < 0.5) set(inX, floor + 1, z0 + 3, ID.crafting_table);
-  if (rng() < 0.35) set(x0 + 2, floor + 1, z0 + 3, ID.chest_loot);
+  if (rng() < 0.6) set(x0 + 2, floor + 1, z0 + 3, ID.chest_loot);
   else if (rng() < 0.4) set(x0 + 2, floor + 1, z0 + 3, ID.furnace);
   set(x0 + 2, floor + 3, z0 + 2, ID.glowstone);
 };
@@ -157,14 +157,19 @@ World.prototype.buildFarm = function (S, M, qx, qz) {
   const x0 = qx + 1, z0 = qz + 1;
   const h = H(x0 + 2, z0 + 2);
   if (h <= SEA) return;
-  const crops = [ID.hay_bale, ID.pumpkin, ID.melon];
+  const crops = [ID.wheat_crop, ID.wheat_crop, ID.wheat_crop, ID.pumpkin, ID.melon];
   const crop = crops[rng() * crops.length | 0];
   for (let x = x0 - 1; x <= x0 + 5; x++) for (let z = z0 - 1; z <= z0 + 5; z++) {
     for (let y = h + 1; y <= h + 4; y++) set(x, y, z, 0);
     const edge = x === x0 - 1 || x === x0 + 5 || z === z0 - 1 || z === z0 + 5;
     if (edge) { set(x, h, z, M.post); continue; }
     set(x, h, z, x === x0 + 2 ? ID.water : ID.dirt);
-    if (x !== x0 + 2 && rng() < 0.75) set(x, h + 1, z, rng() < 0.6 ? ID.tall_grass : crop);
+    if (x !== x0 + 2 && rng() < 0.9) set(x, h + 1, z, crop === ID.wheat_crop ? crop : rng() < 0.6 ? ID.tall_grass : crop);
+  }
+  // a few hay bales next to the farm
+  for (let k = 0; k < 3; k++) {
+    const hx = x0 - 2, hz = z0 + k;
+    if (H(hx, hz) === h && rng() < 0.7) set(hx, h + 1, hz, ID.hay_bale);
   }
 };
 
@@ -304,20 +309,37 @@ World.prototype.buildShipwreck = function (S) {
 };
 
 /* ---------- treasure ---------- */
-const LOOT = [
-  ['iron_ingot', 1, 5, 10], ['gold_ingot', 1, 6, 9], ['coal', 2, 8, 8], ['apple', 1, 3, 7], ['arrow', 4, 12, 6],
-  ['flint', 1, 3, 6], ['string', 1, 4, 5], ['bone', 1, 4, 5], ['obsidian', 1, 4, 5], ['emerald', 1, 3, 4],
-  ['diamond', 1, 2, 3], ['ender_pearl', 1, 2, 2], ['golden_apple', 1, 1, 2], ['flint_and_steel', 1, 1, 2],
-  ['iron_helmet', 1, 1, 2], ['iron_chestplate', 1, 1, 1], ['iron_sword', 1, 1, 2], ['diamond_sword', 1, 1, 1],
-  ['iron_pickaxe', 1, 1, 2], ['bow', 1, 1, 2], ['tnt', 1, 3, 2], ['melon_slice', 2, 6, 4],
-];
-function rollLoot(rng) {
-  const total = LOOT.reduce((a, l) => a + l[3], 0);
+/* what each kind of structure keeps in its chests: [item, min, max, weight], and how many stacks */
+const LOOT_TABLES = {
+  village: [5, 9, [['bread', 1, 4, 15], ['wheat', 2, 7, 12], ['apple', 1, 5, 12], ['iron_ingot', 1, 5, 10], ['emerald', 1, 4, 8], ['gold_ingot', 1, 3, 5],
+    ['coal', 2, 8, 8], ['iron_sword', 1, 1, 3], ['iron_pickaxe', 1, 1, 3], ['iron_helmet', 1, 1, 2], ['iron_chestplate', 1, 1, 2], ['iron_leggings', 1, 1, 2],
+    ['iron_boots', 1, 1, 2], ['leather', 1, 3, 4], ['oak_log', 2, 6, 6], ['diamond', 1, 3, 1]]],
+  desert: [5, 8, [['bone', 4, 6, 25], ['rotten_flesh', 3, 7, 16], ['gunpowder', 1, 8, 10], ['sand', 1, 8, 10], ['string', 1, 8, 10], ['gold_ingot', 2, 7, 15],
+    ['iron_ingot', 1, 5, 15], ['emerald', 1, 3, 15], ['diamond', 1, 3, 5], ['golden_apple', 1, 1, 6], ['ender_pearl', 1, 1, 3], ['tnt', 1, 2, 3]]],
+  dungeon: [4, 8, [['bread', 1, 1, 15], ['wheat', 1, 4, 15], ['bone', 1, 8, 10], ['rotten_flesh', 1, 8, 10], ['gunpowder', 1, 8, 10], ['string', 1, 8, 10],
+    ['coal', 1, 4, 10], ['iron_ingot', 1, 4, 10], ['gold_ingot', 1, 4, 5], ['redstone', 1, 4, 5], ['golden_apple', 1, 1, 3], ['saddle', 1, 1, 5], ['diamond', 1, 2, 1]]],
+  mineshaft: [4, 8, [['bread', 1, 3, 15], ['coal', 3, 8, 10], ['iron_ingot', 1, 5, 10], ['gold_ingot', 1, 3, 5], ['redstone', 4, 9, 5], ['lapis', 4, 9, 5],
+    ['diamond', 1, 2, 3], ['iron_pickaxe', 1, 1, 1], ['golden_apple', 1, 1, 2], ['oak_planks', 4, 12, 8], ['string', 1, 4, 5]]],
+  igloo: [3, 6, [['apple', 1, 3, 15], ['coal', 1, 4, 15], ['gold_ingot', 1, 3, 10], ['stone_axe', 1, 1, 2], ['rotten_flesh', 1, 1, 10], ['emerald', 1, 1, 1],
+    ['wheat', 2, 3, 10], ['golden_apple', 1, 1, 1]]],
+  shipwreck: [4, 8, [['iron_ingot', 1, 5, 90], ['gold_ingot', 1, 5, 10], ['emerald', 1, 5, 40], ['diamond', 1, 1, 5], ['coal', 2, 8, 20], ['wheat', 8, 21, 20],
+    ['rotten_flesh', 5, 24, 20], ['leather_helmet', 1, 1, 5], ['leather_chestplate', 1, 1, 5], ['leather_boots', 1, 1, 5], ['lapis', 1, 10, 20], ['gunpowder', 1, 5, 10]]],
+  ruined_portal: [4, 8, [['obsidian', 1, 2, 40], ['flint', 1, 4, 40], ['iron_ingot', 3, 9, 20], ['flint_and_steel', 1, 1, 40], ['gold_ingot', 2, 8, 15],
+    ['golden_apple', 1, 1, 15], ['golden_sword', 1, 1, 15], ['golden_pickaxe', 1, 1, 15], ['golden_helmet', 1, 1, 15], ['golden_chestplate', 1, 1, 15],
+    ['golden_boots', 1, 1, 15], ['gold_block', 1, 2, 1]]],
+  library: [2, 6, [['ender_pearl', 1, 1, 10], ['diamond', 1, 3, 3], ['iron_ingot', 1, 5, 10], ['gold_ingot', 1, 3, 5], ['redstone', 4, 9, 5], ['bread', 1, 3, 15],
+    ['apple', 1, 3, 15], ['iron_pickaxe', 1, 1, 5], ['iron_sword', 1, 1, 5], ['iron_chestplate', 1, 1, 5], ['iron_helmet', 1, 1, 5], ['golden_apple', 1, 1, 1],
+    ['bookshelf', 1, 3, 10], ['emerald', 1, 3, 5]]],
+};
+function rollLoot(rng, kind) {
+  const [lo, hi, table0] = LOOT_TABLES[kind] || LOOT_TABLES.dungeon;
+  const table = table0.filter(l => ID[l[0]] !== undefined);
+  const total = table.reduce((a, l) => a + l[3], 0);
   const out = [];
-  const n = 3 + (rng() * 4 | 0);
+  const n = lo + (rng() * (hi - lo + 1) | 0);
   for (let i = 0; i < n; i++) {
     let r = rng() * total;
-    for (const [k, a, b, w] of LOOT) { r -= w; if (r <= 0) { out.push([ID[k], a + (rng() * (b - a + 1) | 0)]); break; } }
+    for (const [k, a, b, w] of table) { r -= w; if (r <= 0) { out.push([ID[k], Math.min(DEFS[ID[k]].stack, a + (rng() * (b - a + 1) | 0))]); break; } }
   }
   return out;
 }

@@ -442,6 +442,9 @@ makeTile('i_chicken', pBlob(0xf5c8b0, 4.6));
 makeTile('i_cooked_chicken', pBlob(0xc8883e, 4.6));
 makeTile('i_apple', pPlant(P => { P.disc(8, 9, 5, 0xd0201c, 10); P.pts([[6, 7], [6, 8], [7, 6]], 0xff6a5a); P.line(8, 4, 8, 2, 0x5a3a1a); P.pts([[9, 3], [10, 2], [10, 3]], 0x3f8f2f); }));
 makeTile('i_golden_apple', pPlant(P => { P.disc(8, 9, 5, 0xf5cc2e, 10); P.pts([[6, 7], [6, 8], [7, 6]], 0xfff3a0); P.line(8, 4, 8, 2, 0x5a3a1a); P.pts([[9, 3], [10, 2], [10, 3]], 0x3f8f2f); }));
+makeTile('i_wheat', pPlant(P => { for (const [x0, lean] of [[5, -1], [8, 0], [11, 1]]) { P.line(x0, 15, x0 + lean * 2, 5, 0xb89a3a); for (let j = 0; j < 4; j++) { P.put(x0 + lean * 2 - 1, 2 + j * 1.5, P.vary(0xdcb84a, 14)); P.put(x0 + lean * 2 + 1, 2.5 + j * 1.5, P.vary(0xc9a33a, 14)); P.put(x0 + lean * 2, 1 + j * 1.5, P.vary(0xe8c860, 14)); } } P.rect(4, 11, 9, 2, 0x7a5a20); }));
+makeTile('i_bread', pPlant(P => { for (let y = 5; y <= 12; y++) for (let x = 1; x <= 14; x++) { const d = ((x - 7.5) / 7) ** 2 + ((y - 8.5) / 3.8) ** 2; if (d <= 1) P.put(x, y, d > 0.75 ? 0x7a4a1c : y < 8 ? P.vary(0xc8843a, 10) : P.vary(0xa86a2a, 10)); } for (const x of [4, 7, 10]) P.line(x, 6, x + 1, 8, 0xe8c070); }));
+makeTile('wheat_crop', pPlant(P => { for (let i = 0; i < 9; i++) { const x = 1 + i * 1.7 | 0, h = 9 + P.rng() * 5 | 0; P.line(x, 15, x, 15 - h, P.vary(0x8a9a3a, 12)); for (let j = 0; j < 4; j++) P.put(x + (j % 2 ? 1 : -1), 15 - h + j, P.vary(0xd8b848, 16)); } }));
 makeTile('i_melon_slice', pPlant(P => { for (let y = 4; y <= 12; y++) for (let x = 2; x <= 14; x++) { const d = Math.hypot(x - 8, y - 4); if (d <= 7) P.put(x, y, d > 6 ? 0x3e8a1d : d > 5.2 ? 0xe8f0a0 : 0xe0342c); } P.pts([[6, 6], [9, 7], [8, 9], [11, 6]], 0x1a1a1a); }));
 makeTile('i_ender_pearl', pPlant(P => { P.disc(8, 8, 5, 0x1d6b5c, 8); P.disc(8, 8, 2.6, 0x3fb59a, 8); P.pts([[6, 6], [7, 6]], 0xb0fff0); }));
 makeTile('i_bow', pPlant(P => { for (let a = 0; a <= 90; a += 4) { const r = a * Math.PI / 180; P.put(2 + Math.cos(r) * 11, 2 + Math.sin(r) * 11, 0x7a5a32); P.put(2 + Math.cos(r) * 10, 2 + Math.sin(r) * 10, 0x5a3e20); } P.line(13, 2, 2, 13, 0xdddddd); }));
@@ -547,7 +550,7 @@ block('melon', 'Melon', { top: 'melon_top', side: 'melon_side' }, { tool: 'axe',
 block('hay_bale', 'Hay Bale', { top: 'hay_top', side: 'hay_side' }, { hardness: 0.5 });
 block('rose', 'Rose', 'rose', CROSS);
 block('dandelion', 'Dandelion', 'dandelion', CROSS);
-block('tall_grass', 'Tall Grass', 'tall_grass', Object.assign({ drop: null, replaceable: true }, CROSS));
+block('tall_grass', 'Tall Grass', 'tall_grass', Object.assign({ drop: (r) => (r() < 0.1 ? [['wheat', 1]] : []), replaceable: true }, CROSS));
 block('dead_bush', 'Dead Bush', 'dead_bush', Object.assign({ drop: (r) => (r() < 0.5 ? [['stick', 1]] : []), replaceable: true }, CROSS));
 block('red_mushroom', 'Red Mushroom', 'red_mushroom', CROSS);
 block('brown_mushroom', 'Brown Mushroom', 'brown_mushroom', CROSS);
@@ -562,6 +565,7 @@ block('chest', 'Chest', { top: 'chest_top', side: 'chest_side' }, { tool: 'axe',
 block('spawner', 'Monster Spawner', 'spawner', PICK(1, 5, { opaque: false, cutout: true, drop: null, light: true }));
 block('nether_portal', 'Nether Portal', 'portal', { solid: false, opaque: false, translucent: true, hardness: 0, drop: null, light: true, portal: true });
 block('bed_head', 'Bed', { top: 'bed_head_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2, height: 0.5625, opaque: false, drop: 'bed' });
+block('wheat_crop', 'Wheat', 'wheat_crop', Object.assign({ drop: (r) => [['wheat', 1 + (r() < 0.4 ? 1 : 0)]] }, CROSS));
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -616,6 +620,9 @@ for (const [k, n, tier, speed, dmg] of TOOL_MATS) {
   item(k + '_shovel', n + ' Shovel', k + '_shovel', { stack: 1, tool: { type: 'shovel', tier, speed }, damage: dmg - 3 });
   item(k + '_axe', n + ' Axe', k + '_axe', { stack: 1, tool: { type: 'axe', tier, speed }, damage: dmg + 1 });
 }
+
+item('wheat', 'Wheat', 'wheat');
+item('bread', 'Bread', 'bread', { food: 5 });
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -697,7 +704,9 @@ const RECIPES = [
   ['bookshelf', 1, { '#planks': 6, leather: 3 }, 'table'],
   ['mossy_cobblestone', 1, { cobblestone: 1, oak_leaves: 1 }],
   ['melon', 1, { melon_slice: 9 }],
-  ['hay_bale', 1, { tall_grass: 9 }],
+  ['hay_bale', 1, { wheat: 9 }],
+  ['wheat', 9, { hay_bale: 1 }],
+  ['bread', 1, { wheat: 3 }],
   ['wool_white', 1, { string: 4 }],
   ['wool_red', 1, { wool_white: 1, rose: 1 }],
   ['wool_yellow', 1, { wool_white: 1, dandelion: 1 }],

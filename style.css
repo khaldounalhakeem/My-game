@@ -313,3 +313,6 @@ body.touch:not(.pad) #crosshair { display: none; }
 .inv-left { max-height: calc(100dvh - 60px); overflow-y: auto; }
 .panel.inv.with-chest .inv-armor-row { display: none; }
 @media (max-height: 520px) { .panel.inv.with-chest .slot { width: 34px; height: 34px; } #chest-box { margin-bottom: 4px; padding-bottom: 4px; } }
+.panel.inv { position: relative; }
+#btn-inv-close { position: absolute; top: 14px; right: 14px; z-index: 2; }
+#side-craft > h2, #side-creative > .tabs { padding-right: 90px; }
