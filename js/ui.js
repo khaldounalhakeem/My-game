@@ -162,11 +162,13 @@ const UI = {
       this.invSlots[i] = s;
     };
     for (let i = 36; i < 40; i++) { mk($('inv-armor'), i); this.invSlots[i].dataset.hint = ['Head', 'Chest', 'Legs', 'Feet'][i - 36]; }
+    for (let i = 100; i < 127; i++) mk($('inv-chest'), i);
     for (let i = 9; i < 36; i++) mk($('inv-main'), i);
     for (let i = 0; i < 9; i++) mk($('inv-hot'), i);
     $('cat-search').addEventListener('input', () => this.renderSide());
     for (const b of document.querySelectorAll('[data-tab]')) b.addEventListener('click', () => { this.tab = b.dataset.tab; this.renderSide(); });
     $('trash').addEventListener('pointerdown', e => { e.preventDefault(); this.cursor = null; this.moveCursor(); });
+    $('btn-chest-all').addEventListener('click', () => this.takeAll());
   },
 
   tip(text) {
@@ -187,7 +189,52 @@ const UI = {
     } else c.hidden = true;
   },
 
+  /* a click on one of the open chest's slots (ids 100-126) */
+  clickChest(k, button, shift) {
+    const box = this.chest && this.chest.slots, inv = G.player.inv;
+    if (!box) return;
+    const s = box[k], cur = this.cursor;
+    if (shift && s && !cur) {
+      const left = inv.add(s.id, s.count);
+      if (left) s.count = left; else box[k] = null;
+    } else if (button === 2) {
+      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = { id: s.id, count: half }; s.count -= half; if (!s.count) box[k] = null; }
+      else if (cur && (!s || (s.id === cur.id && s.count < DEFS[s.id].stack))) {
+        if (!s) box[k] = { id: cur.id, count: 1 }; else s.count++;
+        cur.count--; if (!cur.count) this.cursor = null;
+      }
+    } else {
+      if (!cur) { this.cursor = s; box[k] = null; }
+      else if (!s) { box[k] = cur; this.cursor = null; }
+      else if (s.id === cur.id) { const n = Math.min(DEFS[s.id].stack - s.count, cur.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null; }
+      else { box[k] = cur; this.cursor = s; }
+    }
+    G.sound.play('click');
+    inv.changed();
+    this.renderInventory();
+    this.moveCursor();
+  },
+
+  /* shift-click from your inventory into the open chest */
+  toChest(i) {
+    const box = this.chest.slots, inv = G.player.inv, s = inv.slots[i];
+    const max = DEFS[s.id].stack;
+    for (let k = 0; k < 27 && s.count; k++) { const t = box[k]; if (t && t.id === s.id && t.count < max) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; } }
+    for (let k = 0; k < 27 && s.count; k++) if (!box[k]) { box[k] = { id: s.id, count: s.count }; s.count = 0; }
+    if (!s.count) inv.slots[i] = null;
+    G.sound.play('click'); inv.changed(); this.renderInventory();
+  },
+
+  takeAll() {
+    const box = this.chest && this.chest.slots, inv = G.player.inv;
+    if (!box) return;
+    for (let k = 0; k < 27; k++) if (box[k]) { const left = inv.add(box[k].id, box[k].count); if (left) box[k].count = left; else box[k] = null; }
+    G.sound.play('pickup'); inv.changed(); this.renderInventory();
+  },
+
   clickSlot(i, button, shift) {
+    if (i >= 100) return this.clickChest(i - 100, button, shift);
+    if (shift && this.chest && G.player.inv.slots[i] && !this.cursor && i < 36) return this.toChest(i);
     const inv = G.player.inv, s = inv.slots[i], cur = this.cursor;
     // armor slots only take the matching piece
     if (i >= 36 && cur && !(DEFS[cur.id].armor && DEFS[cur.id].armor.slot === i - 36)) { G.ui.message('That slot is for ' + ['helmets', 'chestplates', 'leggings', 'boots'][i - 36] + '.'); return; }
@@ -221,9 +268,12 @@ const UI = {
     this.moveCursor();
   },
 
-  openInventory(station) {
+  openInventory(station, chest) {
     if (G.state !== 'play') return;
-    this.station = station || null;
+    this.station = station === 'chest' ? null : station || null;
+    this.chest = chest || null;
+    $('chest-box').hidden = !this.chest;
+    $('menu-inv').firstElementChild.classList.toggle('with-chest', !!this.chest);
     G.setState('inventory');
     $('menu-inv').hidden = false;
     this.renderInventory();
@@ -237,6 +287,7 @@ const UI = {
       this.cursor = null; this.moveCursor();
     }
     this.tip('');
+    this.chest = null;
     $('menu-inv').hidden = true;
     G.setState('play');
   },
@@ -245,6 +296,11 @@ const UI = {
     const inv = G.player.inv;
     for (let i = 0; i < 40; i++) this.fillSlot(this.invSlots[i], inv.slots[i]);
     for (let i = 36; i < 40; i++) this.invSlots[i].classList.toggle('empty', !inv.slots[i]);
+    if (this.chest) {
+      // someone broke the chest while it was open
+      if (G.world.getBlock(this.chest.x, this.chest.y, this.chest.z) !== ID.chest) { this.closeInventory(); return; }
+      for (let k = 0; k < 27; k++) this.fillSlot(this.invSlots[100 + k], this.chest.slots[k]);
+    }
     if (G.player.mode === 'survival') this.renderRecipes();
   },
 

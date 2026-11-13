@@ -347,14 +347,37 @@ G.tryBuildGolem = (x, y, z) => {
   return false;
 };
 
-/* open a treasure chest found in a structure: the loot pops out and the chest is left empty */
-G.openChest = (x, y, z, broken) => {
-  if (!broken) G.world.setBlock(x, y, z, ID.chest);
-  const items = rollLoot(Math.random);
-  for (const [id, n] of items) G.spawnDrop(id, n, x + 0.5, y + 1.1, z + 0.5, new THREE.Vector3((Math.random() - 0.5) * 3, 4 + Math.random() * 2, (Math.random() - 0.5) * 3));
-  G.particles.burst(x + 0.5, y + 1, z + 0.5, [0xf5cc2e, 0xffffff, 0xfff3a0], 16, 2.5, 0.12);
-  Sound.play('levelup');
-  G.ui.message('Treasure! ' + items.map(([id, n]) => n + ' ' + DEFS[id].name).join(', '), 'gold');
+/* chests keep 27 slots each. A treasure chest from a structure gets its loot the first time it is
+   opened (it is put inside, ready to take out), then it is an ordinary chest. */
+const chestKey = (x, y, z) => G.dim + ':' + x + ',' + y + ',' + z;
+G.chestSlots = (x, y, z, create) => {
+  G.chests = G.chests || {};
+  const k = chestKey(x, y, z);
+  if (!G.chests[k] && create) G.chests[k] = new Array(27).fill(null);
+  return G.chests[k] || null;
+};
+G.openChest = (x, y, z) => {
+  const W = G.world, id = W.getBlock(x, y, z);
+  const slots = G.chestSlots(x, y, z, true);
+  if (id === ID.chest_loot) {
+    W.setBlock(x, y, z, ID.chest);
+    const rng = mulberry32(hash3(x, y * 31 + z, G.seed + 77)); // same treasure for everyone in this world
+    const free = [...Array(27).keys()];
+    for (const [it, n] of rollLoot(rng)) {
+      const at = free.splice((rng() * free.length) | 0, 1)[0];
+      if (at !== undefined) slots[at] = { id: it, count: n };
+    }
+    G.particles.burst(x + 0.5, y + 1, z + 0.5, [0xf5cc2e, 0xffffff, 0xfff3a0], 16, 2.5, 0.12);
+    Sound.play('levelup');
+  } else Sound.play('click');
+  G.ui.openInventory('chest', { slots, x, y, z });
+};
+/* a chest that is broken spills what is inside */
+G.breakChest = (x, y, z, wasLoot) => {
+  let slots = G.chestSlots(x, y, z, false);
+  if (!slots && wasLoot) slots = rollLoot(mulberry32(hash3(x, y * 31 + z, G.seed + 77))).map(([id, count]) => ({ id, count }));
+  if (slots) for (const s of slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5);
+  if (G.chests) delete G.chests[chestKey(x, y, z)];
 };
 
 G.summonDragon = (kind) => {
@@ -526,7 +549,7 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = [];
+  G.pets = {}; G.pendingPets = []; G.chests = {};
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -680,6 +703,7 @@ G.continueSaved = () => {
   G.worlds.nether.loadEdits(s.netherEdits || {});
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether') useDim('nether');
+  G.chests = s.chests || {};
   G.pets = Object.assign({}, s.pets || {});
   G.pendingPets = G.pets[G.dim] || [];
   G.pets[G.dim] = [];
@@ -708,7 +732,7 @@ G.save = () => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(),
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
 };

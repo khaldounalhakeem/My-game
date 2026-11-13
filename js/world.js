@@ -376,7 +376,8 @@ class World {
         const ch = 1 + (rng() * 3 | 0);
         for (let k = 1; k <= ch; k++) set(x, h + k, z, ID.cactus);
       }
-      if (rng() < 0.07) this.pyramid(set, get, heights, rng);
+      rng(); // keeps the rest of the chunk the same as before
+      if (this.regionPick && this.regionPick(cx, cz, 'pyramid') && !(this.villageAt && this.villageAt(cx, cz))) this.pyramid(set, get, heights, rng);
     }
     if ((center === BIOME.PLAINS || center === BIOME.FOREST) && rng() < 0.08) plant(3, [ID.pumpkin, ID.melon], ID.grass);
     if (this.buildStructures) this.buildStructures(c, set, get, heights, biomes, rng);

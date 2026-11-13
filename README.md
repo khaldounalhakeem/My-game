@@ -63,8 +63,8 @@ Just like Minecraft on a phone: **tap a block** to place a block there (or use i
 - **Every seed is its own world**: a different starting place, different land height, more or fewer mountains, a hotter or colder climate and more or fewer trees.
 - **Infinite world** with biomes: plains, forests, birch forests, taiga, snowy tundra, deserts, beaches, oceans and mountains. Caves, lava lakes deep down, and ore veins.
 - **76 blocks**, including every ore: coal, iron, **gold**, diamond, redstone, lapis and emerald (emerald in mountains). Also gold, iron, diamond, emerald, lapis, coal, redstone and quartz blocks, TNT, glass, bricks, obsidian, glowstone, wool in 8 colours, flowers, mushrooms, cactus, pumpkins, melons and more.
-- **Desert pyramids** with gold-capped tops and a treasure room of gold blocks and a diamond block. Watch out for the TNT hidden underneath.
-- **Structures**, each with **treasure chests** (tap or right-click to open):
+- **Desert pyramids** (rare, like villages) with gold-capped tops and a treasure room of gold blocks and a diamond block. Watch out for the TNT hidden underneath.
+- **Structures**, spaced out like in Minecraft (villages and desert temples are hundreds of blocks apart, so you have to explore to find them), each with **treasure chests**. Tap or right-click a chest to open it and see the loot inside, then take what you want (shift-click or Take all). Chests remember what you leave in them, and you can craft your own chest from 8 planks at a crafting table to store things. Breaking a chest spills what is inside.
   - **Villages** in plains, forests, deserts, snowy plains and taiga: houses with beds, a well, farms, a street grid, lamp posts and **villagers**
   - **Dungeons** underground with a **monster spawner** that keeps spawning zombies, skeletons and spiders
   - **Mineshafts**: tunnel networks with wooden supports, and a spiral staircase down from the surface

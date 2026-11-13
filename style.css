@@ -305,3 +305,11 @@ body.touch:not(.pad) #crosshair { display: none; }
 }
 #dmg-popup.show { animation: dmgpop 2.4s ease-out forwards; }
 @keyframes dmgpop { 0% { opacity: 1; transform: translate(-50%, 0); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -14px); } }
+
+#chest-box { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 2px solid var(--stone-lo); }
+.chest-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.chest-head .label { font-family: var(--font-display); font-size: 11px; color: #f5cc2e; }
+.grid9.chest .slot { background: #3a2a18; }
+.inv-left { max-height: calc(100dvh - 60px); overflow-y: auto; }
+.panel.inv.with-chest .inv-armor-row { display: none; }
+@media (max-height: 520px) { .panel.inv.with-chest .slot { width: 34px; height: 34px; } #chest-box { margin-bottom: 4px; padding-bottom: 4px; } }

@@ -3,7 +3,20 @@
    libraries. Every piece is built chunk by chunk, so a structure that spans several chunks
    (villages, mineshafts) is laid out on a grid of chunks around a centre picked per region. */
 
-const VILLAGE_CELL = 7, MINESHAFT_CELL = 6;
+/* Spacing like Minecraft: the world is cut into big squares of chunks, and each square gets at
+   most one structure of a kind, somewhere inside it, leaving a gap to the next square. */
+const VILLAGE_CELL = 34, VILLAGE_GAP = 8, MINESHAFT_CELL = 14;
+const SPACING = {
+  pyramid: [32, 8, 303], igloo: [32, 8, 304], shipwreck: [24, 4, 305], ruinedPortal: [40, 15, 306], library: [64, 16, 307],
+};
+
+/* is this chunk the one picked for this kind of structure in its square? */
+World.prototype.regionPick = function (cx, cz, kind) {
+  const [cell, gap, salt] = SPACING[kind];
+  const gx = Math.floor(cx / cell), gz = Math.floor(cz / cell);
+  const r = mulberry32(hash3(gx, gz, this.seed + salt));
+  return cx === gx * cell + (r() * (cell - gap) | 0) && cz === gz * cell + (r() * (cell - gap) | 0);
+};
 
 /* which village (if any) owns this chunk: {cx, cz, style, radius} */
 World.prototype.villageAt = function (cx, cz) {
@@ -12,9 +25,9 @@ World.prototype.villageAt = function (cx, cz) {
   this.villageCache = this.villageCache || new Map();
   if (!this.villageCache.has(key)) {
     const r = mulberry32(hash3(gx, gz, this.seed + 101));
-    const ccx = gx * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - 4) | 0), ccz = gz * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - 4) | 0);
+    const ccx = gx * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0), ccz = gz * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0);
     let v = null;
-    if (r() < 0.6) {
+    {
       const wx = ccx * 16 + 8, wz = ccz * 16 + 8, h = this.heightAt(wx, wz), b = this.biomeAt(wx, wz, h);
       const style = { [BIOME.PLAINS]: 'oak', [BIOME.FOREST]: 'oak', [BIOME.BIRCH]: 'oak', [BIOME.DESERT]: 'sand', [BIOME.SNOWY]: 'spruce', [BIOME.TAIGA]: 'spruce' }[b];
       if (style && h > SEA + 1) v = { cx: ccx, cz: ccz, style, radius: 1 + (r() < 0.5 ? 1 : 0), x: wx, z: wz };
@@ -29,7 +42,7 @@ World.prototype.villageAt = function (cx, cz) {
 World.prototype.mineshaftAt = function (cx, cz) {
   const gx = Math.floor(cx / MINESHAFT_CELL), gz = Math.floor(cz / MINESHAFT_CELL);
   const r = mulberry32(hash3(gx, gz, this.seed + 202));
-  if (r() > 0.45) return null;
+  if (r() > 0.75) return null;
   const ccx = gx * MINESHAFT_CELL + 1 + (r() * (MINESHAFT_CELL - 2) | 0), ccz = gz * MINESHAFT_CELL + 1 + (r() * (MINESHAFT_CELL - 2) | 0);
   const y = 14 + (r() * 18 | 0);
   if (Math.max(Math.abs(cx - ccx), Math.abs(cz - ccz)) > 2) return null;
@@ -47,14 +60,14 @@ World.prototype.buildStructures = function (c, set, get, heights, biomes, rng) {
   if (ms) this.buildMineshaft(S, ms);
 
   if (rng() < 0.08) this.buildDungeon(S);
-  if (rng() < 0.012) this.buildLibrary(S);
+  if (this.regionPick(cx, cz, 'library')) this.buildLibrary(S);
 
   const v = this.villageAt(cx, cz);
   if (v) { this.buildVillageChunk(S, v); return; }
 
-  if (center === BIOME.SNOWY && rng() < 0.08) this.buildIgloo(S);
-  else if (center === BIOME.OCEAN && rng() < 0.1) this.buildShipwreck(S);
-  else if (center !== BIOME.OCEAN && center !== BIOME.BEACH && rng() < 0.035) this.buildRuinedPortal(S);
+  if (center === BIOME.SNOWY && this.regionPick(cx, cz, 'igloo')) this.buildIgloo(S);
+  else if (center === BIOME.OCEAN && this.regionPick(cx, cz, 'shipwreck')) this.buildShipwreck(S);
+  else if (center !== BIOME.OCEAN && center !== BIOME.BEACH && this.regionPick(cx, cz, 'ruinedPortal')) this.buildRuinedPortal(S);
 };
 
 /* ---------- village ---------- */

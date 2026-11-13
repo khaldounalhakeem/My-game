@@ -635,6 +635,7 @@ const RECIPES = [
   ['oak_planks', 4, { oak_log: 1 }], ['birch_planks', 4, { birch_log: 1 }], ['spruce_planks', 4, { spruce_log: 1 }],
   ['stick', 4, { '#planks': 2 }],
   ['crafting_table', 1, { '#planks': 4 }],
+  ['chest', 1, { '#planks': 8 }, 'table'],
   ['furnace', 1, { cobblestone: 8 }, 'table'],
   ['wooden_pickaxe', 1, { '#planks': 3, stick: 2 }, 'table'],
   ['stone_pickaxe', 1, { cobblestone: 3, stick: 2 }, 'table'],
