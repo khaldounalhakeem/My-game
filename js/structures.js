@@ -5,7 +5,7 @@
 
 /* Spacing like Minecraft: the world is cut into big squares of chunks, and each square gets at
    most one structure of a kind, somewhere inside it, leaving a gap to the next square. */
-const VILLAGE_CELL = 34, VILLAGE_GAP = 8, MINESHAFT_CELL = 14;
+const VILLAGE_CELL = 22, VILLAGE_GAP = 6, MINESHAFT_CELL = 14;
 const SPACING = {
   pyramid: [32, 8, 303], igloo: [32, 8, 304], shipwreck: [24, 4, 305], ruinedPortal: [40, 15, 306], library: [64, 16, 307],
 };
@@ -25,12 +25,14 @@ World.prototype.villageAt = function (cx, cz) {
   this.villageCache = this.villageCache || new Map();
   if (!this.villageCache.has(key)) {
     const r = mulberry32(hash3(gx, gz, this.seed + 101));
-    const ccx = gx * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0), ccz = gz * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0);
     let v = null;
-    {
+    // try a few spots in this square until one is on land a village can be built on
+    for (let tries = 0; tries < 6 && !v; tries++) {
+      const ccx = gx * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0), ccz = gz * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0);
       const wx = ccx * 16 + 8, wz = ccz * 16 + 8, h = this.heightAt(wx, wz), b = this.biomeAt(wx, wz, h);
       const style = { [BIOME.PLAINS]: 'oak', [BIOME.FOREST]: 'oak', [BIOME.BIRCH]: 'oak', [BIOME.DESERT]: 'sand', [BIOME.SNOWY]: 'spruce', [BIOME.TAIGA]: 'spruce' }[b];
-      if (style && h > SEA + 1) v = { cx: ccx, cz: ccz, style, radius: 1 + (r() < 0.5 ? 1 : 0), x: wx, z: wz };
+      const big = r() < 0.5;
+      if (style && h > SEA + 1) v = { cx: ccx, cz: ccz, style, radius: 1 + (big ? 1 : 0), x: wx, z: wz };
     }
     this.villageCache.set(key, v);
   }

@@ -50,7 +50,7 @@ class Player {
   }
 
   reset() {
-    this.health = 20; this.hunger = 20; this.air = 15; this.fire = 0; this.deathCause = ''; this.airWarned = false;
+    this.health = 20; this.hunger = 20; this.saturation = 5; this.air = 15; this.fire = 0; this.deathCause = ''; this.airWarned = false;
     this.xp = 0; this.level = 0; this.dead = false; this.flying = false;
     this.hurtCd = 0; this.attackCd = 0; this.useCd = 0; this.breakCd = 0;
     this.regenT = 0; this.starveT = 0; this.drownT = 0; this.lavaT = 0; this.cactusT = 0; this.fireT = 0;
@@ -167,7 +167,7 @@ class Player {
     } else {
       this.vel.y -= 28 * dt;
       if (this.vel.y < -55) this.vel.y = -55;
-      if (input.jump && this.onGround) { this.vel.y = 8.7; this.hungerDrain(0.05); }
+      if (input.jump && this.onGround) { this.vel.y = 8.7; this.hungerDrain(this.sprinting ? 0.05 : 0.0125); }
     }
     const wasGround = this.onGround;
     // sneaking keeps you from walking off edges
@@ -213,14 +213,21 @@ class Player {
     this.vel.set(0, 4, 0);
   }
 
-  hungerDrain(n) { if (this.mode === 'survival') this.hunger = Math.max(0, this.hunger - n); }
+  /* like Minecraft: food also fills a hidden 'saturation' store that gets used up before the hunger bar */
+  hungerDrain(n) {
+    if (this.mode !== 'survival') return;
+    const fromSat = Math.min(this.saturation || 0, n);
+    this.saturation = (this.saturation || 0) - fromSat;
+    this.hunger = Math.max(0, this.hunger - (n - fromSat));
+  }
 
   survivalTick(dt, swimming) {
     const W = G.world;
-    this.hungerDrain(dt * (this.sprinting ? 1 / 12 : 1 / 60));
+    const moving = Math.hypot(this.vel.x, this.vel.z) > 0.5;
+    this.hungerDrain(dt * (this.sprinting ? 1 / 45 : moving ? 1 / 300 : 1 / 600));
     if (this.hunger >= 17 && this.health < 20) {
       this.regenT += dt;
-      if (this.regenT > 2.5) { this.regenT = 0; this.health = Math.min(20, this.health + 1); this.hungerDrain(0.4); }
+      if (this.regenT > 2.5) { this.regenT = 0; this.health = Math.min(20, this.health + 1); this.hungerDrain(0.25); }
     } else this.regenT = 0;
     if (this.hunger <= 0) {
       this.starveT += dt;
@@ -301,7 +308,7 @@ class Player {
     else if (target instanceof Dragon) target.hurt(dmg);
     else target.hurt(dmg, this.pos, this.sprinting ? 10 : 6, true);
     if (crit) G.particles.burst(target.pos.x, target.pos.y + 1, target.pos.z, [0xffffff, 0xdddddd], 8, 3, 0.1);
-    this.hungerDrain(0.1);
+    this.hungerDrain(0.025);
   }
 
   breakBlock(x, y, z, id) {
@@ -314,7 +321,7 @@ class Player {
         for (const [did, n] of getDrops(def, Math.random)) G.spawnDrop(did, n, x + 0.5, y + 0.3, z + 0.5);
         if (def.xp && def.drop !== undefined) this.addXp(def.xp);
       }
-      this.hungerDrain(0.02);
+      this.hungerDrain(0.005);
       if (id === ID.dragon_egg && Math.random() < 0.5) G.ui.message('The egg feels warm...', 'purple');
     }
     // plants and cactus above lose their support
@@ -412,6 +419,7 @@ class Player {
       const canEat = this.mode === 'creative' || this.hunger < 20 || hd.heal;
       if (!canEat) return;
       this.hunger = Math.min(20, this.hunger + hd.food);
+      this.saturation = Math.min(this.hunger, (this.saturation || 0) + hd.food * 1.2);
       if (hd.heal) this.health = Math.min(20, this.health + hd.heal);
       if (hd.key === 'rotten_flesh' && Math.random() < 0.5) this.hungerDrain(2);
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);

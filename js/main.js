@@ -770,7 +770,7 @@ G.continueSaved = () => {
   const P = G.player;
   P.reset(); P.mode = s.mode || 'survival';
   P.inv = new Inventory(); P.inv.load(s.inv || []);
-  P.health = s.health ?? 20; P.hunger = s.hunger ?? 20; P.xp = s.xp || 0; P.level = s.level || 0;
+  P.health = s.health ?? 20; P.hunger = s.hunger ?? 20; P.saturation = s.saturation ?? 5; P.xp = s.xp || 0; P.level = s.level || 0;
   P.spawn.fromArray(s.spawn); P.pos.fromArray(s.pos); P.yaw = s.yaw || 0; P.pitch = s.pitch || 0;
   G.time = s.time || 0.1; G.dragonTimer = s.dragonTimer ?? 30;
   loadAround(P.pos.x, P.pos.z, 2);
@@ -789,7 +789,7 @@ G.save = () => {
   const data = {
     v: 1, seed: G.seed, mode: P.mode, time: G.time, dragonTimer: G.dragonTimer,
     pos: P.pos.toArray(), spawn: P.spawn.toArray(), yaw: P.yaw, pitch: P.pitch,
-    health: P.dead ? 20 : P.health, hunger: P.hunger, xp: P.xp, level: P.level,
+    health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(),
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
     dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
