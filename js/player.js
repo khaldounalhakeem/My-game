@@ -328,6 +328,7 @@ class Player {
     const above = W.getBlock(x, y + 1, z);
     if (above && (DEFS[above].cross || above === ID.cactus)) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
+    if (id === ID.furnace) G.breakFurnace(x, y, z);
     if (id === ID.bed || id === ID.bed_head) {
       const other = id === ID.bed ? ID.bed_head : ID.bed;
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (W.getBlock(x + dx, y, z + dz) === other) { W.setBlock(x + dx, y, z + dz, 0); break; }
@@ -385,7 +386,7 @@ class Player {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
       if (b.id === ID.bed || b.id === ID.bed_head) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
-      if (b.id === ID.furnace) { G.ui.openInventory('furnace'); return; }
+      if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
       if (b.id === ID.tnt && hd && hd.key === 'flint_and_steel') {
         W.setBlock(b.x, b.y, b.z, 0); G.primeTNT(b.x, b.y, b.z, 4); this.useCd = 0.3; this.swing = 1; return;
       }

@@ -120,6 +120,14 @@
     <div class="inv-left">
       <div class="inv-head"><h2>Inventory</h2><button id="btn-inv-close" class="btn small" type="button">Close</button></div>
       <div id="chest-box" hidden><div class="chest-head"><span class="label">Chest</span><button id="btn-chest-all" class="btn small" type="button">Take all</button></div><div id="inv-chest" class="grid9 chest"></div></div>
+      <div id="furnace-box" hidden>
+        <div class="chest-head"><span class="label">Furnace</span><span id="f-status" class="fstatus"></span></div>
+        <div class="furnace-row">
+          <div class="furnace-col"><div id="fslot-in"></div><div class="fflame"><div id="f-flame"></div></div><div id="fslot-fuel"></div></div>
+          <div class="farrow"><div id="f-arrow"></div></div>
+          <div id="fslot-out" class="fout"></div>
+        </div>
+      </div>
       <div class="inv-armor-row"><span class="label">Armor</span><div id="inv-armor"></div></div>
       <div id="inv-main" class="grid9"></div>
       <div id="inv-hot" class="grid9 hot"></div>

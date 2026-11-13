@@ -772,3 +772,13 @@ function iconURL(id) {
 }
 
 function tileOf(id) { const d = DEFS[id]; return d.isBlock ? d.faces[0] : d.tile; }
+
+/* ---------- furnace: what smelts into what, and how long fuel burns (seconds; one item takes 10) ---------- */
+const SMELT_TIME = 10;
+const SMELT = {}; // input id -> [output id, count, xp]
+const SMELT_XP = { iron_ingot: 0.7, gold_ingot: 1, glass: 0.1, stone: 0.1, coal: 0.15, terracotta: 0.35, cooked_porkchop: 0.35, steak: 0.35, cooked_chicken: 0.35 };
+for (const r of RECIPES) if (r[3] === 'furnace') for (const k in r[2]) for (const m of GROUPS[k] || [k]) if (ID[m] !== undefined) SMELT[ID[m]] = [ID[r[0]], r[1], SMELT_XP[r[0]] || 0.1];
+const FUEL = {};
+for (const [k, t] of [['coal', 80], ['coal_block', 800], ['blaze_rod', 120], ['stick', 5], ['crafting_table', 15], ['chest', 15], ['bookshelf', 15],
+  ['oak_log', 15], ['birch_log', 15], ['spruce_log', 15], ['oak_planks', 15], ['birch_planks', 15], ['spruce_planks', 15], ['bow', 15],
+  ['wooden_pickaxe', 10], ['wooden_sword', 10], ['wooden_axe', 10], ['wooden_shovel', 10], ['dead_bush', 5]]) if (ID[k] !== undefined) FUEL[ID[k]] = t;

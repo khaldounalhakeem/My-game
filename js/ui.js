@@ -163,6 +163,8 @@ const UI = {
     };
     for (let i = 36; i < 40; i++) { mk($('inv-armor'), i); this.invSlots[i].dataset.hint = ['Head', 'Chest', 'Legs', 'Feet'][i - 36]; }
     for (let i = 100; i < 127; i++) mk($('inv-chest'), i);
+    mk($('fslot-in'), 200); mk($('fslot-fuel'), 201); mk($('fslot-out'), 202);
+    this.invSlots[200].dataset.hint = 'Smelt'; this.invSlots[201].dataset.hint = 'Fuel';
     for (let i = 9; i < 36; i++) mk($('inv-main'), i);
     for (let i = 0; i < 9; i++) mk($('inv-hot'), i);
     $('cat-search').addEventListener('input', () => this.renderSide());
@@ -190,8 +192,8 @@ const UI = {
   },
 
   /* a click on one of the open chest's slots (ids 100-126) */
-  clickChest(k, button, shift) {
-    const box = this.chest && this.chest.slots, inv = G.player.inv;
+  clickChest(k, button, shift, other) {
+    const box = other || (this.chest && this.chest.slots), inv = G.player.inv;
     if (!box) return;
     const s = box[k], cur = this.cursor;
     if (shift && s && !cur) {
@@ -232,9 +234,63 @@ const UI = {
     G.sound.play('pickup'); inv.changed(); this.renderInventory();
   },
 
+  /* furnace slots: 0 = what to smelt, 1 = fuel, 2 = the result (you can only take from it) */
+  clickFurnace(k, button, shift) {
+    const f = this.furnace, inv = G.player.inv;
+    if (!f) return;
+    const box = f.slots, s = box[k], cur = this.cursor;
+    if (k === 2) {
+      if (!s) return;
+      if (shift) { const left = inv.add(s.id, s.count); if (left) s.count = left; else box[2] = null; }
+      else if (!cur) { this.cursor = s; box[2] = null; }
+      else if (cur.id === s.id && cur.count + s.count <= DEFS[s.id].stack) { cur.count += s.count; box[2] = null; }
+      else return;
+      this.furnaceXp();
+    } else {
+      if (cur && k === 1 && !FUEL[cur.id]) { G.ui.message(DEFS[cur.id].name + ' can\'t be used as fuel. Try coal, wood or planks.'); return; }
+      if (cur && k === 0 && !SMELT[cur.id]) { G.ui.message(DEFS[cur.id].name + ' can\'t be smelted.'); return; }
+      return this.clickChest(k, button, shift, box);
+    }
+    G.sound.play('click'); inv.changed(); this.renderInventory(); this.moveCursor();
+  },
+
+  /* XP from smelting goes to whoever takes the result out */
+  furnaceXp() {
+    const f = this.furnace;
+    if (!f || f.xp <= 0) return;
+    let n = Math.floor(f.xp);
+    if (Math.random() < f.xp - n) n++;
+    f.xp = 0;
+    if (n) G.player.addXp(n);
+  },
+
+  toFurnace(i) {
+    const f = this.furnace, inv = G.player.inv, s = inv.slots[i];
+    const k = SMELT[s.id] ? 0 : FUEL[s.id] ? 1 : -1;
+    if (k < 0) { G.ui.message(DEFS[s.id].name + ' can\'t be smelted or burned.'); return; }
+    const t = f.slots[k], max = DEFS[s.id].stack;
+    if (!t) { f.slots[k] = { id: s.id, count: s.count }; inv.slots[i] = null; }
+    else if (t.id === s.id) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; if (!s.count) inv.slots[i] = null; }
+    else return;
+    G.sound.play('click'); inv.changed(); this.renderInventory();
+  },
+
+  renderFurnace() {
+    const f = this.furnace;
+    if (!f) return;
+    if (G.world.getBlock(f.x, f.y, f.z) !== ID.furnace) { this.closeInventory(); return; }
+    for (let k = 0; k < 3; k++) { this.fillSlot(this.invSlots[200 + k], f.slots[k]); this.invSlots[200 + k].classList.toggle('empty', !f.slots[k]); }
+    $('f-flame').style.height = (f.burnMax ? Math.round(100 * f.burn / f.burnMax) : 0) + '%';
+    $('f-arrow').style.width = Math.round(100 * f.cook / SMELT_TIME) + '%';
+    const st = f.burn > 0 ? (f.slots[0] && SMELT[f.slots[0].id] ? 'Smelting...' : 'Burning') : !f.slots[0] ? 'Put something to smelt on top' : !f.slots[1] ? 'Add fuel below (coal, wood or planks)' : '';
+    if ($('f-status').textContent !== st) $('f-status').textContent = st;
+  },
+
   clickSlot(i, button, shift) {
+    if (i >= 200) return this.clickFurnace(i - 200, button, shift);
     if (i >= 100) return this.clickChest(i - 100, button, shift);
     if (shift && this.chest && G.player.inv.slots[i] && !this.cursor && i < 36) return this.toChest(i);
+    if (shift && this.furnace && G.player.inv.slots[i] && !this.cursor && i < 36) return this.toFurnace(i);
     const inv = G.player.inv, s = inv.slots[i], cur = this.cursor;
     // armor slots only take the matching piece
     if (i >= 36 && cur && !(DEFS[cur.id].armor && DEFS[cur.id].armor.slot === i - 36)) { G.ui.message('That slot is for ' + ['helmets', 'chestplates', 'leggings', 'boots'][i - 36] + '.'); return; }
@@ -268,11 +324,14 @@ const UI = {
     this.moveCursor();
   },
 
-  openInventory(station, chest) {
+  openInventory(station, chest, furnace) {
     if (G.state !== 'play') return;
     this.station = station === 'chest' ? null : station || null;
     this.chest = chest || null;
+    this.furnace = furnace || null;
     $('chest-box').hidden = !this.chest;
+    $('furnace-box').hidden = !this.furnace;
+    $('menu-inv').firstElementChild.classList.toggle('with-furnace', !!this.furnace);
     $('menu-inv').firstElementChild.classList.toggle('with-chest', !!this.chest);
     G.setState('inventory');
     $('menu-inv').hidden = false;
@@ -287,7 +346,7 @@ const UI = {
       this.cursor = null; this.moveCursor();
     }
     this.tip('');
-    this.chest = null;
+    this.chest = null; this.furnace = null;
     $('menu-inv').hidden = true;
     G.setState('play');
   },
@@ -296,6 +355,7 @@ const UI = {
     const inv = G.player.inv;
     for (let i = 0; i < 40; i++) this.fillSlot(this.invSlots[i], inv.slots[i]);
     for (let i = 36; i < 40; i++) this.invSlots[i].classList.toggle('empty', !inv.slots[i]);
+    if (this.furnace) this.renderFurnace();
     if (this.chest) {
       // someone broke the chest while it was open
       if (G.world.getBlock(this.chest.x, this.chest.y, this.chest.z) !== ID.chest) { this.closeInventory(); return; }
@@ -373,7 +433,7 @@ const UI = {
   renderRecipes() {
     const title = { table: 'Crafting Table', furnace: 'Furnace' }[this.station] || 'Crafting';
     $('craft-title').textContent = title;
-    $('craft-hint').textContent = this.station === 'furnace' ? 'Smelt ores, sand and food.'
+    $('craft-hint').textContent = this.station === 'furnace' ? 'Put what you want to smelt in the top slot and fuel in the bottom slot. Each item takes 10 seconds. Coal smelts 8 items, wood or planks 1 and a half, a stick half of one.'
       : this.station === 'table' ? 'Every recipe is available here.' : 'Place a Crafting Table and ' + (Input.touch ? 'tap' : 'right-click') + ' it for tools, weapons and more.';
     const list = $('recipes');
     const rs = this.stationRecipes().map(r => [r, this.canCraft(r)]);
@@ -392,6 +452,7 @@ const UI = {
         ins += `<span class="need${enough ? '' : ' short'}"><img alt="" src="${iconURL(ID[shown])}">${r[2][k]}</span>`;
       }
       row.innerHTML = `<span class="out"><img alt="" src="${iconURL(outId)}">${r[1] > 1 ? '<b>' + r[1] + '</b>' : ''}</span><span class="rname">${DEFS[outId].name}</span><span class="ins">${ins}</span>`;
+      if (this.station === 'furnace') { row.className = 'recipe guide' + (ok ? ' ok' : ''); row.title = 'Put it in the furnace to smelt it'; list.appendChild(row); continue; }
       row.title = ok ? 'Click to craft. Shift-click crafts as many as you can.' : 'Missing ingredients';
       row.addEventListener('click', e => { if (ok) { this.craft(r, e.shiftKey ? 64 : 1); this.renderInventory(); } });
       list.appendChild(row);

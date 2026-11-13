@@ -316,3 +316,20 @@ body.touch:not(.pad) #crosshair { display: none; }
 .panel.inv { position: relative; }
 #btn-inv-close { position: absolute; top: 14px; right: 14px; z-index: 2; }
 #side-craft > h2, #side-creative > .tabs { padding-right: 90px; }
+
+#furnace-box { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 2px solid var(--stone-lo); }
+.fstatus { font-size: 12px; color: var(--muted); }
+.furnace-row { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 4px 0; }
+.furnace-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fflame { width: 22px; height: 22px; position: relative; background: #2a2630; clip-path: polygon(50% 0, 85% 45%, 100% 100%, 0 100%, 15% 45%); }
+#f-flame { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(#ffe070, #ff8a20); }
+.farrow { width: 60px; height: 22px; position: relative; background: #2a2630; clip-path: polygon(0 30%, 65% 30%, 65% 0, 100% 50%, 65% 100%, 65% 70%, 0 70%); }
+#f-arrow { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: #f0f0f0; }
+.fout .slot { width: 52px; height: 52px; }
+.panel.inv.with-furnace .inv-armor-row { display: none; }
+.recipe.guide { cursor: default; }
+#furnace-box .slot { position: relative; }
+#furnace-box .slot.empty::after { content: attr(data-hint); position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: #6a6478; pointer-events: none; }
+#furnace-box .slot { width: 46px; height: 46px; box-sizing: border-box; }
+#furnace-box .fout .slot { width: 58px; height: 58px; }
+#furnace-box .slot img { width: 70%; height: 70%; }

@@ -69,6 +69,7 @@ Just like Minecraft on a phone: **tap a block** to place a block there (or use i
   - **Dungeons** underground with a **monster spawner** that keeps spawning zombies, skeletons and spiders
   - **Mineshafts**: tunnel networks with wooden supports, and a spiral staircase down from the surface
   - **Igloos** in snowy plains, **ruined portals** (with spare obsidian to fix them), **shipwrecks** on the ocean floor, and rare underground **stronghold libraries** full of bookshelves
+- **Smelting like Minecraft**: open a Furnace, put what you want to smelt in the top slot and fuel in the bottom slot, and take the result from the right. Each item takes 10 seconds and the furnace keeps working while you do other things. Coal burns long enough for 8 items, logs and planks 1.5, a stick half of one (a block of coal 80, a blaze rod 12). You get XP when you take the result out, and breaking a furnace spills what is inside.
 - **Crafting** at a Crafting Table and **smelting** in a Furnace: planks, sticks, pickaxes, axes, shovels and swords from wood to diamond (gold tools are the fastest; axes chop wood fast and hit hard, shovels dig dirt, sand and gravel fast), bow and arrows, flint and steel, TNT, golden apples, storage blocks, dyed wool and more.
 - **Mobs**:
   - Friendly: pigs, cows, sheep, chickens

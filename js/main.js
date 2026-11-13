@@ -414,6 +414,60 @@ G.openChest = (x, y, z) => {
   } else Sound.play('click');
   G.ui.openInventory('chest', { slots, x, y, z });
 };
+/* furnaces: [thing to smelt, fuel, result], burning and cooking timers, and XP waiting for whoever takes the result */
+G.furnaceAt = (x, y, z, create) => {
+  G.furnaces = G.furnaces || {};
+  const k = chestKey(x, y, z);
+  if (!G.furnaces[k] && create) G.furnaces[k] = { slots: [null, null, null], burn: 0, burnMax: 0, cook: 0, xp: 0 };
+  return G.furnaces[k] || null;
+};
+G.openFurnace = (x, y, z) => {
+  const f = G.furnaceAt(x, y, z, true);
+  G.ui.openInventory('furnace', null, Object.assign(f, { x, y, z }));
+};
+G.breakFurnace = (x, y, z) => {
+  const f = G.furnaceAt(x, y, z, false);
+  if (f) for (const s of f.slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5);
+  if (G.furnaces) delete G.furnaces[chestKey(x, y, z)];
+};
+function furnaceCanSmelt(f) {
+  const [inp, , out] = f.slots, r = inp && SMELT[inp.id];
+  return !!r && (!out || (out.id === r[0] && out.count + r[1] <= DEFS[out.id].stack));
+}
+/* furnaces keep working while you do other things, as long as they are in the loaded world */
+G.tickFurnaces = (dt) => {
+  if (!G.furnaces) return;
+  const pre = G.dim + ':';
+  for (const k in G.furnaces) {
+    if (!k.startsWith(pre)) continue;
+    const f = G.furnaces[k];
+    const [x, y, z] = k.slice(pre.length).split(',').map(Number);
+    if (!G.world.isLoaded(x, z)) continue;
+    if (G.world.getBlock(x, y, z) !== ID.furnace) { delete G.furnaces[k]; continue; }
+    const can = furnaceCanSmelt(f);
+    if (f.burn <= 0 && can && f.slots[1] && FUEL[f.slots[1].id]) {
+      f.burn = f.burnMax = FUEL[f.slots[1].id];
+      if (--f.slots[1].count <= 0) f.slots[1] = null;
+    }
+    if (f.burn > 0) {
+      f.burn = Math.max(0, f.burn - dt);
+      if (can) {
+        f.cook += dt;
+        if (f.cook >= SMELT_TIME) {
+          f.cook = 0;
+          const [outId, n, xp] = SMELT[f.slots[0].id];
+          if (--f.slots[0].count <= 0) f.slots[0] = null;
+          if (f.slots[2]) f.slots[2].count += n; else f.slots[2] = { id: outId, count: n };
+          f.xp += xp;
+          if (G.player.pos.distanceTo(new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5)) < 16) Sound.play('smelt');
+        }
+      } else f.cook = 0;
+      if (Math.random() < dt * 3) G.particles.burst(x + 0.5, y + 0.4, z + 0.5, [0xff9a20, 0xffd060, 0x707070], 2, 0.4, 0.08, 1);
+    } else if (f.cook > 0) f.cook = Math.max(0, f.cook - dt * 2);
+  }
+  if (G.ui.furnace) G.ui.renderFurnace();
+};
+
 /* a chest that is broken spills what is inside */
 G.breakChest = (x, y, z, wasLoot) => {
   let slots = G.chestSlots(x, y, z, false);
@@ -605,7 +659,7 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.chests = {}; G.dimDrops = {};
+  G.pets = {}; G.pendingPets = []; G.chests = {}; G.dimDrops = {}; G.furnaces = {};
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -763,6 +817,7 @@ G.continueSaved = () => {
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether') useDim('nether'); else restoreDrops('overworld');
   G.chests = s.chests || {};
+  G.furnaces = s.furnaces || {};
   G.dimDrops = s.drops && typeof s.drops === 'object' ? s.drops : {};
   G.pets = Object.assign({}, s.pets || {});
   G.pendingPets = G.pets[G.dim] || [];
@@ -792,7 +847,7 @@ G.save = () => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(),
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
 };
@@ -885,6 +940,7 @@ function frame(now) {
   }
 
   const active = G.state === 'play';
+  if (active || G.state === 'inventory') G.tickFurnaces(dt); // furnaces keep smelting while a menu like the furnace is open
   if (active) {
     G.time = (G.time + dt / DAY_LENGTH) % 1;
     // look
