@@ -438,8 +438,18 @@ G.chestSlots = (x, y, z, create) => {
   if (!G.chests[k] && create) G.chests[k] = new Array(27).fill(null);
   return G.chests[k] || null;
 };
+/* chests are shared in multiplayer: every change bumps the chest's version and is sent to the others */
+G.chestKey = chestKey;
+G.chestChanged = (k) => {
+  G.chestVer = G.chestVer || {};
+  G.chestVer[k] = (G.chestVer[k] || 0) + 1;
+  Net.chestChanged(k);
+};
 G.openChest = (x, y, z) => {
-  const W = G.world, id = W.getBlock(x, y, z);
+  const W = G.world, id = W.getBlock(x, y, z), key = chestKey(x, y, z);
+  // one player at a time, so nobody can take the same item twice
+  const busy = Net.chestUser(key);
+  if (busy) { G.ui.message(busy + ' is using this chest. Wait until they close it.', 'purple'); return; }
   const slots = G.chestSlots(x, y, z, true);
   if (id === ID.chest_loot) {
     W.setBlock(x, y, z, ID.chest);
@@ -451,6 +461,7 @@ G.openChest = (x, y, z) => {
     }
     G.particles.burst(x + 0.5, y + 1, z + 0.5, [0xf5cc2e, 0xffffff, 0xfff3a0], 16, 2.5, 0.12);
     Sound.play('levelup');
+    G.chestChanged(key);
   } else Sound.play('click');
   G.ui.openInventory('chest', { slots, x, y, z });
 };
@@ -513,7 +524,7 @@ G.breakChest = (x, y, z, wasLoot) => {
   let slots = G.chestSlots(x, y, z, false);
   if (!slots && wasLoot) slots = rollLoot(mulberry32(hash3(x, y * 31 + z, G.seed + 77)), G.chestKind(x, y, z)).map(([id, count]) => ({ id, count }));
   if (slots) for (const s of slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5);
-  if (G.chests) delete G.chests[chestKey(x, y, z)];
+  if (G.chests && G.chests[chestKey(x, y, z)]) { delete G.chests[chestKey(x, y, z)]; G.chestChanged(chestKey(x, y, z)); }
 };
 
 G.summonDragon = (kind) => {
@@ -576,7 +587,8 @@ function spawnTick() {
     }
   }
   const night = G.isNight();
-  if (hostile < (night ? 9 : 4) && Math.random() < 0.4) {
+  const dm = G.diff().mobs;
+  if (dm > 0 && hostile < Math.round((night ? 9 : 4) * dm) && Math.random() < 0.4 * Math.min(1.5, dm)) {
     for (let tries = 0; tries < 4; tries++) {
       const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 20;
       const x = Math.floor(P.pos.x + Math.cos(a) * r), z = Math.floor(P.pos.z + Math.sin(a) * r);
@@ -609,7 +621,7 @@ function endSpawn(hostile) {
     G.ui.message('The Ender Dragon guards the End. Beat it to win!', 'purple');
     G.sound.play('dragonRoar', d.pos);
   }
-  if (hostile >= 6 || Math.random() > 0.3) return;
+  if (G.diff().mobs === 0 || hostile >= 6 || Math.random() > 0.3) return;
   const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 20;
   const x = Math.floor(P.pos.x + Math.cos(a) * r), z = Math.floor(P.pos.z + Math.sin(a) * r);
   if (!W.isLoaded(x, z)) return;
@@ -622,7 +634,8 @@ function netherSpawn(hostile) {
   const P = G.player, W = G.world;
   // a moment to look around after coming through the portal
   if (performance.now() - (G.arrivedAt || 0) < 12000) return;
-  if (hostile >= 7 || Math.random() > 0.45) return;
+  const dm = G.diff().mobs;
+  if (hostile >= Math.max(3, Math.round(7 * dm)) || Math.random() > 0.45) return;
   const ghasts = G.mobs.filter(m => m.type === 'ghast' && !m.dead).length;
   for (let tries = 0; tries < 4; tries++) {
     const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 20;
@@ -630,6 +643,7 @@ function netherSpawn(hostile) {
     if (!W.isLoaded(x, z)) continue;
     let type = pick(NETHER_POOL);
     if (type === 'ghast' && (ghasts >= 2 || r < 30)) type = 'zombified_piglin';
+    if (dm === 0 && MOB_TYPES[type].hostile) type = 'zombified_piglin'; // peaceful: only the piglins that leave you alone
     const T = MOB_TYPES[type];
     let y = -1;
     if (T.fly) {
@@ -730,7 +744,7 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.chests = {}; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
+  G.pets = {}; G.pendingPets = []; G.chests = {}; G.chestVer = {}; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -922,6 +936,7 @@ G.startNew = (mode) => {
   const txt = $('seed').value.trim();
   makeWorld(txt ? seedFromText(txt) : G.seed);
   P.inv = new Inventory(); P.reset(); P.mode = mode; P.sel = 0;
+  G.setDifficulty(G.pickedDifficulty(), true);
   const [sx, sz] = findSpawn(G.world);
   loadAround(sx, sz, 2);
   const sy = G.world.surfaceY(sx, sz) + 1;
@@ -962,6 +977,8 @@ G.continueSaved = () => {
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether' || s.dim === 'end') useDim(s.dim); else restoreDrops('overworld');
   G.chests = s.chests || {};
+  G.difficulty = G.DIFFS[s.difficulty] ? s.difficulty : 'normal';
+  G.chestVer = s.chestVer || {};
   G.furnaces = s.furnaces || {};
   G.dimDrops = s.drops && typeof s.drops === 'object' ? s.drops : {};
   G.pets = Object.assign({}, s.pets || {});
@@ -992,7 +1009,7 @@ G.save = () => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
 };
@@ -1035,6 +1052,25 @@ G.lockFailed = () => {
     G.ui.message('Mouse capture is not available here. Drag to look, click to place, hold the mouse to dig, right-click to use.');
   } else G.ui.message('Click the game to capture the mouse.');
 };
+/* difficulty: how many monsters, how hard they hit, how fast you get hungry and heal */
+G.DIFFS = {
+  peaceful: { name: 'Peaceful', dmg: 0.5, mobs: 0, hunger: 0, regen: 1, starve: 20 },
+  normal: { name: 'Normal', dmg: 1, mobs: 1, hunger: 1, regen: 2.5, starve: 2 },
+  hard: { name: 'Hard', dmg: 1.5, mobs: 1.5, hunger: 1.3, regen: 3.5, starve: 1 },
+  extreme: { name: 'Extreme', dmg: 2, mobs: 2, hunger: 1.6, regen: 5, starve: 0 },
+};
+G.difficulty = 'normal';
+G.diff = () => G.DIFFS[G.difficulty] || G.DIFFS.normal;
+G.mobDmg = n => Math.max(1, Math.round(n * G.diff().dmg));
+G.pickedDifficulty = () => { try { const v = localStorage.getItem('blockrealm-diff'); return G.DIFFS[v] ? v : 'normal'; } catch (e) { return 'normal'; } };
+G.setDifficulty = (d, quiet) => {
+  if (!G.DIFFS[d]) return;
+  G.difficulty = d;
+  try { localStorage.setItem('blockrealm-diff', d); } catch (e) { /* storage unavailable */ }
+  if (d === 'peaceful') for (const m of G.mobs) if (m.T.hostile && !m.remoteCtl) m.removeSilently();
+  if (!quiet) G.ui.message('Difficulty: ' + G.DIFFS[d].name, 'gold');
+};
+
 /* your skin: remembered on this device, shown on your body, your arm and to other players */
 G.loadSkin = () => { try { const v = parseInt(localStorage.getItem('blockrealm-skin'), 10); return v >= 0 && v < SKINS.length ? v : DEFAULT_SKIN; } catch (e) { return DEFAULT_SKIN; } };
 G.setSkin = (i, quiet) => {

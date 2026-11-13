@@ -72,6 +72,7 @@
       <h2 class="page-title">Singleplayer</h2>
       <button id="btn-continue" class="btn mc gold" type="button" hidden>Continue saved world</button>
       <div class="seed-slot"></div>
+      <div class="diff-slot"></div>
       <div class="mc-row">
         <button id="btn-play-seed-s" class="btn mc" type="button">New Survival World</button>
         <button id="btn-play-seed-c" class="btn mc" type="button">New Creative World</button>
@@ -85,6 +86,7 @@
       <h2 class="page-title">Multiplayer</h2>
       <p class="page-hint">Type the same world seed as your friends and press Join. Everyone with the same seed plays in the same world.</p>
       <div class="seed-slot"></div>
+      <div class="diff-slot"></div>
       <div class="mc-row">
         <button id="btn-mp-s" class="btn mc" type="button">Join in Survival</button>
         <button id="btn-mp-c" class="btn mc" type="button">Join in Creative</button>
@@ -120,6 +122,16 @@
       <button class="btn mc back" type="button" data-go="main">Back</button>
     </div>
 
+    <div id="diff-row" class="diff-row" hidden>
+      <span class="diff-label">Difficulty</span>
+      <div class="diff-btns">
+        <button type="button" class="btn diff" data-diff="peaceful">Peaceful</button>
+        <button type="button" class="btn diff" data-diff="normal">Normal</button>
+        <button type="button" class="btn diff" data-diff="hard">Hard</button>
+        <button type="button" class="btn diff" data-diff="extreme">Extreme</button>
+      </div>
+      <p id="diff-hint" class="diff-hint"></p>
+    </div>
     <div id="seed-row" class="seed-row">
       <label for="seed">World seed</label>
       <input id="seed" type="text" inputmode="text" autocomplete="off" spellcheck="false">
@@ -133,6 +145,7 @@
     <h2>Paused</h2>
     <button id="btn-resume" class="btn wide" type="button">Back to game</button>
     <button id="btn-mode" class="btn wide" type="button">Game mode</button>
+    <button id="btn-diff" class="btn wide" type="button">Difficulty</button>
     <button id="btn-dragon" class="btn wide gold" type="button">Summon a dragon</button>
     <button id="btn-time" class="btn wide" type="button">Make it night</button>
     <button id="btn-cam" class="btn wide" type="button">Camera: First person</button>

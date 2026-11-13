@@ -525,7 +525,7 @@ class Mob {
       this.yaw = Math.atan2(moveX, moveZ);
       if (golemDist < 2.6 && this.attackCd <= 0) {
         this.attackCd = 1.2; this.swingT = 0.5;
-        if (golemTarget === P) { P.hurt(T.dmg, this.pos, 10, true, 'An Iron Golem smashed you. Golems only fight you if you hit one first.'); P.vel.y = 9; }
+        if (golemTarget === P) { P.hurt(G.mobDmg(T.dmg), this.pos, 10, true, 'An Iron Golem smashed you. Golems only fight you if you hit one first.'); P.vel.y = 9; }
         else { golemTarget.hurt(15, this.pos, 10, false); golemTarget.vel.y = 9; }
         G.sound.play('golem', this.pos);
       }
@@ -573,7 +573,7 @@ class Mob {
       } else if (dist < 1.4 + this.w / 2 && Math.abs(toP.y) < 1.6 && this.attackCd <= 0) {
         this.attackCd = 1;
         G.lastAttacker = this;
-        P.hurt(T.dmg, this.pos, 6, false, 'A ' + T.name + ' attacked you.');
+        P.hurt(G.mobDmg(T.dmg), this.pos, 6, false, 'A ' + T.name + ' attacked you.');
       }
     } else {
       this.fuse = Math.max(0, this.fuse - dt);
@@ -895,7 +895,7 @@ class Dragon {
       speed = 21 * this.K.speed;
       target = new V3(P.pos.x, P.pos.y + 1.5, P.pos.z);
       if (dP < 5 || this.stateT > 6 || !pAlive || P.mode !== 'survival') {
-        if (dP < 6.5 && pAlive) P.hurt(5, this.pos, 14, false, 'The ' + this.name + ' swooped down on you.');
+        if (dP < 6.5 && pAlive) P.hurt(G.mobDmg(5), this.pos, 14, false, 'The ' + this.name + ' swooped down on you.');
         this.state = 'climb'; this.stateT = 0; this.nextAttack = 10 + Math.random() * 8;
       }
     } else {
@@ -1021,7 +1021,7 @@ class Projectile {
       const t = rayAABB(this.pos, dir, P.pos.x - 0.4, P.pos.y, P.pos.z - 0.4, P.pos.x + 0.4, P.pos.y + 1.8, P.pos.z + 0.4);
       if (t !== null && t < step + 0.2) {
         if (this.kind === 'fireball') { this.pos.addScaledVector(dir, t); return this.explodeHere(); }
-        P.hurt(this.kind === 'arrow' ? 3 : this.kind === 'smallfire' ? 4 : 2, this.pos, 4, false, this.kind === 'arrow' ? 'You were shot by an arrow.' : this.kind === 'smallfire' ? 'A Blaze fireball hit you.' : 'You were hit.');
+        P.hurt(G.mobDmg(this.kind === 'arrow' ? 3 : this.kind === 'smallfire' ? 4 : 2), this.pos, 4, false, this.kind === 'arrow' ? 'You were shot by an arrow.' : this.kind === 'smallfire' ? 'A Blaze fireball hit you.' : 'You were hit.');
         if (this.kind === 'smallfire' && P.mode === 'survival') P.fire = Math.max(P.fire, 3);
         return this.finish();
       }

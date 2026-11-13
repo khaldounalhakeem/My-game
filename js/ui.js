@@ -213,9 +213,12 @@ const UI = {
     }
     G.sound.play('click');
     inv.changed();
+    if (!other) this.chestEdited();
     this.renderInventory();
     this.moveCursor();
   },
+
+  chestEdited() { if (this.chest) G.chestChanged(G.chestKey(this.chest.x, this.chest.y, this.chest.z)); },
 
   /* shift-click from your inventory into the open chest */
   toChest(i) {
@@ -224,14 +227,14 @@ const UI = {
     for (let k = 0; k < 27 && s.count; k++) { const t = box[k]; if (t && t.id === s.id && t.count < max) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; } }
     for (let k = 0; k < 27 && s.count; k++) if (!box[k]) { box[k] = { id: s.id, count: s.count }; s.count = 0; }
     if (!s.count) inv.slots[i] = null;
-    G.sound.play('click'); inv.changed(); this.renderInventory();
+    G.sound.play('click'); inv.changed(); this.chestEdited(); this.renderInventory();
   },
 
   takeAll() {
     const box = this.chest && this.chest.slots, inv = G.player.inv;
     if (!box) return;
     for (let k = 0; k < 27; k++) if (box[k]) { const left = inv.add(box[k].id, box[k].count); if (left) box[k].count = left; else box[k] = null; }
-    G.sound.play('pickup'); inv.changed(); this.renderInventory();
+    G.sound.play('pickup'); inv.changed(); this.chestEdited(); this.renderInventory();
   },
 
   /* furnace slots: 0 = what to smelt, 1 = fuel, 2 = the result (you can only take from it) */
@@ -468,8 +471,22 @@ const UI = {
     const slot = document.querySelector('.title-page[data-page="' + name + '"] .seed-slot');
     $('seed-row').hidden = !slot;
     if (slot) slot.appendChild($('seed-row'));
+    const dslot = document.querySelector('.title-page[data-page="' + name + '"] .diff-slot');
+    $('diff-row').hidden = !dslot;
+    if (dslot) { dslot.appendChild($('diff-row')); this.renderDiff(); }
     if (name === 'skins') this.renderSkins();
     if (G.sound && G.state === 'title') G.sound.play('click');
+  },
+
+  renderDiff() {
+    const d = G.pickedDifficulty();
+    for (const b of document.querySelectorAll('[data-diff]')) b.classList.toggle('on', b.dataset.diff === d);
+    $('diff-hint').textContent = {
+      peaceful: 'No monsters, you never stay hungry, and you heal fast.',
+      normal: 'The usual game.',
+      hard: 'More monsters that hit harder, and you get hungry faster.',
+      extreme: 'Twice the monsters, they hit twice as hard, and starving can kill you.',
+    }[d];
   },
 
   renderSkins() {
@@ -501,6 +518,12 @@ const UI = {
 
   bindMenus() {
     for (const b of document.querySelectorAll('[data-go]')) b.addEventListener('click', () => this.titlePage(b.dataset.go));
+    for (const b of document.querySelectorAll('[data-diff]')) b.addEventListener('click', () => { try { localStorage.setItem('blockrealm-diff', b.dataset.diff); } catch (e) { /* storage unavailable */ } this.renderDiff(); });
+    $('btn-diff').addEventListener('click', () => {
+      const order = ['peaceful', 'normal', 'hard', 'extreme'];
+      G.setDifficulty(order[(order.indexOf(G.difficulty) + 1) % 4]);
+      this.syncPause();
+    });
     $('btn-mp-s').addEventListener('click', () => G.startNew('survival'));
     $('btn-mp-c').addEventListener('click', () => G.startNew('creative'));
     $('nick').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); e.stopPropagation(); });
@@ -538,6 +561,7 @@ const UI = {
   syncPause() {
     const P = G.player;
     $('btn-mode').textContent = 'Game mode: ' + (P.mode === 'survival' ? 'Survival' : 'Creative');
+    $('btn-diff').textContent = 'Difficulty: ' + G.diff().name;
     $('rd').value = G.world.renderDist; $('rd-val').textContent = G.world.renderDist;
     $('sens').value = Input.sens; $('sens-val').textContent = Input.sens.toFixed(1);
     $('btn-time').textContent = G.isNight() ? 'Make it day' : 'Make it night';

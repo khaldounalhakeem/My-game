@@ -218,6 +218,7 @@ class Player {
   /* like Minecraft: food also fills a hidden 'saturation' store that gets used up before the hunger bar */
   hungerDrain(n) {
     if (this.mode !== 'survival') return;
+    n *= G.diff().hunger;
     const fromSat = Math.min(this.saturation || 0, n);
     this.saturation = (this.saturation || 0) - fromSat;
     this.hunger = Math.max(0, this.hunger - (n - fromSat));
@@ -227,13 +228,15 @@ class Player {
     const W = G.world;
     const moving = Math.hypot(this.vel.x, this.vel.z) > 0.5;
     this.hungerDrain(dt * (this.sprinting ? 1 / 45 : moving ? 1 / 300 : 1 / 600));
-    if (this.hunger >= 17 && this.health < 20) {
+    const D = G.diff();
+    if (D.mobs === 0 && this.hunger < 20) this.hunger = Math.min(20, this.hunger + dt / 3); // peaceful: never hungry for long
+    if ((this.hunger >= 17 || D.mobs === 0) && this.health < 20) {
       this.regenT += dt;
-      if (this.regenT > 2.5) { this.regenT = 0; this.health = Math.min(20, this.health + 1); this.hungerDrain(0.25); }
+      if (this.regenT > D.regen) { this.regenT = 0; this.health = Math.min(20, this.health + 1); this.hungerDrain(0.25); }
     } else this.regenT = 0;
     if (this.hunger <= 0) {
       this.starveT += dt;
-      if (this.starveT > 4) { this.starveT = 0; if (this.health > 2) this.hurt(1, null, 0, true, 'You starved. Eat food when your hunger bar gets low.'); }
+      if (this.starveT > 4) { this.starveT = 0; if (this.health > G.diff().starve) this.hurt(1, null, 0, true, 'You starved. Eat food when your hunger bar gets low.'); }
     }
     if (this.headInWater) {
       this.air -= dt;

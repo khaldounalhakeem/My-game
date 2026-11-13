@@ -233,7 +233,7 @@ function makeMultiRoom(rooms, me) {
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
   world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0, blasts: [], blastSeq: 0,
-  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, askRing: [], askSeq: 0, giveRing: [], giveSeq: 0, gotDrops: new Set(), seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
+  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, askRing: [], askSeq: 0, chestRing: [], giveRing: [], giveSeq: 0, gotDrops: new Set(), seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
   nick: '', color: SHIRT_COLORS[0],
 
   async init() {
@@ -367,8 +367,9 @@ const Net = {
         ar: [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0)), ex: this.blasts,
         mb: this.slim ? null : this.ownedMobs(), mh: this.mobHits, dr: this.slim ? null : this.dropRing, pk: this.slim ? null : this.pickRing,
         rq: this.slim ? null : this.askRing, gv: this.slim ? null : this.giveRing,
+        cs: this.slim ? null : this.chestRing, oc: G.ui.chest ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
       });
-    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null });
+    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, cs: null, oc: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
@@ -591,6 +592,23 @@ const Net = {
     return [...this.peers.values()].filter(rp => rp.inWorld && rp.dim === 'overworld' && !rp.dead && !rp.sleeping).map(rp => rp.name || 'your friend');
   },
 
+  /* a chest changed here: send its whole contents with its version (the last 12 changed chests) */
+  chestChanged(key) {
+    if (!this.inShared()) return;
+    const slots = G.chests[key];
+    const entry = [key, (G.chestVer || {})[key] || 0, slots ? slots.map(s => (s ? [s.id, s.count] : 0)) : null];
+    this.chestRing = this.chestRing.filter(e => e[0] !== key);
+    this.chestRing.push(entry);
+    if (this.chestRing.length > 12) this.chestRing.shift();
+    this.sendT = 0;
+  },
+
+  /* the name of a friend who has this chest open right now, if any */
+  chestUser(key) {
+    for (const rp of this.peers.values()) if (rp.inWorld && rp.openChest === key) return rp.name || 'Your friend';
+    return null;
+  },
+
   /* is the player whose game dropped this item still here to hand it out? */
   ownerHere(owner) { const rp = this.peers.get(owner); return !!(rp && rp.inWorld); },
 
@@ -683,6 +701,23 @@ const Net = {
         if (e[0] > top) top = e[0];
       }
       rp.lastRq = top;
+    }
+    // chests they changed: take their version if it is newer than ours
+    rp.openChest = typeof pr.oc === 'string' ? pr.oc : null;
+    if (Array.isArray(pr.cs)) for (const e of pr.cs) {
+      if (!Array.isArray(e) || typeof e[0] !== 'string' || !Number.isInteger(e[1])) continue;
+      G.chestVer = G.chestVer || {}; G.chests = G.chests || {};
+      if (e[1] <= (G.chestVer[e[0]] || 0)) continue;
+      G.chestVer[e[0]] = e[1];
+      if (!Array.isArray(e[2])) { delete G.chests[e[0]]; continue; }
+      const slots = G.chests[e[0]] || (G.chests[e[0]] = new Array(27).fill(null));
+      for (let k = 0; k < 27; k++) { const v = e[2][k]; slots[k] = Array.isArray(v) && DEFS[v[0]] && v[1] > 0 ? { id: v[0], count: Math.min(64, v[1] | 0) } : null; }
+      if (G.ui.chest && G.ui.chest.slots === slots) G.ui.renderInventory();
+    }
+    // both opened the same chest at the same moment: the one with the smaller id keeps it
+    if (rp.openChest && G.ui.chest && rp.openChest === G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) && this.uid > rp.peer) {
+      G.ui.closeInventory();
+      G.ui.message((rp.name || 'Your friend') + ' opened this chest first.', 'purple');
     }
     // items they handed to us
     if (Array.isArray(pr.gv)) for (const e of pr.gv) {
