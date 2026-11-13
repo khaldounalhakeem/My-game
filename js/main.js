@@ -146,8 +146,7 @@ function setupRenderer() {
   G.handItem = new THREE.Mesh(itemGeometry(ID.stone), G.mats.held);
   G.handItem.renderOrder = 11; G.hand.add(G.handItem);
   G.handId = -2;
-  const pm = buildMobModel('player');
-  G.playerModel = pm; pm.group.visible = false; G.scene.add(pm.group);
+  G.setSkin(G.loadSkin(), true);
   G.camMode = 0;
 
   buildSky();
@@ -207,8 +206,17 @@ G.applyFog = () => {
   G.fogFar = far; G.fogNear = far * 0.55;
 };
 
-const C_NETHER = new THREE.Color(0x3a0c0c);
+const C_NETHER = new THREE.Color(0x3a0c0c), C_END = new THREE.Color(0x120c1c);
 function updateSky(dt) {
+  if (G.dim === 'end' && G.state !== 'title') {
+    G.sky.visible = false; G.clouds.visible = false;
+    G.scene.background = C_END;
+    G.scene.fog.color.copy(C_END);
+    G.scene.fog.near = G.fogNear * 0.6; G.scene.fog.far = G.fogFar * 1.1;
+    for (const k of ['opaque', 'trans', 'item', 'held']) G.mats[k].color.setScalar(0.85);
+    G.ambient.intensity = 0.8; G.sunLight.intensity = 0.15;
+    return;
+  }
   const netherView = G.dim === 'nether' && G.state !== 'title';
   G.sky.visible = !netherView; G.clouds.visible = !netherView;
   if (netherView) {
@@ -329,9 +337,9 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause, opts) => {
 /* right-click a bed: set your respawn point there and, at night, sleep until morning */
 G.sleep = (b) => {
   const P = G.player;
-  if (G.dim === 'nether') {
+  if (G.dim !== 'overworld') {
     G.world.setBlock(b.x, b.y, b.z, 0);
-    G.ui.message('Beds explode in the Nether!', 'purple');
+    G.ui.message('Beds explode outside the Overworld!', 'purple');
     G.explode(b.x + 0.5, b.y + 0.5, b.z + 0.5, 4, true, false, null, 'Your bed exploded. Beds blow up in the Nether.');
     return;
   }
@@ -339,14 +347,45 @@ G.sleep = (b) => {
   if (!G.isNight()) { G.ui.message('Respawn point set. You can only sleep at night.'); return; }
   const near = G.mobs.some(m => !m.dead && m.T.hostile && m.pos.distanceTo(P.pos) < 10);
   if (near) { G.ui.message('Respawn point set, but you can\'t sleep now: there are monsters nearby.'); return; }
+  // lie down; the night only ends once everyone in the world is in bed
+  P.sleeping = { x: b.x, y: b.y, z: b.z, t: 0 };
+  P.vel.set(0, 0, 0);
+  $('sleep-wait').hidden = false;
+  G.unlock(); // free the mouse so 'Leave bed' can be clicked
+  G.sleepTick(0);
+};
+
+const NO_INPUT = { moveX: 0, moveZ: 0 };
+G.wake = (msg) => {
+  const P = G.player;
+  if (!P.sleeping) return;
+  P.sleeping = null;
+  $('sleep-wait').hidden = true;
+  $('fx-sleep').classList.remove('on', 'half');
+  if (msg) G.ui.message(msg, 'gold');
+};
+G.sleepTick = (dt) => {
+  const P = G.player;
+  if (!P.sleeping) return;
+  if (P.dead || G.dim !== 'overworld' || G.world.getBlock(P.sleeping.x, P.sleeping.y, P.sleeping.z) !== ID.bed) return G.wake();
+  if (!G.isNight()) return G.wake('Good morning!');
+  if (Input.jump) return G.wake();
+  const waiting = Net.notSleeping();
   const fx = $('fx-sleep');
-  fx.classList.add('on');
-  setTimeout(() => {
-    G.time = 0.02; G.timeEventAt = Date.now();
-    fx.classList.remove('on');
-    G.ui.message('You slept through the night. Good morning!', 'gold');
-    G.save();
-  }, 1600);
+  if (waiting.length) {
+    P.sleeping.t = 0;
+    fx.classList.add('half'); fx.classList.remove('on');
+    $('sleep-text').textContent = 'Sleeping... waiting for ' + waiting.join(' and ') + ' to get in bed.';
+  } else {
+    P.sleeping.t += dt;
+    fx.classList.add('on'); fx.classList.remove('half');
+    $('sleep-text').textContent = 'Sleeping...';
+    if (P.sleeping.t > 1.6) {
+      G.time = 0.02; G.timeEventAt = Date.now();
+      G.wake('Everyone slept through the night. Good morning!');
+      G.save();
+    }
+  }
 };
 
 /* a pumpkin placed on a T of four iron blocks comes alive as an iron golem */
@@ -382,6 +421,7 @@ G.chestKind = (x, y, z) => {
   }
   if (shelves >= 4) return 'library';
   if (G.dim === 'nether') return 'ruined_portal';
+  if (G.dim === 'end') return 'library';
   const cx = Math.floor(x / 16), cz = Math.floor(z / 16);
   if (W.villageAt && W.villageAt(cx, cz)) return 'village';
   if (W.regionPick) {
@@ -479,7 +519,7 @@ G.breakChest = (x, y, z, wasLoot) => {
 G.summonDragon = (kind) => {
   if (G.dim !== 'nether') { G.ui.message('Dragons can only be summoned in the Nether. Build an obsidian portal and light it with Flint and Steel.', 'purple'); return false; }
   if (G.dragons.some(d => !d.done)) { G.ui.message('A dragon is already flying around!', 'purple'); return false; }
-  kind = kind || ['ender', 'fire', 'ice'][(Math.random() * 3) | 0];
+  kind = kind && kind !== 'ender' ? kind : ['fire', 'ice'][(Math.random() * 2) | 0];
   const P = G.player;
   const center = new THREE.Vector3(P.pos.x, G.world.groundY(P.pos.x, P.pos.z), P.pos.z);
   const d = new Dragon(kind, center);
@@ -518,9 +558,10 @@ function spawnTick() {
     if (d > (m.T.passive ? 96 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
   }
-  if (G.dim === 'nether') { if (hostile < 12) netherSpawn(); return; }
+  if (G.dim === 'nether') { netherSpawn(hostile); return; }
+  if (G.dim === 'end') { endSpawn(hostile); return; }
   structureSpawns();
-  if (passive < 12 && Math.random() < 0.4) {
+  if (passive < 10 && Math.random() < 0.12) {
     const a = Math.random() * Math.PI * 2, r = 20 + Math.random() * 25;
     const x = Math.floor(P.pos.x + Math.cos(a) * r) + 0.5, z = Math.floor(P.pos.z + Math.sin(a) * r) + 0.5;
     if (W.isLoaded(x, z)) {
@@ -535,9 +576,9 @@ function spawnTick() {
     }
   }
   const night = G.isNight();
-  if (hostile < (night ? 14 : 6)) {
+  if (hostile < (night ? 9 : 4) && Math.random() < 0.4) {
     for (let tries = 0; tries < 4; tries++) {
-      const a = Math.random() * Math.PI * 2, r = 16 + Math.random() * 26;
+      const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 20;
       const x = Math.floor(P.pos.x + Math.cos(a) * r), z = Math.floor(P.pos.z + Math.sin(a) * r);
       if (!W.isLoaded(x, z)) continue;
       const top = W.surfaceY(x, z);
@@ -559,13 +600,37 @@ function spawnTick() {
 }
 
 const NETHER_POOL = [['zombified_piglin', 40], ['wither_skeleton', 14], ['blaze', 16], ['ghast', 7]];
-function netherSpawn() {
+/* the End: endermen wander the island, and the dragon guards it until it is beaten */
+function endSpawn(hostile) {
   const P = G.player, W = G.world;
+  if (!G.endDragonDead && !G.dragons.some(d => !d.dead && d.kind === 'ender')) {
+    const d = new Dragon('ender', new THREE.Vector3(0, 54, 0));
+    G.dragons.push(d);
+    G.ui.message('The Ender Dragon guards the End. Beat it to win!', 'purple');
+    G.sound.play('dragonRoar', d.pos);
+  }
+  if (hostile >= 6 || Math.random() > 0.3) return;
+  const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 20;
+  const x = Math.floor(P.pos.x + Math.cos(a) * r), z = Math.floor(P.pos.z + Math.sin(a) * r);
+  if (!W.isLoaded(x, z)) return;
+  const top = W.endTop ? W.endTop(x, z) : -1;
+  if (top < 0 || W.getBlock(x, top + 1, z) || W.getBlock(x, top + 2, z) || W.getBlock(x, top + 3, z)) return;
+  spawnMob('enderman', x + 0.5, top + 1, z + 0.5);
+}
+
+function netherSpawn(hostile) {
+  const P = G.player, W = G.world;
+  // a moment to look around after coming through the portal
+  if (performance.now() - (G.arrivedAt || 0) < 12000) return;
+  if (hostile >= 7 || Math.random() > 0.45) return;
+  const ghasts = G.mobs.filter(m => m.type === 'ghast' && !m.dead).length;
   for (let tries = 0; tries < 4; tries++) {
-    const a = Math.random() * Math.PI * 2, r = 14 + Math.random() * 22;
+    const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 20;
     const x = Math.floor(P.pos.x + Math.cos(a) * r), z = Math.floor(P.pos.z + Math.sin(a) * r);
     if (!W.isLoaded(x, z)) continue;
-    const type = pick(NETHER_POOL), T = MOB_TYPES[type];
+    let type = pick(NETHER_POOL);
+    if (type === 'ghast' && (ghasts >= 2 || r < 30)) type = 'zombified_piglin';
+    const T = MOB_TYPES[type];
     let y = -1;
     if (T.fly) {
       const need = type === 'ghast' ? 6 : 3;
@@ -581,6 +646,12 @@ function netherSpawn() {
       }
     }
     if (y < 0) continue;
+    // like Minecraft: blazes and wither skeletons only live in nether fortresses
+    if (type === 'blaze' || type === 'wither_skeleton') {
+      let brick = false;
+      for (let dy = -6; dy <= 1 && !brick; dy++) for (let d = -2; d <= 2 && !brick; d++) if (W.getBlock(x + d, y + dy, z) === ID.nether_bricks || W.getBlock(x, y + dy, z + d) === ID.nether_bricks) brick = true;
+      if (!brick) continue;
+    }
     spawnMob(type, x + 0.5, y, z + 0.5);
     break;
   }
@@ -652,14 +723,14 @@ function makeWorld(seed, legacy) {
   clearEntities();
   const rd = G.world ? G.world.renderDist : (Input.touch ? 4 : 5);
   G.worlds = {};
-  for (const dim of ['overworld', 'nether']) {
+  for (const dim of ['overworld', 'nether', 'end']) {
     const w = new World(seed, G.mats, dim, legacy);
     w.renderDist = rd;
     w.onEdit = (x, y, z, id) => Net.edit(dim, x, y, z, id);
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.chests = {}; G.dimDrops = {}; G.furnaces = {};
+  G.pets = {}; G.pendingPets = []; G.chests = {}; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -726,6 +797,7 @@ G.switchDimension = (to) => {
     }
   }
   P.vel.set(0, 0, 0); P.fallStart = null; P.portalT = 0; P.portalCd = true;
+  G.arrivedAt = performance.now();
   Sound.play('teleport');
   if (to === 'nether') {
     G.ui.message('Welcome to the Nether! Watch out for lava, ghasts and blazes.', 'purple');
@@ -733,6 +805,77 @@ G.switchDimension = (to) => {
     G.netherVisited = true;
   } else G.ui.message('Back in the Overworld.', 'gold');
   G.save();
+};
+
+/* jump into an End portal: off to the End (or home again from it) */
+G.enterEnd = () => {
+  const P = G.player;
+  useDim('end');
+  loadAround(60, 0, 2);
+  const W = G.world, y = Math.max(W.endTop(60, 0), 50) + 1;
+  for (let x = 58; x <= 62; x++) for (let z = -2; z <= 2; z++) for (let k = 0; k < 3; k++) W.setBlock(x, y + k, z, 0);
+  P.pos.set(60.5, y, 0.5); P.yaw = Math.PI / 2;
+  P.vel.set(0, 0, 0); P.fallStart = null; P.portalCd = true;
+  G.arrivedAt = performance.now();
+  Sound.play('teleport');
+  G.ui.message('Welcome to the End! The Ender Dragon lives here. Hit it when it swoops, or shoot it with arrows.', 'purple');
+  G.save();
+};
+G.leaveEnd = () => {
+  const P = G.player;
+  useDim('overworld');
+  P.pos.copy(P.spawn);
+  loadAround(P.pos.x, P.pos.z, 2);
+  if (G.world.collides(P.pos.x, P.pos.y, P.pos.z, P.w, P.h)) P.pos.y = G.world.groundY(P.pos.x, P.pos.z) + 1;
+  P.vel.set(0, 0, 0); P.fallStart = null; P.portalCd = true;
+  Sound.play('teleport');
+  G.ui.message('Back home in the Overworld.', 'gold');
+  G.save();
+};
+/* the dragon is beaten: a portal home opens in the middle of the island */
+G.endDragonBeaten = () => {
+  G.endDragonDead = true;
+  const W = G.worlds.end, y = Math.max(W.endTop(0, 0), 50) + 1;
+  for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) {
+    if (Math.hypot(x, z) > 3.6) continue;
+    W.setBlock(x, y - 1, z, ID.bedrock);
+    for (let k = 0; k < 4; k++) W.setBlock(x, y + k, z, 0);
+    if (Math.hypot(x, z) > 2.5) W.setBlock(x, y, z, ID.bedrock);
+    else W.setBlock(x, y, z, ID.end_portal);
+  }
+  for (let k = 0; k < 4; k++) W.setBlock(0, y + k, 0, ID.bedrock);
+  W.setBlock(0, y + 4, 0, ID.dragon_egg);
+  G.ui.message('You beat the Ender Dragon! A portal home has opened in the middle of the island.', 'gold');
+  G.save();
+};
+
+/* put an Eye of Ender in a frame; when all 12 frames around the 3 by 3 hole have one, the portal opens */
+G.fillEndFrame = (x, y, z) => {
+  const W = G.world;
+  W.setBlock(x, y, z, ID.end_portal_frame_eye);
+  G.particles.burst(x + 0.5, y + 1, z + 0.5, [0x46c98a, 0x9a4ad8], 10, 1.5, 0.08);
+  for (let cx = x - 4; cx <= x + 4; cx++) for (let cz = z - 4; cz <= z + 4; cz++) {
+    let ok = true;
+    for (let i = -1; i <= 1 && ok; i++) for (const [fx, fz] of [[cx + i, cz - 2], [cx + i, cz + 2], [cx - 2, cz + i], [cx + 2, cz + i]]) if (W.getBlock(fx, y, fz) !== ID.end_portal_frame_eye) { ok = false; break; }
+    if (!ok) continue;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) W.setBlock(cx + i, y, cz + j, ID.end_portal);
+    Sound.play('dragonRoar', new THREE.Vector3(cx, y, cz));
+    G.ui.message('The End portal is open! Jump in to go to the End.', 'purple');
+    return;
+  }
+  G.ui.message('The eye fits into the frame.', 'purple');
+};
+
+/* throw an Eye of Ender: it flies toward the nearest stronghold */
+G.throwEye = () => {
+  const P = G.player;
+  if (G.dim !== 'overworld') { G.ui.message('Eyes of Ender only find strongholds in the Overworld.', 'purple'); return false; }
+  const s = G.world.nearestStronghold(P.pos.x, P.pos.z);
+  const from = new THREE.Vector3(P.pos.x, P.pos.y + 1.5, P.pos.z);
+  G.projectiles.push(new EyeOfEnder(from, s));
+  const d = Math.round(Math.hypot(s.x - P.pos.x, s.z - P.pos.z));
+  if (d < 14) G.ui.message('The eye sinks into the ground: the stronghold is right below you! Dig down.', 'purple');
+  return true;
 };
 
 G.respawnPlayer = () => {
@@ -814,8 +957,10 @@ G.continueSaved = () => {
   makeWorld(s.seed, !s.gen); // saves from before seed personalities keep their old landscape
   G.worlds.overworld.loadEdits(s.edits || {});
   G.worlds.nether.loadEdits(s.netherEdits || {});
+  G.worlds.end.loadEdits(s.endEdits || {});
+  G.endDragonDead = !!s.endDragonDead;
   G.netherVisited = !!s.netherVisited;
-  if (s.dim === 'nether') useDim('nether'); else restoreDrops('overworld');
+  if (s.dim === 'nether' || s.dim === 'end') useDim(s.dim); else restoreDrops('overworld');
   G.chests = s.chests || {};
   G.furnaces = s.furnaces || {};
   G.dimDrops = s.drops && typeof s.drops === 'object' ? s.drops : {};
@@ -845,7 +990,7 @@ G.save = () => {
     v: 1, seed: G.seed, mode: P.mode, time: G.time, dragonTimer: G.dragonTimer,
     pos: P.pos.toArray(), spawn: P.spawn.toArray(), yaw: P.yaw, pitch: P.pitch,
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
-    inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(),
+    inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
     dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
@@ -890,6 +1035,20 @@ G.lockFailed = () => {
     G.ui.message('Mouse capture is not available here. Drag to look, click to place, hold the mouse to dig, right-click to use.');
   } else G.ui.message('Click the game to capture the mouse.');
 };
+/* your skin: remembered on this device, shown on your body, your arm and to other players */
+G.loadSkin = () => { try { const v = parseInt(localStorage.getItem('blockrealm-skin'), 10); return v >= 0 && v < SKINS.length ? v : DEFAULT_SKIN; } catch (e) { return DEFAULT_SKIN; } };
+G.setSkin = (i, quiet) => {
+  G.skin = i >= 0 && i < SKINS.length ? i : DEFAULT_SKIN;
+  try { localStorage.setItem('blockrealm-skin', String(G.skin)); } catch (e) { /* storage unavailable */ }
+  const was = G.playerModel;
+  if (was) G.scene.remove(was.group);
+  const pm = buildPlayerModel(G.skin);
+  pm.group.visible = was ? was.group.visible : false;
+  G.playerModel = pm; G.scene.add(pm.group);
+  if (G.handArm) G.handArm.material.color.setHex(SKINS[G.skin].s);
+  if (!quiet && Net.announce) Net.announce();
+};
+
 G.unlock = () => { if (document.pointerLockElement) document.exitPointerLock(); };
 G.pause = () => {
   if (G.state !== 'play') return;
@@ -949,7 +1108,8 @@ function frame(now) {
     P.pitch = clamp(P.pitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
     G.ui.readMovement();
     const ready = G.world.isLoaded(P.pos.x, P.pos.z) && !G.world.chunks.get(G.world.key(Math.floor(P.pos.x) >> 4, Math.floor(P.pos.z) >> 4)).dirty;
-    if (ready) P.update(dt, Input);
+    if (ready) P.update(dt, P.sleeping ? NO_INPUT : Input);
+    if (P.sleeping) G.sleepTick(dt);
 
     // interaction
     const aimPt = Input.tap || Input.aim;
@@ -994,6 +1154,8 @@ function frame(now) {
         P.portalT = (P.portalT || 0) + dt;
         if (P.portalT > (P.mode === 'creative' ? 0.8 : 2.2)) G.switchDimension(G.dim === 'nether' ? 'overworld' : 'nether');
       }
+    } else if (!P.dead && G.world.touching(P, ID.end_portal, 0)) {
+      if (!P.portalCd) { if (G.dim === 'end') G.leaveEnd(); else G.enterEnd(); }
     } else { P.portalT = 0; P.portalCd = false; }
     $('fx-portal').style.opacity = clamp((P.portalT || 0) / 2, 0, 0.85);
 
@@ -1006,7 +1168,7 @@ function frame(now) {
     if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); }
     if (!G.dragons.length && G.dim === 'nether' && Net.isHost()) {
       G.dragonTimer -= dt;
-      if (G.dragonTimer <= 0) { G.dragonTimer = 240; G.summonDragon(G.firstDragonDone ? null : 'ender'); G.firstDragonDone = true; }
+      if (G.dragonTimer <= 0) { G.dragonTimer = 240; G.summonDragon(null); }
     }
     G.saveT += dt;
     if (G.saveT > 30) { G.saveT = 0; G.save(); }

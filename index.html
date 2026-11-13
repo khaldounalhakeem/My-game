@@ -34,6 +34,7 @@
 <div id="dmg-popup" aria-live="polite"></div>
 <div id="fx-portal" class="fx"></div>
 <div id="fx-sleep" class="fx"></div>
+<div id="sleep-wait" hidden><p id="sleep-text">Sleeping...</p><button id="btn-wake" class="btn" type="button">Leave bed</button></div>
 <div id="padcursor" aria-hidden="true"></div>
 
 <div id="touch">
@@ -48,36 +49,81 @@
 </div>
 
 <section id="menu-start" class="screen title">
+  <label class="name-chip" for="nick" title="Tap to change your name">
+    <span id="name-face" class="name-face"></span>
+    <input id="nick" type="text" maxlength="16" autocomplete="off" spellcheck="false" aria-label="Your name">
+    <span class="name-edit" aria-hidden="true">&#9998;</span>
+  </label>
   <div class="title-wrap">
     <h1 class="logo">Block<span>Realm</span></h1>
     <p class="tag">Dig for gold. Build anything. Survive the night. Slay the dragon.</p>
-    <div class="play-row">
-      <button id="btn-survival" class="btn big" type="button"><b>Survival</b><small>Health, hunger, crafting, mobs</small></button>
-      <button id="btn-creative" class="btn big" type="button"><b>Creative</b><small>Every block, flying, no damage</small></button>
+
+    <div class="title-page" data-page="main">
+      <button class="btn mc" type="button" data-go="single">Singleplayer</button>
+      <button class="btn mc" type="button" data-go="multi">Multiplayer</button>
+      <button class="btn mc" type="button" data-go="skins">Skins</button>
+      <div class="mc-row">
+        <button class="btn mc" type="button" data-go="howto">How to Play</button>
+        <button class="btn mc" type="button" data-go="about">About</button>
+      </div>
     </div>
-    <button id="btn-continue" class="btn wide" type="button" hidden>Continue saved world</button>
-    <div class="seed-row">
-      <label for="nick">Your name</label>
-      <input id="nick" type="text" maxlength="16" autocomplete="off" spellcheck="false">
+
+    <div class="title-page" data-page="single" hidden>
+      <h2 class="page-title">Singleplayer</h2>
+      <button id="btn-continue" class="btn mc gold" type="button" hidden>Continue saved world</button>
+      <div class="seed-slot"></div>
+      <div class="mc-row">
+        <button id="btn-play-seed-s" class="btn mc" type="button">New Survival World</button>
+        <button id="btn-play-seed-c" class="btn mc" type="button">New Creative World</button>
+      </div>
+      <button id="btn-survival" class="btn" type="button" hidden>Survival</button>
+      <button id="btn-creative" class="btn" type="button" hidden>Creative</button>
+      <button class="btn mc back" type="button" data-go="main">Back</button>
     </div>
-    <div class="seed-row">
+
+    <div class="title-page" data-page="multi" hidden>
+      <h2 class="page-title">Multiplayer</h2>
+      <p class="page-hint">Type the same world seed as your friends and press Join. Everyone with the same seed plays in the same world.</p>
+      <div class="seed-slot"></div>
+      <div class="mc-row">
+        <button id="btn-mp-s" class="btn mc" type="button">Join in Survival</button>
+        <button id="btn-mp-c" class="btn mc" type="button">Join in Creative</button>
+      </div>
+      <a id="web-link" class="btn wide gold web-link" href="https://raw.githack.com/khaldounalhakeem/My-game/blockrealm-game/index.html" target="_blank" rel="noopener" hidden>Play online with friends, no account needed (opens the BlockRealm website)</a>
+      <div class="net-row"><p id="net-status" class="net-status"></p><button id="net-btn" class="btn gold" type="button" hidden>Turn on multiplayer</button><div id="net-friends" class="net-friends"></div></div>
+      <button class="btn mc back" type="button" data-go="main">Back</button>
+    </div>
+
+    <div class="title-page" data-page="skins" hidden>
+      <h2 class="page-title">Skins</h2>
+      <div class="skin-top"><canvas id="skin-preview" width="96" height="192"></canvas><div><p id="skin-name" class="skin-name"></p><p class="page-hint">Tap a skin to wear it. Your friends see it too.</p></div></div>
+      <div id="skin-grid" class="skin-grid"></div>
+      <button class="btn mc back" type="button" data-go="main">Done</button>
+    </div>
+
+    <div class="title-page" data-page="howto" hidden>
+      <h2 class="page-title">How to Play</h2>
+      <div class="howto">
+        <div><kbd>W A S D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>Shift</kbd> sprint &middot; <kbd>C</kbd> sneak</div>
+        <div><kbd>Left click</kbd> mine / attack &middot; <kbd>Right click</kbd> place / use / eat</div>
+        <div><kbd>E</kbd> inventory &amp; crafting &middot; <kbd>1-9</kbd> or wheel: hotbar &middot; <kbd>Q</kbd> drop</div>
+        <div>Creative: double-tap <kbd>Space</kbd> or <kbd>F</kbd> to fly &middot; <kbd>V</kbd> camera &middot; <kbd>Esc</kbd> pause</div>
+        <div class="touch-only">Touch: tap a block to place, hold on a block to mine, tap a mob to hit, drag to look.</div>
+        <div class="pad-line">PS4 controller: connect it by Bluetooth and press any button.</div>
+      </div>
+      <button class="btn mc back" type="button" data-go="main">Back</button>
+    </div>
+
+    <div class="title-page" data-page="about" hidden>
+      <h2 class="page-title">About</h2>
+      <p class="page-hint">BlockRealm is a fan-made block building game. Find blaze rods in Nether fortresses and ender pearls from endermen, craft Eyes of Ender, follow them to a stronghold, and open the portal to the End to fight the Ender Dragon.</p>
+      <button class="btn mc back" type="button" data-go="main">Back</button>
+    </div>
+
+    <div id="seed-row" class="seed-row">
       <label for="seed">World seed</label>
       <input id="seed" type="text" inputmode="text" autocomplete="off" spellcheck="false">
-      <button id="btn-random" class="btn" type="button">Random seed</button>
-    </div>
-    <div class="play-row">
-      <button id="btn-play-seed-s" class="btn" type="button">Play this seed in Survival</button>
-      <button id="btn-play-seed-c" class="btn" type="button">Play this seed in Creative</button>
-    </div>
-    <a id="web-link" class="btn wide gold web-link" href="https://raw.githack.com/khaldounalhakeem/My-game/blockrealm-game/index.html" target="_blank" rel="noopener" hidden>Play online with friends, no account needed (opens the BlockRealm website)</a>
-    <div class="net-row"><p id="net-status" class="net-status"></p><button id="net-btn" class="btn gold" type="button" hidden>Turn on multiplayer</button><div id="net-friends" class="net-friends"></div></div>
-    <div class="howto">
-      <div><kbd>W A S D</kbd> move &middot; <kbd>Space</kbd> jump &middot; <kbd>Shift</kbd> sprint &middot; <kbd>C</kbd> sneak</div>
-      <div><kbd>Left click</kbd> mine / attack &middot; <kbd>Right click</kbd> place / use / eat</div>
-      <div><kbd>E</kbd> inventory &amp; crafting &middot; <kbd>1-9</kbd> or wheel: hotbar &middot; <kbd>Q</kbd> drop</div>
-      <div>Creative: double-tap <kbd>Space</kbd> or <kbd>F</kbd> to fly &middot; <kbd>V</kbd> camera &middot; <kbd>Esc</kbd> pause</div>
-      <div class="touch-only">Touch: tap a block to place, hold on a block to mine, tap a mob to hit, drag to look.</div>
-      <div class="pad-line">PS4 controller: connect it by Bluetooth and press any button.</div>
+      <button id="btn-random" class="btn" type="button">Random</button>
     </div>
   </div>
 </section>
@@ -159,6 +205,7 @@
 <script src="js/blocks.js"></script>
 <script src="js/world.js"></script>
 <script src="js/structures.js"></script>
+<script src="js/skins.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/player.js"></script>
 <script src="js/ui.js"></script>

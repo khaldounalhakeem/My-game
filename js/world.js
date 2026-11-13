@@ -44,6 +44,7 @@ class World {
   constructor(seed, materials, dim, legacy) {
     this.dim = dim || 'overworld';
     if (this.dim === 'nether') seed = (seed ^ 0x2f6e2b1) + 7;
+    if (this.dim === 'end') seed = (seed ^ 0x51e3d0c9) + 13;
     this.seed = seed >>> 0;
     this.noise = new Noise(this.seed);
     this.noiseB = new Noise((this.seed ^ 0x5bd1e995) >>> 0);
@@ -269,6 +270,7 @@ class World {
   /* ---------- generation ---------- */
   generate(cx, cz) {
     if (this.dim === 'nether') return this.generateNether(cx, cz);
+    if (this.dim === 'end') return this.generateEnd(cx, cz);
     const c = new Chunk(cx, cz);
     const d = c.data;
     const rng = mulberry32(hash3(cx, cz, this.seed));
@@ -387,6 +389,48 @@ class World {
     if (m) for (const [i, id] of m) d[i] = id;
 
     c.heights = heights;
+    this.chunks.set(this.key(cx, cz), c);
+    return c;
+  }
+
+  /* the End: one big island of end stone floating over the void, ringed by obsidian pillars */
+  endPillars() {
+    if (this.pillars) return this.pillars;
+    const r = mulberry32(this.seed + 5);
+    this.pillars = [];
+    for (let i = 0; i < 10; i++) {
+      const a = i / 10 * Math.PI * 2;
+      this.pillars.push({ x: Math.round(Math.cos(a) * 40), z: Math.round(Math.sin(a) * 40), r: 2 + (r() * 3 | 0), top: 66 + (r() * 22 | 0) });
+    }
+    return this.pillars;
+  }
+  endTop(wx, wz) {
+    const d = Math.hypot(wx, wz), edge = 72 + this.noise.fbm2(wx / 40, wz / 40, 2) * 14;
+    if (d > edge) return -1;
+    return Math.floor(50 + (1 - (d / edge) ** 2) * 5 + this.noiseB.fbm2(wx / 25, wz / 25, 2) * 2);
+  }
+  generateEnd(cx, cz) {
+    const c = new Chunk(cx, cz);
+    const d = c.data;
+    const heights = new Int16Array(256);
+    const set = (x, y, z, id) => { if (x >= 0 && x < 16 && z >= 0 && z < 16 && y > 0 && y < WH) d[x + (z << 4) + (y << 8)] = id; };
+    for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+      const wx = cx * 16 + x, wz = cz * 16 + z, top = this.endTop(wx, wz);
+      heights[x + z * 16] = Math.max(top, 0);
+      if (top < 0) continue;
+      const dist = Math.hypot(wx, wz), depth = 6 + Math.floor((1 - Math.min(1, dist / 80)) * 24);
+      for (let y = top - depth; y <= top; y++) set(x, y, z, ID.end_stone);
+      for (const p of this.endPillars()) {
+        if (Math.hypot(wx - p.x, wz - p.z) <= p.r + 0.3) {
+          for (let y = top + 1; y <= p.top; y++) set(x, y, z, ID.obsidian);
+          heights[x + z * 16] = p.top;
+        }
+      }
+    }
+    c.heights = heights;
+    // apply player edits
+    const m = this.edits.get(this.key(cx, cz));
+    if (m) for (const [i, id] of m) d[i] = id;
     this.chunks.set(this.key(cx, cz), c);
     return c;
   }

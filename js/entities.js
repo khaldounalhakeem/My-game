@@ -71,6 +71,63 @@ function headMats(type, baseColor) {
   return [side, side, side, side, front, side];
 }
 
+/* ---------- a player wearing one of the skins ---------- */
+function buildPlayerModel(skinIdx) {
+  const sk = skinOf(skinIdx), g = new THREE.Group(), P = { legs: [], arms: [], head: null, wings: [] };
+  const M = c => lam(c);
+  const mSkin = M(sk.s), mShirt = M(sk.t), mPants = M(sk.p), mShoe = M(sk.b), mDetail = M(sk.t2 !== undefined ? sk.t2 : sk.t);
+  const lw = 0.25, legL = 0.75, bodyH = 0.75, hip = legL, shoulder = hip + bodyH - 0.1, armL = 0.72;
+  P.legs.push(limb(g, lw, legL, lw, mPants, -0.125, hip, 0), limb(g, lw, legL, lw, mPants, 0.125, hip, 0));
+  for (const l of P.legs) addBox(l, lw + 0.01, 0.16, lw + 0.01, mShoe, 0, -legL + 0.08, 0);
+  addBox(g, 0.5, bodyH, 0.25, mShirt, 0, hip + bodyH / 2, 0);
+  P.arms.push(limb(g, lw, armL, lw, mSkin, -0.25 - lw / 2, shoulder, 0), limb(g, lw, armL, lw, mSkin, 0.25 + lw / 2, shoulder, 0));
+  for (const a of P.arms) addBox(a, lw + 0.02, sk.tp === 'robe' || sk.tp === 'coat' ? 0.55 : 0.3, lw + 0.02, mShirt, 0, sk.tp === 'robe' || sk.tp === 'coat' ? -0.25 : -0.12, 0);
+  const bodyY = hip + bodyH / 2, front = 0.13;
+  // shirt details
+  switch (sk.tp) {
+    case 'stripe': addBox(g, 0.52, 0.12, 0.27, mDetail, 0, bodyY + 0.08, 0); break;
+    case 'belt': addBox(g, 0.52, 0.07, 0.27, mDetail, 0, hip + 0.06, 0); break;
+    case 'vest': for (const x of [-0.18, 0.18]) addBox(g, 0.14, bodyH, 0.02, mDetail, x, bodyY, front); break;
+    case 'tie': addBox(g, 0.08, 0.42, 0.02, mDetail, 0, bodyY + 0.12, front); break;
+    case 'coat': for (const x of [-0.22, 0.22]) addBox(g, 0.06, bodyH, 0.02, mDetail, x, bodyY, front); addBox(g, 0.52, bodyH * 0.6, 0.27, mShirt, 0, hip - 0.15, 0); break;
+    case 'robe': addBox(g, 0.08, bodyH, 0.02, mDetail, 0, bodyY, front); addBox(g, 0.52, 0.55, 0.28, mShirt, 0, hip - 0.2, 0); addBox(g, 0.53, 0.05, 0.29, mDetail, 0, hip - 0.45, 0); break;
+    case 'overalls': addBox(g, 0.32, 0.4, 0.02, mDetail, 0, hip + 0.2, front); for (const x of [-0.13, 0.13]) addBox(g, 0.05, 0.36, 0.02, mDetail, x, hip + 0.55, front); break;
+    case 'plaid': for (const y of [-0.25, 0, 0.25]) addBox(g, 0.52, 0.04, 0.27, mDetail, 0, bodyY + y, 0); for (const x of [-0.13, 0.13]) addBox(g, 0.04, bodyH, 0.27, mDetail, x, bodyY, 0.002); break;
+    case 'zip': addBox(g, 0.04, bodyH, 0.02, mDetail, 0, bodyY, front); break;
+  }
+  if (sk.cape !== undefined) addBox(g, 0.5, 1.05, 0.04, M(sk.cape), 0, shoulder + 0.05 - 0.52, -0.16);
+  // head with the skin's face
+  const tex = faceTex('skin_face_' + SKINS.indexOf(sk), 8, px => drawSkinFace(px, sk));
+  const hairM = M(sk.hs === 'bald' ? sk.s : sk.h), sideM = sk.hs === 'long' ? hairM : mSkin;
+  const head = new THREE.Mesh(boxGeo(0.5, 0.5, 0.5), [sideM, sideM, hairM, mSkin, lam(0xffffff, { map: tex }), hairM]);
+  head.position.set(0, hip + bodyH + 0.25, 0); g.add(head); P.head = head;
+  if (sk.hs === 'bun') addBox(head, 0.18, 0.18, 0.18, hairM, 0, 0.22, -0.24);
+  if (sk.hs === 'spiky') for (const [x, z] of [[-0.15, 0], [0.05, 0.1], [0.15, -0.1], [-0.05, -0.15]]) addBox(head, 0.1, 0.1, 0.1, hairM, x, 0.28, z);
+  if (sk.hat) {
+    const [k, c] = sk.hat, H = M(c);
+    const box = (w, h, d, x, y, z, m) => addBox(head, w, h, d, m || H, x, y, z);
+    switch (k) {
+      case 'cap': box(0.54, 0.12, 0.54, 0, 0.21, 0); box(0.44, 0.04, 0.22, 0, 0.15, 0.34); break;
+      case 'helmet': box(0.6, 0.16, 0.6, 0, 0.22, 0); box(0.6, 0.42, 0.06, 0, 0.02, -0.27); box(0.06, 0.42, 0.6, -0.27, 0.02, 0); box(0.06, 0.42, 0.6, 0.27, 0.02, 0); break;
+      case 'hardhat': box(0.56, 0.16, 0.56, 0, 0.24, 0); box(0.66, 0.04, 0.66, 0, 0.16, 0); break;
+      case 'hood': box(0.6, 0.12, 0.6, 0, 0.25, 0); box(0.6, 0.6, 0.06, 0, -0.02, -0.28); box(0.06, 0.5, 0.6, -0.28, 0, 0); box(0.06, 0.5, 0.6, 0.28, 0, 0); break;
+      case 'beanie': box(0.56, 0.18, 0.56, 0, 0.22, 0); box(0.1, 0.08, 0.1, 0, 0.34, 0, M(0xffffff)); break;
+      case 'crown': for (const [w, d, x, z] of [[0.54, 0.04, 0, 0.25], [0.54, 0.04, 0, -0.25], [0.04, 0.54, 0.25, 0], [0.04, 0.54, -0.25, 0]]) box(w, 0.1, d, x, 0.3, z); for (const [x, z] of [[-0.2, 0.25], [0, 0.25], [0.2, 0.25], [-0.25, 0], [0.25, 0], [0, -0.25]]) box(0.06, 0.08, 0.06, x, 0.39, z); break;
+      case 'band': box(0.54, 0.06, 0.54, 0, 0.12, 0); break;
+      case 'bandana': box(0.56, 0.14, 0.56, 0, 0.2, 0); box(0.12, 0.12, 0.08, 0, 0.12, -0.3); break;
+      case 'tophat': box(0.64, 0.04, 0.64, 0, 0.27, 0); box(0.4, 0.42, 0.4, 0, 0.5, 0); break;
+      case 'chef': box(0.5, 0.36, 0.5, 0, 0.43, 0); box(0.58, 0.14, 0.58, 0, 0.66, 0); break;
+      case 'cowboy': box(0.84, 0.04, 0.84, 0, 0.26, 0); box(0.44, 0.22, 0.44, 0, 0.38, 0); break;
+      case 'viking': box(0.56, 0.2, 0.56, 0, 0.21, 0); for (const sx of [-1, 1]) { const horn = box(0.08, 0.26, 0.08, sx * 0.34, 0.33, 0, M(0xf0ecd8)); horn.rotation.z = -sx * 0.5; } break;
+      case 'wizard': box(0.72, 0.04, 0.72, 0, 0.27, 0); box(0.42, 0.2, 0.42, 0, 0.38, 0); box(0.28, 0.2, 0.28, 0, 0.56, -0.03); box(0.14, 0.2, 0.14, 0, 0.74, -0.06); break;
+      case 'visor': box(0.62, 0.08, 0.62, 0, 0.29, 0); box(0.62, 0.62, 0.06, 0, 0, -0.29); box(0.06, 0.62, 0.62, -0.29, 0, 0); box(0.06, 0.62, 0.62, 0.29, 0, 0); box(0.62, 0.08, 0.62, 0, -0.29, 0);
+        box(0.5, 0.5, 0.02, 0, 0, 0.3, lam(0x3a6ad0, { transparent: true, opacity: 0.45 })); break;
+      case 'headphones': box(0.58, 0.06, 0.12, 0, 0.28, 0); for (const sx of [-1, 1]) box(0.08, 0.18, 0.18, sx * 0.29, 0.02, 0); break;
+    }
+  }
+  return { group: g, parts: P, skin: sk };
+}
+
 /* ---------- armor on a player model ---------- */
 const ARMOR_COLORS = { leather: 0x8a4f2a, golden: 0xf5cc2e, iron: 0xdcdcdc, diamond: 0x5decf5 };
 const armorMats = {};
@@ -798,19 +855,23 @@ class Dragon {
         G.player.addXp(120);
         G.explode(this.pos.x, this.pos.y, this.pos.z, 4, false, true);
         G.ui.message('The dragon\'s treasure falls at your feet!', 'gold');
+        if (G.world.dim === 'end') G.endDragonBeaten();
       }
       return;
     }
     this.hurtT -= dt;
     const pAlive = !P.dead;
     const nether = W.dim === 'nether';
-    const groundY = Math.max(W.groundY(this.pos.x, this.pos.z), nether ? 31 : SEA);
+    const groundY = W.dim === 'end' ? Math.max(W.groundY(this.pos.x, this.pos.z), 54) : Math.max(W.groundY(this.pos.x, this.pos.z), nether ? 31 : SEA);
     const ceil = nether ? 70 : WH + 40;
     let target, speed = 15 * this.K.speed;
     const toP = tmpV2.set(P.pos.x - this.pos.x, P.pos.y + 1 - this.pos.y, P.pos.z - this.pos.z);
     const dP = toP.length();
-    if (Math.hypot(P.pos.x - this.center.x, P.pos.z - this.center.z) > 140) this.center.lerp(new V3(P.pos.x, 0, P.pos.z), 0.002);
-    this.center.y = Math.max(W.groundY(this.center.x, this.center.z), nether ? 31 : SEA);
+    if (W.dim === 'end') this.center.set(0, 54, 0); // the dragon guards the island
+    else {
+      if (Math.hypot(P.pos.x - this.center.x, P.pos.z - this.center.z) > 140) this.center.lerp(new V3(P.pos.x, 0, P.pos.z), 0.002);
+      this.center.y = Math.max(W.groundY(this.center.x, this.center.z), nether ? 31 : SEA);
+    }
 
     if (this.state === 'circle') {
       this.angle += dt * 0.28 * this.K.speed;
@@ -1075,10 +1136,15 @@ class ItemDrop {
       const dx = P.pos.x - this.pos.x, dy = (P.pos.y + 0.8) - this.pos.y, dz = P.pos.z - this.pos.z;
       const d = Math.hypot(dx, dy, dz);
       if (d < 1.6) {
-        const left = P.inv.add(this.id, this.count);
-        if (left < this.count) G.sound.play('pickup');
-        this.count = left;
-        if (left === 0) { Net.dropPicked(this.did); return this.finish(); }
+        // an item another player's game dropped: ask them for it, so two players can't both get it
+        if (this.owner && Net.ownerHere(this.owner)) {
+          if (!this.askedAt || performance.now() - this.askedAt > 2500) { this.askedAt = performance.now(); Net.askForDrop(this); }
+        } else {
+          const left = P.inv.add(this.id, this.count);
+          if (left < this.count) G.sound.play('pickup');
+          this.count = left;
+          if (left === 0) { Net.dropPicked(this.did); return this.finish(); }
+        }
       } else if (d < 3) {
         this.pos.x += dx / d * dt * 6; this.pos.z += dz / d * dt * 6;
       }
@@ -1086,6 +1152,34 @@ class ItemDrop {
     if (this.age > 300 || this.pos.y < -20) this.finish();
   }
   finish() { this.done = true; G.scene.remove(this.mesh); }
+}
+
+/* ---------- a thrown Eye of Ender: floats off toward the nearest stronghold ---------- */
+class EyeOfEnder {
+  constructor(from, target) {
+    this.pos = from.clone(); this.done = false; this.t = 0;
+    const dx = target.x - from.x, dz = target.z - from.z, d = Math.hypot(dx, dz) || 1;
+    this.below = d < 14; // standing right above it: the eye sinks into the ground
+    this.dir = new V3(dx / d, 0, dz / d);
+    this.mesh = new THREE.Mesh(itemGeometry(ID.eye_of_ender), G.mats.item);
+    this.mesh.scale.setScalar(0.35);
+    G.scene.add(this.mesh);
+    G.sound.play('bow', this.pos);
+  }
+  update(dt) {
+    this.t += dt;
+    if (this.below) { this.pos.y += (this.t < 0.6 ? 2 : -3) * dt; }
+    else if (this.t < 2.2) { this.pos.addScaledVector(this.dir, 9 * dt); this.pos.y += 2.2 * dt; }
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.y += dt * 4;
+    if (Math.random() < dt * 20) G.particles.burst(this.pos.x, this.pos.y, this.pos.z, [0x9a4ad8, 0x46c98a], 1, 0.3, 0.06);
+    if (this.t > 3) {
+      this.done = true; G.scene.remove(this.mesh);
+      // like Minecraft, eyes sometimes break
+      if (Math.random() < 0.2) { G.particles.burst(this.pos.x, this.pos.y, this.pos.z, [0x46c98a, 0x2a8a5a], 14, 2, 0.1); G.sound.play('break', this.pos); G.ui.message('The Eye of Ender broke.', 'purple'); }
+      else G.spawnDrop(ID.eye_of_ender, 1, this.pos.x, this.pos.y, this.pos.z, new V3(0, 0, 0));
+    }
+  }
 }
 
 /* ---------- primed TNT ---------- */

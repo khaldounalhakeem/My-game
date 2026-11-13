@@ -69,8 +69,10 @@ class Player {
   hurt(amount, from, kb = 6, force = false, cause = '') {
     if (this.dead || this.mode === 'creative') return;
     if (this.hurtCd > 0 && !force) return;
-    // armor softens hits from mobs, players, arrows and explosions (4% per armor point)
-    if (from) amount = Math.max(1, Math.round(amount * (1 - Math.min(0.8, this.inv.armorPoints() * 0.04))));
+    if (this.sleeping) G.wake('You were woken up!');
+    // armor softens every kind of hurt except falling, drowning, starving and the void (4% per armor point, like Minecraft)
+    const bypass = !from && /fell from|fell out|drown|starv|void|pearl/i.test(cause || '');
+    if (!bypass) amount = Math.max(1, Math.round(amount * (1 - Math.min(0.8, this.inv.armorPoints() * 0.04))));
     this.deathCause = cause || (from ? 'You were defeated by a monster or an explosion.' : 'You died.');
     if (from && G.lastAttacker && !G.lastAttacker.dead) for (const m of G.mobs) if (m.tame && m.type === 'wolf') m.petTarget = G.lastAttacker;
     G.lastAttacker = null;
@@ -189,7 +191,7 @@ class Player {
       this.fallStart = null;
     }
     if (this.onGround) this.fallStart = null;
-    if (this.pos.y < -30) { this.hurt(20, null, 0, true); }
+    if (this.pos.y < -30) { this.hurt(20, null, 0, true, 'You fell out of the world into the void.'); }
 
     if (!creative) this.survivalTick(dt, swimming);
 
@@ -387,6 +389,11 @@ class Player {
       if (b.id === ID.bed || b.id === ID.bed_head) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
+      if (b.id === ID.end_portal_frame && hd && hd.key === 'eye_of_ender') {
+        this.useCd = 0.4; this.swing = 1;
+        if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+        G.fillEndFrame(b.x, b.y, b.z); return;
+      }
       if (b.id === ID.tnt && hd && hd.key === 'flint_and_steel') {
         W.setBlock(b.x, b.y, b.z, 0); G.primeTNT(b.x, b.y, b.z, 4); this.useCd = 0.3; this.swing = 1; return;
       }
@@ -426,6 +433,11 @@ class Player {
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       G.sound.play('eat');
       this.useCd = 0.5; this.swing = 1;
+      return;
+    }
+    if (hd.key === 'eye_of_ender') {
+      this.useCd = 0.8; this.swing = 1;
+      if (G.throwEye() && this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       return;
     }
     if (hd.key === 'bow') {

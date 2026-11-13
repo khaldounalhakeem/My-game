@@ -6,6 +6,7 @@
 const SHIRT_COLORS = [0x2fb5c8, 0xd8452b, 0x46a83a, 0xe8b320, 0x8a4ad0, 0xe86aa8, 0xf08a24, 0x3a6ad8];
 const r2 = v => Math.round(v * 100) / 100;
 const r3 = v => Math.round(v * 1000) / 1000;
+const DIMS = ['overworld', 'nether', 'end'], dimCode = d => Math.max(0, DIMS.indexOf(d));
 const isInt = v => Number.isInteger(v) && Math.abs(v) < 3e7;
 
 function nameTag(text) {
@@ -142,7 +143,7 @@ function makeDbRoom(db, me) {
   async function flush() {
     if (writing || !topic) return;
     const now = Date.now(), body = JSON.stringify(mine);
-    if (now - lastWrite < 450 || (body === lastBody && now - lastWrite < 5000)) return;
+    if (now - lastWrite < 300 || (body === lastBody && now - lastWrite < 5000)) return;
     writing = true; lastBody = body; lastWrite = now;
     const t = topic;
     try { await players(t).doc(dev).set(Object.assign({}, mine, { t: now })); status.ok++; status.err = ''; setConn(true); }
@@ -232,7 +233,7 @@ function makeMultiRoom(rooms, me) {
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
   world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0, blasts: [], blastSeq: 0,
-  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
+  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, askRing: [], askSeq: 0, giveRing: [], giveSeq: 0, gotDrops: new Set(), seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
   nick: '', color: SHIRT_COLORS[0],
 
   async init() {
@@ -346,7 +347,7 @@ const Net = {
   /* send who we are and where; in a world this is refreshed ten times a second by tick() */
   announce() {
     if (!this.room || this.status !== 'on') return;
-    const base = { v: 2, u: this.uid, n: this.nick, c: this.color, w: this.world };
+    const base = { v: 2, u: this.uid, n: this.nick, c: this.color, w: this.world, sk: G.skin || 0 };
     if (this.world && G.player) {
       const P = G.player, held = P.heldSlot(), now = Date.now();
       this.trail = this.trail || [];
@@ -360,12 +361,14 @@ const Net = {
       base.tm = Math.round(G.time * 100000) / 100000; base.tj = this.joinedAt || now; base.te = G.timeEventAt || 0;
       base.tr = this.trail.map(s => [s[0] - now, s[1], s[2], s[3], s[4]]);
       Object.assign(base, {
-        m: P.mode === 'creative' ? 1 : 0, d: G.dim === 'nether' ? 1 : 0, p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
+        m: P.mode === 'creative' ? 1 : 0, d: dimCode(G.dim), p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
         s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
+        sl: P.sleeping ? 1 : 0,
         ar: [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0)), ex: this.blasts,
         mb: this.slim ? null : this.ownedMobs(), mh: this.mobHits, dr: this.slim ? null : this.dropRing, pk: this.slim ? null : this.pickRing,
+        rq: this.slim ? null : this.askRing, gv: this.slim ? null : this.giveRing,
       });
-    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null });
+    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
@@ -385,7 +388,7 @@ const Net = {
   edit(dim, x, y, z, id) {
     if (!this.world) return;
     this.seq++;
-    this.ring.push([this.seq, dim === 'nether' ? 1 : 0, x, y, z, id]);
+    this.ring.push([this.seq, dimCode(dim), x, y, z, id]);
     while (this.ring.length > this.ringMax) this.ring.shift();
     this.sendT = Math.min(this.sendT, 0.03);
   },
@@ -550,7 +553,7 @@ const Net = {
   blast(x, y, z, power, cause) {
     if (!this.inShared()) return;
     this.blastSeq++;
-    this.blasts.push([this.blastSeq, r2(x), r2(y), r2(z), power, G.dim === 'nether' ? 1 : 0, cause || '']);
+    this.blasts.push([this.blastSeq, r2(x), r2(y), r2(z), power, dimCode(G.dim), cause || '']);
     if (this.blasts.length > 6) this.blasts.shift();
     this.sendT = 0;
   },
@@ -568,7 +571,7 @@ const Net = {
     if (!this.inShared()) return;
     this.drSeq++;
     this.seenDrops.add(d.did);
-    this.dropRing.push([this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), G.dim === 'nether' ? 1 : 0]);
+    this.dropRing.push([this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), dimCode(G.dim)]);
     if (this.dropRing.length > 45) this.dropRing.shift();
     this.sendT = 0;
   },
@@ -579,6 +582,22 @@ const Net = {
     this.pickedDrops.add(did);
     this.pickRing.push([this.pkSeq, did]);
     if (this.pickRing.length > 45) this.pickRing.shift();
+    this.sendT = 0;
+  },
+
+  /* names of the players in this world who still need to get into bed */
+  notSleeping() {
+    if (!this.inShared()) return [];
+    return [...this.peers.values()].filter(rp => rp.inWorld && rp.dim === 'overworld' && !rp.dead && !rp.sleeping).map(rp => rp.name || 'your friend');
+  },
+
+  /* is the player whose game dropped this item still here to hand it out? */
+  ownerHere(owner) { const rp = this.peers.get(owner); return !!(rp && rp.inWorld); },
+
+  askForDrop(d) {
+    this.askSeq++;
+    this.askRing.push([this.askSeq, d.did, d.owner]);
+    if (this.askRing.length > 20) this.askRing.shift();
     this.sendT = 0;
   },
 
@@ -642,8 +661,38 @@ const Net = {
       const [, did, id, count, x, y, z, dim] = e;
       if (this.seenDrops.has(did) || this.pickedDrops.has(did)) continue;
       this.seenDrops.add(did);
-      if ((dim === 1) !== (G.dim === 'nether') || !DEFS[id] || !Number.isFinite(x + y + z) || !(count > 0)) continue;
-      G.spawnDrop(id, Math.min(64, count | 0), x, y, z, new THREE.Vector3(0, 0, 0), { did, remote: true });
+      if (DIMS[dim] !== G.dim || !DEFS[id] || !Number.isFinite(x + y + z) || !(count > 0)) continue;
+      const nd = G.spawnDrop(id, Math.min(64, count | 0), x, y, z, new THREE.Vector3(0, 0, 0), { did, remote: true });
+      nd.owner = rp.peer;
+    }
+    // they asked for an item our game dropped: give it to the first one to ask, if it is still there
+    if (Array.isArray(pr.rq)) {
+      let top = rp.lastRq || 0;
+      for (const e of pr.rq) {
+        if (!Array.isArray(e) || !Number.isInteger(e[0]) || typeof e[1] !== 'string') continue;
+        if (e[0] > (rp.lastRq || 0) && e[2] === this.uid) {
+          const d = G.drops.find(o => o.did === e[1] && !o.done && !o.owner);
+          if (d) {
+            this.giveSeq++;
+            this.giveRing.push([this.giveSeq, d.did, rp.peer, d.id, d.count]);
+            if (this.giveRing.length > 20) this.giveRing.shift();
+            this.dropPicked(d.did);
+            d.finish();
+          }
+        }
+        if (e[0] > top) top = e[0];
+      }
+      rp.lastRq = top;
+    }
+    // items they handed to us
+    if (Array.isArray(pr.gv)) for (const e of pr.gv) {
+      if (!Array.isArray(e) || e.length < 5 || e[2] !== this.uid || typeof e[1] !== 'string' || this.gotDrops.has(e[1])) continue;
+      this.gotDrops.add(e[1]);
+      for (const d of G.drops) if (d.did === e[1]) d.finish();
+      if (!DEFS[e[3]] || !(e[4] > 0)) continue;
+      const P = G.player, left = P.inv.add(e[3], Math.min(64, e[4] | 0));
+      G.sound.play('pickup');
+      if (left) G.spawnDrop(e[3], left, P.pos.x, P.pos.y + 1, P.pos.z, new THREE.Vector3(0, 0, 0));
     }
     if (Array.isArray(pr.pk)) for (const e of pr.pk) {
       if (!Array.isArray(e) || typeof e[1] !== 'string' || this.pickedDrops.has(e[1])) continue;
@@ -700,7 +749,8 @@ const Net = {
   playback(rp) {
     const buf = rp.buf;
     if (!buf || !buf.length) return rp.target ? [rp.target[0], rp.target[1], rp.target[2], rp.yaw] : null;
-    const delay = clamp((rp.gap || 150) * 1.25 + 60, 120, 1500);
+    // stay only a little behind and guess ahead between updates, so friends don't lag a second behind
+    const delay = clamp((rp.gap || 150) * 0.9 + 40, 100, 900);
     const now = Date.now(), want = now - (rp.offset || 0) - delay;
     // a playback clock that runs at normal speed and only drifts gently (up to 15% faster or
     // slower) toward where it should be, so changes in network timing never make a jump
@@ -716,7 +766,7 @@ const Net = {
       // ran past the newest point: keep going the same way for a moment instead of freezing
       const prev = buf.length > 1 ? buf[buf.length - 2] : null;
       if (prev && last[0] > prev[0]) {
-        const k = Math.min(t - last[0], 350) / (last[0] - prev[0]);
+        const k = Math.min(t - last[0], 300) / (last[0] - prev[0]);
         return [last[1] + (last[1] - prev[1]) * k, last[2], last[3] + (last[3] - prev[3]) * k, last[4]];
       }
       return [last[1], last[2], last[3], last[4]];
@@ -774,15 +824,18 @@ const Net = {
     this.syncTime(pr);
     const pos = Array.isArray(pr.p) && pr.p.length === 3 && pr.p.every(Number.isFinite) ? pr.p : null;
     const rot = Array.isArray(pr.r) && pr.r.length === 2 && pr.r.every(Number.isFinite) ? pr.r : [0, 0];
-    rp.dim = pr.d === 1 ? 'nether' : 'overworld';
+    rp.dim = DIMS[pr.d] || 'overworld';
     rp.dead = pr.x === 1;
+    rp.sleeping = pr.sl === 1;
     rp.yaw = rot[0]; rp.pitch = clamp(rot[1], -1.6, 1.6);
     rp.swing = Number.isFinite(pr.s) ? clamp(pr.s, 0, 1) : 0;
     if (pos) {
       const first = !rp.model;
       rp.target = pos;
       this.bufferMove(rp, pr, pos, rot[0]);
-      if (!rp.model) this.makeModel(rp, SHIRT_COLORS.includes(pr.c) ? pr.c : SHIRT_COLORS[0]);
+      const skin = Number.isInteger(pr.sk) && pr.sk >= 0 && pr.sk < SKINS.length ? pr.sk : DEFAULT_SKIN;
+      if (rp.model && rp.skin !== skin) { const at = rp.model.group.position.clone(); G.scene.remove(rp.model.group); rp.model = null; this.makeModel(rp, skin); rp.model.group.position.copy(at); }
+      if (!rp.model) this.makeModel(rp, skin);
       if (first) rp.model.group.position.set(pos[0], pos[1], pos[2]);
     }
     if (rp.model) dressModel(rp.model, Array.isArray(pr.ar) && pr.ar.length === 4 ? pr.ar.map(v => (isInt(v) ? v : 0)) : [0, 0, 0, 0]);
@@ -791,7 +844,7 @@ const Net = {
       let top = rp.lastEx || 0;
       for (const b of pr.ex) {
         if (!Array.isArray(b) || b.length < 6 || !Number.isInteger(b[0]) || !b.slice(1, 6).every(Number.isFinite)) continue;
-        if (rp.exReady && b[0] > (rp.lastEx || 0) && (b[5] === 1) === (G.dim === 'nether')) {
+        if (rp.exReady && b[0] > (rp.lastEx || 0) && DIMS[b[5]] === G.dim) {
           const cause = typeof b[6] === 'string' ? b[6].replace(/[^\w .,'!-]/g, '').slice(0, 80) : '';
           G.explode(b[1], b[2], b[3], clamp(b[4], 0.5, 6), false, false, null, cause || undefined, { remote: true });
         }
@@ -825,16 +878,16 @@ const Net = {
         if (!Array.isArray(e) || e.length !== 6 || !e.every(isInt)) continue;
         const [sq, d, x, y, z, id] = e;
         if (sq <= rp.last || id < 0 || id >= 128 || !DEFS[id] || (DEFS[id].liquid && id !== ID.water)) continue;
-        G.worlds[d === 1 ? 'nether' : 'overworld'].applyRemote(x, y, z, id);
+        if (G.worlds[DIMS[d]]) G.worlds[DIMS[d]].applyRemote(x, y, z, id);
         if (sq > top) top = sq;
       }
       rp.last = top;
     }
   },
 
-  makeModel(rp, color) {
-    const m = buildMobModel('player');
-    m.group.traverse(o => { if (o.isMesh) for (const mat of [].concat(o.material)) if (mat.color && mat.color.getHex() === 0x2fb5c8) mat.color.setHex(color); });
+  makeModel(rp, skin) {
+    const m = buildPlayerModel(skin);
+    rp.skin = skin;
     rp.mats = [];
     m.group.traverse(o => { if (o.isMesh) for (const mat of [].concat(o.material)) if (mat.emissive) rp.mats.push(mat); });
     rp.red = 0;

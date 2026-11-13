@@ -460,7 +460,52 @@ const UI = {
   },
 
   /* ---------- menus ---------- */
+  /* ---------- main menu pages ---------- */
+  titlePage(name) {
+    for (const pg of document.querySelectorAll('.title-page')) pg.hidden = pg.dataset.page !== name;
+    $('menu-start').classList.toggle('sub', name !== 'main');
+    // the seed box sits on whichever page needs it
+    const slot = document.querySelector('.title-page[data-page="' + name + '"] .seed-slot');
+    $('seed-row').hidden = !slot;
+    if (slot) slot.appendChild($('seed-row'));
+    if (name === 'skins') this.renderSkins();
+    if (G.sound && G.state === 'title') G.sound.play('click');
+  },
+
+  renderSkins() {
+    const grid = $('skin-grid');
+    if (!grid.childElementCount) {
+      SKINS.forEach((sk, i) => {
+        const card = document.createElement('button');
+        card.type = 'button'; card.className = 'skin-card'; card.title = sk.n; card.dataset.i = i;
+        const cv = document.createElement('canvas'); cv.width = 32; cv.height = 64;
+        drawSkinFront(cv.getContext('2d'), sk, 2);
+        card.appendChild(cv);
+        card.addEventListener('click', () => { G.setSkin(i); this.renderSkins(); G.sound.play('click'); });
+        grid.appendChild(card);
+      });
+    }
+    for (const c of grid.children) c.classList.toggle('on', +c.dataset.i === G.skin);
+    const sk = SKINS[G.skin];
+    drawSkinFront($('skin-preview').getContext('2d'), sk, 6);
+    $('skin-name').textContent = sk.n;
+    this.renderNameFace();
+  },
+
+  renderNameFace() {
+    const c = document.createElement('canvas'); c.width = c.height = 8;
+    const x = c.getContext('2d');
+    drawSkinFace((a, b, col, w = 1, h = 1) => { x.fillStyle = col; x.fillRect(a, b, w, h); }, SKINS[G.skin || 0]);
+    $('name-face').style.backgroundImage = 'url(' + c.toDataURL() + ')';
+  },
+
   bindMenus() {
+    for (const b of document.querySelectorAll('[data-go]')) b.addEventListener('click', () => this.titlePage(b.dataset.go));
+    $('btn-mp-s').addEventListener('click', () => G.startNew('survival'));
+    $('btn-mp-c').addEventListener('click', () => G.startNew('creative'));
+    $('nick').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); e.stopPropagation(); });
+    this.titlePage('main');
+    this.renderNameFace();
     $('btn-survival').addEventListener('click', () => G.startNew('survival'));
     $('btn-creative').addEventListener('click', () => G.startNew('creative'));
     $('btn-continue').addEventListener('click', () => G.continueSaved());
@@ -483,6 +528,7 @@ const UI = {
     $('btn-quit').addEventListener('click', () => { G.save(); G.toTitle(); });
     $('rd').addEventListener('input', () => { for (const w of Object.values(G.worlds)) { w.renderDist = +$('rd').value; w.queue = []; } $('rd-val').textContent = $('rd').value; G.applyFog(); });
     $('sens').addEventListener('input', () => { Input.sens = +$('sens').value; $('sens-val').textContent = (+$('sens').value).toFixed(1); });
+    $('btn-wake').addEventListener('click', () => G.wake());
     $('btn-respawn').addEventListener('click', () => { $('menu-dead').hidden = true; G.respawnPlayer(); G.resume(); });
     $('nick').addEventListener('change', () => Net.setNick($('nick').value));
     $('nick').addEventListener('keydown', e => e.stopPropagation());
@@ -534,7 +580,7 @@ const UI = {
     document.addEventListener('pointerlockchange', () => {
       Input.locked = document.pointerLockElement === cv;
       if (Input.locked) G.lockFails = 0;
-      if (!Input.locked && G.state === 'play' && !Input.fallback && !Input.touch && !Pad.active) G.pause();
+      if (!Input.locked && G.state === 'play' && !Input.fallback && !Input.touch && !Pad.active && !(G.player && G.player.sleeping)) G.pause();
     });
     document.addEventListener('pointerlockerror', () => G.lockFailed());
 

@@ -7,7 +7,7 @@
    most one structure of a kind, somewhere inside it, leaving a gap to the next square. */
 const VILLAGE_CELL = 22, VILLAGE_GAP = 6, MINESHAFT_CELL = 14;
 const SPACING = {
-  pyramid: [32, 8, 303], igloo: [32, 8, 304], shipwreck: [24, 4, 305], ruinedPortal: [40, 15, 306], library: [64, 16, 307],
+  pyramid: [32, 8, 303], igloo: [32, 8, 304], shipwreck: [24, 4, 305], ruinedPortal: [40, 15, 306], library: [40, 12, 307],
 };
 
 /* is this chunk the one picked for this kind of structure in its square? */
@@ -236,10 +236,27 @@ World.prototype.buildMineshaft = function (S, ms) {
   }
 };
 
+/* centre (world x, z) and floor height of the stronghold in this square of chunks, if any */
+World.prototype.strongholdIn = function (gx, gz) {
+  const [cell, gap, salt] = SPACING.library;
+  const r = mulberry32(hash3(gx, gz, this.seed + salt));
+  const cx = gx * cell + (r() * (cell - gap) | 0), cz = gz * cell + (r() * (cell - gap) | 0);
+  return { cx, cz, x: cx * 16 + 8, z: cz * 16 + 8 };
+};
+World.prototype.nearestStronghold = function (x, z) {
+  const cell = SPACING.library[0] * 16, gx = Math.floor(x / cell), gz = Math.floor(z / cell);
+  let best = null, bd = Infinity;
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) {
+    const s = this.strongholdIn(gx + dx, gz + dz), d = Math.hypot(s.x - x, s.z - z);
+    if (d < bd) { bd = d; best = s; }
+  }
+  return best;
+};
+
+/* a stronghold: a library hall with the End portal in the middle */
 World.prototype.buildLibrary = function (S) {
-  const { set, get, rng } = S;
+  const { set, rng } = S;
   const y0 = 18 + (rng() * 12 | 0);
-  if (get(8, y0 + 3, 8) !== ID.stone) return;
   for (let x = 1; x <= 14; x++) for (let z = 1; z <= 14; z++) for (let y = y0; y <= y0 + 7; y++) {
     const wall = x === 1 || x === 14 || z === 1 || z === 14 || y === y0 || y === y0 + 7;
     let id = wall ? (rng() < 0.15 ? ID.mossy_cobblestone : ID.stone_bricks) : 0;
@@ -247,9 +264,12 @@ World.prototype.buildLibrary = function (S) {
     set(x, y, z, id);
   }
   for (const [x, z] of [[2, 7], [13, 8]]) for (let y = y0 + 1; y <= y0 + 2; y++) set(x, y, z, 0);
-  for (const [x, z] of [[5, 5], [10, 10], [5, 10], [10, 5]]) set(x, y0 + 6, z, ID.glowstone);
-  for (let x = 6; x <= 9; x++) for (const z of [6, 9]) set(x, y0 + 1, z, ID.bookshelf);
-  set(7, y0 + 1, 7, ID.chest_loot); set(8, y0 + 1, 8, ID.chest_loot);
+  for (const [x, z] of [[4, 4], [11, 11], [4, 11], [11, 4]]) set(x, y0 + 6, z, ID.glowstone);
+  // the End portal frame: 12 frame blocks around a 3 by 3 hole, a few already holding an eye
+  for (let i = 6; i <= 8; i++) for (const [x, z] of [[i, 5], [i, 9], [5, i], [9, i]]) set(x, y0 + 1, z, rng() < 0.1 ? ID.end_portal_frame_eye : ID.end_portal_frame);
+  for (let x = 6; x <= 8; x++) for (let z = 6; z <= 8; z++) { set(x, y0, z, ID.lava); set(x, y0 - 1, z, ID.stone_bricks); }
+  for (const [x, z] of [[4, 6], [4, 8], [10, 6], [10, 8]]) set(x, y0 + 1, z, ID.stone_bricks);
+  set(3, y0 + 1, 3, ID.chest_loot); set(12, y0 + 1, 12, ID.chest_loot);
 };
 
 /* ---------- surface ---------- */
