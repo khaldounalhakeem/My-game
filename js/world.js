@@ -804,7 +804,7 @@ class World {
         const def = DEFS[this.getBlock(x, yy, z)];
         if (def.boxes || def.fence) {
           for (const b of this.shapeBoxes(def, (a, b2, c) => this.getBlock(a, b2, c), x, yy, z, false))
-            if (px + r - e > x + b[0] && px - r + e < x + b[3] && pz + r - e > z + b[2] && pz - r + e < z + b[5] && yy + b[4] <= py + 0.6) top = Math.max(top, yy - y + b[4]);
+            if (px + r - e > x + b[0] && px - r + e < x + b[3] && pz + r - e > z + b[2] && pz - r + e < z + b[5] && yy + b[4] <= py + 0.36) top = Math.max(top, yy - y + b[4]); // only things you are landing on, never lift onto a fence
         } else if (yy === y) top = Math.max(top, def.height || 1);
       }
     }
@@ -830,11 +830,14 @@ class World {
     const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) / 0.35));
     dx /= steps; dy /= steps; dz /= steps;
     const wasGround = b.onGround;
+    // checked before moving, so a wall we are about to bump into doesn't count as ground
+    const nearGround = wasGround || ((b.airT || 0) < 0.25 && b.vel.y <= 0.5 && this.collides(b.pos.x, b.pos.y - 0.15, b.pos.z, b.w, 0.15));
     b.onGround = false; b.hitH = false;
     const hw = b.w / 2;
     // like Minecraft: walk up anything up to about half a block high without jumping
     const stepUp = () => {
-      if (!(wasGround || (b.airT || 0) < 0.25) || b.vel.y > 0.5 || b.noStep || this.collides(b.pos.x, b.pos.y + 0.6, b.pos.z, b.w, b.h)) return false;
+      // only from the ground (or standing just above it on a step), never in the middle of a jump
+      if (!nearGround || b.vel.y > 0.5 || b.noStep || this.collides(b.pos.x, b.pos.y + 0.6, b.pos.z, b.w, b.h)) return false;
       b.pos.y += 0.6; return true;
     };
     for (let s = 0; s < steps; s++) {

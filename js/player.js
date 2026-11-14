@@ -235,7 +235,7 @@ class Player {
   survivalTick(dt, swimming) {
     const W = G.world;
     const moving = Math.hypot(this.vel.x, this.vel.z) > 0.5;
-    this.hungerDrain(dt * (this.sprinting ? 1 / 45 : moving ? 1 / 300 : 1 / 600));
+    this.hungerDrain(dt * (this.sprinting ? 1 / 25 : moving ? 1 / 100 : 1 / 200)); // walking: a full bar lasts about 40 minutes
     const D = G.diff();
     if (D.mobs === 0 && this.hunger < 20) this.hunger = Math.min(20, this.hunger + dt / 3); // peaceful: never hungry for long
     if ((this.hunger >= 17 || D.mobs === 0) && this.health < 20) {
