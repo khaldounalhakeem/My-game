@@ -409,6 +409,43 @@ G.tryBuildGolem = (x, y, z) => {
   return false;
 };
 
+/* open or close a door (both halves) or a trapdoor */
+G.toggleDoor = (x, y, z) => {
+  const W = G.world, d = DEFS[W.getBlock(x, y, z)];
+  if (d.trapdoor) {
+    W.setBlock(x, y, z, ID['trapdoor_' + d.trapdoor.ax + (d.trapdoor.open ? 'c' : 'o')]);
+  } else if (d.door) {
+    const op = d.door.open ? 'c' : 'o', ly = d.door.half === 'lower' ? y : y - 1;
+    W.setBlock(x, ly, z, ID['door_' + d.door.ax + op + '_lower']);
+    if (DEFS[W.getBlock(x, ly + 1, z)].door) W.setBlock(x, ly + 1, z, ID['door_' + d.door.ax + op + '_upper']);
+  }
+  Sound.play('click', new THREE.Vector3(x, y, z));
+};
+
+/* grass slowly spreads onto dirt next to it that has open air above (about two minutes) */
+G.tickGrass = () => {
+  const P = G.player, W = G.world;
+  if (G.dim !== 'overworld') return;
+  G.grassT = G.grassT || {};
+  const now = performance.now(), px = Math.floor(P.pos.x), pz = Math.floor(P.pos.z), seen = {};
+  for (let dz = -20; dz <= 20; dz++) for (let dx = -20; dx <= 20; dx++) {
+    const x = px + dx, z = pz + dz;
+    if (!W.isLoaded(x, z)) continue;
+    const y = W.surfaceY(x, z);
+    if (W.getBlock(x, y, z) !== ID.dirt) continue;
+    const above = W.getBlock(x, y + 1, z);
+    if (above && DEFS[above].opaque) continue;
+    let near = false;
+    for (let oy = -1; oy <= 1 && !near; oy++) for (let oz = -1; oz <= 1 && !near; oz++) for (let ox = -1; ox <= 1 && !near; ox++) if ((ox || oz) && W.getBlock(x + ox, y + oy, z + oz) === ID.grass) near = true;
+    if (!near) continue;
+    const k = x + ',' + y + ',' + z;
+    seen[k] = true;
+    if (!G.grassT[k]) G.grassT[k] = now + 100000 + Math.random() * 40000;
+    else if (now >= G.grassT[k]) { W.setBlock(x, y, z, ID.grass); delete G.grassT[k]; }
+  }
+  for (const k in G.grassT) if (!seen[k]) delete G.grassT[k];
+};
+
 /* crops: planted seeds grow into ripe wheat after a few minutes (only while their area is loaded) */
 G.plantCrop = (x, y, z) => { G.crops = G.crops || {}; G.crops[chestKey(x, y, z)] = 1; };
 G.tickCrops = () => {
@@ -1264,7 +1301,7 @@ function frame(now) {
       restorePets(ready);
     }
     G.spawnT -= dt;
-    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); }
+    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); }
     if (!G.dragons.length && G.dim === 'nether' && Net.isHost()) {
       G.dragonTimer -= dt;
       if (G.dragonTimer <= 0) { G.dragonTimer = 240; G.summonDragon(null); }

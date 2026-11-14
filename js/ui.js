@@ -382,7 +382,7 @@ const UI = {
     box.innerHTML = '';
     const ids = [];
     for (const d of DEFS) {
-      if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head') continue;
+      if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.door || d.trapdoor || d.key === 'wheat_sprout') continue;
       if (q ? !d.name.toLowerCase().includes(q) : (this.tab === 'blocks') !== d.isBlock) continue;
       ids.push(d.id);
     }

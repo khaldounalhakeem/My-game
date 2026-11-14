@@ -337,6 +337,11 @@ class Player {
     if (above && (DEFS[above].cross || above === ID.cactus)) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
     if (id === ID.furnace) G.breakFurnace(x, y, z);
+    if (DEFS[id].door) {
+      const oy = DEFS[id].door.half === 'lower' ? y + 1 : y - 1, other = W.getBlock(x, oy, z);
+      if (other && DEFS[other].door) W.setBlock(x, oy, z, 0);
+      if (DEFS[id].door.half === 'upper' && this.mode === 'survival') G.spawnDrop(ID.oak_door, 1, x + 0.5, y - 0.5, z + 0.5);
+    }
     if (id === ID.bed || id === ID.bed_head) {
       const other = id === ID.bed ? ID.bed_head : ID.bed;
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (W.getBlock(x + dx, y, z + dz) === other) { W.setBlock(x + dx, y, z + dz, 0); break; }
@@ -397,6 +402,22 @@ class Player {
   /* buckets, milk, hoes and seeds; true if the held item did something */
   useBucketOrHoe(hd, b) {
     const W = G.world, k = hd.key;
+    if ((k === 'oak_door' || k === 'oak_trapdoor') && b) {
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const free = (x, y, z) => { const id = W.getBlock(x, y, z); return !id || DEFS[id].replaceable; };
+      const ax = Math.abs(Math.sin(this.yaw)) > Math.abs(Math.cos(this.yaw)) ? 'z' : 'x'; // a door faces you
+      if (k === 'oak_door') {
+        if (!free(px, py, pz) || !free(px, py + 1, pz) || !W.isSolid(px, py - 1, pz)) { G.ui.message('A door needs two blocks of space and a floor.'); return true; }
+        W.setBlock(px, py, pz, ID['door_' + ax + 'c_lower']); W.setBlock(px, py + 1, pz, ID['door_' + ax + 'c_upper']);
+      } else {
+        if (!free(px, py, pz)) return true;
+        W.setBlock(px, py, pz, ID['trapdoor_' + ax + 'c']);
+      }
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.25; this.swing = 1;
+      return true;
+    }
     if (k === 'bucket') {
       const o = this.eyePos(), d = this.lookDir();
       const hit = W.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 4.6, true);
@@ -455,12 +476,12 @@ class Player {
     // a bucket on a cow: milk
     if (tgt.mob && tgt.mob.type === 'cow' && !tgt.mob.dead && hd && hd.key === 'bucket') { this.useCd = 0.4; this.swing = 1; this.swapHeld(ID.milk_bucket); G.sound.play('pickup'); return; }
     if (tgt.mob && tgt.mob.interact && tgt.mob.interact(this, hd)) { this.useCd = 0.35; this.swing = 1; return; }
-    if (hd && this.useBucketOrHoe(hd, b)) return;
     if (b && !this.sneaking) {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
       if (b.id === ID.bed || b.id === ID.bed_head) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
+      if (DEFS[b.id].door || DEFS[b.id].trapdoor) { this.useCd = 0.3; this.swing = 1; G.toggleDoor(b.x, b.y, b.z); return; }
       if (b.id === ID.end_portal_frame && hd && hd.key === 'eye_of_ender') {
         this.useCd = 0.4; this.swing = 1;
         if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
@@ -485,6 +506,7 @@ class Player {
         return;
       }
     }
+    if (hd && this.useBucketOrHoe(hd, b)) return;
     if (!hd) return;
     if (hd.armor) {
       const slot = 36 + hd.armor.slot, old = this.inv.slots[slot];

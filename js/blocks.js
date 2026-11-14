@@ -469,6 +469,11 @@ makeTile('i_milk_bucket', pBucket(0xf4f4f4));
 makeTile('i_wheat_seeds', pPlant(P => { for (const [x, y] of [[5, 6], [8, 5], [10, 8], [6, 10], [9, 11], [12, 6], [4, 12], [11, 12]]) { P.put(x, y, 0x5a9a2a); P.put(x + 1, y, 0x3e7a1e); P.put(x, y + 1, 0x7aba3a); } }));
 makeTile('farmland_top', P => { P.fill(0x5a3a1e, 8); for (let y = 1; y < 16; y += 3) for (let x = 0; x < 16; x++) P.put(x, y, P.vary(0x3e2810, 6)); });
 makeTile('wheat_sprout', pPlant(P => { for (let i = 0; i < 6; i++) { const x = 2 + i * 2.4 | 0, h = 3 + P.rng() * 4 | 0; P.line(x, 15, x, 15 - h, P.vary(0x5aa02a, 14)); P.put(x + 1, 15 - h + 1, P.vary(0x7ac040, 14)); } }));
+makeTile('door_lower', P => { pPlanks(0x9a6a32)(P); P.rect(2, 2, 12, 12, 0x7a5228, 6); P.rect(0, 0, 16, 1, 0x5a3c1c); P.rect(0, 0, 1, 16, 0x5a3c1c); P.rect(15, 0, 1, 16, 0x5a3c1c); P.rect(0, 15, 16, 1, 0x5a3c1c); P.rect(12, 1, 2, 2, 0x3a3a3a); });
+makeTile('door_upper', P => { pPlanks(0x9a6a32)(P); P.rect(3, 3, 4, 5, 0xbfe0f0); P.rect(9, 3, 4, 5, 0xbfe0f0); P.rect(3, 10, 4, 4, 0xbfe0f0); P.rect(9, 10, 4, 4, 0xbfe0f0); P.rect(0, 0, 16, 1, 0x5a3c1c); P.rect(0, 0, 1, 16, 0x5a3c1c); P.rect(15, 0, 1, 16, 0x5a3c1c); });
+makeTile('trapdoor', P => { pPlanks(0x9a6a32)(P); P.rect(0, 0, 16, 2, 0x5a3c1c); P.rect(0, 14, 16, 2, 0x5a3c1c); P.rect(0, 0, 2, 16, 0x5a3c1c); P.rect(14, 0, 2, 16, 0x5a3c1c); P.rect(4, 4, 3, 3, 0x2a1a0a); P.rect(9, 4, 3, 3, 0x2a1a0a); P.rect(4, 9, 3, 3, 0x2a1a0a); P.rect(9, 9, 3, 3, 0x2a1a0a); });
+makeTile('i_oak_door', pPlant(P => { P.rect(4, 0, 8, 16, 0x9a6a32); P.rect(5, 2, 2, 4, 0xbfe0f0); P.rect(9, 2, 2, 4, 0xbfe0f0); P.rect(4, 0, 1, 16, 0x5a3c1c); P.rect(11, 0, 1, 16, 0x5a3c1c); P.rect(4, 8, 8, 1, 0x5a3c1c); P.put(10, 10, 0x3a3a3a); }));
+makeTile('i_oak_trapdoor', pPlant(P => { P.rect(1, 3, 14, 10, 0x9a6a32); P.rect(1, 3, 14, 1, 0x5a3c1c); P.rect(1, 12, 14, 1, 0x5a3c1c); P.rect(4, 5, 3, 3, 0x2a1a0a); P.rect(9, 5, 3, 3, 0x2a1a0a); P.rect(4, 9, 3, 2, 0x2a1a0a); P.rect(9, 9, 3, 2, 0x2a1a0a); }));
 makeTile('i_melon_slice', pPlant(P => { for (let y = 4; y <= 12; y++) for (let x = 2; x <= 14; x++) { const d = Math.hypot(x - 8, y - 4); if (d <= 7) P.put(x, y, d > 6 ? 0x3e8a1d : d > 5.2 ? 0xe8f0a0 : 0xe0342c); } P.pts([[6, 6], [9, 7], [8, 9], [11, 6]], 0x1a1a1a); }));
 makeTile('i_ender_pearl', pPlant(P => { P.disc(8, 8, 5, 0x1d6b5c, 8); P.disc(8, 8, 2.6, 0x3fb59a, 8); P.pts([[6, 6], [7, 6]], 0xb0fff0); }));
 makeTile('i_bow', pPlant(P => { for (let a = 0; a <= 90; a += 4) { const r = a * Math.PI / 180; P.put(2 + Math.cos(r) * 11, 2 + Math.sin(r) * 11, 0x7a5a32); P.put(2 + Math.cos(r) * 10, 2 + Math.sin(r) * 10, 0x5a3e20); } P.line(13, 2, 2, 13, 0xdddddd); }));
@@ -597,6 +602,16 @@ block('end_portal_frame_eye', 'End Portal Frame', { top: 'end_frame_top_eye', si
 block('end_portal', 'End Portal', 'end_portal', { solid: false, opaque: false, hardness: Infinity, drop: null, light: true, portal: true, height: 0.75 });
 block('farmland', 'Farmland', { top: 'farmland_top', side: 'dirt', bottom: 'dirt' }, { tool: 'shovel', hardness: 0.6, height: 0.9375, opaque: false, drop: 'dirt' });
 block('wheat_sprout', 'Wheat (growing)', 'wheat_sprout', Object.assign({ drop: 'wheat_seeds' }, CROSS));
+/* doors: two halves, closed or open, across x or z; trapdoors: closed (lying flat) or open (standing up) */
+const DOOR_BOX = { xc: [0, 0, 0.40625, 1, 1, 0.59375], xo: [0, 0, 0, 0.1875, 1, 1], zc: [0.40625, 0, 0, 0.59375, 1, 1], zo: [0, 0, 0, 1, 1, 0.1875] };
+for (const ax of ['x', 'z']) for (const op of ['c', 'o']) for (const half of ['lower', 'upper']) {
+  const tile = half === 'lower' ? 'door_lower' : 'door_upper';
+  block('door_' + ax + op + '_' + half, 'Oak Door', tile, { tool: 'axe', hardness: 1.5, opaque: false, solid: op === 'c', box: DOOR_BOX[ax + op], drop: half === 'lower' ? 'oak_door' : null, door: { ax, open: op === 'o', half } });
+}
+const TRAP_BOX = { c: [0, 0, 0, 1, 0.1875, 1], ox: [0, 0, 0, 1, 1, 0.1875], oz: [0, 0, 0, 0.1875, 1, 1] };
+for (const ax of ['x', 'z']) for (const op of ['c', 'o']) {
+  block('trapdoor_' + ax + op, 'Oak Trapdoor', 'trapdoor', { tool: 'axe', hardness: 1.5, opaque: false, solid: op === 'c', height: op === 'c' ? 0.1875 : undefined, box: op === 'c' ? TRAP_BOX.c : TRAP_BOX['o' + ax], drop: 'oak_trapdoor', trapdoor: { ax, open: op === 'o' } });
+}
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -656,6 +671,8 @@ item('blaze_powder', 'Blaze Powder', 'blaze_powder');
 item('eye_of_ender', 'Eye of Ender', 'eye_of_ender', { stack: 16 });
 item('wheat', 'Wheat', 'wheat');
 item('wheat_seeds', 'Wheat Seeds', 'wheat_seeds');
+item('oak_door', 'Oak Door', 'oak_door');
+item('oak_trapdoor', 'Oak Trapdoor', 'oak_trapdoor');
 item('bucket', 'Bucket', 'bucket', { stack: 16 });
 item('water_bucket', 'Water Bucket', 'water_bucket', { stack: 1 });
 item('lava_bucket', 'Lava Bucket', 'lava_bucket', { stack: 1 });
@@ -747,6 +764,8 @@ const RECIPES = [
   ['wheat', 9, { hay_bale: 1 }],
   ['bread', 1, { wheat: 3 }],
   ['bucket', 1, { iron_ingot: 3 }, 'table'],
+  ['oak_door', 3, { '#planks': 6 }, 'table'],
+  ['oak_trapdoor', 2, { '#planks': 6 }, 'table'],
   ['wooden_hoe', 1, { '#planks': 2, stick: 2 }, 'table'],
   ['stone_hoe', 1, { cobblestone: 2, stick: 2 }, 'table'],
   ['iron_hoe', 1, { iron_ingot: 2, stick: 2 }, 'table'],

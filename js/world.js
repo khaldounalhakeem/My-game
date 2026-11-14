@@ -641,6 +641,7 @@ class World {
       if (!id) continue;
       const def = DEFS[id];
       if (def.cross) { this.addCross(O, x, y, z, def); continue; }
+      if (def.box) { this.addBox(O, x, y, z, def); continue; }
       const out = def.translucent ? T : O;
       const topH = def.height ? def.height : def.liquid && get(x, y + 1, z) !== id ? 0.875 : 1;
       for (let f = 0; f < 6; f++) {
@@ -682,6 +683,26 @@ class World {
     if (O.idx.length) c.meshes.push(this.makeMesh(O, this.mats.opaque, cx, cz));
     if (T.idx.length) { const m = this.makeMesh(T, this.mats.trans, cx, cz); m.renderOrder = 1; c.meshes.push(m); }
     for (const m of c.meshes) this.group.add(m);
+  }
+
+  /* a thin block like a door or trapdoor: one box inside the block, picture cropped to fit */
+  addBox(out, x, y, z, def) {
+    const [x0, y0, z0, x1, y1, z1] = def.box, lo = [x0, y0, z0], hi = [x1, y1, z1];
+    for (let f = 0; f < 6; f++) {
+      const F = FACES[f], uv = TILE_UV[def.faces[f]], base = out.pos.length / 3;
+      const axes = [0, 1, 2].filter(a => F.n[a] === 0), [ua, va] = f === 2 || f === 3 ? [0, 2] : [axes[0] === 1 ? axes[1] : axes[0], 1];
+      for (let k = 0; k < 4; k++) {
+        const cc = F.c[k], p = [0, 1, 2].map(a => (cc[a] ? hi[a] : lo[a]));
+        out.pos.push(x + p[0], y + p[1], z + p[2]);
+        const fu = FACE_UV[k];
+        const su = fu[0] ? (cc[ua] ? hi[ua] : lo[ua]) : (cc[ua] ? hi[ua] : lo[ua]);
+        const u = uv[0] + (uv[2] - uv[0]) * clamp(su, 0, 1), v = uv[1] + (uv[3] - uv[1]) * clamp(p[va], 0, 1);
+        out.uv.push(u, v);
+        const br = F.shade;
+        out.col.push(br, br, br);
+      }
+      out.idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    }
   }
 
   addCross(out, x, y, z, def) {
