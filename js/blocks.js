@@ -487,6 +487,9 @@ makeTile('i_ladder_icon', P => { P.clear(); for (const x of [3, 11]) P.rect(x, 0
 makeTile('ladder', P => { P.clear(); for (const x of [2, 12]) P.rect(x, 0, 2, 16, 0x8a6a3a); for (const y of [2, 6, 10, 14]) P.rect(2, y, 12, 2, 0xa8834f); P.rect(2, 0, 1, 16, 0x5a3c1c); P.rect(13, 0, 1, 16, 0x5a3c1c); });
 makeTile('i_oak_fence_gate', pPlant(P => { P.rect(1, 2, 2, 12, 0xa8834f); P.rect(13, 2, 2, 12, 0xa8834f); P.rect(3, 4, 10, 2, 0x8a6a3a); P.rect(3, 10, 10, 2, 0x8a6a3a); P.rect(7, 4, 2, 8, 0x8a6a3a); P.put(1, 2, 0xc8a46a); P.put(13, 2, 0xc8a46a); }));
 makeTile('i_oak_sign', pPlant(P => { P.rect(1, 2, 14, 8, 0xb8935a); P.rect(1, 2, 14, 1, 0x7a5a2a); P.rect(1, 9, 14, 1, 0x7a5a2a); P.rect(7, 10, 2, 5, 0x7a5a2a); for (const y of [4, 6]) P.rect(3, y, 10, 1, 0x4a3418); }));
+makeTile('i_carrot', pPlant(P => { for (let i = 0; i < 9; i++) { const w = Math.max(1, 3 - (i >> 2)); P.rect(6 + i * 0.6 | 0, 5 + i, w, 1, P.vary(0xf0801a, 12)); } P.pts([[7, 7], [9, 10]], 0xc05a10); for (const [x, y] of [[5, 2], [6, 1], [7, 3], [8, 2], [9, 1]]) { P.put(x, y, 0x3e8a1d); P.put(x, y + 1, 0x5aa02a); } }));
+makeTile('carrot_sprout', pPlant(P => { for (let i = 0; i < 5; i++) { const x = 3 + i * 2.5 | 0, h = 2 + P.rng() * 3 | 0; P.line(x, 15, x, 15 - h, P.vary(0x4a9a2a, 14)); P.put(x - 1, 15 - h, 0x6ab83a); } }));
+makeTile('carrot_crop', pPlant(P => { for (let i = 0; i < 5; i++) { const x = 2 + i * 3 | 0, h = 5 + P.rng() * 4 | 0; P.line(x, 13, x, 13 - h, P.vary(0x3e8a1d, 14)); P.put(x + 1, 13 - h + 1, 0x5aa02a); P.put(x - 1, 13 - h + 2, 0x5aa02a); P.rect(x - 1, 13, 3, 3, P.vary(0xf0801a, 10)); } }));
 makeTile('i_melon_slice', pPlant(P => { for (let y = 4; y <= 12; y++) for (let x = 2; x <= 14; x++) { const d = Math.hypot(x - 8, y - 4); if (d <= 7) P.put(x, y, d > 6 ? 0x3e8a1d : d > 5.2 ? 0xe8f0a0 : 0xe0342c); } P.pts([[6, 6], [9, 7], [8, 9], [11, 6]], 0x1a1a1a); }));
 makeTile('i_ender_pearl', pPlant(P => { P.disc(8, 8, 5, 0x1d6b5c, 8); P.disc(8, 8, 2.6, 0x3fb59a, 8); P.pts([[6, 6], [7, 6]], 0xb0fff0); }));
 makeTile('i_bow', pPlant(P => { for (let a = 0; a <= 90; a += 4) { const r = a * Math.PI / 180; P.put(2 + Math.cos(r) * 11, 2 + Math.sin(r) * 11, 0x7a5a32); P.put(2 + Math.cos(r) * 10, 2 + Math.sin(r) * 10, 0x5a3e20); } P.line(13, 2, 2, 13, 0xdddddd); }));
@@ -649,6 +652,8 @@ for (const d of ['n', 's', 'e', 'w']) {
   block('sign_' + d, 'Oak Sign', 'planks_oak', { tool: 'axe', hardness: 1, opaque: false, solid: false, boxes: [SIGN_BOARD[d], [0.4375, 0, 0.4375, 0.5625, 0.5, 0.5625]], drop: 'oak_sign', sign: { d, wall: false } });
   block('wall_sign_' + d, 'Oak Sign', 'planks_oak', { tool: 'axe', hardness: 1, opaque: false, solid: false, boxes: [WALL_SIGN[d]], drop: 'oak_sign', sign: { d, wall: true } });
 }
+block('carrot_sprout', 'Carrots (growing)', 'carrot_sprout', Object.assign({ drop: 'carrot' }, CROSS));
+block('carrot_crop', 'Carrots', 'carrot_crop', Object.assign({ drop: (r) => [['carrot', 2 + (r() * 3 | 0)]] }, CROSS));
 for (const [k, n] of [['oak', 'Oak'], ['birch', 'Birch'], ['spruce', 'Spruce']]) block(k + '_sapling', n + ' Sapling', k + '_sapling', Object.assign({ sapling: k }, CROSS));
 /* ladders sit flat against a wall: the letter says which side of the block they hug */
 const LADDER_BOX = { w: [0, 0, 0, 0.1875, 1, 1], e: [0.8125, 0, 0, 1, 1, 1], n: [0, 0, 0, 1, 1, 0.1875], s: [0, 0, 0.8125, 1, 1, 1] };
@@ -712,6 +717,7 @@ item('blaze_powder', 'Blaze Powder', 'blaze_powder');
 item('eye_of_ender', 'Eye of Ender', 'eye_of_ender', { stack: 16 });
 item('wheat', 'Wheat', 'wheat');
 item('wheat_seeds', 'Wheat Seeds', 'wheat_seeds');
+item('carrot', 'Carrot', 'carrot', { food: 3 });
 item('oak_door', 'Oak Door', 'oak_door');
 for (const [k, n] of [['oak', 'Oak'], ['cobblestone', 'Cobblestone'], ['stone_brick', 'Stone Brick']]) item(k + '_stairs', n + ' Stairs', k + '_stairs', { placesStair: k });
 item('oak_trapdoor', 'Oak Trapdoor', 'oak_trapdoor');

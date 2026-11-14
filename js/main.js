@@ -519,7 +519,14 @@ G.growTree = (x, y, z, kind) => {
 };
 
 /* crops: planted seeds grow into ripe wheat after a few minutes (only while their area is loaded) */
-G.plantCrop = (x, y, z) => { G.crops = G.crops || {}; G.crops[chestKey(x, y, z)] = 1; };
+const CROP_TIME = 300; // five minutes from planting to ripe
+const RIPE = () => ({ [ID.wheat_sprout]: ID.wheat_crop, [ID.carrot_sprout]: ID.carrot_crop });
+G.plantCrop = (x, y, z) => { G.crops = G.crops || {}; G.crops[chestKey(x, y, z)] = CROP_TIME; };
+G.waterNear = (x, y, z) => {
+  const W = G.world;
+  for (let dy = 0; dy <= 1; dy++) for (let dz = -5; dz <= 5; dz++) for (let dx = -5; dx <= 5; dx++) if (W.getBlock(x + dx, y + dy, z + dz) === ID.water) return true;
+  return false;
+};
 G.tickCrops = () => {
   if (!G.crops) return;
   const pre = G.dim + ':';
@@ -527,10 +534,12 @@ G.tickCrops = () => {
     if (!k.startsWith(pre)) continue;
     const [x, y, z] = k.slice(pre.length).split(',').map(Number);
     if (!G.world.isLoaded(x, z)) continue;
-    const here = G.world.getBlock(x, y, z), sap = DEFS[here].sapling;
-    if (here !== ID.wheat_sprout && !sap) { delete G.crops[k]; continue; }
+    const here = G.world.getBlock(x, y, z), sap = DEFS[here].sapling, ripe = RIPE()[here];
+    if (!ripe && !sap) { delete G.crops[k]; continue; }
     if (sap) { if (Math.random() < 1 / 200 && G.growTree(x, y, z, sap)) delete G.crops[k]; continue; }
-    if (Math.random() < 1 / 150) { G.world.setBlock(x, y, z, ID.wheat_crop); delete G.crops[k]; }
+    // crops count down while their area is loaded (one tick a second)
+    G.crops[k] = (typeof G.crops[k] === 'number' && G.crops[k] > 1 ? G.crops[k] : 1) - 1;
+    if (G.crops[k] <= 0) { G.world.setBlock(x, y, z, ripe); delete G.crops[k]; }
   }
 };
 
@@ -703,14 +712,15 @@ function spawnTick() {
     if (m.dead || m.remoteCtl) continue;
     const d = Math.min(...players.map(q => Math.hypot(m.pos.x - q.x, m.pos.z - q.z)));
     if (m.tame || m.rider) continue;
-    if (d > (m.T.passive ? 96 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
+    if (d > (m.T.passive ? 160 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
   }
   if (G.dim === 'nether') { netherSpawn(hostile); return; }
   if (G.dim === 'end') { endSpawn(hostile); return; }
   structureSpawns();
-  if (passive < 10 && Math.random() < 0.12) {
-    const a = Math.random() * Math.PI * 2, r = 20 + Math.random() * 25;
+  // farm animals, horses and wolves: plenty of them around (monsters are counted separately)
+  if (passive < 22 && Math.random() < 0.5) {
+    const a = Math.random() * Math.PI * 2, r = 22 + Math.random() * 34;
     const x = Math.floor(P.pos.x + Math.cos(a) * r) + 0.5, z = Math.floor(P.pos.z + Math.sin(a) * r) + 0.5;
     if (W.isLoaded(x, z)) {
       const y = W.surfaceY(x, z);
@@ -1094,10 +1104,13 @@ G.startNew = (mode, name) => {
     ['grass', 'stone', 'oak_planks', 'glass', 'bricks', 'gold_block', 'diamond_block', 'tnt', 'flint_and_steel'].forEach((k, i) => { P.inv.slots[i] = { id: ID[k], count: DEFS[ID[k]].stack }; });
     P.inv.changed();
   }
-  for (let i = 0; i < 6; i++) {
-    const x = sx + (Math.random() - 0.5) * 30, z = sz + (Math.random() - 0.5) * 30;
+  // a new world starts with herds of animals nearby
+  for (let i = 0; i < 10; i++) {
+    const x = sx + (Math.random() - 0.5) * 48, z = sz + (Math.random() - 0.5) * 48;
     const y = G.world.surfaceY(x, z);
-    if (G.world.getBlock(Math.floor(x), y, Math.floor(z)) === ID.grass) spawnMob(pick(PASSIVE_POOL), x, y + 1, z);
+    if (G.world.getBlock(Math.floor(x), y, Math.floor(z)) !== ID.grass) continue;
+    const type = pick(PASSIVE_POOL);
+    for (let n = 2 + (Math.random() * 2 | 0); n > 0; n--) spawnMob(type, x + (Math.random() - 0.5) * 3, y + 1, z + (Math.random() - 0.5) * 3);
   }
   $('menu-start').hidden = true;
   G.ui.message(mode === 'creative' ? 'Creative mode: unlimited blocks, double-tap jump to fly.' : 'Survival mode: punch trees, craft tools, survive the night!', 'gold');

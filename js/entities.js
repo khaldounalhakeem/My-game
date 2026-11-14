@@ -171,7 +171,7 @@ function dressModel(m, ids) {
 }
 
 /* what each farm animal loves: holding it makes them follow you, feeding two of them makes a baby */
-const BREED_FOOD = { cow: ['wheat'], sheep: ['wheat'], pig: ['apple'], chicken: ['wheat_seeds'] };
+const BREED_FOOD = { cow: ['wheat'], sheep: ['wheat'], pig: ['carrot', 'apple'], chicken: ['wheat_seeds'] };
 const lovesFood = (type, id) => !!(id && DEFS[id] && BREED_FOOD[type] && BREED_FOOD[type].includes(DEFS[id].key));
 
 /* ---------- mob definitions ---------- */

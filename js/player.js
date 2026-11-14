@@ -516,14 +516,16 @@ class Player {
     }
     if (hd.tool && hd.tool.type === 'hoe') {
       if (!b || (b.id !== ID.grass && b.id !== ID.dirt) || W.getBlock(b.x, b.y + 1, b.z)) return false;
+      // like Minecraft: farmland needs water close by (up to 5 blocks away, at the same height or one above)
+      if (!G.waterNear(b.x, b.y, b.z)) { G.ui.message('Farmland needs water within 5 blocks. Pour a water bucket nearby first.'); this.useCd = 0.4; return true; }
       W.setBlock(b.x, b.y, b.z, ID.farmland);
       G.sound.play('dig', new THREE.Vector3(b.x, b.y, b.z));
       this.useCd = 0.25; this.swing = 1;
       return true;
     }
-    if (k === 'wheat_seeds') {
+    if (k === 'wheat_seeds' || k === 'carrot') {
       if (!b || b.id !== ID.farmland || W.getBlock(b.x, b.y + 1, b.z)) return false;
-      W.setBlock(b.x, b.y + 1, b.z, ID.wheat_sprout);
+      W.setBlock(b.x, b.y + 1, b.z, k === 'carrot' ? ID.carrot_sprout : ID.wheat_sprout);
       G.plantCrop(b.x, b.y + 1, b.z);
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       G.sound.play('place');
