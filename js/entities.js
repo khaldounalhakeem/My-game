@@ -447,7 +447,9 @@ class Mob {
   interact(P, hd) {
     if (this.dead) return false;
     if (this.remoteCtl && (this.type === 'wolf' || this.type === 'horse')) {
-      G.ui.message('This animal belongs to the other player\'s game right now. The player who joined the world first can tame and ride animals.');
+      // a wolf or horse another player's game runs: if nobody tamed it yet, ask for it, then tame it here
+      if (this.tame) { G.ui.message('This ' + this.T.name.toLowerCase() + ' is already tamed by ' + Net.nameOf(this.remoteCtl) + '.'); return true; }
+      Net.claimMob(this, hd ? hd.id : 0);
       return true;
     }
     if (hd && lovesFood(this.type, hd.id)) {

@@ -710,7 +710,7 @@ function spawnTick() {
   const P = G.player, W = G.world;
   // in multiplayer only the host runs wild mobs; everyone else shows the host's
   if (!Net.isHost()) {
-    for (const m of G.mobs) if (!m.remoteCtl && !m.tame && !m.rider && !m.dead) m.removeSilently();
+    for (const m of G.mobs) if (!m.remoteCtl && !m.tame && !m.rider && !m.dead && !m.claimed) m.removeSilently();
     return;
   }
   const players = [P.pos, ...Net.proxies().map(p => p.pos)];

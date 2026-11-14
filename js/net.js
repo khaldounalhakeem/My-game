@@ -233,7 +233,7 @@ function makeMultiRoom(rooms, me) {
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
   world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0, blasts: [], blastSeq: 0,
-  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, askRing: [], askSeq: 0, chestRing: [], signRing: [], signSeq: 0, giveRing: [], giveSeq: 0, gotDrops: new Set(), seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
+  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, askRing: [], askSeq: 0, giveMobRing: [], giveMobSeq: 0, gotMobs: new Set(), pendingClaims: {}, chestRing: [], signRing: [], signSeq: 0, giveRing: [], giveSeq: 0, gotDrops: new Set(), seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
   nick: '', color: SHIRT_COLORS[0],
 
   async init() {
@@ -368,9 +368,10 @@ const Net = {
         ar: [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0)), ex: this.blasts,
         mb: this.slim ? null : this.ownedMobs(), mh: this.mobHits, dr: this.slim ? null : this.dropRing, pk: this.slim ? null : this.pickRing,
         rq: this.slim ? null : this.askRing, gv: this.slim ? null : this.giveRing,
+        gm: this.slim ? null : this.giveMobRing,
         cs: this.slim ? null : this.chestRing, oc: G.ui.chest ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
       });
-    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, cs: null, oc: null });
+    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
@@ -569,6 +570,19 @@ const Net = {
     this.sendT = 0;
   },
 
+  nameOf(peer) { const rp = this.peers.get(peer); return (rp && rp.name) || 'another player'; },
+
+  /* ask the device that runs an untamed wolf or horse to hand it over, so we can tame it here */
+  claimMob(m, heldId) {
+    if (this.pendingClaims[m.nid] && Date.now() - this.pendingClaims[m.nid].at < 3000) return;
+    this.pendingClaims[m.nid] = { at: Date.now(), held: heldId };
+    this.mhSeq++;
+    const P = G.player;
+    this.mobHits.push([this.mhSeq, m.remoteCtl, m.nid, 0, r2(P.pos.x), r2(P.pos.z), 0, 'claim']);
+    if (this.mobHits.length > 16) this.mobHits.shift();
+    this.sendT = 0;
+  },
+
   /* feeding an animal that another device runs: ask them to feed it */
   mobFeed(m) {
     this.mhSeq++;
@@ -695,6 +709,16 @@ const Net = {
         if (rp.mhReady && h[0] > (rp.lastMh || 0) && h[1] === this.uid) {
           const target = G.mobs.find(m => !m.remoteCtl && m.nid === h[2]) || G.dragons.find(d => !d.remoteCtl && d.nid === h[2]);
           if (target && !target.dead && h[7] === 'feed') { if (target.feed) target.feed(); }
+          else if (h[7] === 'claim') {
+            // they want to tame one of our wolves or horses: hand it over if nobody has tamed it
+            if (target && !target.dead && !target.tame && !target.rider && (target.type === 'wolf' || target.type === 'horse')) {
+              this.giveMobSeq++;
+              this.giveMobRing.push([this.giveMobSeq, rp.peer, target.type, r2(target.pos.x), r2(target.pos.y), r2(target.pos.z), r2(target.yaw), Math.round(target.hp), target.nid, target.tameProgress || 0]);
+              if (this.giveMobRing.length > 8) this.giveMobRing.shift();
+              target.removeSilently();
+              this.sendT = 0;
+            }
+          }
           else if (target && !target.dead) {
             if (target instanceof Dragon) target.hurt(clamp(+h[3] || 1, 1, 20));
             else target.hurt(clamp(+h[3] || 1, 1, 20), { x: +h[4], z: +h[5] }, clamp(+h[6] || 6, 0, 16), true);
@@ -750,6 +774,21 @@ const Net = {
     if (rp.openChest && G.ui.chest && rp.openChest === G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) && this.uid > rp.peer) {
       G.ui.closeInventory();
       G.ui.message((rp.name || 'Your friend') + ' opened this chest first.', 'purple');
+    }
+    // a wolf or horse they handed over to us: it lives in our game now, and the taming we tried goes ahead
+    if (Array.isArray(pr.gm)) for (const e of pr.gm) {
+      if (!Array.isArray(e) || e.length < 9 || e[1] !== this.uid || typeof e[8] !== 'string' || this.gotMobs.has(e[8]) || (e[2] !== 'wolf' && e[2] !== 'horse')) continue;
+      if (!e.slice(3, 8).every(Number.isFinite)) continue;
+      this.gotMobs.add(e[8]);
+      for (const old of G.mobs) if (old.nid === e[8] && old.remoteCtl) old.removeSilently();
+      const m = new Mob(e[2], e[3], e[4], e[5]);
+      m.claimed = true; // handed over to us: keep it even though we don't run the wild animals
+      m.nid = e[8]; m.yaw = e[6]; m.hp = Math.max(1, Math.min(m.T.hp + 10, e[7])); m.tameProgress = +e[9] || 0;
+      G.mobs.push(m);
+      const want = this.pendingClaims[e[8]];
+      delete this.pendingClaims[e[8]];
+      const P = G.player, held = P.heldSlot();
+      if (want && m.pos.distanceTo(P.pos) < 8) m.interact(P, held ? DEFS[held.id] : null);
     }
     // items they handed to us
     if (Array.isArray(pr.gv)) for (const e of pr.gv) {
