@@ -710,15 +710,32 @@ function spawnTick() {
   const P = G.player, W = G.world;
   // in multiplayer only the host runs wild mobs; everyone else shows the host's
   if (!Net.isHost()) {
-    for (const m of G.mobs) if (!m.remoteCtl && !m.tame && !m.rider && !m.dead && !m.claimed) m.removeSilently();
+    for (const m of G.mobs) if (!m.remoteCtl && !m.tame && !m.rider && !m.dead && !m.claimed) {
+      if (m.penned) (G.guestPens = G.guestPens || []).push(serializeMob(m)); // ours: kept in the save
+      m.removeSilently();
+    }
     return;
+  }
+  // back in charge of our own animals
+  if (G.guestPens && G.guestPens.length) { G.pendingPets = (G.pendingPets || []).concat(G.guestPens); G.guestPens = []; }
+  // check now and then which mobs are shut in a pen
+  const now = Date.now();
+  let checks = 0;
+  for (const m of G.mobs) {
+    if (checks >= 4) break;
+    if (m.dead || m.remoteCtl || m.tame || now < (m.penCheckAt || 0) || !W.isLoaded(m.pos.x, m.pos.z)) continue;
+    m.penCheckAt = now + 7000 + Math.random() * 3000; checks++;
+    const pen = G.isPenned(m);
+    if (pen !== null) m.penned = pen;
   }
   const players = [P.pos, ...Net.proxies().map(p => p.pos)];
   let hostile = 0, passive = 0;
   for (const m of G.mobs) {
     if (m.dead || m.remoteCtl) continue;
     const d = Math.min(...players.map(q => Math.hypot(m.pos.x - q.x, m.pos.z - q.z)));
-    if (m.tame || m.rider) continue;
+    // tamed and penned mobs never vanish: far away they wait in the save until you come back
+    if ((m.tame || m.penned) && !m.rider && !W.isLoaded(m.pos.x, m.pos.z)) { G.pendingPets.push(serializeMob(m)); m.removeSilently(); continue; }
+    if (m.tame || m.rider || m.penned) continue;
     if (d > (m.T.passive ? 160 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
   }
@@ -898,33 +915,88 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.chests = {}; G.chestVer = {}; for (const k of Object.keys(G.signMeshes || {})) { G.scene.remove(G.signMeshes[k]); } G.signs = {}; G.signMeshes = {}; G.crops = {}; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
+  G.pets = {}; G.pendingPets = []; G.guestPens = []; G.chests = {}; G.chestVer = {}; for (const k of Object.keys(G.signMeshes || {})) { G.scene.remove(G.signMeshes[k]); } G.signs = {}; G.signMeshes = {}; G.crops = {}; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
   G.applyFog();
 }
 
-/* tamed animals are kept in the save, one list per dimension */
+/* tamed animals, and any mob shut in a pen, are kept in the save, one list per dimension:
+   [type, x, y, z, sitting, flags (1 tame, 2 penned, 4 baby), time left to grow up, health] */
+const keepsForever = m => (m.tame || m.penned) && !m.dead && !m.remoteCtl;
+function serializeMob(m) {
+  return [m.type, +m.pos.x.toFixed(2), +m.pos.y.toFixed(2), +m.pos.z.toFixed(2), m.sitting ? 1 : 0,
+    (m.tame ? 1 : 0) | (m.penned ? 2 : 0) | (m.baby ? 4 : 0), Math.round(m.growT || 0), Math.round(m.hp)];
+}
 function serializePets() {
-  return G.mobs.filter(m => m.tame && !m.dead).map(m => [m.type, +m.pos.x.toFixed(1), +m.pos.y.toFixed(1), +m.pos.z.toFixed(1), m.sitting ? 1 : 0]);
+  return G.mobs.filter(keepsForever).map(serializeMob).concat(G.guestPens || []);
 }
 function restorePets(list) {
   for (const p of list || []) {
-    if (!Array.isArray(p) || !MOB_TYPES[p[0]]) continue;
-    const m = spawnMob(p[0], p[1], p[2] + 0.2, p[3]);
-    m.tame = true; m.sitting = !!p[4];
-    if (m.parts.collar) m.parts.collar.visible = true;
-    if (m.parts.saddle) m.parts.saddle.visible = true;
-    if (m.type === 'wolf') m.hp = 20;
+    if (!Array.isArray(p) || !MOB_TYPES[p[0]] || !p.slice(1, 4).every(Number.isFinite)) continue;
+    const flags = Number.isInteger(p[5]) ? p[5] : 1;
+    // in a friend's world the host looks after the animals; keep ours safe in the save meanwhile
+    if (!(flags & 1) && !Net.isHost()) { (G.guestPens = G.guestPens || []).push(p); continue; }
+    const m = spawnMob(p[0], p[1], p[2] + 0.05, p[3]);
+    m.penned = !!(flags & 2); m.penCheckAt = Date.now() + 8000;
+    if (flags & 4 && m.makeBaby) m.makeBaby(Number.isFinite(p[6]) ? p[6] : 240);
+    if (Number.isFinite(p[7]) && p[7] > 0) m.hp = Math.min(p[7], m.T.hp * 2);
+    if (flags & 1) {
+      m.tame = true; m.sitting = !!p[4];
+      if (m.parts.collar) m.parts.collar.visible = true;
+      if (m.parts.saddle) m.parts.saddle.visible = true;
+      if (m.type === 'wolf') m.hp = 20;
+    }
   }
 }
+
+/* is this mob shut in on every side (fences, walls, a closed gate...) so it can never walk out?
+   Walks the floor the mob could reach, stepping up half blocks and single blocks the way mobs can.
+   It only counts if a player built or dug some of it, so cave monsters don't pile up forever. */
+const PEN_MAX = 1200, PEN_R = 28;
+G.isPenned = (m) => {
+  const W = G.world, ox = m.pos.x, oz = m.pos.z;
+  const blocked = (x, y, z) => W.collides(x + 0.5, y, z + 0.5, 0.4, 0.9);
+  const edited = (x, y, z) => { const e = W.edits.get(W.key(x >> 4, z >> 4)); return !!(e && e.has((x & 15) + ((z & 15) << 4) + (y << 8))); };
+  const sx = Math.floor(ox), sz = Math.floor(oz);
+  // where it stands (it may be in the middle of a jump), on the half-block grid
+  let y0 = Math.floor(m.pos.y * 2) / 2;
+  for (let i = 0; i < 8 && y0 > 1 && !blocked(sx, y0 - 0.5, sz); i++) y0 -= 0.5;
+  for (let i = 0; i < 3 && blocked(sx, y0, sz); i++) y0 += 0.5;
+  const seen = new Set(), queue = [[sx, y0, sz]];
+  seen.add(sx + ',' + y0 + ',' + sz);
+  let built = false;
+  while (queue.length) {
+    const [x, y, z] = queue.pop();
+    if (seen.size > PEN_MAX || Math.abs(x - sx) > PEN_R || Math.abs(z - sz) > PEN_R) return false;
+    const fy = Math.floor(y);
+    if (!built && (edited(x, fy, z) || edited(x, fy - 1, z))) built = true;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, nz = z + dz;
+      if (!W.isLoaded(nx, nz)) return null; // can't tell yet
+      let ny = null;
+      if (!blocked(nx, y, nz)) {
+        ny = y;
+        for (let f = 0; f < 4 && ny > 0 && !blocked(nx, ny - 0.5, nz); f++) ny -= 0.5; // walk or fall down
+        if (ny < y - 1.5) ny = Math.floor(ny);
+      } else {
+        for (const up of [0.5, 1]) if (!blocked(nx, y + up, nz) && !blocked(x, y + up, z)) { ny = y + up; break; } // hop up
+        if (ny === null && !built && (edited(nx, fy, nz) || edited(nx, fy + 1, nz))) built = true; // a wall someone placed
+      }
+      if (ny === null || ny < 1) continue;
+      const k = nx + ',' + ny + ',' + nz;
+      if (!seen.has(k)) { seen.add(k); queue.push([nx, ny, nz]); }
+    }
+  }
+  return built;
+};
 
 function useDim(to) {
   if (G.dim === to) return;
   if (G.player.riding) G.player.dismount();
   G.pets = G.pets || {};
-  G.pets[G.dim] = serializePets().concat(G.pendingPets || []);
+  G.pets[G.dim] = serializePets().concat(G.pendingPets || []); G.guestPens = [];
   if (to === 'overworld' && G.dragons.some(d => !d.dead)) G.dragonTimer = 20;
   G.dimDrops = G.dimDrops || {};
   G.dimDrops[G.dim] = (G.dimDrops[G.dim] || []).concat(serializeDrops());

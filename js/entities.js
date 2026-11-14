@@ -544,6 +544,7 @@ class Mob {
 
   update(dt) {
     if (this.remoteCtl) return this.puppetUpdate(dt);
+    if (!G.world.isLoaded(this.pos.x, this.pos.z)) return; // the ground here isn't loaded: wait
     const W = G.world, P = this.tame ? G.player : nearestPlayer(this.pos);
     if (this.dead) {
       this.deathT += dt;
