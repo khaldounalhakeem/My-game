@@ -69,23 +69,34 @@
     </div>
 
     <div class="title-page" data-page="single" hidden>
-      <h2 class="page-title">Singleplayer</h2>
-      <button id="btn-continue" class="btn mc gold" type="button" hidden>Continue saved world</button>
-      <div class="seed-slot"></div>
-      <div class="diff-slot"></div>
-      <div class="mc-row">
-        <button id="btn-play-seed-s" class="btn mc" type="button">New Survival World</button>
-        <button id="btn-play-seed-c" class="btn mc" type="button">New Creative World</button>
-      </div>
+      <h2 class="page-title">Your Worlds</h2>
+      <div id="world-list" class="world-list"></div>
+      <button class="btn mc gold" type="button" data-go="create">Create New World</button>
+      <button id="btn-continue" class="btn" type="button" hidden>Continue</button>
       <button id="btn-survival" class="btn" type="button" hidden>Survival</button>
       <button id="btn-creative" class="btn" type="button" hidden>Creative</button>
       <button class="btn mc back" type="button" data-go="main">Back</button>
+    </div>
+
+    <div class="title-page" data-page="create" hidden>
+      <h2 class="page-title">Create New World</h2>
+      <div class="seed-row"><label for="world-name">World name</label><input id="world-name" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="New World"></div>
+      <div class="seed-slot"></div>
+      <p id="create-hint" class="page-hint"></p>
+      <div class="diff-slot"></div>
+      <div class="mc-row">
+        <button id="btn-play-seed-s" class="btn mc" type="button">Create in Survival</button>
+        <button id="btn-play-seed-c" class="btn mc" type="button">Create in Creative</button>
+      </div>
+      <button class="btn mc back" type="button" data-go="single">Back</button>
     </div>
 
     <div class="title-page" data-page="multi" hidden>
       <h2 class="page-title">Multiplayer</h2>
       <p class="page-hint">Type the same world seed as your friends and press Join. Everyone with the same seed plays in the same world.</p>
       <div class="seed-slot"></div>
+      <div class="seed-row"><label for="mp-world-name">World name</label><input id="mp-world-name" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="Shared World"></div>
+      <p id="mp-hint" class="page-hint"></p>
       <div class="diff-slot"></div>
       <div class="mc-row">
         <button id="btn-mp-s" class="btn mc" type="button">Join in Survival</button>

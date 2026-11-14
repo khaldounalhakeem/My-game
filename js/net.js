@@ -347,7 +347,7 @@ const Net = {
   /* send who we are and where; in a world this is refreshed ten times a second by tick() */
   announce() {
     if (!this.room || this.status !== 'on') return;
-    const base = { v: 2, u: this.uid, n: this.nick, c: this.color, w: this.world, sk: G.skin || 0 };
+    const base = { v: 2, u: this.uid, n: this.nick, c: this.color, w: this.world, sk: G.skin || 0, wn: this.world && G.worldName ? String(G.worldName).slice(0, 32) : null };
     if (this.world && G.player) {
       const P = G.player, held = P.heldSlot(), now = Date.now();
       this.trail = this.trail || [];
@@ -584,6 +584,12 @@ const Net = {
     this.pickRing.push([this.pkSeq, did]);
     if (this.pickRing.length > 45) this.pickRing.shift();
     this.sendT = 0;
+  },
+
+  /* the name a friend already gave the world with this seed, if one of them is playing it */
+  friendWorldName(seed) {
+    for (const rp of this.peers.values()) if (rp.world === 'w' + seed && rp.worldName) return { name: rp.worldName, by: rp.name || 'Your friend' };
+    return null;
   },
 
   /* names of the players in this world who still need to get into bed */
@@ -851,6 +857,14 @@ const Net = {
     if (name !== rp.name) this.removeModel(rp);
     rp.name = name;
     rp.world = typeof pr.w === 'string' ? pr.w.slice(0, 24) : null;
+    rp.worldName = typeof pr.wn === 'string' ? pr.wn.replace(/[^\w .,'!?&()-]/g, '').slice(0, 32) : null;
+    // joined a new world through multiplayer: whoever was here first already named it
+    if (G.adoptName && rp.worldName && this.world && rp.world === this.world && Number.isFinite(pr.tj) && pr.tj < (this.joinedAt || Date.now()) && rp.worldName !== G.worldName) {
+      G.adoptName = false;
+      G.renameWorld(G.worldId, rp.worldName);
+      G.ui.message((this.clean(pr.n) || 'Your friend') + ' named this world "' + rp.worldName + '".', 'gold');
+      G.save();
+    }
     rp.mode = pr.m === 1 ? 'creative' : 'survival';
     const wasIn = rp.inWorld;
     rp.inWorld = !!this.world && rp.world === this.world && G.state !== 'title';

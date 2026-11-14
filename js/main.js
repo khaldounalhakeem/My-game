@@ -1,7 +1,9 @@
 'use strict';
 /* Game setup, sky and day/night cycle, sounds, spawning, explosions, saving and the main loop. */
 
-const SAVE_KEY = 'blockrealm-save-v1';
+const SAVE_KEY = 'blockrealm-save-v1'; // the old single save, moved into the world list on first start
+const WORLDS_KEY = 'blockrealm-worlds';
+const worldKey = id => 'blockrealm-world-' + id;
 const DAY_LENGTH = 600; // seconds for a full day
 
 const G = {
@@ -419,11 +421,20 @@ G.chestKind = (x, y, z) => {
     if (b === ID.spawner) return 'dungeon';
     if (b === ID.bookshelf) shelves++;
   }
+  const cx = Math.floor(x / 16), cz = Math.floor(z / 16);
+  // a village building: what is in the room says whose chest it is
+  if (G.dim === 'overworld' && y > SEA - 3 && W.villageAt && W.villageAt(cx, cz)) {
+    const n = {};
+    for (let dy = -1; dy <= 3; dy++) for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { const b = W.getBlock(x + dx, y + dy, z + dz); n[b] = (n[b] || 0) + 1; }
+    if (n[ID.lava]) return 'v_blacksmith';
+    if (n[ID.hay_bale] >= 2 && n[ID.furnace]) return 'v_butcher';
+    if (n[ID.furnace] && (n[ID.crafting_table] || n[ID.iron_block])) return 'v_toolsmith';
+    if (n[ID.stone_bricks] >= 12) return 'v_temple';
+    return 'v_house';
+  }
   if (shelves >= 4) return 'library';
   if (G.dim === 'nether') return 'ruined_portal';
   if (G.dim === 'end') return 'library';
-  const cx = Math.floor(x / 16), cz = Math.floor(z / 16);
-  if (W.villageAt && W.villageAt(cx, cz)) return 'village';
   if (W.regionPick) {
     if (W.regionPick(cx, cz, 'pyramid')) return 'desert';
     if (W.regionPick(cx, cz, 'igloo')) return 'igloo';
@@ -930,10 +941,16 @@ G.previewWorld = (seedText) => {
   G.titleAngle = 0;
 };
 
-G.startNew = (mode) => {
+G.startNew = (mode, name) => {
   Sound.init();
   const P = G.player;
   const txt = $('seed').value.trim();
+  const seedNow = txt ? seedFromText(txt) : G.seed;
+  // a seed you played before takes you back to that world instead of starting over
+  if (G.findWorld(seedNow)) { G.continueSaved(String(seedNow)); return; }
+  G.worldId = String(seedNow);
+  G.worldName = (name || '').trim() || 'New World';
+  G.adoptName = G.ui.fromMultiplayer && !(Net.friendWorldName && Net.friendWorldName(seedNow));
   makeWorld(txt ? seedFromText(txt) : G.seed);
   P.inv = new Inventory(); P.reset(); P.mode = mode; P.sel = 0;
   G.setDifficulty(G.pickedDifficulty(), true);
@@ -964,11 +981,13 @@ G.startNew = (mode) => {
   Net.joinWorld(G.seed);
 };
 
-G.continueSaved = () => {
+G.continueSaved = (id) => {
   Sound.init();
-  let s;
-  try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
+  const entry = id ? G.findWorld(id) : G.worldList()[0];
+  let s = null;
+  try { s = entry ? JSON.parse(localStorage.getItem(worldKey(entry.id))) : null; } catch (e) { s = null; }
   if (!s) { G.ui.message('No saved world found.'); return; }
+  G.worldId = entry.id; G.worldName = entry.name;
   makeWorld(s.seed, !s.gen); // saves from before seed personalities keep their old landscape
   G.worlds.overworld.loadEdits(s.edits || {});
   G.worlds.nether.loadEdits(s.netherEdits || {});
@@ -996,7 +1015,7 @@ G.continueSaved = () => {
   P.portalCd = true;
   $('seed').value = s.seed;
   $('menu-start').hidden = true;
-  G.ui.message('Welcome back!', 'gold');
+  G.ui.message('Welcome back to ' + G.worldName + '!', 'gold');
   G.resume();
   Net.joinWorld(G.seed);
 };
@@ -1012,21 +1031,48 @@ G.save = () => {
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
     dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, keepInventory: !!G.keepInventory, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
+  try { localStorage.setItem(G.saveKey(), JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
+  const list = G.worldList().filter(w => w.id !== G.worldId);
+  list.unshift({ id: G.worldId, name: G.worldName || 'My World', seed: G.seed, mode: P.mode, last: Date.now() });
+  writeWorldList(list);
 };
 
-function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
-function refreshContinue() {
-  let s = null;
-  try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
-  $('btn-continue').hidden = !s;
-  if (s) $('btn-continue').textContent = 'Continue saved world (seed ' + s.seed + (s.mode === 'creative' ? ', Creative' : ', Survival') + ')';
+/* ---------- your worlds: every seed you played is kept, with the name you gave it ---------- */
+G.worldList = () => {
+  try { const l = JSON.parse(localStorage.getItem(WORLDS_KEY)); return Array.isArray(l) ? l.filter(w => w && w.id) : []; } catch (e) { return []; }
+};
+function writeWorldList(list) { try { localStorage.setItem(WORLDS_KEY, JSON.stringify(list)); } catch (e) { /* storage unavailable */ } }
+G.findWorld = seed => G.worldList().find(w => w.id === String(seed));
+G.saveKey = () => worldKey(G.worldId);
+G.deleteWorld = id => {
+  writeWorldList(G.worldList().filter(w => w.id !== id));
+  try { localStorage.removeItem(worldKey(id)); } catch (e) { /* storage unavailable */ }
+};
+G.renameWorld = (id, name) => {
+  const list = G.worldList(), w = list.find(x => x.id === id);
+  if (w) { w.name = name; writeWorldList(list); }
+  if (G.worldId === id) G.worldName = name;
+};
+function migrateOldSave() {
+  let old = null;
+  try { old = localStorage.getItem(SAVE_KEY); } catch (e) { return; }
+  if (!old) return;
+  try {
+    const s = JSON.parse(old), id = String(s.seed);
+    if (!G.findWorld(id)) {
+      localStorage.setItem(worldKey(id), old);
+      writeWorldList([{ id, name: 'My World', seed: s.seed, mode: s.mode || 'survival', last: Date.now() }, ...G.worldList()]);
+    }
+    localStorage.removeItem(SAVE_KEY);
+  } catch (e) { /* keep the old save where it is */ }
 }
+function refreshContinue() { G.ui.renderWorldList(); }
 
 G.toTitle = () => {
   G.setState('title');
   for (const id of ['menu-pause', 'menu-inv', 'menu-dead']) $(id).hidden = true;
   $('menu-start').hidden = false;
+  G.ui.titlePage('main');
   refreshContinue();
   G.unlock();
   Net.leave();
@@ -1292,11 +1338,11 @@ function boot() {
   G.ui = UI;
   UI.init();
   Net.init();
-  let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { saved = null; }
+  migrateOldSave();
+  const recent = G.worldList()[0];
   refreshContinue();
   G.setState('title');
-  G.previewWorld(saved ? String(saved.seed) : null);
+  G.previewWorld(recent ? String(recent.seed) : null);
   window.addEventListener('beforeunload', () => G.save());
   document.addEventListener('visibilitychange', () => { if (document.hidden) { G.save(); if (G.state === 'play') G.pause(); } });
   requestAnimationFrame(t => { last = t; frame(t); });

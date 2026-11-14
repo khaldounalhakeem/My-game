@@ -475,7 +475,45 @@ const UI = {
     $('diff-row').hidden = !dslot;
     if (dslot) { dslot.appendChild($('diff-row')); this.renderDiff(); }
     if (name === 'skins') this.renderSkins();
+    if (name === 'single') this.renderWorldList();
+    if (name === 'create' || name === 'multi') this.seedHints();
     if (G.sound && G.state === 'title') G.sound.play('click');
+  },
+
+  /* the list of worlds you have played, newest first */
+  renderWorldList() {
+    const box = $('world-list');
+    if (!box) return;
+    box.innerHTML = '';
+    const list = G.worldList();
+    if (!list.length) { const p = document.createElement('p'); p.className = 'world-empty'; p.textContent = 'No worlds yet. Create one!'; box.appendChild(p); return; }
+    for (const w of list) {
+      const row = document.createElement('div'); row.className = 'world-row';
+      const play = document.createElement('button'); play.type = 'button'; play.className = 'btn world-play';
+      const b = document.createElement('b'); b.textContent = w.name || 'My World';
+      const sm = document.createElement('small');
+      const when = w.last ? new Date(w.last).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+      sm.textContent = 'Seed ' + w.seed + ' · ' + (w.mode === 'creative' ? 'Creative' : 'Survival') + (when ? ' · ' + when : '');
+      play.append(b, sm);
+      play.addEventListener('click', () => G.continueSaved(w.id));
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'btn world-del'; del.textContent = 'Delete';
+      del.addEventListener('click', () => { if (confirm('Delete the world "' + (w.name || 'My World') + '"? This can\'t be undone.')) { G.deleteWorld(w.id); this.renderWorldList(); } });
+      row.append(play, del);
+      box.appendChild(row);
+    }
+  },
+
+  /* tell people what typing this seed will do: open a world they already have, or join a friend's named world */
+  seedHints() {
+    const txt = $('seed').value.trim(), seed = txt ? seedFromText(txt) : G.seed;
+    const mine = G.findWorld(seed), friend = Net.friendWorldName ? Net.friendWorldName(seed) : null;
+    const ch = $('create-hint'), mh = $('mp-hint'), mn = $('mp-world-name');
+    if (ch) ch.textContent = mine ? 'You already have a world with this seed: "' + mine.name + '". Creating will open it.' : '';
+    if (mn) {
+      if (mine) { mn.value = mine.name; mn.disabled = true; mh.textContent = 'You played this world before. Join to go back to "' + mine.name + '".'; }
+      else if (friend) { mn.value = friend.name; mn.disabled = true; mh.textContent = friend.by + ' already named this world "' + friend.name + '".'; }
+      else { if (mn.disabled) mn.value = ''; mn.disabled = false; mh.textContent = 'You are the first one here, so you get to name this world.'; }
+    }
   },
 
   renderDiff() {
@@ -527,8 +565,10 @@ const UI = {
       this.message('Keep Inventory is ' + (G.keepInventory ? 'on: you keep your items when you die.' : 'off: your items drop when you die.'), 'gold');
       this.syncPause();
     });
-    $('btn-mp-s').addEventListener('click', () => G.startNew('survival'));
-    $('btn-mp-c').addEventListener('click', () => G.startNew('creative'));
+    const mpName = () => { const t = $('seed').value.trim(), f = Net.friendWorldName(t ? seedFromText(t) : G.seed); return f ? f.name : $('mp-world-name').value || 'Shared World'; };
+    $('btn-mp-s').addEventListener('click', () => { this.fromMultiplayer = true; G.startNew('survival', mpName()); this.fromMultiplayer = false; });
+    $('btn-mp-c').addEventListener('click', () => { this.fromMultiplayer = true; G.startNew('creative', mpName()); this.fromMultiplayer = false; });
+    $('seed').addEventListener('input', () => this.seedHints());
     $('nick').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); e.stopPropagation(); });
     this.titlePage('main');
     this.renderNameFace();
@@ -536,9 +576,11 @@ const UI = {
     $('btn-creative').addEventListener('click', () => G.startNew('creative'));
     $('btn-continue').addEventListener('click', () => G.continueSaved());
     $('btn-random').addEventListener('click', () => G.previewWorld(null));
-    $('btn-play-seed-s').addEventListener('click', () => G.startNew('survival'));
-    $('btn-play-seed-c').addEventListener('click', () => G.startNew('creative'));
-    $('seed').addEventListener('keydown', e => { if (e.key === 'Enter') G.startNew('survival'); e.stopPropagation(); });
+    $('btn-play-seed-s').addEventListener('click', () => G.startNew('survival', $('world-name').value));
+    $('btn-play-seed-c').addEventListener('click', () => G.startNew('creative', $('world-name').value));
+    $('world-name').addEventListener('keydown', e => e.stopPropagation());
+    $('mp-world-name').addEventListener('keydown', e => e.stopPropagation());
+    $('seed').addEventListener('keydown', e => { e.stopPropagation(); });
     $('btn-resume').addEventListener('click', () => G.resume());
     $('btn-mode').addEventListener('click', () => {
       const P = G.player;

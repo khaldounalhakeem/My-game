@@ -389,3 +389,12 @@ body.touch:not(.pad) #crosshair { display: none; }
 .knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #d9d4cc; box-shadow: inset -2px -2px 0 rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
 .toggle-row[aria-checked="true"] .switch { background: #3fae4a; }
 .toggle-row[aria-checked="true"] .knob { transform: translateX(24px); }
+
+.world-list { display: flex; flex-direction: column; gap: 6px; width: 100%; max-height: 42vh; overflow-y: auto; }
+.world-row { display: flex; align-items: stretch; gap: 6px; }
+.world-play { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 8px 12px; text-align: left; }
+.world-play b { font-size: 17px; }
+.world-play small { font-family: var(--font-body); font-size: 17px; color: var(--muted); text-shadow: none; }
+.world-del { flex: none; padding: 0 12px; font-size: 13px; }
+.world-empty { margin: 4px 0; font-size: 19px; color: var(--muted); text-shadow: 1px 1px 0 #000; }
+#mp-world-name:disabled { opacity: 0.7; }

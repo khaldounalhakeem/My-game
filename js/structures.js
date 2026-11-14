@@ -99,13 +99,105 @@ World.prototype.buildVillageChunk = function (S, v) {
   }
   quads.forEach(([qx, qz], i) => {
     if (isCentre && i === 0) return;
-    const roll = rng();
-    if (roll < 0.55) this.buildHouse(S, M, qx, qz);
-    else if (roll < 0.8) this.buildFarm(S, M, qx, qz);
+    const kind = pickWeighted(rng, VILLAGE_BUILDINGS);
+    if (kind === 'farm') this.buildFarm(S, M, qx, qz);
+    else if (kind === 'house') this.buildHouse(S, M, qx, qz);
+    else if (kind !== 'empty') this.buildShop(S, M, qx, qz, kind);
   });
   // lamp post at the crossing
   const lh = H(9, 9);
   if (lh > SEA && !isCentre) { for (let y = 1; y <= 3; y++) set(9, lh + y, 9, M.post); set(9, lh + 4, 9, ID.glowstone); }
+};
+
+/* what each plot in a village becomes */
+const VILLAGE_BUILDINGS = [['house', 22], ['bighouse', 12], ['farm', 24], ['blacksmith', 8], ['toolsmith', 6], ['butcher', 6], ['temple', 5], ['library', 5], ['empty', 4]];
+function pickWeighted(rng, list) {
+  let r = rng() * list.reduce((a, l) => a + l[1], 0);
+  for (const [k, w] of list) { r -= w; if (r <= 0) return k; }
+  return list[0][0];
+}
+
+/* the other village buildings: a big house, the blacksmith, toolsmith, butcher, temple and library */
+World.prototype.buildShop = function (S, M, qx, qz, kind) {
+  const { set, get, H, rng } = S;
+  const x0 = qx + 1, z0 = qz + 1, W = 5;
+  const floor = H(x0 + 2, z0 + 2);
+  if (floor <= SEA + 1) return;
+  const tall = { bighouse: 7, temple: 8 }[kind] || 4;
+  const wall = { blacksmith: ID.cobblestone, temple: ID.stone_bricks, toolsmith: M.wall, butcher: M.wall, library: M.wall, bighouse: M.wall }[kind];
+  const floorB = { blacksmith: ID.cobblestone, temple: ID.stone_bricks }[kind] || (M.base === ID.sandstone ? ID.sandstone : ID.oak_planks);
+  for (let x = x0 - 1; x <= x0 + W; x++) for (let z = z0 - 1; z <= z0 + W; z++) for (let y = floor + 1; y <= floor + tall + 5; y++) set(x, y, z, 0);
+  const roadX = qx === 0 ? x0 + W - 1 : x0; // the side that faces the street
+  for (let x = x0; x < x0 + W; x++) for (let z = z0; z < z0 + W; z++) {
+    for (let y = floor; y > floor - 6 && y > 0; y--) { const id = get(x, y, z); if (y < floor && id && DEFS[id].solid) break; set(x, y, z, M.base); }
+    set(x, floor, z, floorB);
+    const edgeX = x === x0 || x === x0 + W - 1, edgeZ = z === z0 || z === z0 + W - 1;
+    if (!edgeX && !edgeZ) continue;
+    for (let y = floor + 1; y <= floor + tall - 1; y++) {
+      let id = edgeX && edgeZ ? (kind === 'temple' || kind === 'blacksmith' ? wall : M.post) : wall;
+      // the blacksmith's forge is open to the street
+      if (kind === 'blacksmith' && x === roadX && !(edgeX && edgeZ) && y <= floor + 2) id = 0;
+      set(x, y, z, id);
+    }
+    if (!(edgeX && edgeZ) && kind !== 'blacksmith') {
+      if (kind === 'temple') { if (x === x0 + 2 || z === z0 + 2) { set(x, floor + 5, z, ID.glass); set(x, floor + 6, z, ID.glass); } }
+      else if (x === x0 + 2 || z === z0 + 2) { set(x, floor + 2, z, ID.glass); if (kind === 'bighouse') set(x, floor + 5, z, ID.glass); }
+    }
+  }
+  // door to the street
+  if (kind !== 'blacksmith') { set(roadX, floor + 1, z0 + 2, 0); set(roadX, floor + 2, z0 + 2, 0); }
+  const sx = roadX + (qx === 0 ? 1 : -1);
+  set(sx, floor, z0 + 2, M.base); set(sx, floor + 1, z0 + 2, 0); set(sx, floor + 2, z0 + 2, 0);
+  const back = qx === 0 ? x0 + 1 : x0 + 3, mid = x0 + 2; // inside, away from the door
+  // roofs: flat for the forge and temple, a tall pointed one for the big house, stepped for the rest
+  if (kind === 'blacksmith' || kind === 'temple') {
+    for (let x = x0 - 1; x <= x0 + W; x++) for (let z = z0 - 1; z <= z0 + W; z++) set(x, floor + tall, z, kind === 'temple' ? ID.stone_bricks : ID.cobblestone);
+    if (kind === 'temple') for (const [x, z] of [[x0, z0], [x0 + 4, z0], [x0, z0 + 4], [x0 + 4, z0 + 4]]) set(x, floor + tall + 1, z, ID.stone_bricks);
+  } else {
+    const steps = kind === 'bighouse' ? 4 : 3;
+    for (let k = 0; k < steps; k++) for (let x = x0 - 1 + k; x <= x0 + W - k; x++) for (let z = z0 - 1 + k; z <= z0 + W - k; z++) set(x, floor + tall + k, z, M.roof);
+    if (kind === 'bighouse') set(mid, floor + tall + 4, z0 + 2, M.post);
+  }
+  set(mid, floor + tall - 1, z0 + 2, ID.glowstone);
+  switch (kind) {
+    case 'bighouse': {
+      // an upstairs floor with steps up to it, the bed upstairs
+      for (let x = x0 + 1; x < x0 + W - 1; x++) for (let z = z0 + 1; z < z0 + W - 1; z++) set(x, floor + 3, z, ID.oak_planks);
+      set(back, floor + 1, z0 + 3, ID.oak_planks); set(back, floor + 2, z0 + 2, ID.oak_planks);
+      for (const z of [z0 + 1, z0 + 2]) set(back, floor + 3, z, 0);
+      set(back, floor + 3, z0 + 2, 0);
+      const up = qx === 0 ? x0 + 3 : x0 + 1;
+      set(up, floor + 4, z0 + 1, ID.bed); set(up, floor + 4, z0 + 2, ID.bed_head);
+      set(mid, floor + 1, z0 + 1, ID.crafting_table);
+      if (rng() < 0.5) set(up, floor + 4, z0 + 3, ID.chest_loot);
+      set(mid, floor + 6, z0 + 2, ID.glowstone);
+      break;
+    }
+    case 'blacksmith':
+      // a lava pit and furnaces: the forge
+      set(back, floor, z0 + 1, ID.lava); set(back, floor, z0 + 2, ID.lava);
+      set(back, floor + 1, z0 + 3, ID.furnace); set(mid, floor + 1, z0 + 3, ID.furnace);
+      set(mid, floor + 1, z0 + 1, ID.chest_loot);
+      break;
+    case 'toolsmith':
+      set(back, floor + 1, z0 + 1, ID.crafting_table); set(back, floor + 1, z0 + 3, ID.furnace); set(mid, floor + 1, z0 + 3, ID.iron_block);
+      set(back, floor + 1, z0 + 2, ID.chest_loot);
+      break;
+    case 'butcher':
+      set(back, floor + 1, z0 + 1, ID.hay_bale); set(back, floor + 2, z0 + 1, ID.hay_bale); set(mid, floor + 1, z0 + 1, ID.hay_bale);
+      set(back, floor + 1, z0 + 3, ID.furnace);
+      set(back, floor + 1, z0 + 2, ID.chest_loot);
+      break;
+    case 'temple':
+      for (let y = floor + 1; y <= floor + 2; y++) set(mid, y, qx === 0 ? z0 + 1 : z0 + 3, ID.stone_bricks);
+      set(mid, floor + 3, qx === 0 ? z0 + 1 : z0 + 3, ID.glowstone);
+      set(back, floor + 1, z0 + 3, ID.chest_loot);
+      break;
+    case 'library':
+      for (let z = z0 + 1; z <= z0 + 3; z++) for (let y = floor + 1; y <= floor + 2; y++) set(back, y, z, ID.bookshelf);
+      set(mid, floor + 1, z0 + 1, ID.bookshelf); set(mid, floor + 1, z0 + 3, ID.crafting_table);
+      break;
+  }
 };
 
 World.prototype.buildWell = function (S, M) {
@@ -149,7 +241,7 @@ World.prototype.buildHouse = function (S, M, qx, qz) {
   const inX = qx === 0 ? x0 + 1 : x0 + 3;
   set(inX, floor + 1, z0 + 1, ID.bed); set(inX, floor + 1, z0 + 2, ID.bed_head);
   if (rng() < 0.5) set(inX, floor + 1, z0 + 3, ID.crafting_table);
-  if (rng() < 0.6) set(x0 + 2, floor + 1, z0 + 3, ID.chest_loot);
+  if (rng() < 0.35) set(x0 + 2, floor + 1, z0 + 3, ID.chest_loot);
   else if (rng() < 0.4) set(x0 + 2, floor + 1, z0 + 3, ID.furnace);
   set(x0 + 2, floor + 3, z0 + 2, ID.glowstone);
 };
@@ -333,9 +425,13 @@ World.prototype.buildShipwreck = function (S) {
 /* ---------- treasure ---------- */
 /* what each kind of structure keeps in its chests: [item, min, max, weight], and how many stacks */
 const LOOT_TABLES = {
-  village: [5, 9, [['bread', 1, 4, 15], ['wheat', 2, 7, 12], ['apple', 1, 5, 12], ['iron_ingot', 1, 5, 10], ['emerald', 1, 4, 8], ['gold_ingot', 1, 3, 5],
-    ['coal', 2, 8, 8], ['iron_sword', 1, 1, 3], ['iron_pickaxe', 1, 1, 3], ['iron_helmet', 1, 1, 2], ['iron_chestplate', 1, 1, 2], ['iron_leggings', 1, 1, 2],
-    ['iron_boots', 1, 1, 2], ['leather', 1, 3, 4], ['oak_log', 2, 6, 6], ['diamond', 1, 3, 1]]],
+  // villages, like Minecraft: ordinary houses have simple things, the blacksmith has the good stuff
+  v_house: [3, 7, [['bread', 1, 4, 10], ['apple', 1, 5, 10], ['wheat', 1, 7, 10], ['dandelion', 1, 1, 3], ['rose', 1, 1, 3], ['feather', 1, 2, 3], ['stick', 1, 3, 4], ['emerald', 1, 1, 1]]],
+  v_blacksmith: [3, 8, [['diamond', 1, 3, 3], ['iron_ingot', 1, 5, 10], ['gold_ingot', 1, 3, 5], ['bread', 1, 3, 15], ['apple', 1, 3, 15], ['iron_pickaxe', 1, 1, 5], ['iron_sword', 1, 1, 5],
+    ['iron_chestplate', 1, 1, 5], ['iron_helmet', 1, 1, 5], ['iron_leggings', 1, 1, 5], ['iron_boots', 1, 1, 5], ['obsidian', 3, 7, 5], ['oak_log', 3, 7, 5]]],
+  v_toolsmith: [3, 8, [['diamond', 1, 3, 1], ['iron_ingot', 1, 5, 5], ['gold_ingot', 1, 3, 1], ['bread', 1, 3, 15], ['iron_pickaxe', 1, 1, 1], ['coal', 1, 3, 1], ['stick', 1, 3, 20], ['iron_shovel', 1, 1, 5]]],
+  v_butcher: [1, 5, [['emerald', 1, 1, 1], ['porkchop', 1, 3, 6], ['wheat', 1, 3, 6], ['beef', 1, 3, 6], ['coal', 1, 3, 3]]],
+  v_temple: [3, 8, [['redstone', 1, 4, 2], ['bread', 1, 4, 7], ['rotten_flesh', 1, 4, 7], ['lapis', 1, 4, 1], ['gold_ingot', 1, 4, 1], ['emerald', 1, 4, 1]]],
   desert: [5, 8, [['bone', 4, 6, 25], ['rotten_flesh', 3, 7, 16], ['gunpowder', 1, 8, 10], ['sand', 1, 8, 10], ['string', 1, 8, 10], ['gold_ingot', 2, 7, 15],
     ['iron_ingot', 1, 5, 15], ['emerald', 1, 3, 15], ['diamond', 1, 3, 5], ['golden_apple', 1, 1, 6], ['ender_pearl', 1, 1, 3], ['tnt', 1, 2, 3]]],
   dungeon: [4, 8, [['bread', 1, 1, 15], ['wheat', 1, 4, 15], ['bone', 1, 8, 10], ['rotten_flesh', 1, 8, 10], ['gunpowder', 1, 8, 10], ['string', 1, 8, 10],
