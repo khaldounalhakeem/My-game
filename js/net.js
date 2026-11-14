@@ -256,6 +256,7 @@ const Net = {
       const db = await use('db');
       if (db) {
         this.dbRoom = makeDbRoom(db, this.uid);
+        this.db = db;
         this.lobby = room;
         room = room ? makeMultiRoom([room, this.dbRoom], this.uid) : this.dbRoom;
         perms = room === this.dbRoom ? null : perms;
@@ -318,6 +319,7 @@ const Net = {
     const key = this.worldKey(seed);
     if (this.world !== key) { this.world = key; this.ring = []; this.clearModels(); }
     this.joinedAt = Date.now();
+    this.liveTouched = new Set(); this.sharedFor = new Set(); this.wsMerged = new Set(); this.wsInfo = null;
     if (this.room && this.room.setTopic) this.room.setTopic(key);
     this.askPermission();
     this.announce();
@@ -369,9 +371,10 @@ const Net = {
         mb: this.slim ? null : this.ownedMobs(), mh: this.mobHits, dr: this.slim ? null : this.dropRing, pk: this.slim ? null : this.pickRing,
         rq: this.slim ? null : this.askRing, gv: this.slim ? null : this.giveRing,
         gm: this.slim ? null : this.giveMobRing,
+        ws: this.wsInfo || null,
         cs: this.slim ? null : this.chestRing, oc: G.ui.chest ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
       });
-    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null });
+    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null, ws: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
@@ -392,6 +395,7 @@ const Net = {
     if (!this.world) return;
     this.seq++;
     this.ring.push([this.seq, dimCode(dim), x, y, z, id]);
+    if (this.liveTouched) this.liveTouched.add(dimCode(dim) + ':' + x + ',' + y + ',' + z);
     while (this.ring.length > this.ringMax) this.ring.shift();
     this.sendT = Math.min(this.sendT, 0.03);
   },
@@ -438,7 +442,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v11 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v12 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -458,6 +462,7 @@ const Net = {
     if (!this.room || this.status !== 'on' || !this.world) return;
     this.sendT -= dt;
     if (this.sendT <= 0) { this.sendT = 0.1; this.announce(); }
+    this.shareTick();
     this.diagT = (this.diagT || 0) - dt;
     if (this.diagT <= 0) { this.diagT = 1; this.render(); }
     for (const rp of this.peers.values()) {
@@ -667,6 +672,109 @@ const Net = {
   dropPuppets(owner) {
     for (const m of G.mobs) if (m.remoteCtl === owner) m.removeSilently();
     for (const d of G.dragons) if (d.remoteCtl === owner) d.remove();
+  },
+
+  /* ---------- the whole world, for friends who join ----------
+     Block changes are shared as they happen, but a friend who joins later (or whose own copy of the
+     world got lost) also needs everything that was built before. So when someone new arrives,
+     everyone in the world uploads their whole world to the shared database and the newcomer copies in
+     what they're missing. Where two copies disagree, the one with more building in it wins. */
+  editCount() {
+    let n = 0;
+    for (const d of DIMS) { const w = G.worlds && G.worlds[d]; if (w) for (const m of w.edits.values()) n += m.size; }
+    return n;
+  },
+  shareCol() { return this.db && this.world ? this.db.collection('mp/' + this.world + '/share') : null; },
+  shareTick() {
+    if (!this.db || !this.dbRoom || this.wsBusy || !this.sharedFor || !G.worlds) return;
+    const newcomers = [...this.peers.values()].filter(rp => rp.inWorld && !this.sharedFor.has(rp.peer));
+    if (!newcomers.length) return;
+    for (const rp of newcomers) this.sharedFor.add(rp.peer);
+    this.shareUpload();
+  },
+  async shareUpload() {
+    const col = this.shareCol(), cnt = this.editCount(), world = this.world;
+    if (!col || !cnt) return;
+    this.wsBusy = true;
+    try {
+      const data = {
+        ed: DIMS.map(d => G.worlds[d].serializeEdits()), ch: G.chests || {}, cv: G.chestVer || {}, sg: G.signs || {},
+        cr: G.crops || {}, fu: G.furnaces || {}, dd: G.endDragonDead ? 1 : 0,
+      };
+      const text = JSON.stringify(data), t = Date.now(), CH = 80000, parts = Math.ceil(text.length / CH), dev = this.dbRoom.dev;
+      if (parts > 60) throw new Error('too big');
+      for (let i = 0; i < parts; i++) await col.doc(dev + '_' + i).set({ d: text.slice(i * CH, (i + 1) * CH), t, n: parts });
+      if (this.world !== world) return;
+      this.wsInfo = [dev, t, cnt, parts];
+      this.sendT = 0;
+    } catch (e) { /* the next newcomer tries again */ } finally { this.wsBusy = false; }
+  },
+  async fetchShare(rp, ws) {
+    const [dev, t, cnt, parts] = ws, world = this.world, col = this.shareCol();
+    if (!col) return;
+    rp.wsTried = t;
+    this.wsMerged.add(rp.peer);
+    let text = '';
+    try {
+      for (let i = 0; i < parts; i++) {
+        const doc = await col.doc(dev + '_' + i).get();
+        const b = doc.exists ? doc.data() : null;
+        if (!b || b.t !== t || typeof b.d !== 'string') throw new Error('changed');
+        text += b.d;
+      }
+      if (this.world !== world || G.state === 'title') return;
+      const n = this.mergeWorld(JSON.parse(text), cnt > this.editCount());
+      if (n) {
+        G.save({ now: true });
+        G.ui.message('Got everything ' + rp.name + ' built in this world (' + n + ' blocks).', 'gold');
+      }
+    } catch (e) { this.wsMerged.delete(rp.peer); }
+  },
+  mergeWorld(data, theirsWin) {
+    if (!data || typeof data !== 'object' || !Array.isArray(data.ed)) return 0;
+    let n = 0;
+    DIMS.forEach((d, di) => {
+      const w = G.worlds[d], obj = data.ed[di];
+      if (!w || !obj || typeof obj !== 'object') return;
+      for (const k in obj) {
+        const m = /^(-?\d+),(-?\d+)$/.exec(k), arr = obj[k];
+        if (!m || !Array.isArray(arr)) continue;
+        const cx = +m[1], cz = +m[2], mine = w.edits.get(k);
+        for (let i = 0; i + 1 < arr.length; i += 2) {
+          const idx = arr[i], id = arr[i + 1];
+          if (!Number.isInteger(idx) || idx < 0 || idx >= 16 * 16 * WH || !Number.isInteger(id) || !DEFS[id] || !DEFS[id].isBlock || (DEFS[id].liquid && id !== ID.water)) continue;
+          const have = mine ? mine.get(idx) : undefined;
+          if (have === id || (have !== undefined && !theirsWin)) continue;
+          const x = cx * 16 + (idx & 15), z = cz * 16 + ((idx >> 4) & 15), y = idx >> 8;
+          if (this.liveTouched && this.liveTouched.has(di + ':' + x + ',' + y + ',' + z)) continue; // changed since, while we played together
+          w.applyRemote(x, y, z, id);
+          // applyRemote skips blocks that already look right; keep the change in the save anyway
+          let mm = w.edits.get(k);
+          if (!mm) { mm = new Map(); w.edits.set(k, mm); }
+          mm.set(idx, id);
+          n++;
+        }
+      }
+    });
+    const open = G.ui.chest ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null;
+    const take = (src, dst, ok, after) => {
+      if (!src || typeof src !== 'object') return;
+      for (const k in src) {
+        if (!/^\w+:-?\d+,-?\d+,-?\d+$/.test(k) || !ok(src[k])) continue;
+        if (dst[k] !== undefined && !theirsWin) continue;
+        if (k === open) continue;
+        if (JSON.stringify(dst[k]) === JSON.stringify(src[k])) continue;
+        dst[k] = src[k];
+        if (after) after(k);
+      }
+    };
+    G.chests = G.chests || {}; G.chestVer = G.chestVer || {}; G.signs = G.signs || {}; G.crops = G.crops || {}; G.furnaces = G.furnaces || {};
+    take(data.ch, G.chests, v => Array.isArray(v) && v.length <= 54, k => { if (data.cv && Number.isInteger(data.cv[k])) G.chestVer[k] = Math.max(G.chestVer[k] || 0, data.cv[k]); });
+    take(data.sg, G.signs, v => Array.isArray(v), k => { G.signs[k] = G.cleanSignText(G.signs[k]); G.drawSign(k); });
+    take(data.cr, G.crops, v => v !== null && typeof v !== 'function');
+    take(data.fu, G.furnaces, v => v && typeof v === 'object');
+    if (data.dd === 1) G.endDragonDead = true;
+    return n;
   },
 
   syncShared(rp, pr) {
@@ -933,8 +1041,18 @@ const Net = {
     rp.mode = pr.m === 1 ? 'creative' : 'survival';
     const wasIn = rp.inWorld;
     rp.inWorld = !!this.world && rp.world === this.world && G.state !== 'title';
-    if (!rp.inWorld) { this.removeModel(rp); this.dropPuppets(rp.peer); if (wasIn) G.ui.message(name + ' left the world'); return; }
-    if (!wasIn) G.ui.message(name + ' joined your world!', 'gold');
+    if (!rp.inWorld) {
+      this.removeModel(rp); this.dropPuppets(rp.peer);
+      if (this.sharedFor) this.sharedFor.delete(rp.peer);
+      if (this.wsMerged) this.wsMerged.delete(rp.peer);
+      if (wasIn) G.ui.message(name + ' left the world');
+      return;
+    }
+    if (!wasIn) { G.ui.message(name + ' joined your world!', 'gold'); rp.inSince = Date.now(); }
+    // the whole world as they have it (everything built before we got here)
+    const ws = pr.ws;
+    if (Array.isArray(ws) && ws.length === 4 && typeof ws[0] === 'string' && /^[\w-]{1,40}$/.test(ws[0]) && Number.isFinite(ws[1]) && isInt(ws[2]) && isInt(ws[3]) && ws[3] > 0 && ws[3] <= 60
+      && this.wsMerged && !this.wsMerged.has(rp.peer) && ws[1] >= (rp.inSince || 0) - 20000 && rp.wsTried !== ws[1]) this.fetchShare(rp, ws);
     this.syncTime(pr);
     const pos = Array.isArray(pr.p) && pr.p.length === 3 && pr.p.every(Number.isFinite) ? pr.p : null;
     const rot = Array.isArray(pr.r) && pr.r.length === 2 && pr.r.every(Number.isFinite) ? pr.r : [0, 0];
@@ -1010,6 +1128,7 @@ const Net = {
         const [sq, d, x, y, z, id] = e;
         if (sq <= rp.last || id < 0 || !DEFS[id] || !DEFS[id].isBlock || (DEFS[id].liquid && id !== ID.water)) continue;
         if (G.worlds[DIMS[d]]) G.worlds[DIMS[d]].applyRemote(x, y, z, id);
+        if (this.liveTouched) this.liveTouched.add(d + ':' + x + ',' + y + ',' + z);
         if (sq > top) top = sq;
       }
       rp.last = top;
