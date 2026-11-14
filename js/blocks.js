@@ -479,6 +479,12 @@ makeTile('i_oak_stairs', pStairIcon(0xa8834f, 0x5a3c1c));
 makeTile('i_cobblestone_stairs', pStairIcon(0x8a8a8a, 0x4a4a4a));
 makeTile('i_stone_brick_stairs', pStairIcon(0x7a7a7a, 0x3e3e3e));
 makeTile('i_oak_fence', pPlant(P => { for (const x of [2, 7, 12]) P.rect(x, 1, 2, 14, 0xa8834f); P.rect(2, 4, 12, 2, 0x8a6a3a); P.rect(2, 10, 12, 2, 0x8a6a3a); for (const x of [2, 7, 12]) { P.put(x, 1, 0xc8a46a); P.put(x + 1, 14, 0x5a3c1c); } }));
+const pSapling = (leaf, trunk) => pPlant(P => { P.line(8, 15, 8, 8, trunk); P.put(7, 12, trunk); for (let i = 0; i < 26; i++) { const a = P.rng() * 6.28, r = P.rng() * 4.5; P.put(8 + Math.cos(a) * r, 6 + Math.sin(a) * r * 0.8, P.vary(leaf, 18)); } });
+makeTile('oak_sapling', pSapling(0x4a8a2a, 0x6a4a24));
+makeTile('birch_sapling', pSapling(0x7aa84a, 0xd8d8c8));
+makeTile('spruce_sapling', pSapling(0x2e5a2e, 0x4a3420));
+makeTile('i_ladder_icon', P => { P.clear(); for (const x of [3, 11]) P.rect(x, 0, 2, 16, 0x8a6a3a); for (const y of [2, 6, 10, 14]) P.rect(3, y, 10, 2, 0xa8834f); });
+makeTile('ladder', P => { P.clear(); for (const x of [2, 12]) P.rect(x, 0, 2, 16, 0x8a6a3a); for (const y of [2, 6, 10, 14]) P.rect(2, y, 12, 2, 0xa8834f); P.rect(2, 0, 1, 16, 0x5a3c1c); P.rect(13, 0, 1, 16, 0x5a3c1c); });
 makeTile('i_melon_slice', pPlant(P => { for (let y = 4; y <= 12; y++) for (let x = 2; x <= 14; x++) { const d = Math.hypot(x - 8, y - 4); if (d <= 7) P.put(x, y, d > 6 ? 0x3e8a1d : d > 5.2 ? 0xe8f0a0 : 0xe0342c); } P.pts([[6, 6], [9, 7], [8, 9], [11, 6]], 0x1a1a1a); }));
 makeTile('i_ender_pearl', pPlant(P => { P.disc(8, 8, 5, 0x1d6b5c, 8); P.disc(8, 8, 2.6, 0x3fb59a, 8); P.pts([[6, 6], [7, 6]], 0xb0fff0); }));
 makeTile('i_bow', pPlant(P => { for (let a = 0; a <= 90; a += 4) { const r = a * Math.PI / 180; P.put(2 + Math.cos(r) * 11, 2 + Math.sin(r) * 11, 0x7a5a32); P.put(2 + Math.cos(r) * 10, 2 + Math.sin(r) * 10, 0x5a3e20); } P.line(13, 2, 2, 13, 0xdddddd); }));
@@ -524,7 +530,7 @@ block('dirt', 'Dirt', 'dirt', { tool: 'shovel', hardness: 0.5 });
 block('stone', 'Stone', 'stone', PICK(1, 1.5, { drop: 'cobblestone' }));
 block('cobblestone', 'Cobblestone', 'cobblestone', PICK(1, 2));
 block('oak_log', 'Oak Log', { top: 'log_oak_top', side: 'log_oak' }, { tool: 'axe', hardness: 2 });
-block('oak_leaves', 'Oak Leaves', 'leaves_oak', Object.assign({ drop: (r) => (r() < 0.06 ? [['apple', 1]] : r() < 0.08 ? [['stick', 1]] : r() < 0.1 ? [['oak_leaves', 1]] : []) }, LEAVES));
+block('oak_leaves', 'Oak Leaves', 'leaves_oak', Object.assign({ drop: (r) => (r() < 0.05 ? [['oak_sapling', 1]] : r() < 0.06 ? [['apple', 1]] : r() < 0.08 ? [['stick', 1]] : []) }, LEAVES));
 block('oak_planks', 'Oak Planks', 'planks_oak', { tool: 'axe', hardness: 2 });
 block('sand', 'Sand', 'sand', { tool: 'shovel', hardness: 0.5 });
 block('water', 'Water', 'water', { solid: false, opaque: false, translucent: true, liquid: true, hardness: Infinity });
@@ -555,10 +561,10 @@ block('crafting_table', 'Crafting Table', { top: 'ct_top', side: 'ct_side', fron
 block('furnace', 'Furnace', { top: 'furnace_top', side: 'furnace_side', front: 'furnace_front', bottom: 'furnace_top' }, PICK(1, 3.5));
 block('pumpkin', 'Jack o\'Pumpkin', { top: 'pumpkin_top', side: 'pumpkin_side', front: 'pumpkin_face' }, { tool: 'axe', hardness: 1 });
 block('birch_log', 'Birch Log', { top: 'log_birch_top', side: 'log_birch' }, { tool: 'axe', hardness: 2 });
-block('birch_leaves', 'Birch Leaves', 'leaves_birch', Object.assign({ drop: (r) => (r() < 0.06 ? [['stick', 1]] : r() < 0.1 ? [['birch_leaves', 1]] : []) }, LEAVES));
+block('birch_leaves', 'Birch Leaves', 'leaves_birch', Object.assign({ drop: (r) => (r() < 0.05 ? [['birch_sapling', 1]] : r() < 0.06 ? [['stick', 1]] : []) }, LEAVES));
 block('birch_planks', 'Birch Planks', 'planks_birch', { tool: 'axe', hardness: 2 });
 block('spruce_log', 'Spruce Log', { top: 'log_spruce_top', side: 'log_spruce' }, { tool: 'axe', hardness: 2 });
-block('spruce_leaves', 'Spruce Leaves', 'leaves_spruce', Object.assign({ drop: (r) => (r() < 0.06 ? [['stick', 1]] : r() < 0.1 ? [['spruce_leaves', 1]] : []) }, LEAVES));
+block('spruce_leaves', 'Spruce Leaves', 'leaves_spruce', Object.assign({ drop: (r) => (r() < 0.05 ? [['spruce_sapling', 1]] : r() < 0.06 ? [['stick', 1]] : []) }, LEAVES));
 block('spruce_planks', 'Spruce Planks', 'planks_spruce', { tool: 'axe', hardness: 2 });
 block('netherrack', 'Netherrack', 'netherrack', PICK(1, 0.4));
 block('glowstone', 'Glowstone', 'glowstone', { hardness: 0.3, light: true });
@@ -623,6 +629,10 @@ for (const [k, n, tex, tool] of [['oak', 'Oak', 'planks_oak', 'axe'], ['cobblest
   for (const d of ['n', 's', 'w', 'e']) block(k + '_stairs_' + d, n + ' Stairs', tex, { tool, tier: tool === 'pick' ? 1 : 0, hardness: 2, opaque: false, boxes: [[0, 0, 0, 1, 0.5, 1], STAIR_UP[d]], drop: k + '_stairs', stair: k });
 }
 block('oak_fence', 'Oak Fence', 'planks_oak', { tool: 'axe', hardness: 2, opaque: false, fence: true, iconTile: 'i_oak_fence' });
+for (const [k, n] of [['oak', 'Oak'], ['birch', 'Birch'], ['spruce', 'Spruce']]) block(k + '_sapling', n + ' Sapling', k + '_sapling', Object.assign({ sapling: k }, CROSS));
+/* ladders sit flat against a wall: the letter says which side of the block they hug */
+const LADDER_BOX = { w: [0, 0, 0, 0.1875, 1, 1], e: [0.8125, 0, 0, 1, 1, 1], n: [0, 0, 0, 1, 1, 0.1875], s: [0, 0, 0.8125, 1, 1, 1] };
+for (const d of ['n', 's', 'w', 'e']) block('ladder_' + d, 'Ladder', 'ladder', { tool: 'axe', hardness: 0.4, opaque: false, solid: false, box: LADDER_BOX[d], ladder: d, drop: 'ladder' });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -685,6 +695,7 @@ item('wheat_seeds', 'Wheat Seeds', 'wheat_seeds');
 item('oak_door', 'Oak Door', 'oak_door');
 for (const [k, n] of [['oak', 'Oak'], ['cobblestone', 'Cobblestone'], ['stone_brick', 'Stone Brick']]) item(k + '_stairs', n + ' Stairs', k + '_stairs', { placesStair: k });
 item('oak_trapdoor', 'Oak Trapdoor', 'oak_trapdoor');
+item('ladder', 'Ladder', 'ladder_icon', { placesLadder: true });
 item('bucket', 'Bucket', 'bucket', { stack: 16 });
 item('water_bucket', 'Water Bucket', 'water_bucket', { stack: 1 });
 item('lava_bucket', 'Lava Bucket', 'lava_bucket', { stack: 1 });
@@ -781,6 +792,7 @@ const RECIPES = [
   ['cobblestone_stairs', 4, { cobblestone: 6 }, 'table'],
   ['stone_brick_stairs', 4, { stone_bricks: 6 }, 'table'],
   ['oak_fence', 3, { '#planks': 4, stick: 2 }, 'table'],
+  ['ladder', 3, { stick: 7 }, 'table'],
   ['oak_trapdoor', 2, { '#planks': 6 }, 'table'],
   ['wooden_hoe', 1, { '#planks': 2, stick: 2 }, 'table'],
   ['stone_hoe', 1, { cobblestone: 2, stick: 2 }, 'table'],

@@ -169,6 +169,11 @@ class Player {
       this.vel.y *= Math.pow(0.15, dt);
       if (input.jump) this.vel.y = Math.min(this.vel.y + 26 * dt, 3.6);
       if (input.jump && this.hitH) this.vel.y = 5.5;
+    } else if (this.onLadder()) {
+      // climb by walking into the ladder or holding jump; sneak to hold still; otherwise slide down slowly
+      const climbing = input.jump || this.hitH || Math.abs(input.moveZ || 0) > 0.1;
+      this.vel.y = climbing ? 3.2 : input.sneak ? 0 : Math.max(this.vel.y - 28 * dt, -2.4);
+      this.fallStart = null;
     } else {
       this.vel.y -= 28 * dt;
       if (this.vel.y < -55) this.vel.y = -55;
@@ -390,6 +395,14 @@ class Player {
   }
 
   /* right button */
+  onLadder() {
+    const W = G.world, r = this.w / 2 + 0.05;
+    for (let y = Math.floor(this.pos.y); y <= Math.floor(this.pos.y + 1); y++)
+      for (let z = Math.floor(this.pos.z - r); z <= Math.floor(this.pos.z + r); z++)
+        for (let x = Math.floor(this.pos.x - r); x <= Math.floor(this.pos.x + r); x++) { const id = W.getBlock(x, y, z); if (id && DEFS[id].ladder) return true; }
+    return false;
+  }
+
   /* swap one of the held item for another (an empty bucket for a full one, and back) */
   swapHeld(id) {
     if (this.mode === 'creative') { if (DEFS[id].key === 'bucket') return; this.inv.add(id, 1); this.inv.changed(); return; }
@@ -402,6 +415,23 @@ class Player {
   /* buckets, milk, hoes and seeds; true if the held item did something */
   useBucketOrHoe(hd, b) {
     const W = G.world, k = hd.key;
+    if (hd.placesLadder && b) {
+      if (!b.nx && !b.nz) { G.ui.message('Put a ladder on the side of a block.'); return true; }
+      const px = b.x + b.nx, py = b.y, pz = b.z + b.nz, cur = W.getBlock(px, py, pz);
+      if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return true;
+      W.setBlock(px, py, pz, ID['ladder_' + (b.nx === 1 ? 'w' : b.nx === -1 ? 'e' : b.nz === 1 ? 'n' : 's')]);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
+      return true;
+    }
+    if (hd.sapling && b) {
+      if ((b.id !== ID.grass && b.id !== ID.dirt) || W.getBlock(b.x, b.y + 1, b.z)) return true;
+      W.setBlock(b.x, b.y + 1, b.z, hd.id);
+      G.plantCrop(b.x, b.y + 1, b.z);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
+      return true;
+    }
     if (hd.placesStair && b) {
       let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
       if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }

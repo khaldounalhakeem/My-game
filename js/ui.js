@@ -170,6 +170,12 @@ const UI = {
     $('cat-search').addEventListener('input', () => this.renderSide());
     for (const b of document.querySelectorAll('[data-tab]')) b.addEventListener('click', () => { this.tab = b.dataset.tab; this.renderSide(); });
     $('trash').addEventListener('pointerdown', e => { e.preventDefault(); this.cursor = null; this.moveCursor(); });
+    document.addEventListener('pointerdown', e => {
+      if (G.state !== 'inventory' || !this.cursor || e.target.closest('#menu-inv .panel, #hotbar, button')) return;
+      e.preventDefault(); e.stopPropagation();
+      this.throwCursor(e.button === 2);
+    }, true);
+    $('menu-inv').addEventListener('contextmenu', e => e.preventDefault());
     $('btn-chest-all').addEventListener('click', () => this.takeAll());
   },
 
@@ -382,7 +388,7 @@ const UI = {
     box.innerHTML = '';
     const ids = [];
     for (const d of DEFS) {
-      if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.door || d.trapdoor || d.stair || d.key === 'wheat_sprout') continue;
+      if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.door || d.trapdoor || d.stair || d.ladder || d.key === 'wheat_sprout') continue;
       if (q ? !d.name.toLowerCase().includes(q) : (this.tab === 'blocks') !== d.isBlock) continue;
       ids.push(d.id);
     }
@@ -484,6 +490,19 @@ const UI = {
     const up = q.y - P.pos.y, ud = Math.abs(up) > 4 ? (up > 0 ? ' up' : ' down') : '';
     const text = (best.name || 'Friend') + ' · ' + Math.round(bd) + ' blocks' + ud;
     if (this.friendText !== text) { this.friendText = text; $('friend-label').textContent = text; }
+  },
+
+  /* tap outside the inventory box while holding items: throw them out in front of you (right-click throws one) */
+  throwCursor(one) {
+    const cur = this.cursor;
+    if (!cur) return;
+    const n = one ? 1 : cur.count, P = G.player, d = P.lookDir(), o = P.eyePos();
+    const drop = G.spawnDrop(cur.id, n, o.x + d.x * 0.6, o.y - 0.3, o.z + d.z * 0.6, d.clone().multiplyScalar(6).setY(d.y * 6 + 2));
+    drop.pickDelay = 1.5;
+    cur.count -= n;
+    if (cur.count <= 0) this.cursor = null;
+    G.sound.play('click');
+    this.moveCursor();
   },
 
   /* ---------- main menu pages ---------- */
