@@ -170,6 +170,10 @@ function dressModel(m, ids) {
   }
 }
 
+/* what each farm animal loves: holding it makes them follow you, feeding two of them makes a baby */
+const BREED_FOOD = { cow: ['wheat'], sheep: ['wheat'], pig: ['apple'], chicken: ['wheat_seeds'] };
+const lovesFood = (type, id) => !!(id && DEFS[id] && BREED_FOOD[type] && BREED_FOOD[type].includes(DEFS[id].key));
+
 /* ---------- mob definitions ---------- */
 const MOB_TYPES = {
   zombie: { name: 'Zombie', hp: 20, w: 0.6, h: 1.95, speed: 2.3, hostile: true, dmg: 3, burns: true, xp: 5, drops: [['rotten_flesh', 0, 2]] },
@@ -349,6 +353,7 @@ class Mob {
     this.fleeT = 0; this.angry = false; this.fuse = 0; this.shootCd = 1 + Math.random() * 2;
     this.burnT = 0; this.walk = 0; this.soundT = 3 + Math.random() * 8;
     this.nid = Net.newId(); this.remoteCtl = null;
+    this.loveT = 0; this.breedCd = 0; this.baby = false; this.growT = 0;
     const m = buildMobModel(type);
     this.mesh = m.group; this.parts = m.parts;
     this.mats = [];
@@ -357,6 +362,64 @@ class Mob {
   }
 
   center() { return tmpV.set(this.pos.x, this.pos.y + this.h / 2, this.pos.z); }
+
+  /* farm animals: find a partner when in love, or follow a player holding food they love; sets this.goal */
+  breedTick(dt) {
+    if (!BREED_FOOD[this.type]) return false;
+    this.loveT -= dt; this.breedCd -= dt;
+    if (this.baby) { this.growT -= dt; if (this.growT <= 0) this.growUp(); }
+    if (this.loveT > 0) {
+      if (Math.random() < dt * 2) G.particles.burst(this.pos.x, this.pos.y + this.h + 0.2, this.pos.z, [0xff3a5a, 0xff8aa0], 1, 0.6, 0.12, -1);
+      let mate = null, md = 8;
+      for (const m of G.mobs) {
+        if (m === this || m.type !== this.type || m.dead || m.remoteCtl || m.baby || !(m.loveT > 0)) continue;
+        const d = this.pos.distanceTo(m.pos);
+        if (d < md) { md = d; mate = m; }
+      }
+      if (mate) {
+        if (md < 1.3) {
+          // a baby is born between them
+          const baby = new Mob(this.type, (this.pos.x + mate.pos.x) / 2, Math.max(this.pos.y, mate.pos.y), (this.pos.z + mate.pos.z) / 2);
+          baby.makeBaby(); G.mobs.push(baby);
+          this.loveT = mate.loveT = 0; this.breedCd = mate.breedCd = 300;
+          this.hearts(); mate.hearts();
+          if (G.player.pos.distanceTo(this.pos) < 16) G.player.addXp(1 + (Math.random() * 7 | 0));
+          return false;
+        }
+        this.goal = { x: mate.pos.x, z: mate.pos.z };
+        return true;
+      }
+    }
+    // follow the closest player holding food this animal loves
+    let best = null, bd = 10;
+    const P = G.player, held = P.heldSlot();
+    if (!P.dead && held && lovesFood(this.type, held.id)) { bd = this.pos.distanceTo(P.pos); best = P.pos; if (bd >= 10) best = null; }
+    for (const q of Net.proxies()) {
+      if (!lovesFood(this.type, q.held)) continue;
+      const d = this.pos.distanceTo(q.pos);
+      if (d < bd) { bd = d; best = q.pos; }
+    }
+    if (!best) return false;
+    this.goal = { x: best.x, z: best.z, slow: true, stop: bd < 2.2 };
+    return true;
+  }
+
+  /* a baby: small, can't breed, grows up after a few minutes */
+  makeBaby(grow) {
+    this.baby = true; this.growT = grow === undefined ? 240 : grow;
+    this.w = this.T.w * 0.6; this.h = this.T.h * 0.6;
+    this.mesh.scale.setScalar(0.55);
+  }
+  growUp() { this.baby = false; this.w = this.T.w; this.h = this.T.h; this.mesh.scale.setScalar(1); }
+
+  /* fed the food it loves: a baby grows faster, a grown-up is ready to make a baby */
+  feed() {
+    if (this.dead) return false;
+    if (this.baby) { this.growT = Math.max(0, this.growT - 30); this.hearts(); return true; }
+    if (this.breedCd > 0 || this.loveT > 0) return false;
+    this.loveT = 30; this.hearts();
+    return true;
+  }
 
   hurt(dmg, from, kb = 7, byPlayer = false) {
     if (this.dead) return;
@@ -385,6 +448,13 @@ class Mob {
     if (this.dead) return false;
     if (this.remoteCtl && (this.type === 'wolf' || this.type === 'horse')) {
       G.ui.message('This animal belongs to the other player\'s game right now. The player who joined the world first can tame and ride animals.');
+      return true;
+    }
+    if (hd && lovesFood(this.type, hd.id)) {
+      if (this.remoteCtl) { Net.mobFeed(this); this.hearts(); }
+      else if (!this.feed()) { G.ui.message(this.breedCd > 0 ? 'This animal needs a rest before it can have another baby.' : 'This animal is already in love.'); return true; }
+      if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1);
+      G.sound.play('eat', this.pos);
       return true;
     }
     const meat = hd && ['porkchop', 'cooked_porkchop', 'beef', 'steak', 'chicken', 'cooked_chicken', 'rotten_flesh'].includes(hd.key);
@@ -459,7 +529,7 @@ class Mob {
     this.dead = true; this.deathT = 0;
     G.sound.play('deathMob', this.pos);
     if (byPlayer) {
-      for (const [k, a, b] of this.T.drops) {
+      if (!this.baby) for (const [k, a, b] of this.T.drops) {
         const n = a + Math.floor(Math.random() * (b - a + 1));
         if (n > 0) G.spawnDrop(ID[k], n, this.pos.x, this.pos.y + 0.5, this.pos.z);
       }
@@ -582,6 +652,11 @@ class Mob {
         moveX = -toP.x / l; moveZ = -toP.z / l; speed *= 2;
         if (Math.random() < dt) { const a = (Math.random() - 0.5); const c = Math.cos(a), s = Math.sin(a); const nx = moveX * c - moveZ * s; moveZ = moveX * s + moveZ * c; moveX = nx; }
         this.yaw = Math.atan2(moveX, moveZ);
+      } else if (this.breedTick(dt)) {
+        const g = this.goal, l = Math.hypot(g.x - this.pos.x, g.z - this.pos.z) || 1;
+        moveX = (g.x - this.pos.x) / l; moveZ = (g.z - this.pos.z) / l; speed *= 1.1;
+        if (g.stop) { moveX = 0; moveZ = 0; }
+        this.yaw = Math.atan2(g.x - this.pos.x, g.z - this.pos.z);
       } else {
         this.wanderT -= dt;
         if (this.wanderT <= 0) {
@@ -655,7 +730,7 @@ class Mob {
     while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
     this.mesh.rotation.y = ry + d * Math.min(1, dt * 8);
     this.mesh.position.copy(this.pos);
-    const s = this.fuse > 0 ? 1 + this.fuse * 0.12 : 1;
+    const s = (this.fuse > 0 ? 1 + this.fuse * 0.12 : 1) * (this.baby ? 0.55 : 1);
     this.mesh.scale.set(s, s, s);
     const flashFuse = this.fuse > 0 && Math.floor(this.fuse * 8) % 2 === 0;
     for (const m of this.mats) {
@@ -694,6 +769,8 @@ class Mob {
     }
     const f = this.netFlags || 0;
     this.tame = !!(f & 2); this.sitting = !!(f & 4);
+    const small = !!(f & 32);
+    if (small !== this.baby) { if (small) this.makeBaby(9999); else this.growUp(); }
     if (this.parts.collar) this.parts.collar.visible = this.tame;
     if (this.parts.saddle) this.parts.saddle.visible = this.tame && this.type === 'horse';
     if (this.parts.ring) this.parts.ring.rotation.y += dt * 3;
@@ -702,7 +779,7 @@ class Mob {
     while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
     this.mesh.rotation.y += d * Math.min(1, dt * 10);
     const fuse = f & 8 ? 1 : 0;
-    this.mesh.scale.setScalar(fuse ? 1.12 : 1);
+    this.mesh.scale.setScalar((fuse ? 1.12 : 1) * (this.baby ? 0.55 : 1));
     const flash = fuse && Math.floor(performance.now() / 120) % 2 === 0;
     for (const m of this.mats) if (m.emissive) {
       if (this.hurtT > 0) m.emissive.setRGB(0.55, 0, 0);

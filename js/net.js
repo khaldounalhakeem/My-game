@@ -527,7 +527,7 @@ const Net = {
       if (!rp.inWorld || rp.dim !== G.dim || rp.dead || !rp.model) continue;
       if (!rp.proxy) {
         const r = rp;
-        rp.proxy = { remote: r, w: 0.6, h: 1.8, vel: new THREE.Vector3(), fire: 0, get pos() { return r.model ? r.model.group.position : new THREE.Vector3(); }, get dead() { return !!r.dead; }, get mode() { return r.mode || 'survival'; }, hurt: (dmg, from, kb, force, cause) => Net.hit(r, Math.round(dmg), kb || 6, cause || 'You were hit.') };
+        rp.proxy = { remote: r, w: 0.6, h: 1.8, vel: new THREE.Vector3(), fire: 0, get pos() { return r.model ? r.model.group.position : new THREE.Vector3(); }, get dead() { return !!r.dead; }, get mode() { return r.mode || 'survival'; }, get held() { return r.held || 0; }, hurt: (dmg, from, kb, force, cause) => Net.hit(r, Math.round(dmg), kb || 6, cause || 'You were hit.') };
       }
       out.push(rp.proxy);
     }
@@ -540,7 +540,7 @@ const Net = {
     const near = pos => players.some(q => Math.abs(q.x - pos.x) < 96 && Math.abs(q.z - pos.z) < 96);
     for (const m of G.mobs) {
       if (m.remoteCtl || m.removed || !near(m.pos) || out.length >= 45) continue;
-      const flags = (m.dead ? 1 : 0) | (m.tame ? 2 : 0) | (m.sitting ? 4 : 0) | (m.fuse > 0 ? 8 : 0) | (m.angry ? 16 : 0);
+      const flags = (m.dead ? 1 : 0) | (m.tame ? 2 : 0) | (m.sitting ? 4 : 0) | (m.fuse > 0 ? 8 : 0) | (m.angry ? 16 : 0) | (m.baby ? 32 : 0);
       out.push([m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags]);
     }
     for (const d of G.dragons) {
@@ -564,6 +564,15 @@ const Net = {
     this.mhSeq++;
     const P = G.player;
     this.mobHits.push([this.mhSeq, m.remoteCtl, m.nid, Math.round(dmg), r2(P.pos.x), r2(P.pos.z), Math.round(kb || 6)]);
+    if (this.mobHits.length > 16) this.mobHits.shift();
+    this.sendT = 0;
+  },
+
+  /* feeding an animal that another device runs: ask them to feed it */
+  mobFeed(m) {
+    this.mhSeq++;
+    const P = G.player;
+    this.mobHits.push([this.mhSeq, m.remoteCtl, m.nid, 0, r2(P.pos.x), r2(P.pos.z), 0, 'feed']);
     if (this.mobHits.length > 16) this.mobHits.shift();
     this.sendT = 0;
   },
@@ -669,7 +678,8 @@ const Net = {
         if (!Array.isArray(h) || h.length < 7 || !Number.isInteger(h[0])) continue;
         if (rp.mhReady && h[0] > (rp.lastMh || 0) && h[1] === this.uid) {
           const target = G.mobs.find(m => !m.remoteCtl && m.nid === h[2]) || G.dragons.find(d => !d.remoteCtl && d.nid === h[2]);
-          if (target && !target.dead) {
+          if (target && !target.dead && h[7] === 'feed') { if (target.feed) target.feed(); }
+          else if (target && !target.dead) {
             if (target instanceof Dragon) target.hurt(clamp(+h[3] || 1, 1, 20));
             else target.hurt(clamp(+h[3] || 1, 1, 20), { x: +h[4], z: +h[5] }, clamp(+h[6] || 6, 0, 16), true);
           }
@@ -875,6 +885,7 @@ const Net = {
     const rot = Array.isArray(pr.r) && pr.r.length === 2 && pr.r.every(Number.isFinite) ? pr.r : [0, 0];
     rp.dim = DIMS[pr.d] || 'overworld';
     rp.dead = pr.x === 1;
+    rp.held = isInt(pr.h) ? pr.h : 0;
     rp.sleeping = pr.sl === 1;
     rp.yaw = rot[0]; rp.pitch = clamp(rot[1], -1.6, 1.6);
     rp.swing = Number.isFinite(pr.s) ? clamp(pr.s, 0, 1) : 0;
