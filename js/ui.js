@@ -463,6 +463,29 @@ const UI = {
   },
 
   /* ---------- menus ---------- */
+  /* the arrow above the XP bar that points to the closest friend in this world */
+  updateFriendArrow() {
+    const P = G.player, box = $('friend-arrow');
+    let best = null, bd = Infinity;
+    if (G.state === 'play' || G.state === 'inventory') {
+      for (const rp of Net.peers.values()) {
+        if (!rp.inWorld || !rp.model || rp.dim !== G.dim) continue;
+        const q = rp.model.group.position, d = Math.hypot(q.x - P.pos.x, q.z - P.pos.z);
+        if (d < bd) { bd = d; best = rp; }
+      }
+    }
+    if (!best) { if (!box.hidden) box.hidden = true; return; }
+    box.hidden = false;
+    const q = best.model.group.position;
+    // turn the arrow so straight up means "walk forward"
+    const want = Math.atan2(-(q.x - P.pos.x), -(q.z - P.pos.z));
+    const rel = want - P.yaw;
+    box.firstElementChild.style.transform = 'rotate(' + (-rel * 180 / Math.PI).toFixed(1) + 'deg)';
+    const up = q.y - P.pos.y, ud = Math.abs(up) > 4 ? (up > 0 ? ' up' : ' down') : '';
+    const text = (best.name || 'Friend') + ' · ' + Math.round(bd) + ' blocks' + ud;
+    if (this.friendText !== text) { this.friendText = text; $('friend-label').textContent = text; }
+  },
+
   /* ---------- main menu pages ---------- */
   titlePage(name) {
     for (const pg of document.querySelectorAll('.title-page')) pg.hidden = pg.dataset.page !== name;

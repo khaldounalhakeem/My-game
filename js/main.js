@@ -1309,6 +1309,7 @@ function frame(now) {
     G.saveT += dt;
     if (G.saveT > 30) { G.saveT = 0; G.save(); }
   }
+  G.ui.updateFriendArrow();
   Input.lookDX = Input.lookDY = 0;
   G.particles.update(active ? dt : 0);
   G.world.update(P.pos.x, P.pos.z, active ? 6 : 12);

@@ -398,3 +398,9 @@ body.touch:not(.pad) #crosshair { display: none; }
 .world-del { flex: none; padding: 0 12px; font-size: 13px; }
 .world-empty { margin: 4px 0; font-size: 19px; color: var(--muted); text-shadow: 1px 1px 0 #000; }
 #mp-world-name:disabled { opacity: 0.7; }
+
+#friend-arrow { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 18px; pointer-events: none; }
+#friend-arrow[hidden] { display: none; }
+#friend-arrow svg { width: 30px; height: 30px; transition: transform 0.08s linear; filter: drop-shadow(2px 2px 0 #000); }
+#friend-arrow path { fill: #ffd84a; stroke: #6d4c06; stroke-width: 1.5; stroke-linejoin: round; }
+#friend-label { font-family: var(--font-display); font-size: 13px; color: #fff; text-shadow: 2px 2px 0 #000; white-space: nowrap; }
