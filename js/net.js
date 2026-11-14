@@ -969,7 +969,7 @@ const Net = {
       for (const e of pr.e) {
         if (!Array.isArray(e) || e.length !== 6 || !e.every(isInt)) continue;
         const [sq, d, x, y, z, id] = e;
-        if (sq <= rp.last || id < 0 || id >= 128 || !DEFS[id] || (DEFS[id].liquid && id !== ID.water)) continue;
+        if (sq <= rp.last || id < 0 || !DEFS[id] || !DEFS[id].isBlock || (DEFS[id].liquid && id !== ID.water)) continue;
         if (G.worlds[DIMS[d]]) G.worlds[DIMS[d]].applyRemote(x, y, z, id);
         if (sq > top) top = sq;
       }

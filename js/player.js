@@ -523,9 +523,10 @@ class Player {
       this.useCd = 0.25; this.swing = 1;
       return true;
     }
-    if (k === 'wheat_seeds' || k === 'carrot') {
+    const PLANTS = { wheat_seeds: 'wheat_sprout', carrot: 'carrot_sprout', potato: 'potato_sprout', pumpkin_seeds: 'pumpkin_stem' };
+    if (PLANTS[k]) {
       if (!b || b.id !== ID.farmland || W.getBlock(b.x, b.y + 1, b.z)) return false;
-      W.setBlock(b.x, b.y + 1, b.z, k === 'carrot' ? ID.carrot_sprout : ID.wheat_sprout);
+      W.setBlock(b.x, b.y + 1, b.z, ID[PLANTS[k]]);
       G.plantCrop(b.x, b.y + 1, b.z);
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       G.sound.play('place');

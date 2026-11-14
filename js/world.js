@@ -34,7 +34,7 @@ for (let t = 0; t < ATLAS_N * ATLAS_N; t++) {
 class Chunk {
   constructor(cx, cz) {
     this.cx = cx; this.cz = cz;
-    this.data = new Uint8Array(CS * CS * WH);
+    this.data = new Uint16Array(CS * CS * WH); // block numbers go above 255 (items use 128-511)
     this.meshes = [];
     this.dirty = true;
   }

@@ -171,7 +171,7 @@ function dressModel(m, ids) {
 }
 
 /* what each farm animal loves: holding it makes them follow you, feeding two of them makes a baby */
-const BREED_FOOD = { cow: ['wheat'], sheep: ['wheat'], pig: ['carrot', 'apple'], chicken: ['wheat_seeds'] };
+const BREED_FOOD = { cow: ['wheat'], sheep: ['wheat'], pig: ['carrot', 'potato', 'apple'], chicken: ['wheat_seeds'] };
 const lovesFood = (type, id) => !!(id && DEFS[id] && BREED_FOOD[type] && BREED_FOOD[type].includes(DEFS[id].key));
 
 /* ---------- mob definitions ---------- */
@@ -497,6 +497,9 @@ class Mob {
   /* on touch screens a tap on this animal should feed/ride it instead of hitting it */
   wantsInteract(P) {
     const hd = P.heldDef();
+    // holding food it loves (or a bucket for a cow): a tap feeds it instead of hitting it
+    if (hd && lovesFood(this.type, hd.id)) return true;
+    if (hd && hd.key === 'bucket' && this.type === 'cow') return true;
     if (this.type === 'horse') return true;
     if (this.type === 'wolf') return this.tame || !!(hd && hd.key === 'bone');
     return false;

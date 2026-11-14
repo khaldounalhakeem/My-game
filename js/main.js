@@ -520,7 +520,7 @@ G.growTree = (x, y, z, kind) => {
 
 /* crops: planted seeds grow into ripe wheat after a few minutes (only while their area is loaded) */
 const CROP_TIME = 300; // five minutes from planting to ripe
-const RIPE = () => ({ [ID.wheat_sprout]: ID.wheat_crop, [ID.carrot_sprout]: ID.carrot_crop });
+const RIPE = () => ({ [ID.wheat_sprout]: ID.wheat_crop, [ID.carrot_sprout]: ID.carrot_crop, [ID.potato_sprout]: ID.potato_crop, [ID.pumpkin_stem]: ID.pumpkin });
 G.plantCrop = (x, y, z) => { G.crops = G.crops || {}; G.crops[chestKey(x, y, z)] = CROP_TIME; };
 G.waterNear = (x, y, z) => {
   const W = G.world;
@@ -539,7 +539,14 @@ G.tickCrops = () => {
     if (sap) { if (Math.random() < 1 / 200 && G.growTree(x, y, z, sap)) delete G.crops[k]; continue; }
     // crops count down while their area is loaded (one tick a second)
     G.crops[k] = (typeof G.crops[k] === 'number' && G.crops[k] > 1 ? G.crops[k] : 1) - 1;
-    if (G.crops[k] <= 0) { G.world.setBlock(x, y, z, ripe); delete G.crops[k]; }
+    if (G.crops[k] <= 0) {
+      if (here === ID.pumpkin_stem) {
+        // a pumpkin grows on an empty spot beside the stem; the stem stays and grows another later
+        const W = G.world, spots = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dz]) => !W.getBlock(x + dx, y, z + dz) && [ID.grass, ID.dirt, ID.farmland].includes(W.getBlock(x + dx, y - 1, z + dz)));
+        if (spots.length) { const [dx, dz] = spots[(Math.random() * spots.length) | 0]; W.setBlock(x + dx, y, z + dz, ID.pumpkin); }
+        G.crops[k] = CROP_TIME;
+      } else { G.world.setBlock(x, y, z, ripe); delete G.crops[k]; }
+    }
   }
 };
 

@@ -251,14 +251,14 @@ World.prototype.buildFarm = function (S, M, qx, qz) {
   const x0 = qx + 1, z0 = qz + 1;
   const h = H(x0 + 2, z0 + 2);
   if (h <= SEA) return;
-  const crops = [ID.wheat_crop, ID.wheat_crop, ID.carrot_crop, ID.carrot_crop, ID.pumpkin, ID.melon];
+  const crops = [ID.wheat_crop, ID.wheat_crop, ID.carrot_crop, ID.potato_crop, ID.potato_crop, ID.pumpkin, ID.melon];
   const crop = crops[rng() * crops.length | 0];
   for (let x = x0 - 1; x <= x0 + 5; x++) for (let z = z0 - 1; z <= z0 + 5; z++) {
     for (let y = h + 1; y <= h + 4; y++) set(x, y, z, 0);
     const edge = x === x0 - 1 || x === x0 + 5 || z === z0 - 1 || z === z0 + 5;
     if (edge) { set(x, h, z, M.post); continue; }
     set(x, h, z, x === x0 + 2 ? ID.water : ID.dirt);
-    if (x !== x0 + 2 && rng() < 0.9) set(x, h + 1, z, crop === ID.wheat_crop || crop === ID.carrot_crop ? crop : rng() < 0.6 ? ID.tall_grass : crop);
+    if (x !== x0 + 2 && rng() < 0.9) set(x, h + 1, z, crop === ID.wheat_crop || crop === ID.carrot_crop || crop === ID.potato_crop ? crop : rng() < 0.6 ? ID.tall_grass : crop);
   }
   // a few hay bales next to the farm
   for (let k = 0; k < 3; k++) {
@@ -426,7 +426,7 @@ World.prototype.buildShipwreck = function (S) {
 /* what each kind of structure keeps in its chests: [item, min, max, weight], and how many stacks */
 const LOOT_TABLES = {
   // villages, like Minecraft: ordinary houses have simple things, the blacksmith has the good stuff
-  v_house: [3, 7, [['bread', 1, 4, 10], ['carrot', 1, 4, 8], ['apple', 1, 5, 10], ['wheat', 1, 7, 10], ['dandelion', 1, 1, 3], ['rose', 1, 1, 3], ['feather', 1, 2, 3], ['stick', 1, 3, 4], ['emerald', 1, 1, 1]]],
+  v_house: [3, 7, [['bread', 1, 4, 10], ['carrot', 1, 4, 8], ['potato', 1, 4, 8], ['apple', 1, 5, 10], ['wheat', 1, 7, 10], ['dandelion', 1, 1, 3], ['rose', 1, 1, 3], ['feather', 1, 2, 3], ['stick', 1, 3, 4], ['emerald', 1, 1, 1]]],
   v_blacksmith: [3, 8, [['diamond', 1, 3, 3], ['iron_ingot', 1, 5, 10], ['gold_ingot', 1, 3, 5], ['bread', 1, 3, 15], ['apple', 1, 3, 15], ['iron_pickaxe', 1, 1, 5], ['iron_sword', 1, 1, 5],
     ['iron_chestplate', 1, 1, 5], ['iron_helmet', 1, 1, 5], ['iron_leggings', 1, 1, 5], ['iron_boots', 1, 1, 5], ['obsidian', 3, 7, 5], ['oak_log', 3, 7, 5]]],
   v_toolsmith: [3, 8, [['diamond', 1, 3, 1], ['iron_ingot', 1, 5, 5], ['gold_ingot', 1, 3, 1], ['bread', 1, 3, 15], ['iron_pickaxe', 1, 1, 1], ['coal', 1, 3, 1], ['stick', 1, 3, 20], ['iron_shovel', 1, 1, 5]]],
