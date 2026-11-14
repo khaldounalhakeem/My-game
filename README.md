@@ -102,7 +102,7 @@ Your name is in the top left corner: tap it to change it. The menu has **Singlep
 - **Flint**: break gravel (35% chance). Gravel lies in grey patches on grassy land, on beaches and riverbeds, and in caves. Flint and Steel = 1 iron ingot + 1 flint.
 - **Creative**: every block and item, flying, no damage.
 - Day and night cycle with sun, moon, stars and clouds. Falling sand and gravel, water that fills in holes, and sound effects.
-- Your world **saves automatically** in the browser. Use "Continue saved world" on the title screen.
+- Your worlds **save automatically** in the browser. When you play from the claude.ai link they are also backed up online to your own private space, so a world comes back even if the device forgets it, or on another device signed in to the same account. If a device can't save (its storage is full), the game tells you.
 
 ## Code layout
 
@@ -116,6 +116,7 @@ Your name is in the top left corner: tap it to change it. The menu has **Singlep
 | `js/player.js` | Player movement, mining, building, combat and inventory |
 | `js/ui.js` | HUD, inventory, crafting screens, menus and controls |
 | `js/net.js` | Multiplayer: other players, shared block changes and PvP, over public MQTT servers (website) or the claude.ai room |
+| `js/cloud.js` | Online backup of your worlds when playing from the claude.ai link |
 | `js/gamepad.js` | PS4 / game controller support |
 | `js/main.js` | Rendering, sky, sounds, spawning, explosions, saving and the game loop |
 | `lib/three.min.js` | [three.js](https://threejs.org) r128 3D library (MIT licence) |

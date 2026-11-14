@@ -663,7 +663,7 @@ const UI = {
     $('btn-time').addEventListener('click', () => { G.time = G.isNight() ? 0.02 : 0.52; G.timeEventAt = Date.now(); this.message(G.isNight() ? 'Night falls.' : 'The sun rises.'); });
     $('btn-cam').addEventListener('click', () => { G.camMode = (G.camMode + 1) % 3; this.syncPause(); });
     $('btn-save').addEventListener('click', () => { G.save(); this.message('World saved in this browser.'); });
-    $('btn-quit').addEventListener('click', () => { G.save(); G.toTitle(); });
+    $('btn-quit').addEventListener('click', () => { G.save({ now: true }); G.toTitle(); });
     $('rd').addEventListener('input', () => { for (const w of Object.values(G.worlds)) { w.renderDist = +$('rd').value; w.queue = []; } $('rd-val').textContent = $('rd').value; G.applyFog(); });
     $('sens').addEventListener('input', () => { Input.sens = +$('sens').value; $('sens-val').textContent = (+$('sens').value).toFixed(1); });
     $('btn-wake').addEventListener('click', () => G.wake());

@@ -1128,11 +1128,25 @@ G.startNew = (mode, name) => {
   Net.joinWorld(G.seed);
 };
 
-G.continueSaved = (id) => {
+G.continueSaved = async (id) => {
   Sound.init();
   const entry = id ? G.findWorld(id) : G.worldList()[0];
+  if (entry && Cloud.ready) {
+    let here = null;
+    try { here = localStorage.getItem(worldKey(entry.id)); } catch (e) { here = null; }
+    if (!here || entry.cloud || entry.cloudNewer) {
+      G.ui.message('Loading your world from online...');
+      const text = await Cloud.pull(entry.id);
+      if (text) {
+        try { localStorage.setItem(worldKey(entry.id), text); } catch (e) { G.cloudCopy = text; }
+        const list = G.worldList(), w = list.find(x => x.id === entry.id);
+        if (w) { delete w.cloud; delete w.cloudNewer; writeWorldList(list); }
+      }
+    }
+  }
   let s = null;
-  try { s = entry ? JSON.parse(localStorage.getItem(worldKey(entry.id))) : null; } catch (e) { s = null; }
+  try { s = entry ? JSON.parse(localStorage.getItem(worldKey(entry.id)) || G.cloudCopy || 'null') : null; } catch (e) { s = null; }
+  G.cloudCopy = null;
   if (!s) { G.ui.message('No saved world found.'); return; }
   G.worldId = entry.id; G.worldName = entry.name;
   makeWorld(s.seed, !s.gen); // saves from before seed personalities keep their old landscape
@@ -1170,32 +1184,40 @@ G.continueSaved = (id) => {
   Net.joinWorld(G.seed);
 };
 
-G.save = () => {
+G.save = (opts) => {
   if (G.state === 'title' || !G.world) return;
   const P = G.player;
   const data = {
-    v: 1, seed: G.seed, mode: P.mode, time: G.time, dragonTimer: G.dragonTimer,
+    v: 1, name: G.worldName || 'My World', seed: G.seed, mode: P.mode, time: G.time, dragonTimer: G.dragonTimer,
     pos: P.pos.toArray(), spawn: P.spawn.toArray(), yaw: P.yaw, pitch: P.pitch,
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
     dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, keepInventory: !!G.keepInventory, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
-  try { localStorage.setItem(G.saveKey(), JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
+  let ok = true;
+  try { localStorage.setItem(G.saveKey(), JSON.stringify(data)); } catch (e) { ok = false; }
+  if (!ok && Date.now() - (G.saveWarnAt || 0) > 60000) {
+    G.saveWarnAt = Date.now();
+    G.ui.message(Cloud.ready ? 'This device could not save your world (its storage is full), but it is still saved online.' : 'Your world could not be saved on this device: its storage is full. Delete old worlds you don\'t need from the Singleplayer list.', 'purple');
+  }
   const list = G.worldList().filter(w => w.id !== G.worldId);
   list.unshift({ id: G.worldId, name: G.worldName || 'My World', seed: G.seed, mode: P.mode, last: Date.now() });
   writeWorldList(list);
+  if (ok) Cloud.queue(G.worldId, opts && opts.now);
 };
 
 /* ---------- your worlds: every seed you played is kept, with the name you gave it ---------- */
 G.worldList = () => {
   try { const l = JSON.parse(localStorage.getItem(WORLDS_KEY)); return Array.isArray(l) ? l.filter(w => w && w.id) : []; } catch (e) { return []; }
 };
+G.writeWorldList = list => writeWorldList(list);
 function writeWorldList(list) { try { localStorage.setItem(WORLDS_KEY, JSON.stringify(list)); } catch (e) { /* storage unavailable */ } }
 G.findWorld = seed => G.worldList().find(w => w.id === String(seed));
 G.saveKey = () => worldKey(G.worldId);
 G.deleteWorld = id => {
   writeWorldList(G.worldList().filter(w => w.id !== id));
+  Cloud.remove(id);
   try { localStorage.removeItem(worldKey(id)); } catch (e) { /* storage unavailable */ }
 };
 G.renameWorld = (id, name) => {
@@ -1215,6 +1237,23 @@ function migrateOldSave() {
     }
     localStorage.removeItem(SAVE_KEY);
   } catch (e) { /* keep the old save where it is */ }
+}
+function recoverWorlds() {
+  let keys = [];
+  try { keys = Object.keys(localStorage).filter(k => k.startsWith('blockrealm-world-') && k !== WORLDS_KEY); } catch (e) { return; }
+  const list = G.worldList();
+  let changed = false;
+  for (const k of keys) {
+    const id = k.slice('blockrealm-world-'.length);
+    if (!id || list.find(w => w.id === id)) continue;
+    try {
+      const s = JSON.parse(localStorage.getItem(k));
+      if (!s || s.seed === undefined) continue;
+      list.push({ id, name: s.name || 'Recovered World', seed: s.seed, mode: s.mode || 'survival', last: 0 });
+      changed = true;
+    } catch (e) { /* not a world save */ }
+  }
+  if (changed) writeWorldList(list);
 }
 function refreshContinue() { G.ui.renderWorldList(); }
 
@@ -1289,7 +1328,7 @@ G.pause = () => {
   G.ui.pausePage('main');
   $('menu-pause').hidden = false;
   G.unlock();
-  G.save();
+  G.save({ now: true });
 };
 G.resume = () => {
   Sound.init();
@@ -1490,12 +1529,14 @@ function boot() {
   UI.init();
   Net.init();
   migrateOldSave();
+  recoverWorlds();
+  Cloud.init();
   const recent = G.worldList()[0];
   refreshContinue();
   G.setState('title');
   G.previewWorld(recent ? String(recent.seed) : null);
   window.addEventListener('beforeunload', () => G.save());
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { G.save(); if (G.state === 'play') G.pause(); } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { G.save({ now: true }); if (G.state === 'play') G.pause(); } });
   requestAnimationFrame(t => { last = t; frame(t); });
 }
 boot();
