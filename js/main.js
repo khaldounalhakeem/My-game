@@ -409,6 +409,20 @@ G.tryBuildGolem = (x, y, z) => {
   return false;
 };
 
+/* crops: planted seeds grow into ripe wheat after a few minutes (only while their area is loaded) */
+G.plantCrop = (x, y, z) => { G.crops = G.crops || {}; G.crops[chestKey(x, y, z)] = 1; };
+G.tickCrops = () => {
+  if (!G.crops) return;
+  const pre = G.dim + ':';
+  for (const k in G.crops) {
+    if (!k.startsWith(pre)) continue;
+    const [x, y, z] = k.slice(pre.length).split(',').map(Number);
+    if (!G.world.isLoaded(x, z)) continue;
+    if (G.world.getBlock(x, y, z) !== ID.wheat_sprout) { delete G.crops[k]; continue; }
+    if (Math.random() < 1 / 150) { G.world.setBlock(x, y, z, ID.wheat_crop); delete G.crops[k]; }
+  }
+};
+
 /* chests keep 27 slots each. A treasure chest from a structure gets its loot the first time it is
    opened (it is put inside, ready to take out), then it is an ordinary chest. */
 const chestKey = (x, y, z) => G.dim + ':' + x + ',' + y + ',' + z;
@@ -509,7 +523,8 @@ G.tickFurnaces = (dt) => {
     const can = furnaceCanSmelt(f);
     if (f.burn <= 0 && can && f.slots[1] && FUEL[f.slots[1].id]) {
       f.burn = f.burnMax = FUEL[f.slots[1].id];
-      if (--f.slots[1].count <= 0) f.slots[1] = null;
+      if (f.slots[1].id === ID.lava_bucket) f.slots[1] = { id: ID.bucket, count: 1 };
+      else if (--f.slots[1].count <= 0) f.slots[1] = null;
     }
     if (f.burn > 0) {
       f.burn = Math.max(0, f.burn - dt);
@@ -755,7 +770,7 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.chests = {}; G.chestVer = {}; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
+  G.pets = {}; G.pendingPets = []; G.chests = {}; G.chestVer = {}; G.crops = {}; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -996,6 +1011,7 @@ G.continueSaved = (id) => {
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether' || s.dim === 'end') useDim(s.dim); else restoreDrops('overworld');
   G.chests = s.chests || {};
+  G.crops = s.crops || {};
   G.keepInventory = !!s.keepInventory;
   G.difficulty = G.DIFFS[s.difficulty] ? s.difficulty : 'normal';
   G.chestVer = s.chestVer || {};
@@ -1029,7 +1045,7 @@ G.save = () => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, keepInventory: !!G.keepInventory, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, crops: G.crops || {}, keepInventory: !!G.keepInventory, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   try { localStorage.setItem(G.saveKey(), JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
   const list = G.worldList().filter(w => w.id !== G.worldId);
@@ -1248,7 +1264,7 @@ function frame(now) {
       restorePets(ready);
     }
     G.spawnT -= dt;
-    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); }
+    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); }
     if (!G.dragons.length && G.dim === 'nether' && Net.isHost()) {
       G.dragonTimer -= dt;
       if (G.dragonTimer <= 0) { G.dragonTimer = 240; G.summonDragon(null); }

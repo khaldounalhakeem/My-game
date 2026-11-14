@@ -385,11 +385,77 @@ class Player {
   }
 
   /* right button */
+  /* swap one of the held item for another (an empty bucket for a full one, and back) */
+  swapHeld(id) {
+    if (this.mode === 'creative') { if (DEFS[id].key === 'bucket') return; this.inv.add(id, 1); this.inv.changed(); return; }
+    const held = this.heldSlot();
+    if (held.count > 1) { this.inv.takeFrom(this.sel, 1); const left = this.inv.add(id, 1); if (left) G.spawnDrop(id, 1, this.pos.x, this.pos.y + 1, this.pos.z); }
+    else this.inv.slots[this.sel] = { id, count: 1 };
+    this.inv.changed();
+  }
+
+  /* buckets, milk, hoes and seeds; true if the held item did something */
+  useBucketOrHoe(hd, b) {
+    const W = G.world, k = hd.key;
+    if (k === 'bucket') {
+      const o = this.eyePos(), d = this.lookDir();
+      const hit = W.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 4.6, true);
+      if (!hit || (hit.id !== ID.water && hit.id !== ID.lava)) return false;
+      W.setBlock(hit.x, hit.y, hit.z, 0);
+      this.swapHeld(hit.id === ID.water ? ID.water_bucket : ID.lava_bucket);
+      G.sound.play('pickup'); this.useCd = 0.4; this.swing = 1;
+      return true;
+    }
+    if (k === 'water_bucket' || k === 'lava_bucket') {
+      if (!b) return false;
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz);
+      if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return false;
+      this.useCd = 0.4; this.swing = 1;
+      if (k === 'water_bucket' && G.dim === 'nether') {
+        G.particles.burst(px + 0.5, py + 0.5, pz + 0.5, [0xdddddd, 0xffffff], 14, 1.5, 0.15, 2);
+        G.ui.message('The water boils away in the heat of the Nether.', 'purple');
+      } else W.setBlock(px, py, pz, k === 'water_bucket' ? ID.water : ID.lava);
+      this.swapHeld(ID.bucket);
+      G.sound.play('place');
+      return true;
+    }
+    if (k === 'milk_bucket') {
+      // drinking milk: cools you down and puts out fire
+      this.fire = 0; this.fireT = 0;
+      if (this.mode === 'survival') this.swapHeld(ID.bucket);
+      G.sound.play('eat'); G.ui.message('You drank the milk.');
+      this.useCd = 0.6; this.swing = 1;
+      return true;
+    }
+    if (hd.tool && hd.tool.type === 'hoe') {
+      if (!b || (b.id !== ID.grass && b.id !== ID.dirt) || W.getBlock(b.x, b.y + 1, b.z)) return false;
+      W.setBlock(b.x, b.y, b.z, ID.farmland);
+      G.sound.play('dig', new THREE.Vector3(b.x, b.y, b.z));
+      this.useCd = 0.25; this.swing = 1;
+      return true;
+    }
+    if (k === 'wheat_seeds') {
+      if (!b || b.id !== ID.farmland || W.getBlock(b.x, b.y + 1, b.z)) return false;
+      W.setBlock(b.x, b.y + 1, b.z, ID.wheat_sprout);
+      G.plantCrop(b.x, b.y + 1, b.z);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place');
+      this.useCd = 0.2; this.swing = 1;
+      return true;
+    }
+    return false;
+  }
+
   use(tgt) {
     if (this.useCd > 0) return;
     const W = G.world, held = this.heldSlot(), hd = held ? DEFS[held.id] : null;
     const b = tgt.block;
+    // a bucket on a cow: milk
+    if (tgt.mob && tgt.mob.type === 'cow' && !tgt.mob.dead && hd && hd.key === 'bucket') { this.useCd = 0.4; this.swing = 1; this.swapHeld(ID.milk_bucket); G.sound.play('pickup'); return; }
     if (tgt.mob && tgt.mob.interact && tgt.mob.interact(this, hd)) { this.useCd = 0.35; this.swing = 1; return; }
+    if (hd && this.useBucketOrHoe(hd, b)) return;
     if (b && !this.sneaking) {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
       if (b.id === ID.bed || b.id === ID.bed_head) { this.useCd = 1; G.sleep(b); return; }

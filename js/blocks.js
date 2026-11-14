@@ -243,6 +243,10 @@ function pTool(kind, mat) {
         if (d <= 3.6) P.put(x, y, d > 2.8 ? (x + y < 16 ? hi : lo) : c);
       }
       P.pts([[10, 3], [11, 3]], hi);
+    } else if (kind === 'hoe') {
+      for (let i = 0; i < 10; i++) { P.put(2 + i, 13 - i, stick); P.put(3 + i, 13 - i, stickD); }
+      for (let x = 7; x <= 13; x++) { P.put(x, 2, x === 7 ? hi : c); P.put(x, 3, x === 13 ? lo : c); }
+      P.pts([[7, 4], [8, 4]], lo);
     } else if (kind === 'axe') {
       for (let i = 0; i < 10; i++) { P.put(2 + i, 13 - i, stick); P.put(3 + i, 13 - i, stickD); }
       const rows = [[1, 8, 11], [2, 6, 11], [3, 5, 10], [4, 5, 9], [5, 5, 8], [6, 6, 7]];
@@ -452,6 +456,19 @@ makeTile('end_frame_top_eye', P => { P.fill(0x2f6b5c, 10); P.speck(0x23544a, 0.3
 makeTile('end_portal', P => { P.fill(0x070612, 4); for (let i = 0; i < 18; i++) P.put(P.rng() * 16 | 0, P.rng() * 16 | 0, [0x9fe8d8, 0x6fd0e8, 0xcfa0f0, 0xffffff][i % 4]); });
 makeTile('i_blaze_powder', pPlant(P => { for (let i = 0; i < 26; i++) { const a = P.rng() * 6.28, r = P.rng() * 5; P.put(8 + Math.cos(a) * r, 9 + Math.sin(a) * r * 0.7, P.rng() < 0.5 ? 0xffb020 : 0xf07010); } P.pts([[7, 8], [9, 10], [8, 6]], 0xfff080); }));
 makeTile('i_eye_of_ender', pPlant(P => { P.disc(8, 8, 6, 0x2a8a5a, 8); P.disc(8, 8, 4.5, 0x46c98a, 10); P.rect(7, 4, 2, 8, 0x0c2a1a); P.pts([[5, 5], [6, 5]], 0xc0ffd8); }));
+const pBucket = fill => pPlant(P => {
+  for (let y = 4; y <= 13; y++) { const w = 5 - Math.floor((y - 4) / 3); for (let x = 8 - w; x <= 7 + w; x++) P.put(x, y, x === 8 - w || x === 7 + w || y === 13 ? 0x8a8a8a : 0xc8c8c8); }
+  for (let x = 3; x <= 12; x++) P.put(x, 3, 0x9a9a9a);
+  P.pts([[2, 4], [2, 5], [13, 4], [13, 5]], 0x7a7a7a);
+  if (fill) for (let x = 4; x <= 11; x++) { P.put(x, 4, fill); P.put(x, 5, fill); }
+});
+makeTile('i_bucket', pBucket(0));
+makeTile('i_water_bucket', pBucket(0x3a6ad8));
+makeTile('i_lava_bucket', pBucket(0xf06a10));
+makeTile('i_milk_bucket', pBucket(0xf4f4f4));
+makeTile('i_wheat_seeds', pPlant(P => { for (const [x, y] of [[5, 6], [8, 5], [10, 8], [6, 10], [9, 11], [12, 6], [4, 12], [11, 12]]) { P.put(x, y, 0x5a9a2a); P.put(x + 1, y, 0x3e7a1e); P.put(x, y + 1, 0x7aba3a); } }));
+makeTile('farmland_top', P => { P.fill(0x5a3a1e, 8); for (let y = 1; y < 16; y += 3) for (let x = 0; x < 16; x++) P.put(x, y, P.vary(0x3e2810, 6)); });
+makeTile('wheat_sprout', pPlant(P => { for (let i = 0; i < 6; i++) { const x = 2 + i * 2.4 | 0, h = 3 + P.rng() * 4 | 0; P.line(x, 15, x, 15 - h, P.vary(0x5aa02a, 14)); P.put(x + 1, 15 - h + 1, P.vary(0x7ac040, 14)); } }));
 makeTile('i_melon_slice', pPlant(P => { for (let y = 4; y <= 12; y++) for (let x = 2; x <= 14; x++) { const d = Math.hypot(x - 8, y - 4); if (d <= 7) P.put(x, y, d > 6 ? 0x3e8a1d : d > 5.2 ? 0xe8f0a0 : 0xe0342c); } P.pts([[6, 6], [9, 7], [8, 9], [11, 6]], 0x1a1a1a); }));
 makeTile('i_ender_pearl', pPlant(P => { P.disc(8, 8, 5, 0x1d6b5c, 8); P.disc(8, 8, 2.6, 0x3fb59a, 8); P.pts([[6, 6], [7, 6]], 0xb0fff0); }));
 makeTile('i_bow', pPlant(P => { for (let a = 0; a <= 90; a += 4) { const r = a * Math.PI / 180; P.put(2 + Math.cos(r) * 11, 2 + Math.sin(r) * 11, 0x7a5a32); P.put(2 + Math.cos(r) * 10, 2 + Math.sin(r) * 10, 0x5a3e20); } P.line(13, 2, 2, 13, 0xdddddd); }));
@@ -462,6 +479,7 @@ for (const [k, c] of [['wooden', 0xa8834f], ['stone', 0x8a8a8a], ['iron', 0xdcdc
   makeTile('i_' + k + '_sword', pTool('sword', c));
   makeTile('i_' + k + '_shovel', pTool('shovel', c));
   makeTile('i_' + k + '_axe', pTool('axe', c));
+  makeTile('i_' + k + '_hoe', pTool('hoe', c));
 }
 
 /* ---------- registry ---------- */
@@ -557,7 +575,7 @@ block('melon', 'Melon', { top: 'melon_top', side: 'melon_side' }, { tool: 'axe',
 block('hay_bale', 'Hay Bale', { top: 'hay_top', side: 'hay_side' }, { hardness: 0.5 });
 block('rose', 'Rose', 'rose', CROSS);
 block('dandelion', 'Dandelion', 'dandelion', CROSS);
-block('tall_grass', 'Tall Grass', 'tall_grass', Object.assign({ drop: (r) => (r() < 0.1 ? [['wheat', 1]] : []), replaceable: true }, CROSS));
+block('tall_grass', 'Tall Grass', 'tall_grass', Object.assign({ drop: (r) => (r() < 0.125 ? [['wheat_seeds', 1]] : []), replaceable: true }, CROSS));
 block('dead_bush', 'Dead Bush', 'dead_bush', Object.assign({ drop: (r) => (r() < 0.5 ? [['stick', 1]] : []), replaceable: true }, CROSS));
 block('red_mushroom', 'Red Mushroom', 'red_mushroom', CROSS);
 block('brown_mushroom', 'Brown Mushroom', 'brown_mushroom', CROSS);
@@ -572,11 +590,13 @@ block('chest', 'Chest', { top: 'chest_top', side: 'chest_side' }, { tool: 'axe',
 block('spawner', 'Monster Spawner', 'spawner', PICK(1, 5, { opaque: false, cutout: true, drop: null, light: true }));
 block('nether_portal', 'Nether Portal', 'portal', { solid: false, opaque: false, translucent: true, hardness: 0, drop: null, light: true, portal: true });
 block('bed_head', 'Bed', { top: 'bed_head_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2, height: 0.5625, opaque: false, drop: 'bed' });
-block('wheat_crop', 'Wheat', 'wheat_crop', Object.assign({ drop: (r) => [['wheat', 1 + (r() < 0.4 ? 1 : 0)]] }, CROSS));
+block('wheat_crop', 'Wheat', 'wheat_crop', Object.assign({ drop: (r) => [['wheat', 1], ['wheat_seeds', 1 + (r() < 0.5 ? 1 : 0)]] }, CROSS));
 block('end_stone', 'End Stone', 'end_stone', PICK(1, 3));
 block('end_portal_frame', 'End Portal Frame', { top: 'end_frame_top', side: 'end_frame_side', bottom: 'end_stone' }, { hardness: Infinity, height: 0.8125, opaque: false, light: true });
 block('end_portal_frame_eye', 'End Portal Frame', { top: 'end_frame_top_eye', side: 'end_frame_side', bottom: 'end_stone' }, { hardness: Infinity, height: 0.8125, opaque: false, light: true });
 block('end_portal', 'End Portal', 'end_portal', { solid: false, opaque: false, hardness: Infinity, drop: null, light: true, portal: true, height: 0.75 });
+block('farmland', 'Farmland', { top: 'farmland_top', side: 'dirt', bottom: 'dirt' }, { tool: 'shovel', hardness: 0.6, height: 0.9375, opaque: false, drop: 'dirt' });
+block('wheat_sprout', 'Wheat (growing)', 'wheat_sprout', Object.assign({ drop: 'wheat_seeds' }, CROSS));
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -635,6 +655,12 @@ for (const [k, n, tier, speed, dmg] of TOOL_MATS) {
 item('blaze_powder', 'Blaze Powder', 'blaze_powder');
 item('eye_of_ender', 'Eye of Ender', 'eye_of_ender', { stack: 16 });
 item('wheat', 'Wheat', 'wheat');
+item('wheat_seeds', 'Wheat Seeds', 'wheat_seeds');
+item('bucket', 'Bucket', 'bucket', { stack: 16 });
+item('water_bucket', 'Water Bucket', 'water_bucket', { stack: 1 });
+item('lava_bucket', 'Lava Bucket', 'lava_bucket', { stack: 1 });
+item('milk_bucket', 'Milk Bucket', 'milk_bucket', { stack: 1 });
+for (const [k, n, tier, speed, dmg] of TOOL_MATS) item(k + '_hoe', n + ' Hoe', k + '_hoe', { stack: 1, tool: { type: 'hoe', tier, speed }, damage: 1 });
 item('bread', 'Bread', 'bread', { food: 5 });
 
 function getDrops(def, rng) {
@@ -720,6 +746,12 @@ const RECIPES = [
   ['hay_bale', 1, { wheat: 9 }],
   ['wheat', 9, { hay_bale: 1 }],
   ['bread', 1, { wheat: 3 }],
+  ['bucket', 1, { iron_ingot: 3 }, 'table'],
+  ['wooden_hoe', 1, { '#planks': 2, stick: 2 }, 'table'],
+  ['stone_hoe', 1, { cobblestone: 2, stick: 2 }, 'table'],
+  ['iron_hoe', 1, { iron_ingot: 2, stick: 2 }, 'table'],
+  ['golden_hoe', 1, { gold_ingot: 2, stick: 2 }, 'table'],
+  ['diamond_hoe', 1, { diamond: 2, stick: 2 }, 'table'],
   ['blaze_powder', 2, { blaze_rod: 1 }],
   ['eye_of_ender', 1, { blaze_powder: 1, ender_pearl: 1 }],
   ['wool_white', 1, { string: 4 }],
@@ -794,6 +826,6 @@ const SMELT = {}; // input id -> [output id, count, xp]
 const SMELT_XP = { iron_ingot: 0.7, gold_ingot: 1, glass: 0.1, stone: 0.1, coal: 0.15, terracotta: 0.35, cooked_porkchop: 0.35, steak: 0.35, cooked_chicken: 0.35 };
 for (const r of RECIPES) if (r[3] === 'furnace') for (const k in r[2]) for (const m of GROUPS[k] || [k]) if (ID[m] !== undefined) SMELT[ID[m]] = [ID[r[0]], r[1], SMELT_XP[r[0]] || 0.1];
 const FUEL = {};
-for (const [k, t] of [['coal', 80], ['coal_block', 800], ['blaze_rod', 120], ['stick', 5], ['crafting_table', 15], ['chest', 15], ['bookshelf', 15],
+for (const [k, t] of [['lava_bucket', 1000], ['coal', 80], ['coal_block', 800], ['blaze_rod', 120], ['stick', 5], ['crafting_table', 15], ['chest', 15], ['bookshelf', 15],
   ['oak_log', 15], ['birch_log', 15], ['spruce_log', 15], ['oak_planks', 15], ['birch_planks', 15], ['spruce_planks', 15], ['bow', 15],
   ['wooden_pickaxe', 10], ['wooden_sword', 10], ['wooden_axe', 10], ['wooden_shovel', 10], ['dead_bush', 5]]) if (ID[k] !== undefined) FUEL[ID[k]] = t;
