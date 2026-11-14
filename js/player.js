@@ -60,7 +60,7 @@ class Player {
 
   heldSlot() { return this.inv.slots[this.sel]; }
   heldDef() { const s = this.heldSlot(); return s ? DEFS[s.id] : null; }
-  eyePos() { return new THREE.Vector3(this.pos.x, this.pos.y + this.eye - (this.sneaking ? 0.15 : 0), this.pos.z); }
+  eyePos() { return new THREE.Vector3(this.pos.x, this.pos.y + (this.sleeping ? 0.3 : this.eye - (this.sneaking ? 0.15 : 0)), this.pos.z); }
   lookDir() {
     const cp = Math.cos(this.pitch);
     return new THREE.Vector3(-Math.sin(this.yaw) * cp, Math.sin(this.pitch), -Math.cos(this.yaw) * cp);
@@ -342,6 +342,7 @@ class Player {
     if (above && (DEFS[above].cross || above === ID.cactus)) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
     if (id === ID.furnace) G.breakFurnace(x, y, z);
+    if (DEFS[id].sign) G.setSign(x, y, z, null);
     if (DEFS[id].door) {
       const oy = DEFS[id].door.half === 'lower' ? y + 1 : y - 1, other = W.getBlock(x, oy, z);
       if (other && DEFS[other].door) W.setBlock(x, oy, z, 0);
@@ -415,6 +416,26 @@ class Player {
   /* buckets, milk, hoes and seeds; true if the held item did something */
   useBucketOrHoe(hd, b) {
     const W = G.world, k = hd.key;
+    if ((hd.placesGate || hd.placesSign) && b) {
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz);
+      if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return true;
+      const L = this.lookDir(), alongX = Math.abs(L.x) > Math.abs(L.z);
+      if (hd.placesGate) W.setBlock(px, py, pz, ID['gate_' + (alongX ? 'z' : 'x') + 'c']);
+      else {
+        // on a wall: flat against it; on the floor: on a post, writing toward you
+        let id;
+        if (b.ny === 0) id = ID['wall_sign_' + (b.nx === 1 ? 'e' : b.nx === -1 ? 'w' : b.nz === 1 ? 's' : 'n')];
+        else if (b.ny === 1) id = ID['sign_' + (alongX ? (L.x > 0 ? 'w' : 'e') : (L.z > 0 ? 'n' : 's'))];
+        else return true;
+        W.setBlock(px, py, pz, id);
+        G.ui.editSign(px, py, pz);
+      }
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.25; this.swing = 1;
+      return true;
+    }
     if (hd.placesLadder && b) {
       if (!b.nx && !b.nz) { G.ui.message('Put a ladder on the side of a block.'); return true; }
       const px = b.x + b.nx, py = b.y, pz = b.z + b.nz, cur = W.getBlock(px, py, pz);
@@ -524,7 +545,8 @@ class Player {
       if (b.id === ID.bed || b.id === ID.bed_head) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
-      if (DEFS[b.id].door || DEFS[b.id].trapdoor) { this.useCd = 0.3; this.swing = 1; G.toggleDoor(b.x, b.y, b.z); return; }
+      if (DEFS[b.id].door || DEFS[b.id].trapdoor || DEFS[b.id].gate) { this.useCd = 0.3; this.swing = 1; G.toggleDoor(b.x, b.y, b.z); return; }
+      if (DEFS[b.id].sign) { this.useCd = 0.3; G.ui.editSign(b.x, b.y, b.z); return; }
       if (b.id === ID.end_portal_frame && hd && hd.key === 'eye_of_ender') {
         this.useCd = 0.4; this.swing = 1;
         if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);

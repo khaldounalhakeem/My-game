@@ -233,7 +233,7 @@ function makeMultiRoom(rooms, me) {
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
   world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0, blasts: [], blastSeq: 0,
-  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, askRing: [], askSeq: 0, chestRing: [], giveRing: [], giveSeq: 0, gotDrops: new Set(), seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
+  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, askRing: [], askSeq: 0, chestRing: [], signRing: [], signSeq: 0, giveRing: [], giveSeq: 0, gotDrops: new Set(), seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
   nick: '', color: SHIRT_COLORS[0],
 
   async init() {
@@ -363,7 +363,8 @@ const Net = {
       Object.assign(base, {
         m: P.mode === 'creative' ? 1 : 0, d: dimCode(G.dim), p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
         s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
-        sl: P.sleeping ? 1 : 0,
+        sl: P.sleeping ? 1 : 0, sb: P.sleeping ? [P.sleeping.x, P.sleeping.y, P.sleeping.z] : null,
+        sg: this.slim ? null : this.signRing,
         ar: [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0)), ex: this.blasts,
         mb: this.slim ? null : this.ownedMobs(), mh: this.mobHits, dr: this.slim ? null : this.dropRing, pk: this.slim ? null : this.pickRing,
         rq: this.slim ? null : this.askRing, gv: this.slim ? null : this.giveRing,
@@ -599,6 +600,21 @@ const Net = {
   friendWorldName(seed) {
     for (const rp of this.peers.values()) if (rp.world === 'w' + seed && rp.worldName) return { name: rp.worldName, by: rp.name || 'Your friend' };
     return null;
+  },
+
+  /* someone else is already asleep in this bed (by its foot block)? their name */
+  bedTaken(foot) {
+    for (const rp of this.peers.values()) if (rp.inWorld && rp.sleepBed && rp.sleepBed[0] === foot.x && rp.sleepBed[1] === foot.y && rp.sleepBed[2] === foot.z) return rp.name || 'Your friend';
+    return null;
+  },
+
+  signChanged(key) {
+    if (!this.inShared()) return;
+    this.signSeq++;
+    this.signRing = this.signRing.filter(e => e[0] !== key);
+    this.signRing.push([key, this.signSeq, G.signs[key] || null]);
+    if (this.signRing.length > 16) this.signRing.shift();
+    this.sendT = 0;
   },
 
   /* names of the players in this world who still need to get into bed */
@@ -887,6 +903,22 @@ const Net = {
     rp.dead = pr.x === 1;
     rp.held = isInt(pr.h) ? pr.h : 0;
     rp.sleeping = pr.sl === 1;
+    rp.sleepBed = rp.sleeping && Array.isArray(pr.sb) && pr.sb.length === 3 && pr.sb.every(isInt) ? pr.sb : null;
+    // lie their body down while they sleep
+    if (rp.model) rp.model.group.rotation.x = rp.sleeping ? -Math.PI / 2 : 0;
+    // signs they wrote
+    if (Array.isArray(pr.sg)) for (const e of pr.sg) {
+      if (!Array.isArray(e) || typeof e[0] !== 'string' || !Number.isInteger(e[1])) continue;
+      this.signSeen = this.signSeen || {};
+      const seen = this.signSeen[rp.peer + e[0]] || 0;
+      if (e[1] <= seen) continue;
+      this.signSeen[rp.peer + e[0]] = e[1];
+      const m = /^(\w+):(-?\d+),(-?\d+),(-?\d+)$/.exec(e[0]);
+      if (!m) continue;
+      G.signs = G.signs || {};
+      if (Array.isArray(e[2])) G.signs[e[0]] = G.cleanSignText(e[2]); else delete G.signs[e[0]];
+      G.drawSign(e[0]);
+    }
     rp.yaw = rot[0]; rp.pitch = clamp(rot[1], -1.6, 1.6);
     rp.swing = Number.isFinite(pr.s) ? clamp(pr.s, 0, 1) : 0;
     if (pos) {

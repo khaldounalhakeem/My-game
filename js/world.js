@@ -688,8 +688,8 @@ class World {
 
   /* the boxes that make up a stair or fence block (fences join up with fences and solid blocks beside them) */
   shapeBoxes(def, get, x, y, z, forDrawing) {
-    if (def.boxes) return def.boxes;
-    const joins = (dx, dz) => { const n = get(x + dx, y, z + dz); return n && (DEFS[n].fence || (DEFS[n].opaque && DEFS[n].solid)); };
+    if (def.boxes) return !forDrawing && def.cboxes ? def.cboxes : def.boxes;
+    const joins = (dx, dz) => { const n = get(x + dx, y, z + dz); return n && (DEFS[n].fence || DEFS[n].gate || (DEFS[n].opaque && DEFS[n].solid)); };
     const top = forDrawing ? 1 : 1.5, out = [[0.375, 0, 0.375, 0.625, top, 0.625]];
     const rails = forDrawing ? [[0.375, 0.5625], [0.75, 0.9375]] : [[0, top]];
     for (const [y0, y1] of rails) {

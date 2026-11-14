@@ -485,6 +485,8 @@ makeTile('birch_sapling', pSapling(0x7aa84a, 0xd8d8c8));
 makeTile('spruce_sapling', pSapling(0x2e5a2e, 0x4a3420));
 makeTile('i_ladder_icon', P => { P.clear(); for (const x of [3, 11]) P.rect(x, 0, 2, 16, 0x8a6a3a); for (const y of [2, 6, 10, 14]) P.rect(3, y, 10, 2, 0xa8834f); });
 makeTile('ladder', P => { P.clear(); for (const x of [2, 12]) P.rect(x, 0, 2, 16, 0x8a6a3a); for (const y of [2, 6, 10, 14]) P.rect(2, y, 12, 2, 0xa8834f); P.rect(2, 0, 1, 16, 0x5a3c1c); P.rect(13, 0, 1, 16, 0x5a3c1c); });
+makeTile('i_oak_fence_gate', pPlant(P => { P.rect(1, 2, 2, 12, 0xa8834f); P.rect(13, 2, 2, 12, 0xa8834f); P.rect(3, 4, 10, 2, 0x8a6a3a); P.rect(3, 10, 10, 2, 0x8a6a3a); P.rect(7, 4, 2, 8, 0x8a6a3a); P.put(1, 2, 0xc8a46a); P.put(13, 2, 0xc8a46a); }));
+makeTile('i_oak_sign', pPlant(P => { P.rect(1, 2, 14, 8, 0xb8935a); P.rect(1, 2, 14, 1, 0x7a5a2a); P.rect(1, 9, 14, 1, 0x7a5a2a); P.rect(7, 10, 2, 5, 0x7a5a2a); for (const y of [4, 6]) P.rect(3, y, 10, 1, 0x4a3418); }));
 makeTile('i_melon_slice', pPlant(P => { for (let y = 4; y <= 12; y++) for (let x = 2; x <= 14; x++) { const d = Math.hypot(x - 8, y - 4); if (d <= 7) P.put(x, y, d > 6 ? 0x3e8a1d : d > 5.2 ? 0xe8f0a0 : 0xe0342c); } P.pts([[6, 6], [9, 7], [8, 9], [11, 6]], 0x1a1a1a); }));
 makeTile('i_ender_pearl', pPlant(P => { P.disc(8, 8, 5, 0x1d6b5c, 8); P.disc(8, 8, 2.6, 0x3fb59a, 8); P.pts([[6, 6], [7, 6]], 0xb0fff0); }));
 makeTile('i_bow', pPlant(P => { for (let a = 0; a <= 90; a += 4) { const r = a * Math.PI / 180; P.put(2 + Math.cos(r) * 11, 2 + Math.sin(r) * 11, 0x7a5a32); P.put(2 + Math.cos(r) * 10, 2 + Math.sin(r) * 10, 0x5a3e20); } P.line(13, 2, 2, 13, 0xdddddd); }));
@@ -629,6 +631,24 @@ for (const [k, n, tex, tool] of [['oak', 'Oak', 'planks_oak', 'axe'], ['cobblest
   for (const d of ['n', 's', 'w', 'e']) block(k + '_stairs_' + d, n + ' Stairs', tex, { tool, tier: tool === 'pick' ? 1 : 0, hardness: 2, opaque: false, boxes: [[0, 0, 0, 1, 0.5, 1], STAIR_UP[d]], drop: k + '_stairs', stair: k });
 }
 block('oak_fence', 'Oak Fence', 'planks_oak', { tool: 'axe', hardness: 2, opaque: false, fence: true, iconTile: 'i_oak_fence' });
+/* fence gates: across x or z, closed (a wall as tall as a fence) or open (swung aside) */
+const GATE_BOXES = {
+  xc: [[0, 0.3125, 0.4375, 0.125, 1, 0.5625], [0.875, 0.3125, 0.4375, 1, 1, 0.5625], [0.125, 0.375, 0.4375, 0.875, 0.5625, 0.5625], [0.125, 0.75, 0.4375, 0.875, 0.9375, 0.5625], [0.4375, 0.5625, 0.4375, 0.5625, 0.75, 0.5625]],
+  xo: [[0, 0.3125, 0.4375, 0.125, 1, 0.5625], [0.875, 0.3125, 0.4375, 1, 1, 0.5625], [0, 0.375, 0.5625, 0.125, 0.5625, 0.9375], [0, 0.75, 0.5625, 0.125, 0.9375, 0.9375], [0.875, 0.375, 0.5625, 1, 0.5625, 0.9375], [0.875, 0.75, 0.5625, 1, 0.9375, 0.9375]],
+};
+const swapXZ = bs => bs.map(b => [b[2], b[1], b[0], b[5], b[4], b[3]]);
+GATE_BOXES.zc = swapXZ(GATE_BOXES.xc); GATE_BOXES.zo = swapXZ(GATE_BOXES.xo);
+for (const ax of ['x', 'z']) for (const op of ['c', 'o']) {
+  const cbox = ax === 'x' ? [[0, 0, 0.375, 1, 1.5, 0.625]] : [[0.375, 0, 0, 0.625, 1.5, 1]];
+  block('gate_' + ax + op, 'Oak Fence Gate', 'planks_oak', { tool: 'axe', hardness: 2, opaque: false, solid: op === 'c', boxes: GATE_BOXES[ax + op], cboxes: op === 'c' ? cbox : [], drop: 'oak_fence_gate', gate: { ax, open: op === 'o' } });
+}
+/* signs: standing on a post or flat on a wall; the letter is the way the writing faces */
+const SIGN_BOARD = { n: [0.0625, 0.5, 0.4375, 0.9375, 1, 0.5625], s: [0.0625, 0.5, 0.4375, 0.9375, 1, 0.5625], e: [0.4375, 0.5, 0.0625, 0.5625, 1, 0.9375], w: [0.4375, 0.5, 0.0625, 0.5625, 1, 0.9375] };
+const WALL_SIGN = { n: [0.0625, 0.25, 0.875, 0.9375, 0.75, 1], s: [0.0625, 0.25, 0, 0.9375, 0.75, 0.125], e: [0, 0.25, 0.0625, 0.125, 0.75, 0.9375], w: [0.875, 0.25, 0.0625, 1, 0.75, 0.9375] };
+for (const d of ['n', 's', 'e', 'w']) {
+  block('sign_' + d, 'Oak Sign', 'planks_oak', { tool: 'axe', hardness: 1, opaque: false, solid: false, boxes: [SIGN_BOARD[d], [0.4375, 0, 0.4375, 0.5625, 0.5, 0.5625]], drop: 'oak_sign', sign: { d, wall: false } });
+  block('wall_sign_' + d, 'Oak Sign', 'planks_oak', { tool: 'axe', hardness: 1, opaque: false, solid: false, boxes: [WALL_SIGN[d]], drop: 'oak_sign', sign: { d, wall: true } });
+}
 for (const [k, n] of [['oak', 'Oak'], ['birch', 'Birch'], ['spruce', 'Spruce']]) block(k + '_sapling', n + ' Sapling', k + '_sapling', Object.assign({ sapling: k }, CROSS));
 /* ladders sit flat against a wall: the letter says which side of the block they hug */
 const LADDER_BOX = { w: [0, 0, 0, 0.1875, 1, 1], e: [0.8125, 0, 0, 1, 1, 1], n: [0, 0, 0, 1, 1, 0.1875], s: [0, 0, 0.8125, 1, 1, 1] };
@@ -695,6 +715,8 @@ item('wheat_seeds', 'Wheat Seeds', 'wheat_seeds');
 item('oak_door', 'Oak Door', 'oak_door');
 for (const [k, n] of [['oak', 'Oak'], ['cobblestone', 'Cobblestone'], ['stone_brick', 'Stone Brick']]) item(k + '_stairs', n + ' Stairs', k + '_stairs', { placesStair: k });
 item('oak_trapdoor', 'Oak Trapdoor', 'oak_trapdoor');
+item('oak_fence_gate', 'Oak Fence Gate', 'oak_fence_gate', { placesGate: true });
+item('oak_sign', 'Oak Sign', 'oak_sign', { stack: 16, placesSign: true });
 item('ladder', 'Ladder', 'ladder_icon', { placesLadder: true });
 item('bucket', 'Bucket', 'bucket', { stack: 16 });
 item('water_bucket', 'Water Bucket', 'water_bucket', { stack: 1 });
@@ -793,6 +815,8 @@ const RECIPES = [
   ['stone_brick_stairs', 4, { stone_bricks: 6 }, 'table'],
   ['oak_fence', 3, { '#planks': 4, stick: 2 }, 'table'],
   ['ladder', 3, { stick: 7 }, 'table'],
+  ['oak_fence_gate', 1, { '#planks': 2, stick: 4 }, 'table'],
+  ['oak_sign', 3, { '#planks': 6, stick: 1 }, 'table'],
   ['oak_trapdoor', 2, { '#planks': 6 }, 'table'],
   ['wooden_hoe', 1, { '#planks': 2, stick: 2 }, 'table'],
   ['stone_hoe', 1, { cobblestone: 2, stick: 2 }, 'table'],

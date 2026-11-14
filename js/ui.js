@@ -388,7 +388,7 @@ const UI = {
     box.innerHTML = '';
     const ids = [];
     for (const d of DEFS) {
-      if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.door || d.trapdoor || d.stair || d.ladder || d.key === 'wheat_sprout') continue;
+      if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.door || d.trapdoor || d.stair || d.ladder || d.gate || d.sign || d.key === 'wheat_sprout') continue;
       if (q ? !d.name.toLowerCase().includes(q) : (this.tab === 'blocks') !== d.isBlock) continue;
       ids.push(d.id);
     }
@@ -505,6 +505,28 @@ const UI = {
     this.moveCursor();
   },
 
+  /* the sign editor: up to four short lines */
+  editSign(x, y, z) {
+    if (G.state !== 'play') return;
+    this.signAt = [x, y, z];
+    const lines = G.signs[G.chestKey(x, y, z)] || [];
+    document.querySelectorAll('.sign-line').forEach((el, i) => { el.value = lines[i] || ''; });
+    G.setState('sign');
+    $('menu-sign').hidden = false;
+    G.unlock();
+    setTimeout(() => document.querySelector('.sign-line').focus(), 50);
+  },
+
+  closeSign() {
+    if (!this.signAt) return;
+    const lines = [...document.querySelectorAll('.sign-line')].map(el => el.value);
+    const [x, y, z] = this.signAt;
+    if (DEFS[G.world.getBlock(x, y, z)].sign) G.setSign(x, y, z, lines);
+    this.signAt = null;
+    $('menu-sign').hidden = true;
+    G.resume();
+  },
+
   /* ---------- main menu pages ---------- */
   titlePage(name) {
     for (const pg of document.querySelectorAll('.title-page')) pg.hidden = pg.dataset.page !== name;
@@ -599,6 +621,12 @@ const UI = {
   bindMenus() {
     for (const b of document.querySelectorAll('[data-go]')) b.addEventListener('click', () => this.titlePage(b.dataset.go));
     for (const b of document.querySelectorAll('[data-diff]')) b.addEventListener('click', () => { try { localStorage.setItem('blockrealm-diff', b.dataset.diff); } catch (e) { /* storage unavailable */ } this.renderDiff(); });
+    $('btn-sign-done').addEventListener('click', () => this.closeSign());
+    document.querySelectorAll('.sign-line').forEach((el, i, all) => el.addEventListener('keydown', e => {
+      e.stopPropagation();
+      if (e.key === 'Enter') { e.preventDefault(); if (i < all.length - 1) all[i + 1].focus(); else this.closeSign(); }
+      if (e.key === 'Escape') this.closeSign();
+    }));
     $('btn-settings').addEventListener('click', () => this.pausePage('settings'));
     $('btn-settings-back').addEventListener('click', () => this.pausePage('main'));
     for (const b of document.querySelectorAll('[data-pdiff]')) b.addEventListener('click', () => { G.setDifficulty(b.dataset.pdiff); try { localStorage.setItem('blockrealm-diff', b.dataset.pdiff); } catch (e) { /* storage unavailable */ } this.syncPause(); });

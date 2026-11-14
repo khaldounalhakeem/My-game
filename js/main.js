@@ -349,8 +349,21 @@ G.sleep = (b) => {
   if (!G.isNight()) { G.ui.message('Respawn point set. You can only sleep at night.'); return; }
   const near = G.mobs.some(m => !m.dead && m.T.hostile && m.pos.distanceTo(P.pos) < 10);
   if (near) { G.ui.message('Respawn point set, but you can\'t sleep now: there are monsters nearby.'); return; }
-  // lie down; the night only ends once everyone in the world is in bed
-  P.sleeping = { x: b.x, y: b.y, z: b.z, t: 0 };
+  // find both halves of the bed: the foot (where you sleep from) and the head
+  const W = G.world;
+  let foot = { x: b.x, y: b.y, z: b.z }, head = null;
+  const other = W.getBlock(b.x, b.y, b.z) === ID.bed ? ID.bed_head : ID.bed;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (W.getBlock(b.x + dx, b.y, b.z + dz) === other) { head = { x: b.x + dx, y: b.y, z: b.z + dz }; break; }
+  if (other === ID.bed && head) { const t = foot; foot = head; head = t; }
+  // one sleeper per bed
+  const taken = Net.bedTaken(foot);
+  if (taken) { G.ui.message(taken + ' is already sleeping in this bed.', 'purple'); return; }
+  // lie down on the bed; the night only ends once everyone in the world is in bed
+  P.sleeping = { x: foot.x, y: foot.y, z: foot.z, t: 0, from: P.pos.clone() };
+  const hx = head ? (foot.x + head.x) / 2 : foot.x, hz = head ? (foot.z + head.z) / 2 : foot.z;
+  P.pos.set(hx + 0.5, foot.y + 0.5625, hz + 0.5);
+  if (head) P.yaw = Math.atan2(-(head.x - foot.x), -(head.z - foot.z)) + Math.PI; // head on the pillow, looking toward the foot
+  P.pitch = 0.35;
   P.vel.set(0, 0, 0);
   $('sleep-wait').hidden = false;
   G.unlock(); // free the mouse so 'Leave bed' can be clicked
@@ -361,7 +374,16 @@ const NO_INPUT = { moveX: 0, moveZ: 0 };
 G.wake = (msg) => {
   const P = G.player;
   if (!P.sleeping) return;
+  // stand up next to the bed
+  const s = P.sleeping, W = G.world;
   P.sleeping = null;
+  let spot = null;
+  for (const [dx, dz] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1], [2, 0], [-2, 0], [0, 2], [0, -2]]) {
+    const x = s.x + dx, z = s.z + dz;
+    if ((dx || dz) && !W.collides(x + 0.5, s.y, z + 0.5, P.w, P.h) && W.isSolid(x, s.y - 1, z)) { spot = [x + 0.5, s.y, z + 0.5]; break; }
+  }
+  if (spot) P.pos.set(spot[0], spot[1], spot[2]); else if (s.from) P.pos.copy(s.from);
+  P.pitch = 0;
   $('sleep-wait').hidden = true;
   $('fx-sleep').classList.remove('on', 'half');
   if (msg) G.ui.message(msg, 'gold');
@@ -412,7 +434,9 @@ G.tryBuildGolem = (x, y, z) => {
 /* open or close a door (both halves) or a trapdoor */
 G.toggleDoor = (x, y, z) => {
   const W = G.world, d = DEFS[W.getBlock(x, y, z)];
-  if (d.trapdoor) {
+  if (d.gate) {
+    W.setBlock(x, y, z, ID['gate_' + d.gate.ax + (d.gate.open ? 'c' : 'o')]);
+  } else if (d.trapdoor) {
     W.setBlock(x, y, z, ID['trapdoor_' + d.trapdoor.ax + (d.trapdoor.open ? 'c' : 'o')]);
   } else if (d.door) {
     const op = d.door.open ? 'c' : 'o', ly = d.door.half === 'lower' ? y : y - 1;
@@ -421,6 +445,43 @@ G.toggleDoor = (x, y, z) => {
   }
   Sound.play('click', new THREE.Vector3(x, y, z));
 };
+
+/* signs: up to 4 short lines of writing, drawn on a little picture in front of the board */
+G.signs = {}; G.signMeshes = {};
+const SIGN_FACE = { n: [0, 0, -1], s: [0, 0, 1], e: [1, 0, 0], w: [-1, 0, 0] };
+G.cleanSignText = lines => (Array.isArray(lines) ? lines : []).slice(0, 4).map(t => String(t || '').replace(/[\u0000-\u001f]/g, '').slice(0, 15));
+G.setSign = (x, y, z, lines, fromNet) => {
+  const k = chestKey(x, y, z);
+  if (lines) G.signs[k] = G.cleanSignText(lines); else delete G.signs[k];
+  G.drawSign(k);
+  if (!fromNet) Net.signChanged(k);
+};
+G.drawSign = (k) => {
+  const old = G.signMeshes[k];
+  if (old) { G.scene.remove(old); old.material.map.dispose(); old.material.dispose(); delete G.signMeshes[k]; }
+  const lines = G.signs[k];
+  if (!lines || !k.startsWith(G.dim + ':') || !lines.some(t => t)) return;
+  const [x, y, z] = k.slice(G.dim.length + 1).split(',').map(Number);
+  const def = DEFS[G.world.getBlock(x, y, z)];
+  if (!def || !def.sign) return; // the sign block hasn't arrived yet: draw it once it does
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#1a1208'; g.font = 'bold 26px monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  lines.forEach((t, i) => g.fillText(t, 128, 20 + i * 29));
+  const tex = new THREE.CanvasTexture(c); tex.magFilter = THREE.LinearFilter;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.84, 0.42), new THREE.MeshBasicMaterial({ map: tex, transparent: true }));
+  const { d, wall } = def.sign, f = SIGN_FACE[d];
+  const cy = wall ? y + 0.5 : y + 0.75;
+  // in front of the board
+  const off = wall ? 0.13 : 0.07;
+  const cx = x + 0.5 + (wall ? -f[0] * 0.5 : 0) + f[0] * off, cz = z + 0.5 + (wall ? -f[2] * 0.5 : 0) + f[2] * off;
+  m.position.set(cx, cy, cz);
+  m.rotation.y = Math.atan2(f[0], f[2]);
+  G.scene.add(m); G.signMeshes[k] = m;
+};
+/* writing whose sign block wasn't there yet (still loading, or a friend's edit on its way) */
+G.tickSigns = () => { for (const k in G.signs) if (!G.signMeshes[k] && k.startsWith(G.dim + ':')) G.drawSign(k); };
+G.redrawSigns = () => { for (const k of Object.keys(G.signMeshes)) G.drawSign(k); for (const k in G.signs) G.drawSign(k); };
 
 /* grass slowly spreads onto dirt next to it that has open air above (about two minutes) */
 G.tickGrass = () => {
@@ -820,7 +881,7 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.chests = {}; G.chestVer = {}; G.crops = {}; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
+  G.pets = {}; G.pendingPets = []; G.chests = {}; G.chestVer = {}; for (const k of Object.keys(G.signMeshes || {})) { G.scene.remove(G.signMeshes[k]); } G.signs = {}; G.signMeshes = {}; G.crops = {}; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -860,6 +921,7 @@ function useDim(to) {
   G.pendingPets = G.pets[to] || [];
   G.pets[to] = [];
   restoreDrops(to);
+  G.redrawSigns();
 }
 
 G.switchDimension = (to) => {
@@ -1061,6 +1123,7 @@ G.continueSaved = (id) => {
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether' || s.dim === 'end') useDim(s.dim); else restoreDrops('overworld');
   G.chests = s.chests || {};
+  G.signs = s.signs || {};
   G.crops = s.crops || {};
   G.keepInventory = !!s.keepInventory;
   G.difficulty = G.DIFFS[s.difficulty] ? s.difficulty : 'normal';
@@ -1082,6 +1145,7 @@ G.continueSaved = (id) => {
   $('seed').value = s.seed;
   $('menu-start').hidden = true;
   G.ui.message('Welcome back to ' + G.worldName + '!', 'gold');
+  setTimeout(() => G.redrawSigns(), 1500);
   G.resume();
   Net.joinWorld(G.seed);
 };
@@ -1095,7 +1159,7 @@ G.save = () => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, crops: G.crops || {}, keepInventory: !!G.keepInventory, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, keepInventory: !!G.keepInventory, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   try { localStorage.setItem(G.saveKey(), JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
   const list = G.worldList().filter(w => w.id !== G.worldId);
@@ -1314,7 +1378,7 @@ function frame(now) {
       restorePets(ready);
     }
     G.spawnT -= dt;
-    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); }
+    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); G.tickSigns(); }
     if (!G.dragons.length && G.dim === 'nether' && Net.isHost()) {
       G.dragonTimer -= dt;
       if (G.dragonTimer <= 0) { G.dragonTimer = 240; G.summonDragon(null); }
