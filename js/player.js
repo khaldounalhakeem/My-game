@@ -402,6 +402,19 @@ class Player {
   /* buckets, milk, hoes and seeds; true if the held item did something */
   useBucketOrHoe(hd, b) {
     const W = G.world, k = hd.key;
+    if (hd.placesStair && b) {
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz);
+      if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return true;
+      const L = this.lookDir(), dir = Math.abs(L.x) > Math.abs(L.z) ? (L.x > 0 ? 'e' : 'w') : (L.z > 0 ? 's' : 'n');
+      const e = 1e-3;
+      if (this.pos.x + this.w / 2 > px + e && this.pos.x - this.w / 2 < px + 1 - e && this.pos.z + this.w / 2 > pz + e && this.pos.z - this.w / 2 < pz + 1 - e && this.pos.y < py + 1 && this.pos.y + this.h > py) return true;
+      W.setBlock(px, py, pz, ID[hd.placesStair + '_stairs_' + dir]);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
+      return true;
+    }
     if ((k === 'oak_door' || k === 'oak_trapdoor') && b) {
       let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
       if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }

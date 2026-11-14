@@ -474,6 +474,11 @@ makeTile('door_upper', P => { pPlanks(0x9a6a32)(P); P.rect(3, 3, 4, 5, 0xbfe0f0)
 makeTile('trapdoor', P => { pPlanks(0x9a6a32)(P); P.rect(0, 0, 16, 2, 0x5a3c1c); P.rect(0, 14, 16, 2, 0x5a3c1c); P.rect(0, 0, 2, 16, 0x5a3c1c); P.rect(14, 0, 2, 16, 0x5a3c1c); P.rect(4, 4, 3, 3, 0x2a1a0a); P.rect(9, 4, 3, 3, 0x2a1a0a); P.rect(4, 9, 3, 3, 0x2a1a0a); P.rect(9, 9, 3, 3, 0x2a1a0a); });
 makeTile('i_oak_door', pPlant(P => { P.rect(4, 0, 8, 16, 0x9a6a32); P.rect(5, 2, 2, 4, 0xbfe0f0); P.rect(9, 2, 2, 4, 0xbfe0f0); P.rect(4, 0, 1, 16, 0x5a3c1c); P.rect(11, 0, 1, 16, 0x5a3c1c); P.rect(4, 8, 8, 1, 0x5a3c1c); P.put(10, 10, 0x3a3a3a); }));
 makeTile('i_oak_trapdoor', pPlant(P => { P.rect(1, 3, 14, 10, 0x9a6a32); P.rect(1, 3, 14, 1, 0x5a3c1c); P.rect(1, 12, 14, 1, 0x5a3c1c); P.rect(4, 5, 3, 3, 0x2a1a0a); P.rect(9, 5, 3, 3, 0x2a1a0a); P.rect(4, 9, 3, 2, 0x2a1a0a); P.rect(9, 9, 3, 2, 0x2a1a0a); }));
+const pStairIcon = (c, d) => pPlant(P => { for (let y = 2; y < 15; y++) for (let x = 1; x < 15; x++) { if (y < 8 && x < 8) continue; P.put(x, y, x === 1 || y === 14 || (y === 8 && x < 8) || (x === 8 && y < 8) || x === 14 || y === 2 ? d : P.vary(c, 10)); } });
+makeTile('i_oak_stairs', pStairIcon(0xa8834f, 0x5a3c1c));
+makeTile('i_cobblestone_stairs', pStairIcon(0x8a8a8a, 0x4a4a4a));
+makeTile('i_stone_brick_stairs', pStairIcon(0x7a7a7a, 0x3e3e3e));
+makeTile('i_oak_fence', pPlant(P => { for (const x of [2, 7, 12]) P.rect(x, 1, 2, 14, 0xa8834f); P.rect(2, 4, 12, 2, 0x8a6a3a); P.rect(2, 10, 12, 2, 0x8a6a3a); for (const x of [2, 7, 12]) { P.put(x, 1, 0xc8a46a); P.put(x + 1, 14, 0x5a3c1c); } }));
 makeTile('i_melon_slice', pPlant(P => { for (let y = 4; y <= 12; y++) for (let x = 2; x <= 14; x++) { const d = Math.hypot(x - 8, y - 4); if (d <= 7) P.put(x, y, d > 6 ? 0x3e8a1d : d > 5.2 ? 0xe8f0a0 : 0xe0342c); } P.pts([[6, 6], [9, 7], [8, 9], [11, 6]], 0x1a1a1a); }));
 makeTile('i_ender_pearl', pPlant(P => { P.disc(8, 8, 5, 0x1d6b5c, 8); P.disc(8, 8, 2.6, 0x3fb59a, 8); P.pts([[6, 6], [7, 6]], 0xb0fff0); }));
 makeTile('i_bow', pPlant(P => { for (let a = 0; a <= 90; a += 4) { const r = a * Math.PI / 180; P.put(2 + Math.cos(r) * 11, 2 + Math.sin(r) * 11, 0x7a5a32); P.put(2 + Math.cos(r) * 10, 2 + Math.sin(r) * 10, 0x5a3e20); } P.line(13, 2, 2, 13, 0xdddddd); }));
@@ -612,6 +617,12 @@ const TRAP_BOX = { c: [0, 0, 0, 1, 0.1875, 1], ox: [0, 0, 0, 1, 1, 0.1875], oz: 
 for (const ax of ['x', 'z']) for (const op of ['c', 'o']) {
   block('trapdoor_' + ax + op, 'Oak Trapdoor', 'trapdoor', { tool: 'axe', hardness: 1.5, opaque: false, solid: op === 'c', height: op === 'c' ? 0.1875 : undefined, box: op === 'c' ? TRAP_BOX.c : TRAP_BOX['o' + ax], drop: 'oak_trapdoor', trapdoor: { ax, open: op === 'o' } });
 }
+/* stairs: a bottom half plus a back half; the high side is the side you face when you place them */
+const STAIR_UP = { n: [0, 0.5, 0, 1, 1, 0.5], s: [0, 0.5, 0.5, 1, 1, 1], w: [0, 0.5, 0, 0.5, 1, 1], e: [0.5, 0.5, 0, 1, 1, 1] };
+for (const [k, n, tex, tool] of [['oak', 'Oak', 'planks_oak', 'axe'], ['cobblestone', 'Cobblestone', 'cobblestone', 'pick'], ['stone_brick', 'Stone Brick', 'stone_bricks', 'pick']]) {
+  for (const d of ['n', 's', 'w', 'e']) block(k + '_stairs_' + d, n + ' Stairs', tex, { tool, tier: tool === 'pick' ? 1 : 0, hardness: 2, opaque: false, boxes: [[0, 0, 0, 1, 0.5, 1], STAIR_UP[d]], drop: k + '_stairs', stair: k });
+}
+block('oak_fence', 'Oak Fence', 'planks_oak', { tool: 'axe', hardness: 2, opaque: false, fence: true, iconTile: 'i_oak_fence' });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -672,6 +683,7 @@ item('eye_of_ender', 'Eye of Ender', 'eye_of_ender', { stack: 16 });
 item('wheat', 'Wheat', 'wheat');
 item('wheat_seeds', 'Wheat Seeds', 'wheat_seeds');
 item('oak_door', 'Oak Door', 'oak_door');
+for (const [k, n] of [['oak', 'Oak'], ['cobblestone', 'Cobblestone'], ['stone_brick', 'Stone Brick']]) item(k + '_stairs', n + ' Stairs', k + '_stairs', { placesStair: k });
 item('oak_trapdoor', 'Oak Trapdoor', 'oak_trapdoor');
 item('bucket', 'Bucket', 'bucket', { stack: 16 });
 item('water_bucket', 'Water Bucket', 'water_bucket', { stack: 1 });
@@ -765,6 +777,10 @@ const RECIPES = [
   ['bread', 1, { wheat: 3 }],
   ['bucket', 1, { iron_ingot: 3 }, 'table'],
   ['oak_door', 3, { '#planks': 6 }, 'table'],
+  ['oak_stairs', 4, { '#planks': 6 }, 'table'],
+  ['cobblestone_stairs', 4, { cobblestone: 6 }, 'table'],
+  ['stone_brick_stairs', 4, { stone_bricks: 6 }, 'table'],
+  ['oak_fence', 3, { '#planks': 4, stick: 2 }, 'table'],
   ['oak_trapdoor', 2, { '#planks': 6 }, 'table'],
   ['wooden_hoe', 1, { '#planks': 2, stick: 2 }, 'table'],
   ['stone_hoe', 1, { cobblestone: 2, stick: 2 }, 'table'],

@@ -642,6 +642,7 @@ class World {
       const def = DEFS[id];
       if (def.cross) { this.addCross(O, x, y, z, def); continue; }
       if (def.box) { this.addBox(O, x, y, z, def); continue; }
+      if (def.boxes || def.fence) { for (const bx of this.shapeBoxes(def, (a, b, c) => get(a, b, c), x, y, z, true)) this.addBox(O, x, y, z, { box: bx, faces: def.faces }); continue; }
       const out = def.translucent ? T : O;
       const topH = def.height ? def.height : def.liquid && get(x, y + 1, z) !== id ? 0.875 : 1;
       for (let f = 0; f < 6; f++) {
@@ -683,6 +684,21 @@ class World {
     if (O.idx.length) c.meshes.push(this.makeMesh(O, this.mats.opaque, cx, cz));
     if (T.idx.length) { const m = this.makeMesh(T, this.mats.trans, cx, cz); m.renderOrder = 1; c.meshes.push(m); }
     for (const m of c.meshes) this.group.add(m);
+  }
+
+  /* the boxes that make up a stair or fence block (fences join up with fences and solid blocks beside them) */
+  shapeBoxes(def, get, x, y, z, forDrawing) {
+    if (def.boxes) return def.boxes;
+    const joins = (dx, dz) => { const n = get(x + dx, y, z + dz); return n && (DEFS[n].fence || (DEFS[n].opaque && DEFS[n].solid)); };
+    const top = forDrawing ? 1 : 1.5, out = [[0.375, 0, 0.375, 0.625, top, 0.625]];
+    const rails = forDrawing ? [[0.375, 0.5625], [0.75, 0.9375]] : [[0, top]];
+    for (const [y0, y1] of rails) {
+      if (joins(1, 0)) out.push([0.625, y0, 0.4375, 1, y1, 0.5625]);
+      if (joins(-1, 0)) out.push([0, y0, 0.4375, 0.375, y1, 0.5625]);
+      if (joins(0, 1)) out.push([0.4375, y0, 0.625, 0.5625, y1, 1]);
+      if (joins(0, -1)) out.push([0.4375, y0, 0, 0.5625, y1, 0.375]);
+    }
+    return out;
   }
 
   /* a thin block like a door or trapdoor: one box inside the block, picture cropped to fit */
@@ -761,9 +777,17 @@ class World {
     const x0 = Math.floor(px - r + e), x1 = Math.floor(px + r - e);
     const y0 = Math.floor(py + e), y1 = Math.floor(py + h - e);
     const z0 = Math.floor(pz - r + e), z1 = Math.floor(pz + r - e);
-    for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+    for (let y = y0 - 1; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
       if (!this.isSolid(x, y, z)) continue;
-      const hgt = DEFS[this.getBlock(x, y, z)].height;
+      const def = DEFS[this.getBlock(x, y, z)];
+      if (def.boxes || def.fence) {
+        for (const b of this.shapeBoxes(def, (a, b2, c) => this.getBlock(a, b2, c), x, y, z, false)) {
+          if (px + r - e > x + b[0] && px - r + e < x + b[3] && py + h - e > y + b[1] && py + e < y + b[4] && pz + r - e > z + b[2] && pz - r + e < z + b[5]) return true;
+        }
+        continue;
+      }
+      if (y < y0) continue;
+      const hgt = def.height;
       if (hgt && py + e >= y + hgt) continue; // standing on top of a short block like a bed
       return true;
     }
@@ -775,8 +799,14 @@ class World {
     const r = w / 2, e = 1e-4, y = Math.floor(py + e);
     let top = -1;
     for (let z = Math.floor(pz - r + e); z <= Math.floor(pz + r - e); z++) for (let x = Math.floor(px - r + e); x <= Math.floor(px + r - e); x++) {
-      if (!this.isSolid(x, y, z)) continue;
-      top = Math.max(top, DEFS[this.getBlock(x, y, z)].height || 1);
+      for (const yy of [y, y - 1]) {
+        if (!this.isSolid(x, yy, z)) continue;
+        const def = DEFS[this.getBlock(x, yy, z)];
+        if (def.boxes || def.fence) {
+          for (const b of this.shapeBoxes(def, (a, b2, c) => this.getBlock(a, b2, c), x, yy, z, false))
+            if (px + r - e > x + b[0] && px - r + e < x + b[3] && pz + r - e > z + b[2] && pz - r + e < z + b[5] && yy + b[4] <= py + 0.6) top = Math.max(top, yy - y + b[4]);
+        } else if (yy === y) top = Math.max(top, def.height || 1);
+      }
     }
     return top < 0 ? y + 1 : y + top;
   }
@@ -799,8 +829,14 @@ class World {
     let dx = b.vel.x * dt, dy = b.vel.y * dt, dz = b.vel.z * dt;
     const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) / 0.35));
     dx /= steps; dy /= steps; dz /= steps;
+    const wasGround = b.onGround;
     b.onGround = false; b.hitH = false;
     const hw = b.w / 2;
+    // like Minecraft: walk up anything up to about half a block high without jumping
+    const stepUp = () => {
+      if (!(wasGround || (b.airT || 0) < 0.25) || b.vel.y > 0.5 || b.noStep || this.collides(b.pos.x, b.pos.y + 0.6, b.pos.z, b.w, b.h)) return false;
+      b.pos.y += 0.6; return true;
+    };
     for (let s = 0; s < steps; s++) {
       if (dy) {
         b.pos.y += dy;
@@ -812,20 +848,24 @@ class World {
       }
       if (dx) {
         b.pos.x += dx;
-        if (this.collides(b.pos.x, b.pos.y, b.pos.z, b.w, b.h)) {
-          b.pos.x = dx > 0 ? Math.floor(b.pos.x + hw) - hw - 0.001 : Math.floor(b.pos.x - hw) + 1 + hw + 0.001;
+        if (this.collides(b.pos.x, b.pos.y, b.pos.z, b.w, b.h) && !stepUp()) {
+          const sx = dx > 0 ? Math.floor(b.pos.x + hw) - hw - 0.001 : Math.floor(b.pos.x - hw) + 1 + hw + 0.001;
+          // flush against a full block; against a half-block shape just undo this small move
+          b.pos.x = this.collides(sx, b.pos.y, b.pos.z, b.w, b.h) || Math.abs(sx - b.pos.x) > Math.abs(dx) + 0.01 ? b.pos.x - dx : sx;
           b.vel.x = 0; dx = 0; b.hitH = true;
         }
       }
       if (dz) {
         b.pos.z += dz;
-        if (this.collides(b.pos.x, b.pos.y, b.pos.z, b.w, b.h)) {
-          b.pos.z = dz > 0 ? Math.floor(b.pos.z + hw) - hw - 0.001 : Math.floor(b.pos.z - hw) + 1 + hw + 0.001;
+        if (this.collides(b.pos.x, b.pos.y, b.pos.z, b.w, b.h) && !stepUp()) {
+          const sz = dz > 0 ? Math.floor(b.pos.z + hw) - hw - 0.001 : Math.floor(b.pos.z - hw) + 1 + hw + 0.001;
+          b.pos.z = this.collides(b.pos.x, b.pos.y, sz, b.w, b.h) || Math.abs(sz - b.pos.z) > Math.abs(dz) + 0.01 ? b.pos.z - dz : sz;
           b.vel.z = 0; dz = 0; b.hitH = true;
         }
       }
     }
     if (!b.onGround && b.vel.y <= 0 && this.collides(b.pos.x, b.pos.y - 0.02, b.pos.z, b.w, 0.02)) b.onGround = true;
+    b.airT = b.onGround ? 0 : (b.airT || 0) + dt;
   }
 
   /* ---------- save ---------- */
