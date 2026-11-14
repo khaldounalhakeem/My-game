@@ -744,7 +744,7 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.chests = {}; G.chestVer = {}; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
+  G.pets = {}; G.pendingPets = []; G.chests = {}; G.chestVer = {}; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -977,6 +977,7 @@ G.continueSaved = () => {
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether' || s.dim === 'end') useDim(s.dim); else restoreDrops('overworld');
   G.chests = s.chests || {};
+  G.keepInventory = !!s.keepInventory;
   G.difficulty = G.DIFFS[s.difficulty] ? s.difficulty : 'normal';
   G.chestVer = s.chestVer || {};
   G.furnaces = s.furnaces || {};
@@ -1009,7 +1010,7 @@ G.save = () => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, keepInventory: !!G.keepInventory, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch (e) { /* storage unavailable */ }
 };
@@ -1089,7 +1090,7 @@ G.unlock = () => { if (document.pointerLockElement) document.exitPointerLock(); 
 G.pause = () => {
   if (G.state !== 'play') return;
   G.setState('pause');
-  G.ui.syncPause();
+  G.ui.pausePage('main');
   $('menu-pause').hidden = false;
   G.unlock();
   G.save();

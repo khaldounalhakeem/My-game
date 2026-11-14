@@ -90,6 +90,7 @@ class Player {
   die() {
     if (this.riding) this.dismount();
     this.health = 0; this.dead = true;
+    if (G.keepInventory) { G.ui.showDeath(); return; } // keep inventory: items and XP stay with you
     for (let i = 0; i < 40; i++) {
       const s = this.inv.slots[i];
       if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 1, this.pos.z, new THREE.Vector3((Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6));
@@ -100,7 +101,9 @@ class Player {
   }
 
   respawn() {
+    const xp = this.xp, level = this.level;
     this.reset();
+    if (G.keepInventory) { this.xp = xp; this.level = level; }
     this.pos.copy(this.spawn); this.vel.set(0, 0, 0);
   }
 

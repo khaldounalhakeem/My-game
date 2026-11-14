@@ -519,9 +519,12 @@ const UI = {
   bindMenus() {
     for (const b of document.querySelectorAll('[data-go]')) b.addEventListener('click', () => this.titlePage(b.dataset.go));
     for (const b of document.querySelectorAll('[data-diff]')) b.addEventListener('click', () => { try { localStorage.setItem('blockrealm-diff', b.dataset.diff); } catch (e) { /* storage unavailable */ } this.renderDiff(); });
-    $('btn-diff').addEventListener('click', () => {
-      const order = ['peaceful', 'normal', 'hard', 'extreme'];
-      G.setDifficulty(order[(order.indexOf(G.difficulty) + 1) % 4]);
+    $('btn-settings').addEventListener('click', () => this.pausePage('settings'));
+    $('btn-settings-back').addEventListener('click', () => this.pausePage('main'));
+    for (const b of document.querySelectorAll('[data-pdiff]')) b.addEventListener('click', () => { G.setDifficulty(b.dataset.pdiff); try { localStorage.setItem('blockrealm-diff', b.dataset.pdiff); } catch (e) { /* storage unavailable */ } this.syncPause(); });
+    $('btn-keepinv').addEventListener('click', () => {
+      G.keepInventory = !G.keepInventory;
+      this.message('Keep Inventory is ' + (G.keepInventory ? 'on: you keep your items when you die.' : 'off: your items drop when you die.'), 'gold');
       this.syncPause();
     });
     $('btn-mp-s').addEventListener('click', () => G.startNew('survival'));
@@ -558,10 +561,17 @@ const UI = {
     $('btn-inv-close').addEventListener('click', () => { this.closeInventory(); G.lock(); });
   },
 
+  pausePage(name) {
+    $('pause-main').hidden = name !== 'main';
+    $('pause-settings').hidden = name !== 'settings';
+    this.syncPause();
+  },
+
   syncPause() {
     const P = G.player;
     $('btn-mode').textContent = 'Game mode: ' + (P.mode === 'survival' ? 'Survival' : 'Creative');
-    $('btn-diff').textContent = 'Difficulty: ' + G.diff().name;
+    for (const b of document.querySelectorAll('[data-pdiff]')) b.classList.toggle('on', b.dataset.pdiff === G.difficulty);
+    $('btn-keepinv').setAttribute('aria-checked', G.keepInventory ? 'true' : 'false');
     $('rd').value = G.world.renderDist; $('rd-val').textContent = G.world.renderDist;
     $('sens').value = Input.sens; $('sens-val').textContent = Input.sens.toFixed(1);
     $('btn-time').textContent = G.isNight() ? 'Make it day' : 'Make it night';

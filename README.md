@@ -62,7 +62,7 @@ Just like Minecraft on a phone: **tap a block** to place a block there (or use i
 
 Your name is in the top left corner: tap it to change it. The menu has **Singleplayer** (continue your world or make a new one from a seed), **Multiplayer** (type your friend's seed and join), **Skins** (50 original skins to choose from, which your friends see too), **How to Play** and **About**.
 
-**Difficulty**: on the Singleplayer and Multiplayer pages pick Peaceful (no monsters, never hungry for long, fast healing), Normal, Hard (more monsters that hit 1.5 times as hard, hunger drains faster) or Extreme (twice the monsters, twice the damage, and starving can kill you). You can change it any time from the pause menu.
+**Difficulty**: on the Singleplayer and Multiplayer pages pick Peaceful (no monsters, never hungry for long, fast healing), Normal, Hard (more monsters that hit 1.5 times as hard, hunger drains faster) or Extreme (twice the monsters, twice the damage, and starving can kill you). You can change it any time in the pause menu under **Settings**, where there is also a **Keep Inventory** switch: when it is on, you keep your items and XP when you die.
 
 ## What's in it
 

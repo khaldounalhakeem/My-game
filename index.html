@@ -142,26 +142,43 @@
 
 <section id="menu-pause" class="screen dim" hidden>
   <div class="panel menu">
-    <h2>Paused</h2>
-    <button id="btn-resume" class="btn wide" type="button">Back to game</button>
-    <button id="btn-mode" class="btn wide" type="button">Game mode</button>
-    <button id="btn-diff" class="btn wide" type="button">Difficulty</button>
-    <button id="btn-dragon" class="btn wide gold" type="button">Summon a dragon</button>
-    <button id="btn-time" class="btn wide" type="button">Make it night</button>
-    <button id="btn-cam" class="btn wide" type="button">Camera: First person</button>
-    <p id="players" class="players"></p>
-    <div id="pad-help" class="pad-help" hidden>
-      <div><b>R2</b> mine / attack</div><div><b>L2</b> place / use / eat</div>
-      <div><b>Cross</b> jump (twice to fly)</div><div><b>Circle</b> drop item</div>
-      <div><b>Triangle / Square</b> inventory</div><div><b>L1 / R1</b> hotbar</div>
-      <div><b>L3</b> sprint &middot; <b>R3</b> sneak</div><div><b>D-pad up</b> camera</div>
-      <div class="wide">In menus: left stick moves the pointer, Cross clicks, Square quick-moves, Circle goes back.</div>
+    <div id="pause-main">
+      <h2>Paused</h2>
+      <button id="btn-resume" class="btn wide" type="button">Back to game</button>
+      <button id="btn-settings" class="btn wide" type="button">Settings</button>
+      <button id="btn-mode" class="btn wide" type="button">Game mode</button>
+      <button id="btn-dragon" class="btn wide gold" type="button">Summon a dragon</button>
+      <button id="btn-time" class="btn wide" type="button">Make it night</button>
+      <p id="players" class="players"></p>
+      <div id="pad-help" class="pad-help" hidden>
+        <div><b>R2</b> mine / attack</div><div><b>L2</b> place / use / eat</div>
+        <div><b>Cross</b> jump (twice to fly)</div><div><b>Circle</b> drop item</div>
+        <div><b>Triangle / Square</b> inventory</div><div><b>L1 / R1</b> hotbar</div>
+        <div><b>L3</b> sprint &middot; <b>R3</b> sneak</div><div><b>D-pad up</b> camera</div>
+        <div class="wide">In menus: left stick moves the pointer, Cross clicks, Square quick-moves, Circle goes back.</div>
+      </div>
+      <div class="row2">
+        <button id="btn-save" class="btn" type="button">Save</button>
+        <button id="btn-quit" class="btn" type="button">Save &amp; quit</button>
+      </div>
     </div>
-    <label class="slider" for="rd">View distance <span id="rd-val">5</span><input id="rd" type="range" min="2" max="9" step="1" value="5"></label>
-    <label class="slider" for="sens">Look speed <span id="sens-val">1.0</span><input id="sens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
-    <div class="row2">
-      <button id="btn-save" class="btn" type="button">Save</button>
-      <button id="btn-quit" class="btn" type="button">Save &amp; quit</button>
+    <div id="pause-settings" hidden>
+      <h2>Settings</h2>
+      <span class="diff-label">Difficulty</span>
+      <div class="diff-btns">
+        <button type="button" class="btn diff" data-pdiff="peaceful">Peaceful</button>
+        <button type="button" class="btn diff" data-pdiff="normal">Normal</button>
+        <button type="button" class="btn diff" data-pdiff="hard">Hard</button>
+        <button type="button" class="btn diff" data-pdiff="extreme">Extreme</button>
+      </div>
+      <button id="btn-keepinv" class="toggle-row" type="button" role="switch" aria-checked="false">
+        <span class="toggle-text"><b>Keep Inventory</b><small>Keep your items and XP when you die</small></span>
+        <span class="switch"><span class="knob"></span></span>
+      </button>
+      <button id="btn-cam" class="btn wide" type="button">Camera: First person</button>
+      <label class="slider" for="rd">View distance <span id="rd-val">5</span><input id="rd" type="range" min="2" max="9" step="1" value="5"></label>
+      <label class="slider" for="sens">Look speed <span id="sens-val">1.0</span><input id="sens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
+      <button id="btn-settings-back" class="btn wide" type="button">Done</button>
     </div>
   </div>
 </section>
