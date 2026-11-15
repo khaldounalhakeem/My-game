@@ -777,12 +777,17 @@ class World {
     const x0 = Math.floor(px - r + e), x1 = Math.floor(px + r - e);
     const y0 = Math.floor(py + e), y1 = Math.floor(py + h - e);
     const z0 = Math.floor(pz - r + e), z1 = Math.floor(pz + r - e);
-    for (let y = y0 - 1; y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
+    // for animals and monsters, fences and gates count as a block taller, so they can't hop over
+    // them even from a block that sticks up inside the pen
+    const mob = this.mobMode;
+    for (let y = y0 - (mob ? 2 : 1); y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
       if (!this.isSolid(x, y, z)) continue;
       const def = DEFS[this.getBlock(x, y, z)];
       if (def.boxes || def.fence) {
+        const raise = mob && (def.fence || def.gate) ? 1 : 0;
+        if (y < y0 - 1 && !raise) continue;
         for (const b of this.shapeBoxes(def, (a, b2, c) => this.getBlock(a, b2, c), x, y, z, false)) {
-          if (px + r - e > x + b[0] && px - r + e < x + b[3] && py + h - e > y + b[1] && py + e < y + b[4] && pz + r - e > z + b[2] && pz - r + e < z + b[5]) return true;
+          if (px + r - e > x + b[0] && px - r + e < x + b[3] && py + h - e > y + b[1] && py + e < y + b[4] + raise && pz + r - e > z + b[2] && pz - r + e < z + b[5]) return true;
         }
         continue;
       }

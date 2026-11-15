@@ -700,7 +700,8 @@ class Mob {
       if (this.vel.y < -40) this.vel.y = -40;
     }
     const wantMove = moveX !== 0 || moveZ !== 0;
-    W.moveBody(this, dt);
+    W.mobMode = !this.rider; // a horse you ride can still jump fences
+    W.moveBody(this, dt); W.mobMode = false;
     if (!T.fly && this.hitH && wantMove && (this.onGround || inLiquid)) this.vel.y = 7.6;
     if (this.parts.ring) this.parts.ring.rotation.y += dt * 3;
     if (inLiquid === ID.lava && !T.fireproof && Math.random() < dt * 2) this.hurt(4, null);

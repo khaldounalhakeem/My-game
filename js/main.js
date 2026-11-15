@@ -715,8 +715,10 @@ function separateMobs() {
   const push = (m, dx, dz) => {
     if (m.remoteCtl) return; // someone else's game moves it
     const nx = m.pos.x + dx, nz = m.pos.z + dz;
+    W.mobMode = true;
     if (!W.collides(nx, m.pos.y, m.pos.z, m.w, m.h)) m.pos.x = nx;
     if (!W.collides(m.pos.x, m.pos.y, nz, m.w, m.h)) m.pos.z = nz;
+    W.mobMode = false;
   };
   for (const a of live) {
     const gx = Math.floor(a.pos.x / 2), gz = Math.floor(a.pos.z / 2);
@@ -999,7 +1001,7 @@ function restorePets(list) {
 const PEN_MAX = 1200, PEN_R = 28;
 G.isPenned = (m) => {
   const W = G.world, ox = m.pos.x, oz = m.pos.z;
-  const blocked = (x, y, z) => W.collides(x + 0.5, y, z + 0.5, 0.4, 0.9);
+  const blocked = (x, y, z) => { W.mobMode = true; const c = W.collides(x + 0.5, y, z + 0.5, 0.4, 0.9); W.mobMode = false; return c; };
   const edited = (x, y, z) => { const e = W.edits.get(W.key(x >> 4, z >> 4)); return !!(e && e.has((x & 15) + ((z & 15) << 4) + (y << 8))); };
   const sx = Math.floor(ox), sz = Math.floor(oz);
   // where it stands (it may be in the middle of a jump), on the half-block grid
