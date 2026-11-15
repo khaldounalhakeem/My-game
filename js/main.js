@@ -1203,12 +1203,17 @@ G.startNew = (mode, name) => {
 G.continueSaved = async (id) => {
   Sound.init();
   const entry = id ? G.findWorld(id) : G.worldList()[0];
-  if (entry && Cloud.ready) {
-    let here = null;
-    try { here = localStorage.getItem(worldKey(entry.id)); } catch (e) { here = null; }
-    if (!here || entry.cloud || entry.cloudNewer) {
+  // a save on this device is always what you play. Only when this device has none is an online copy used.
+  let here = null;
+  try { here = entry ? localStorage.getItem(worldKey(entry.id)) : null; } catch (e) { here = null; }
+  if (entry && !here && Cloud.ready) {
+    if (!Cloud.index.length) await Cloud.readIndex();
+    const copies = Cloud.copiesOf(entry.id);
+    const pick = copies.length > 1 ? await G.ui.chooseCopy(entry, copies) : copies[0];
+    if (copies.length && !pick) return; // cancelled
+    if (pick) {
       G.ui.message('Loading your world from online...');
-      const text = await Cloud.pull(entry.id);
+      const text = await Cloud.pull(entry.id, pick.dev);
       if (text) {
         try { localStorage.setItem(worldKey(entry.id), text); } catch (e) { G.cloudCopy = text; }
         const list = G.worldList(), w = list.find(x => x.id === entry.id);

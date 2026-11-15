@@ -567,6 +567,33 @@ const UI = {
     }
   },
 
+  /* this device has no save of a world, but there are several online copies (one per device that
+     played it): let the player pick theirs. Resolves to the chosen copy, or null. */
+  chooseCopy(entry, copies) {
+    return new Promise(done => {
+      const box = document.createElement('div'); box.className = 'copy-pick';
+      const card = document.createElement('div'); card.className = 'copy-card';
+      const h = document.createElement('h3'); h.textContent = 'Which copy of "' + (entry.name || 'My World') + '" is yours?';
+      const p = document.createElement('p'); p.textContent = 'This world was saved on more than one device. Pick the one you played.';
+      card.append(h, p);
+      const close = v => { box.remove(); done(v); };
+      for (const c of copies) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn';
+        const who = c.dev === 'old' ? 'Older backup' : (c.nick ? c.nick + "'s copy" : 'A copy') + (c.dev === Cloud.dev ? ' (this device)' : '');
+        const when = c.last ? new Date(c.last).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+        b.textContent = who + (when ? ' · saved ' + when : '');
+        if (c.nick && c.nick === Net.nick) b.classList.add('on');
+        b.addEventListener('click', () => close(c));
+        card.appendChild(b);
+      }
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'btn'; x.textContent = 'Cancel';
+      x.addEventListener('click', () => close(null));
+      card.appendChild(x);
+      box.appendChild(card);
+      document.body.appendChild(box);
+    });
+  },
+
   /* tell people what typing this seed will do: open a world they already have, or join a friend's named world */
   seedHints() {
     const txt = $('seed').value.trim(), seed = txt ? seedFromText(txt) : G.seed;
