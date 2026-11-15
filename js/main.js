@@ -701,6 +701,48 @@ function pick(pool) {
   for (const [k, w] of pool) { r -= w; if (r <= 0) return k; }
   return pool[0][0];
 }
+/* mobs take up space: two that overlap are pushed apart (only along the ground, and never into a wall) */
+function separateMobs() {
+  const W = G.world, grid = new Map(), live = [];
+  for (const m of G.mobs) {
+    if (m.dead || m.removed || m.rider) continue;
+    live.push(m);
+    const k = Math.floor(m.pos.x / 2) + ',' + Math.floor(m.pos.z / 2);
+    let cell = grid.get(k);
+    if (!cell) grid.set(k, cell = []);
+    cell.push(m);
+  }
+  const push = (m, dx, dz) => {
+    if (m.remoteCtl) return; // someone else's game moves it
+    const nx = m.pos.x + dx, nz = m.pos.z + dz;
+    if (!W.collides(nx, m.pos.y, m.pos.z, m.w, m.h)) m.pos.x = nx;
+    if (!W.collides(m.pos.x, m.pos.y, nz, m.w, m.h)) m.pos.z = nz;
+  };
+  for (const a of live) {
+    const gx = Math.floor(a.pos.x / 2), gz = Math.floor(a.pos.z / 2);
+    for (let ox = -1; ox <= 1; ox++) for (let oz = -1; oz <= 1; oz++) {
+      const cell = grid.get((gx + ox) + ',' + (gz + oz));
+      if (!cell) continue;
+      for (const b of cell) {
+        if (b === a || (a.remoteCtl && b.remoteCtl)) continue;
+        if (a.nid > b.nid) continue; // each pair once
+        const minD = (a.w + b.w) / 2;
+        if (a.pos.y + a.h <= b.pos.y || b.pos.y + b.h <= a.pos.y) continue; // one is standing on the other
+        let dx = b.pos.x - a.pos.x, dz = b.pos.z - a.pos.z;
+        let d = Math.hypot(dx, dz);
+        if (d >= minD) continue;
+        if (d < 1e-4) { const ang = Math.random() * Math.PI * 2; dx = Math.cos(ang); dz = Math.sin(ang); d = 1; }
+        const over = (minD - Math.hypot(b.pos.x - a.pos.x, b.pos.z - a.pos.z)) * 0.3; // a gentle shove each frame
+        const ux = dx / d, uz = dz / d;
+        // a puppet can't be moved here, so the other one moves the whole way
+        const fa = b.remoteCtl ? 2 : 1, fb = a.remoteCtl ? 2 : 1;
+        push(a, -ux * over * fa, -uz * over * fa);
+        push(b, ux * over * fb, uz * over * fb);
+      }
+    }
+  }
+}
+
 function spawnMob(type, x, y, z) {
   const m = new Mob(type, x, y, z);
   G.mobs.push(m);
@@ -1488,6 +1530,7 @@ function frame(now) {
     // entities
     for (const m of G.mobs) m.update(dt);
     G.mobs = G.mobs.filter(m => !m.removed);
+    separateMobs();
     for (const d of G.dragons) d.update(dt);
     G.dragons = G.dragons.filter(d => !d.done || (G.dragonTimer = 240, false));
     for (const p of G.projectiles) p.update(dt);
