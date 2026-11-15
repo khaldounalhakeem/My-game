@@ -156,12 +156,12 @@ const UI = {
       s.innerHTML = '<img alt=""><span class="count"></span>';
       s.addEventListener('pointerdown', e => {
         e.preventDefault();
-        // on a touch screen, tapping a stack asks how many you want to take
-        if (e.pointerType !== 'mouse' && !e.shiftKey && !this.cursor && i !== 202) {
-          const st = this.slotBox(i);
-          if (st && st.box[st.k] && st.box[st.k].count > 1) { this.openSplit(i, s); return; }
-        }
+        this.closeSplit();
+        // picking up a whole stack: a little "Take half" button pops up on that slot
+        const st = !e.shiftKey && !this.cursor && i !== 202 && e.button !== 2 ? this.slotBox(i) : null;
+        const big = st && st.box[st.k] && st.box[st.k].count > 1 ? st.box[st.k].count : 0;
         this.clickSlot(i, e.button, e.shiftKey);
+        if (big && this.cursor && this.cursor.count === big) this.openSplit(i, s);
       });
       s.addEventListener('contextmenu', e => e.preventDefault());
       s.addEventListener('pointerenter', () => this.tip(s.dataset.name));
@@ -310,55 +310,35 @@ const UI = {
     return { box: G.player.inv.slots, k: i };
   },
 
-  /* split a stack: pick how many to take into your hand, the rest stays in the slot */
+  /* you just picked up a whole stack from slot i: offer to leave half of it there */
   openSplit(i, el) {
-    const st = this.slotBox(i), item = st && st.box[st.k];
-    if (!item) return;
-    let pop = $('split-pop');
-    if (!pop) {
-      pop = document.createElement('div'); pop.id = 'split-pop';
-      pop.innerHTML = '<div class="split-card"><b class="split-name"></b>' +
-        '<div class="split-row"><button type="button" class="btn split-minus">−</button><span class="split-n"></span><button type="button" class="btn split-plus">+</button></div>' +
-        '<input type="range" class="split-range" min="1" step="1">' +
-        '<div class="split-row"><button type="button" class="btn split-one">1</button><button type="button" class="btn split-half">Half</button><button type="button" class="btn split-all">All</button></div>' +
-        '<div class="split-row"><button type="button" class="btn split-take">Take</button><button type="button" class="btn split-cancel">Cancel</button></div></div>';
-      pop.addEventListener('pointerdown', e => { e.stopPropagation(); if (e.target === pop) this.closeSplit(); });
-      $('menu-inv').appendChild(pop);
-      const q = c => pop.querySelector(c);
-      const set = n => { const sp = this.split; if (!sp) return; sp.n = clamp(Math.round(n), 1, sp.max); q('.split-n').textContent = sp.n + ' of ' + sp.max; q('.split-range').value = sp.n; };
-      this.setSplit = set;
-      q('.split-minus').addEventListener('click', () => set(this.split.n - 1));
-      q('.split-plus').addEventListener('click', () => set(this.split.n + 1));
-      q('.split-range').addEventListener('input', e => set(+e.target.value));
-      q('.split-one').addEventListener('click', () => set(1));
-      q('.split-half').addEventListener('click', () => set(Math.ceil(this.split.max / 2)));
-      q('.split-all').addEventListener('click', () => set(this.split.max));
-      q('.split-take').addEventListener('click', () => this.takeSplit());
-      q('.split-cancel').addEventListener('click', () => this.closeSplit());
+    let b = $('split-pop');
+    if (!b) {
+      b = document.createElement('button'); b.type = 'button'; b.id = 'split-pop'; b.textContent = 'Take half';
+      b.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this.takeSplit(); });
+      document.body.appendChild(b);
     }
-    this.split = { i, id: item.id, max: item.count, n: Math.ceil(item.count / 2) };
-    pop.querySelector('.split-name').textContent = DEFS[item.id].name + ' — how many do you want to take?';
-    pop.querySelector('.split-range').max = item.count;
-    this.setSplit(this.split.n);
-    pop.hidden = false;
+    const r = el.getBoundingClientRect();
+    b.style.left = (r.left + r.width / 2) + 'px';
+    b.style.top = r.top + 'px';
+    b.hidden = false;
+    this.split = { i };
   },
-  closeSplit() { const pop = $('split-pop'); if (pop) pop.hidden = true; this.split = null; },
+  closeSplit() { const b = $('split-pop'); if (b) b.hidden = true; this.split = null; },
   takeSplit() {
-    const sp = this.split;
+    const sp = this.split, cur = this.cursor;
     this.closeSplit();
-    if (!sp || this.cursor) return;
-    const st = this.slotBox(sp.i), item = st && st.box[st.k];
-    if (!item || item.id !== sp.id) return;
-    const n = Math.min(sp.n, item.count);
-    this.cursor = { id: item.id, count: n };
-    item.count -= n;
-    if (!item.count) st.box[st.k] = null;
+    if (!sp || !cur || cur.count < 2) return;
+    const st = this.slotBox(sp.i);
+    if (!st || st.box[st.k]) return;
+    const back = Math.floor(cur.count / 2);
+    st.box[st.k] = { id: cur.id, count: back };
+    cur.count -= back;
     G.sound.play('click');
     G.player.inv.changed();
     if (sp.i >= 100 && sp.i < 200) this.chestEdited();
     this.renderInventory();
     this.moveCursor();
-    this.message('Now tap an empty slot to put them there.');
   },
 
   clickSlot(i, button, shift) {
