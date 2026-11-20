@@ -595,9 +595,6 @@ block('spruce_leaves', 'Spruce Leaves', 'leaves_spruce', Object.assign({ drop: (
 block('spruce_planks', 'Spruce Planks', 'planks_spruce', { tool: 'axe', hardness: 2 });
 block('netherrack', 'Netherrack', 'netherrack', PICK(1, 0.4));
 block('glowstone', 'Glowstone', 'glowstone', { hardness: 0.3, light: true, emit: 11 });
-/* things that light up the area around them (emit = how far the light reaches) */
-block('torch', 'Torch', { side: 'torch', top: 'torch_top', bottom: 'torch_top' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0.4375, 0, 0.4375, 0.5625, 0.625, 0.5625], light: true, emit: 12, iconTile: 'i_torch' });
-block('lantern', 'Lantern', { side: 'lantern', top: 'lantern_top', bottom: 'lantern_top' }, { hardness: 1, opaque: false, cutout: true, box: [0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875], boxes: [[0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875]], light: true, emit: 14, iconTile: 'i_lantern' });
 block('end_stone', 'End Stone', 'end_stone', PICK(1, 3));
 block('wool_white', 'White Wool', 'wool_white', { hardness: 0.8 });
 block('wool_red', 'Red Wool', 'wool_red', { hardness: 0.8 });
@@ -687,6 +684,12 @@ for (const [k, n] of [['oak', 'Oak'], ['birch', 'Birch'], ['spruce', 'Spruce']])
 const LADDER_BOX = { w: [0, 0, 0, 0.1875, 1, 1], e: [0.8125, 0, 0, 1, 1, 1], n: [0, 0, 0, 1, 1, 0.1875], s: [0, 0, 0.8125, 1, 1, 1] };
 for (const d of ['n', 's', 'w', 'e']) block('ladder_' + d, 'Ladder', 'ladder', { tool: 'axe', hardness: 0.4, opaque: false, solid: false, box: LADDER_BOX[d], ladder: d, drop: 'ladder' });
 
+/* NEW BLOCKS GO HERE, AT THE END: saves keep blocks as numbers, so a block added in the middle
+   would turn every block after it into a different one in everyone's worlds. */
+/* things that light up the area around them (emit = how far the light reaches) */
+block('torch', 'Torch', { side: 'torch', top: 'torch_top', bottom: 'torch_top' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0.4375, 0, 0.4375, 0.5625, 0.625, 0.5625], light: true, emit: 12, iconTile: 'i_torch' });
+block('lantern', 'Lantern', { side: 'lantern', top: 'lantern_top', bottom: 'lantern_top' }, { hardness: 1, opaque: false, cutout: true, box: [0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875], boxes: [[0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875]], light: true, emit: 14, iconTile: 'i_lantern' });
+
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
   const id = nextItemId++;
@@ -756,6 +759,12 @@ item('oak_fence_gate', 'Oak Fence Gate', 'oak_fence_gate', { placesGate: true })
 item('oak_sign', 'Oak Sign', 'oak_sign', { stack: 16, placesSign: true });
 item('ladder', 'Ladder', 'ladder_icon', { placesLadder: true });
 item('bucket', 'Bucket', 'bucket', { stack: 16 });
+item('water_bucket', 'Water Bucket', 'water_bucket', { stack: 1 });
+item('lava_bucket', 'Lava Bucket', 'lava_bucket', { stack: 1 });
+item('milk_bucket', 'Milk Bucket', 'milk_bucket', { stack: 1 });
+for (const [k, n, tier, speed, dmg] of TOOL_MATS) item(k + '_hoe', n + ' Hoe', k + '_hoe', { stack: 1, tool: { type: 'hoe', tier, speed }, damage: 1 });
+item('bread', 'Bread', 'bread', { food: 5 });
+/* NEW ITEMS GO HERE, AT THE END (same reason as blocks) */
 item('boat', 'Boat', 'boat', { stack: 1, placesBoat: true });
 item('lead', 'Rope', 'lead');
 const HORSE_ARMOR = {
@@ -766,11 +775,6 @@ const HORSE_ARMOR = {
 };
 const HORSE_ARMOR_KEYS = Object.keys(HORSE_ARMOR);
 for (const k of HORSE_ARMOR_KEYS) item(k, HORSE_ARMOR[k].name, k, { stack: 1, horseArmor: HORSE_ARMOR[k].pts });
-item('water_bucket', 'Water Bucket', 'water_bucket', { stack: 1 });
-item('lava_bucket', 'Lava Bucket', 'lava_bucket', { stack: 1 });
-item('milk_bucket', 'Milk Bucket', 'milk_bucket', { stack: 1 });
-for (const [k, n, tier, speed, dmg] of TOOL_MATS) item(k + '_hoe', n + ' Hoe', k + '_hoe', { stack: 1, tool: { type: 'hoe', tier, speed }, damage: 1 });
-item('bread', 'Bread', 'bread', { food: 5 });
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -958,3 +962,16 @@ const FUEL = {};
 for (const [k, n] of [['lava_bucket', 100], ['coal', 5], ['coal_block', 45], ['blaze_rod', 12], ['stick', 0.5], ['crafting_table', 1.5], ['chest', 1.5], ['bookshelf', 1.5],
   ['oak_log', 1.5], ['birch_log', 1.5], ['spruce_log', 1.5], ['oak_planks', 1.5], ['birch_planks', 1.5], ['spruce_planks', 1.5], ['bow', 1.5],
   ['wooden_pickaxe', 1], ['wooden_sword', 1], ['wooden_axe', 1], ['wooden_shovel', 1], ['dead_bush', 0.5], ['boat', 6]]) if (ID[k] !== undefined) FUEL[ID[k]] = n * SMELT_TIME;
+
+/* ---------- what each number means ----------
+   Saves (and messages between players) keep blocks and items as numbers. Every save also carries this
+   list, so if the numbers ever change, old saves can be translated instead of turning into the wrong blocks. */
+const ID_PALETTE = (() => { const p = {}; for (const d of DEFS) if (d) p[d.id] = d.key; return p; })();
+const ID_HASH = (() => { let h = 0; const s = Object.keys(ID_PALETTE).map(k => k + ID_PALETTE[k]).join(','); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); })();
+/* a function turning a saved number into today's number (or null when nothing needs changing) */
+function idTranslator(pal) {
+  if (!pal || typeof pal !== 'object') return null;
+  const map = new Map();
+  for (const k in pal) { const now = ID[pal[k]]; if (now !== undefined && now !== +k) map.set(+k, now); }
+  return map.size ? id => (map.has(id) ? map.get(id) : id) : null;
+}

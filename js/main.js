@@ -1326,6 +1326,7 @@ G.continueSaved = async (id) => {
   try { s = entry ? JSON.parse(localStorage.getItem(worldKey(entry.id)) || G.cloudCopy || 'null') : null; } catch (e) { s = null; }
   G.cloudCopy = null;
   if (!s) { G.ui.message('No saved world found.'); return; }
+  translateSave(s);
   G.worldId = entry.id; G.worldName = entry.name;
   makeWorld(s.seed, !s.gen); // saves from before seed personalities keep their old landscape
   G.worlds.overworld.loadEdits(s.edits || {});
@@ -1362,11 +1363,27 @@ G.continueSaved = async (id) => {
   Net.joinWorld(G.seed);
 };
 
+/* translate every block and item number in a save written with different numbers */
+function translateSave(s) {
+  const tr = idTranslator(s.pal);
+  if (!tr) return s;
+  const edits = o => { if (o) for (const k in o) { const a = o[k]; if (Array.isArray(a)) for (let i = 1; i < a.length; i += 2) a[i] = tr(a[i]); } };
+  edits(s.edits); edits(s.netherEdits); edits(s.endEdits);
+  const pair = a => { if (Array.isArray(a) && Number.isInteger(a[0])) a[0] = tr(a[0]); };
+  if (Array.isArray(s.inv)) s.inv.forEach(pair);
+  if (s.chests) for (const k in s.chests) if (Array.isArray(s.chests[k])) for (const it of s.chests[k]) if (it && Number.isInteger(it.id)) it.id = tr(it.id);
+  if (s.furnaces) for (const k in s.furnaces) { const f = s.furnaces[k]; if (f && Array.isArray(f.slots)) for (const it of f.slots) if (it && Number.isInteger(it.id)) it.id = tr(it.id); }
+  if (s.drops) for (const d in s.drops) if (Array.isArray(s.drops[d])) s.drops[d].forEach(pair);
+  if (s.pets) for (const d in s.pets) if (Array.isArray(s.pets[d])) for (const p of s.pets[d]) if (Array.isArray(p) && Array.isArray(p[9])) p[9].forEach(pair);
+  return s;
+}
+G.translateSave = translateSave;
+
 G.save = (opts) => {
   if (G.state === 'title' || !G.world) return;
   const P = G.player;
   const data = {
-    v: 1, name: G.worldName || 'My World', seed: G.seed, mode: P.mode, time: G.time, dragonTimer: G.dragonTimer,
+    v: 1, pal: ID_PALETTE, name: G.worldName || 'My World', seed: G.seed, mode: P.mode, time: G.time, dragonTimer: G.dragonTimer,
     pos: P.pos.toArray(), spawn: P.spawn.toArray(), yaw: P.yaw, pitch: P.pitch,
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,

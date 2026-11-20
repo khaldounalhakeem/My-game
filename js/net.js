@@ -349,7 +349,7 @@ const Net = {
   /* send who we are and where; in a world this is refreshed ten times a second by tick() */
   announce() {
     if (!this.room || this.status !== 'on') return;
-    const base = { v: 2, u: this.uid, n: this.nick, c: this.color, w: this.world, sk: G.skin || 0, wn: this.world && G.worldName ? String(G.worldName).slice(0, 32) : null };
+    const base = { v: 2, iv: ID_HASH, u: this.uid, n: this.nick, c: this.color, w: this.world, sk: G.skin || 0, wn: this.world && G.worldName ? String(G.worldName).slice(0, 32) : null };
     if (this.world && G.player) {
       const P = G.player, held = P.heldSlot(), now = Date.now();
       this.trail = this.trail || [];
@@ -443,7 +443,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v20 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v21 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -709,7 +709,7 @@ const Net = {
     this.wsBusy = true;
     try {
       const data = {
-        ed: DIMS.map(d => G.worlds[d].serializeEdits()), ch: G.chests || {}, cv: G.chestVer || {}, sg: G.signs || {},
+        pal: ID_PALETTE, ed: DIMS.map(d => G.worlds[d].serializeEdits()), ch: G.chests || {}, cv: G.chestVer || {}, sg: G.signs || {},
         cr: G.crops || {}, fu: G.furnaces || {}, dd: G.endDragonDead ? 1 : 0,
       };
       const text = JSON.stringify(data), t = Date.now(), CH = 80000, parts = Math.ceil(text.length / CH), dev = this.dbRoom.dev;
@@ -734,7 +734,14 @@ const Net = {
         text += b.d;
       }
       if (this.world !== world || G.state === 'title') return;
-      const n = this.mergeWorld(JSON.parse(text), cnt > this.editCount());
+      const got = JSON.parse(text);
+      if (!got || got.pal === undefined) throw new Error('old version'); // made by an older game: numbers may differ
+      const tr = idTranslator(got.pal);
+      if (tr && Array.isArray(got.ed)) {
+        for (const o of got.ed) if (o) for (const k in o) { const a = o[k]; if (Array.isArray(a)) for (let i = 1; i < a.length; i += 2) a[i] = tr(a[i]); }
+        for (const k in got.ch || {}) if (Array.isArray(got.ch[k])) for (const it of got.ch[k]) if (it && Number.isInteger(it.id)) it.id = tr(it.id);
+      }
+      const n = this.mergeWorld(got, cnt > this.editCount());
       if (n) {
         G.save({ now: true });
         G.ui.message('Got everything ' + rp.name + ' built in this world (' + n + ' blocks).', 'gold');
@@ -1035,6 +1042,13 @@ const Net = {
     if (!pr || pr.v !== 2) {
       rp.name = ''; rp.world = null; rp.inWorld = false; this.removeModel(rp);
       rp.kind = pr && pr.v === 1 ? 'old' : 'loading';
+      return;
+    }
+    // a friend on another version of the game numbers blocks differently: sharing the world would mix them up
+    if (pr.iv !== ID_HASH) {
+      rp.name = this.clean(pr.n) || 'Player'; rp.world = null; rp.inWorld = false; this.removeModel(rp);
+      if (rp.kind !== 'otherVersion' && typeof pr.w === 'string' && pr.w === this.world) G.ui.message(rp.name + ' has a different version of the game. Both of you close it and open it again to play together.', 'purple');
+      rp.kind = 'otherVersion';
       return;
     }
     rp.kind = 'ok';
