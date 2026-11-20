@@ -112,8 +112,15 @@ const Cloud = {
   /* a saved world put back for a player (by whoever looks after the game), used once */
   async restoreFor(id) {
     if (!this.ready) return null;
+    // 'gift_' copies are only picked up by games that understand saves listing their block numbers
+    for (const kind of ['gift_', 'restore_']) {
+      const r = await this.restoreFrom(kind + this.me() + '_' + id);
+      if (r) return r;
+    }
+    return null;
+  },
+  async restoreFrom(pre) {
     try {
-      const pre = 'restore_' + this.me() + '_' + id;
       const meta = await this.col.doc(pre).get();
       if (!meta.exists || meta.data().done) return null;
       const m = meta.data(), parts = +m.parts || 0;

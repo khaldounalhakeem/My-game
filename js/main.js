@@ -1314,7 +1314,9 @@ G.continueSaved = async (id) => {
     }
     if (pick) {
       G.ui.message('Loading your world from online...');
-      const text = await Cloud.pull(pick);
+      let text = await Cloud.pull(pick);
+      // a copy written by an older game (no list of block numbers) never replaces a newer-format save here
+      if (text && here && pick === mine && !text.includes('"pal"') && here.includes('"pal"')) text = null;
       if (text) {
         try { localStorage.setItem(worldKey(entry.id), text); } catch (e) { G.cloudCopy = text; }
         const list = G.worldList(), w = list.find(x => x.id === entry.id);
