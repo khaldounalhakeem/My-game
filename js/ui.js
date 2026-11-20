@@ -614,6 +614,28 @@ const UI = {
     }
   },
 
+  /* the device forgot who's playing: pick your name from the players saved online. Resolves to a name, or null. */
+  whoIsPlaying(players) {
+    return new Promise(done => {
+      const box = document.createElement('div'); box.className = 'copy-pick';
+      const card = document.createElement('div'); card.className = 'copy-card';
+      const h = document.createElement('h3'); h.textContent = "Who's playing?";
+      const p = document.createElement('p'); p.textContent = 'Pick your name to get your worlds back.';
+      card.append(h, p);
+      const close = v => { box.remove(); done(v); };
+      for (const pl of players.slice(0, 8)) {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.textContent = pl.name;
+        b.addEventListener('click', () => close(pl.name));
+        card.appendChild(b);
+      }
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'btn'; x.textContent = "Someone new";
+      x.addEventListener('click', () => { close(null); G.ui.message('Type your name in the box at the top left, so your worlds are saved under it.', 'gold'); });
+      card.appendChild(x);
+      box.appendChild(card);
+      document.body.appendChild(box);
+    });
+  },
+
   /* this device has no save of a world, but there are several online copies (one per device that
      played it): let the player pick theirs. Resolves to the chosen copy, or null. */
   chooseCopy(entry, copies) {

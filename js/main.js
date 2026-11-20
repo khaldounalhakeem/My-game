@@ -1247,17 +1247,30 @@ G.startNew = (mode, name) => {
 G.continueSaved = async (id) => {
   Sound.init();
   const entry = id ? G.findWorld(id) : G.worldList()[0];
-  // a save on this device is always what you play. Only when this device has none is an online copy used.
+  // your own online copy is used when this device has none or an older one. Someone else's copy is
+  // only used if you pick it yourself.
   let here = null;
   try { here = entry ? localStorage.getItem(worldKey(entry.id)) : null; } catch (e) { here = null; }
-  if (entry && !here && Cloud.ready) {
-    if (!Cloud.index.length) await Cloud.readIndex();
-    const copies = Cloud.copiesOf(entry.id);
-    const pick = copies.length > 1 ? await G.ui.chooseCopy(entry, copies) : copies[0];
-    if (copies.length && !pick) return; // cancelled
+  if (entry && Cloud.ready) {
+    await Cloud.readIndex();
+    const mine = Cloud.mine(entry.id);
+    let pick = null;
+    // a lost world put back for you (once): it wins over whatever this device has
+    const gift = await Cloud.restoreFor(entry.id);
+    if (gift) {
+      try { localStorage.setItem(worldKey(entry.id), gift.text); } catch (e) { G.cloudCopy = gift.text; }
+      here = gift.text;
+      G.ui.message('Your lost world is back' + (gift.from ? ' (saved ' + gift.from + ')' : '') + '!', 'gold');
+    } else
+    if (mine && (!here || (+mine.last || 0) > (entry.last || 0) + 2000)) pick = mine;
+    else if (!here) {
+      const copies = Cloud.copiesOf(entry.id);
+      pick = copies.length > 1 ? await G.ui.chooseCopy(entry, copies) : copies[0];
+      if (copies.length && !pick) return; // cancelled
+    }
     if (pick) {
       G.ui.message('Loading your world from online...');
-      const text = await Cloud.pull(entry.id, pick.dev);
+      const text = await Cloud.pull(pick);
       if (text) {
         try { localStorage.setItem(worldKey(entry.id), text); } catch (e) { G.cloudCopy = text; }
         const list = G.worldList(), w = list.find(x => x.id === entry.id);
@@ -1317,7 +1330,8 @@ G.save = (opts) => {
     dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, keepInventory: !!G.keepInventory, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   let ok = true;
-  try { localStorage.setItem(G.saveKey(), JSON.stringify(data)); } catch (e) { ok = false; }
+  G.lastSaveText = JSON.stringify(data);
+  try { localStorage.setItem(G.saveKey(), G.lastSaveText); } catch (e) { ok = false; }
   if (!ok && Date.now() - (G.saveWarnAt || 0) > 60000) {
     G.saveWarnAt = Date.now();
     G.ui.message(Cloud.ready ? 'This device could not save your world (its storage is full), but it is still saved online.' : 'Your world could not be saved on this device: its storage is full. Delete old worlds you don\'t need from the Singleplayer list.', 'purple');
@@ -1325,7 +1339,7 @@ G.save = (opts) => {
   const list = G.worldList().filter(w => w.id !== G.worldId);
   list.unshift({ id: G.worldId, name: G.worldName || 'My World', seed: G.seed, mode: P.mode, last: Date.now() });
   writeWorldList(list);
-  if (ok) Cloud.queue(G.worldId, opts && opts.now);
+  Cloud.queue(G.worldId, opts && opts.now);
 };
 
 /* ---------- your worlds: every seed you played is kept, with the name you gave it ---------- */
