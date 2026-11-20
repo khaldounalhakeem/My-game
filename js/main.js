@@ -517,19 +517,47 @@ G.findFires = () => {
     for (const [i, id] of m) if (id === ID.fire) G.fires[(cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (cz * 16 + ((i >> 4) & 15))] = 0;
   }
 };
-/* fires burn out after a while (on netherrack they burn forever); they never spread, so houses are safe */
+/* what burns: wood, leaves, wool, hay and dry plants (not Nether wood, chests, crafting tables or doors) */
+const FLAMMABLE = new Set();
+for (const d of DEFS) if (d && d.isBlock && (/^(oak|birch|spruce)_(log|planks|leaves|stairs_.|slab_.)$|^wool_|^bookshelf$|^hay_bale$|^oak_fence$|^tall_grass$|^dead_bush$/.test(d.key))) FLAMMABLE.add(d.id);
+const NEAR6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+/* fires burn out after a while (on netherrack they burn forever). With Fire Spreads on, fire next to
+   wood, leaves or wool jumps to the spaces around them and slowly burns those blocks away. */
 G.tickFires = () => {
   const W = G.world;
   G.fires = G.fires || {};
+  if (Net.inShared() && !Net.isHost()) return; // in a shared world the first player's game looks after fire (and tells everyone)
+  const spread = !G.noFireSpread, newFires = [];
+  let count = 0;
   for (const k in G.fires) {
     const [x, y, z] = k.split(',').map(Number);
     if (!W.isLoaded(x, z)) continue;
     if (W.getBlock(x, y, z) !== ID.fire) { delete G.fires[k]; continue; }
+    count++;
     const below = W.getBlock(x, y - 1, z);
-    if (!below || !DEFS[below].solid) { W.setBlock(x, y, z, 0); delete G.fires[k]; continue; }
+    const fuel = NEAR6.filter(([dx, dy, dz]) => FLAMMABLE.has(W.getBlock(x + dx, y + dy, z + dz)));
+    if ((!below || !DEFS[below].solid) && !fuel.length) { W.setBlock(x, y, z, 0); delete G.fires[k]; continue; }
     if (below === ID.netherrack) continue;
+    if (spread && fuel.length) {
+      // the fire eats into the wood next to it, and jumps to empty spaces beside burning things
+      for (const [dx, dy, dz] of fuel) {
+        const bx = x + dx, by = y + dy, bz = z + dz;
+        // flames climb faster than they creep sideways or down
+        for (const [ex, ey, ez] of NEAR6) if (Math.random() < (ey === 1 ? 0.25 : 0.1)) {
+          const tx = bx + ex, ty = by + ey, tz = bz + ez;
+          if (!W.getBlock(tx, ty, tz) && ty > 0 && ty < WH - 1) newFires.push([tx, ty, tz]);
+        }
+        if (Math.random() < 0.06) { W.setBlock(bx, by, bz, Math.random() < 0.7 ? ID.fire : 0); if (W.getBlock(bx, by, bz) === ID.fire) G.fires[bx + ',' + by + ',' + bz] = 0; }
+      }
+      G.fires[k] = Math.max(0, G.fires[k] - 0.5); // it keeps going while it has something to burn
+    }
     G.fires[k]++;
     if (G.fires[k] > 25 + Math.random() * 20) { W.setBlock(x, y, z, 0); delete G.fires[k]; }
+  }
+  for (const [x, y, z] of newFires) {
+    if (count > 250) break; // a big blaze stays a reasonable size
+    if (W.getBlock(x, y, z)) continue;
+    W.setBlock(x, y, z, ID.fire); G.fires[x + ',' + y + ',' + z] = 0; count++;
   }
   if (Math.random() < 0.3) for (const k in G.fires) { const [x, y, z] = k.split(',').map(Number); G.particles.burst(x + 0.5, y + 0.5, z + 0.5, [0x555555, 0x333333], 1, 0.6, 0.15, -1); }
 };
@@ -1063,7 +1091,7 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.guestPens = []; G.chests = {}; G.chestVer = {}; for (const k of Object.keys(G.signMeshes || {})) { G.scene.remove(G.signMeshes[k]); } G.signs = {}; G.signMeshes = {}; G.crops = {}; G.myFlag = null; G.showFlag = false; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
+  G.pets = {}; G.pendingPets = []; G.guestPens = []; G.chests = {}; G.chestVer = {}; for (const k of Object.keys(G.signMeshes || {})) { G.scene.remove(G.signMeshes[k]); } G.signs = {}; G.signMeshes = {}; G.crops = {}; G.myFlag = null; G.showFlag = false; G.noFireSpread = false; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -1415,6 +1443,7 @@ G.continueSaved = async (id) => {
   G.signs = s.signs || {};
   G.crops = s.crops || {};
   G.keepInventory = !!s.keepInventory;
+  G.noFireSpread = !!s.noFireSpread;
   G.myFlag = s.myFlag && ['overworld', 'nether', 'end'].includes(s.myFlag.dim) && [s.myFlag.x, s.myFlag.y, s.myFlag.z].every(Number.isInteger) ? s.myFlag : null;
   G.showFlag = false;
   G.difficulty = G.DIFFS[s.difficulty] ? s.difficulty : 'normal';
@@ -1480,7 +1509,7 @@ G.save = (opts) => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, keepInventory: !!G.keepInventory, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   let ok = true;
   G.lastSaveText = JSON.stringify(data);

@@ -774,6 +774,11 @@ const UI = {
     $('btn-settings').addEventListener('click', () => this.pausePage('settings'));
     $('btn-settings-back').addEventListener('click', () => this.pausePage('main'));
     for (const b of document.querySelectorAll('[data-pdiff]')) b.addEventListener('click', () => { G.setDifficulty(b.dataset.pdiff); try { localStorage.setItem('blockrealm-diff', b.dataset.pdiff); } catch (e) { /* storage unavailable */ } this.syncPause(); });
+    $('btn-firespread').addEventListener('click', () => {
+      G.noFireSpread = !G.noFireSpread;
+      this.message(G.noFireSpread ? 'Fire Spreads is off: fire stays where you light it.' : 'Fire Spreads is on: fire spreads along wood, leaves and wool. Careful with wooden houses!', 'gold');
+      this.syncPause();
+    });
     $('btn-keepinv').addEventListener('click', () => {
       G.keepInventory = !G.keepInventory;
       this.message('Keep Inventory is ' + (G.keepInventory ? 'on: you keep your items when you die.' : 'off: your items drop when you die.'), 'gold');
@@ -828,6 +833,7 @@ const UI = {
     $('btn-mode').textContent = 'Game mode: ' + (P.mode === 'survival' ? 'Survival' : 'Creative');
     for (const b of document.querySelectorAll('[data-pdiff]')) b.classList.toggle('on', b.dataset.pdiff === G.difficulty);
     $('btn-keepinv').setAttribute('aria-checked', G.keepInventory ? 'true' : 'false');
+    $('btn-firespread').setAttribute('aria-checked', G.noFireSpread ? 'false' : 'true');
     $('rd').value = G.world.renderDist; $('rd-val').textContent = G.world.renderDist;
     $('sens').value = Input.sens; $('sens-val').textContent = Input.sens.toFixed(1);
     $('btn-time').textContent = G.isNight() ? 'Make it day' : 'Make it night';
