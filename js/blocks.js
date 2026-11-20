@@ -380,6 +380,14 @@ makeTile('i_blaze_rod', pPlant(P => { for (let i = 0; i < 10; i++) { P.put(3 + i
 // beds are half a block tall, so only the lower rows (7-15) of the side picture show
 makeTile('bed_top', P => { P.fill(0xb02626, 8); P.speck(0x8a1a1a, 0.2, 5); for (let i = 0; i < 16; i++) { P.put(0, i, 0x7a5a32); P.put(15, i, 0x7a5a32); } });
 makeTile('bed_head_top', P => { P.fill(0xb02626, 8); P.speck(0x8a1a1a, 0.2, 5); P.rect(2, 2, 12, 7, 0xeeeeee, 4); for (let i = 0; i < 16; i++) { P.put(0, i, 0x7a5a32); P.put(15, i, 0x7a5a32); } });
+/* torches and lanterns */
+makeTile('torch', P => { P.clear(); P.rect(7, 9, 2, 7, 0x8a6a3a); P.put(7, 9, 0x6a4a24); P.rect(7, 6, 2, 3, 0xffd34a); P.put(7, 6, 0xfff2b0); P.put(8, 8, 0xff9a2a); });
+makeTile('torch_top', P => { P.fill(0xffd34a, 10); P.disc(7.5, 7.5, 2, 0xfff2b0); });
+makeTile('i_torch', pPlant(P => { P.rect(7, 6, 2, 9, 0x8a6a3a); P.rect(6, 2, 4, 4, 0xffc23a); P.rect(7, 3, 2, 2, 0xfff2b0); P.put(7, 1, 0xff9a2a); }));
+makeTile('lantern', P => { P.clear(); P.rect(5, 7, 6, 9, 0x2e2e34); P.rect(6, 9, 4, 5, 0xffc94a); P.rect(7, 10, 2, 3, 0xfff2b0); P.rect(5, 7, 6, 1, 0x4a4a52); P.rect(5, 15, 6, 1, 0x4a4a52); });
+makeTile('lantern_top', P => { P.fill(0x2e2e34, 6); P.rect(6, 6, 4, 4, 0x4a4a52); P.rect(7, 7, 2, 2, 0x1a1a1e); });
+makeTile('i_lantern', pPlant(P => { P.rect(7, 1, 2, 2, 0x4a4a52); P.rect(4, 3, 8, 12, 0x2e2e34); P.rect(5, 5, 6, 8, 0xffc94a); P.rect(6, 7, 4, 4, 0xfff2b0); P.rect(4, 3, 8, 1, 0x5a5a62); P.rect(4, 14, 8, 1, 0x5a5a62); }));
+
 makeTile('i_bed', pPlant(P => {
   P.rect(1, 6, 14, 3, 0xb02626, 8);           // blanket
   P.rect(1, 5, 4, 4, 0xeeeeee, 4);            // pillow
@@ -463,6 +471,13 @@ const pBucket = fill => pPlant(P => {
   if (fill) for (let x = 4; x <= 11; x++) { P.put(x, 4, fill); P.put(x, 5, fill); }
 });
 makeTile('i_bucket', pBucket(0));
+makeTile('i_boat', pPlant(P => { P.rect(1, 8, 14, 2, 0x9a6a32); P.rect(2, 10, 12, 2, 0x8a5a2a); P.rect(4, 12, 8, 1, 0x6e4a22); P.rect(1, 6, 1, 3, 0x6e4a22); P.rect(14, 6, 1, 3, 0x6e4a22); P.rect(5, 7, 2, 1, 0x6e4a22); P.rect(9, 7, 2, 1, 0x6e4a22); P.line(3, 3, 9, 9, 0x5a3c1c); }));
+makeTile('i_lead', pPlant(P => { for (let i = 0; i < 6; i++) { P.put(3 + i, 3 + i, 0xc8a46a); P.put(4 + i, 3 + i, 0x9a7a4a); } for (let a = 0; a < 6.3; a += 0.4) P.put(11 + Math.cos(a) * 3, 11 + Math.sin(a) * 3, 0x9a7a4a); P.put(2, 2, 0x8a6a3a); }));
+const pHorseArmor = (c1, c2) => pPlant(P => { P.rect(2, 6, 10, 5, c1); P.rect(10, 3, 4, 5, c1); P.rect(12, 2, 2, 2, c2); P.rect(2, 6, 10, 1, c2); P.rect(3, 11, 2, 3, c2); P.rect(9, 11, 2, 3, c2); P.rect(4, 8, 6, 1, c2); });
+makeTile('i_leather_horse_armor', pHorseArmor(0xa0663c, 0x6e4224));
+makeTile('i_iron_horse_armor', pHorseArmor(0xd8d8d8, 0x9a9a9a));
+makeTile('i_golden_horse_armor', pHorseArmor(0xf5cc2e, 0xb8901a));
+makeTile('i_diamond_horse_armor', pHorseArmor(0x5fe0d8, 0x2a9a94));
 makeTile('i_water_bucket', pBucket(0x3a6ad8));
 makeTile('i_lava_bucket', pBucket(0xf06a10));
 makeTile('i_milk_bucket', pBucket(0xf4f4f4));
@@ -579,7 +594,10 @@ block('spruce_log', 'Spruce Log', { top: 'log_spruce_top', side: 'log_spruce' },
 block('spruce_leaves', 'Spruce Leaves', 'leaves_spruce', Object.assign({ drop: (r) => (r() < 0.05 ? [['spruce_sapling', 1]] : r() < 0.06 ? [['stick', 1]] : []) }, LEAVES));
 block('spruce_planks', 'Spruce Planks', 'planks_spruce', { tool: 'axe', hardness: 2 });
 block('netherrack', 'Netherrack', 'netherrack', PICK(1, 0.4));
-block('glowstone', 'Glowstone', 'glowstone', { hardness: 0.3, light: true });
+block('glowstone', 'Glowstone', 'glowstone', { hardness: 0.3, light: true, emit: 11 });
+/* things that light up the area around them (emit = how far the light reaches) */
+block('torch', 'Torch', { side: 'torch', top: 'torch_top', bottom: 'torch_top' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0.4375, 0, 0.4375, 0.5625, 0.625, 0.5625], light: true, emit: 12, iconTile: 'i_torch' });
+block('lantern', 'Lantern', { side: 'lantern', top: 'lantern_top', bottom: 'lantern_top' }, { hardness: 1, opaque: false, cutout: true, box: [0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875], boxes: [[0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875]], light: true, emit: 14, iconTile: 'i_lantern' });
 block('end_stone', 'End Stone', 'end_stone', PICK(1, 3));
 block('wool_white', 'White Wool', 'wool_white', { hardness: 0.8 });
 block('wool_red', 'Red Wool', 'wool_red', { hardness: 0.8 });
@@ -738,6 +756,16 @@ item('oak_fence_gate', 'Oak Fence Gate', 'oak_fence_gate', { placesGate: true })
 item('oak_sign', 'Oak Sign', 'oak_sign', { stack: 16, placesSign: true });
 item('ladder', 'Ladder', 'ladder_icon', { placesLadder: true });
 item('bucket', 'Bucket', 'bucket', { stack: 16 });
+item('boat', 'Boat', 'boat', { stack: 1, placesBoat: true });
+item('lead', 'Rope', 'lead');
+const HORSE_ARMOR = {
+  leather_horse_armor: { name: 'Leather Horse Armor', pts: 3, color: 0xa0663c },
+  iron_horse_armor: { name: 'Iron Horse Armor', pts: 5, color: 0xd8d8d8 },
+  golden_horse_armor: { name: 'Golden Horse Armor', pts: 7, color: 0xf5cc2e },
+  diamond_horse_armor: { name: 'Diamond Horse Armor', pts: 11, color: 0x5fe0d8 },
+};
+const HORSE_ARMOR_KEYS = Object.keys(HORSE_ARMOR);
+for (const k of HORSE_ARMOR_KEYS) item(k, HORSE_ARMOR[k].name, k, { stack: 1, horseArmor: HORSE_ARMOR[k].pts });
 item('water_bucket', 'Water Bucket', 'water_bucket', { stack: 1 });
 item('lava_bucket', 'Lava Bucket', 'lava_bucket', { stack: 1 });
 item('milk_bucket', 'Milk Bucket', 'milk_bucket', { stack: 1 });
@@ -827,6 +855,14 @@ const RECIPES = [
   ['hay_bale', 1, { wheat: 9 }],
   ['wheat', 9, { hay_bale: 1 }],
   ['bread', 1, { wheat: 3 }],
+  ['torch', 4, { coal: 1, stick: 1 }],
+  ['boat', 1, { '#planks': 5 }, 'table'],
+  ['lead', 2, { string: 4 }, 'table'],
+  ['leather_horse_armor', 1, { leather: 7 }, 'table'],
+  ['iron_horse_armor', 1, { iron_ingot: 7 }, 'table'],
+  ['golden_horse_armor', 1, { gold_ingot: 7 }, 'table'],
+  ['diamond_horse_armor', 1, { diamond: 7 }, 'table'],
+  ['lantern', 1, { torch: 1, iron_ingot: 1 }, 'table'],
   ['pumpkin_seeds', 4, { pumpkin: 1 }],
   ['baked_potato', 1, { potato: 1 }, 'furnace'],
   ['bucket', 1, { iron_ingot: 3 }, 'table'],
@@ -912,12 +948,13 @@ function iconURL(id) {
 
 function tileOf(id) { const d = DEFS[id]; return d.isBlock ? d.faces[0] : d.tile; }
 
-/* ---------- furnace: what smelts into what, and how long fuel burns (seconds; one item takes 10) ---------- */
-const SMELT_TIME = 10;
+/* ---------- furnace: what smelts into what, and how long fuel burns (seconds; one item takes 6) ---------- */
+const SMELT_TIME = 6;
 const SMELT = {}; // input id -> [output id, count, xp]
 const SMELT_XP = { iron_ingot: 0.7, gold_ingot: 1, glass: 0.1, stone: 0.1, coal: 0.15, terracotta: 0.35, cooked_porkchop: 0.35, steak: 0.35, cooked_chicken: 0.35 };
 for (const r of RECIPES) if (r[3] === 'furnace') for (const k in r[2]) for (const m of GROUPS[k] || [k]) if (ID[m] !== undefined) SMELT[ID[m]] = [ID[r[0]], r[1], SMELT_XP[r[0]] || 0.1];
 const FUEL = {};
-for (const [k, t] of [['lava_bucket', 1000], ['coal', 80], ['coal_block', 800], ['blaze_rod', 120], ['stick', 5], ['crafting_table', 15], ['chest', 15], ['bookshelf', 15],
-  ['oak_log', 15], ['birch_log', 15], ['spruce_log', 15], ['oak_planks', 15], ['birch_planks', 15], ['spruce_planks', 15], ['bow', 15],
-  ['wooden_pickaxe', 10], ['wooden_sword', 10], ['wooden_axe', 10], ['wooden_shovel', 10], ['dead_bush', 5]]) if (ID[k] !== undefined) FUEL[ID[k]] = t;
+// (how many items each one smelts) x 6 seconds: coal smelts 5 items
+for (const [k, n] of [['lava_bucket', 100], ['coal', 5], ['coal_block', 45], ['blaze_rod', 12], ['stick', 0.5], ['crafting_table', 1.5], ['chest', 1.5], ['bookshelf', 1.5],
+  ['oak_log', 1.5], ['birch_log', 1.5], ['spruce_log', 1.5], ['oak_planks', 1.5], ['birch_planks', 1.5], ['spruce_planks', 1.5], ['bow', 1.5],
+  ['wooden_pickaxe', 1], ['wooden_sword', 1], ['wooden_axe', 1], ['wooden_shovel', 1], ['dead_bush', 0.5], ['boat', 6]]) if (ID[k] !== undefined) FUEL[ID[k]] = n * SMELT_TIME;

@@ -106,12 +106,22 @@ function setupRenderer() {
   G.ambient = new THREE.AmbientLight(0xffffff, 0.6); G.scene.add(G.ambient);
   G.sunLight = new THREE.DirectionalLight(0xffffff, 0.5); G.sunLight.position.set(0.4, 1, 0.3); G.scene.add(G.sunLight);
 
+  /* blocks near a torch stay bright at night and in caves: each corner carries a 'glow' (0..1) */
+  const lit = mat => {
+    mat.onBeforeCompile = sh => {
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float glow;\nvarying float vGlow;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = glow;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vGlow;')
+        .replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( max( diffuse, vGlow * vec3( 1.0, 0.86, 0.66 ) ), opacity );');
+    };
+    return mat;
+  };
   const tex = new THREE.CanvasTexture(atlasCanvas);
   tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter; tex.generateMipmaps = false;
   G.atlasTex = tex;
   G.mats = {
-    opaque: new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.5 }),
-    trans: new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.78, depthWrite: false, side: THREE.DoubleSide }),
+    opaque: lit(new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.5 })),
+    trans: lit(new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, transparent: true, opacity: 0.78, depthWrite: false, side: THREE.DoubleSide })),
     item: new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide }),
     held: new THREE.MeshBasicMaterial({ map: tex, vertexColors: true, alphaTest: 0.5, side: THREE.DoubleSide }),
   };
@@ -701,6 +711,31 @@ function pick(pool) {
   for (const [k, w] of pool) { r -= w; if (r <= 0) return k; }
   return pool[0][0];
 }
+/* ropes: a sagging line from each animal on a rope to the player holding it or the fence it's tied to */
+const ropeLines = [];
+function drawRopes() {
+  let n = 0;
+  const P = G.player;
+  for (const m of G.mobs) {
+    if (!m.leash || m.dead || m.remoteCtl) continue;
+    const t = m.leash === 'player' ? { x: P.pos.x, y: P.pos.y + 1.0, z: P.pos.z } : { x: m.leash.x + 0.5, y: m.leash.y + 0.75, z: m.leash.z + 0.5 };
+    let line = ropeLines[n];
+    if (!line) {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(10 * 3), 3));
+      line = new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x9a7a4a }));
+      line.frustumCulled = false; G.scene.add(line); ropeLines[n] = line;
+    }
+    const a = line.geometry.attributes.position, sx = m.pos.x, sy = m.pos.y + m.h * 0.75, sz = m.pos.z;
+    const len = Math.hypot(t.x - sx, t.y - sy, t.z - sz), sag = Math.max(0, 3.5 - len) * 0.25 + 0.15;
+    for (let i = 0; i < 10; i++) {
+      const k = i / 9;
+      a.setXYZ(i, sx + (t.x - sx) * k, sy + (t.y - sy) * k - Math.sin(k * Math.PI) * sag, sz + (t.z - sz) * k);
+    }
+    a.needsUpdate = true; line.visible = true; n++;
+  }
+  for (let i = n; i < ropeLines.length; i++) ropeLines[i].visible = false;
+}
+
 /* mobs take up space: two that overlap are pushed apart (only along the ground, and never into a wall) */
 function separateMobs() {
   const W = G.world, grid = new Map(), live = [];
@@ -754,7 +789,7 @@ function spawnTick() {
   const P = G.player, W = G.world;
   // in multiplayer only the host runs wild mobs; everyone else shows the host's
   if (!Net.isHost()) {
-    for (const m of G.mobs) if (!m.remoteCtl && !m.tame && !m.rider && !m.dead && !m.claimed) {
+    for (const m of G.mobs) if (!m.remoteCtl && !m.tame && !m.rider && !m.dead && !m.claimed && !m.T.boat && !m.leash) {
       if (m.penned) (G.guestPens = G.guestPens || []).push(serializeMob(m)); // ours: kept in the save
       m.removeSilently();
     }
@@ -767,7 +802,7 @@ function spawnTick() {
   let checks = 0;
   for (const m of G.mobs) {
     if (checks >= 4) break;
-    if (m.dead || m.remoteCtl || m.tame || now < (m.penCheckAt || 0) || !W.isLoaded(m.pos.x, m.pos.z)) continue;
+    if (m.dead || m.remoteCtl || m.tame || m.T.boat || now < (m.penCheckAt || 0) || !W.isLoaded(m.pos.x, m.pos.z)) continue;
     m.penCheckAt = now + 7000 + Math.random() * 3000; checks++;
     const pen = G.isPenned(m);
     if (pen !== null) m.penned = pen;
@@ -778,8 +813,8 @@ function spawnTick() {
     if (m.dead || m.remoteCtl) continue;
     const d = Math.min(...players.map(q => Math.hypot(m.pos.x - q.x, m.pos.z - q.z)));
     // tamed and penned mobs never vanish: far away they wait in the save until you come back
-    if ((m.tame || m.penned) && !m.rider && !W.isLoaded(m.pos.x, m.pos.z)) { G.pendingPets.push(serializeMob(m)); m.removeSilently(); continue; }
-    if (m.tame || m.rider || m.penned) continue;
+    if ((m.tame || m.penned || m.T.boat || m.leash) && !m.rider && !W.isLoaded(m.pos.x, m.pos.z)) { G.pendingPets.push(serializeMob(m)); m.removeSilently(); continue; }
+    if (m.tame || m.rider || m.penned || m.T.boat || m.leash) continue;
     if (d > (m.T.passive ? 160 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
   }
@@ -795,7 +830,7 @@ function spawnTick() {
       if (W.getBlock(Math.floor(x), y, Math.floor(z)) === ID.grass) {
         const b = W.biomeAt(x, z, W.heightAt(x, z));
         let type = pick(PASSIVE_POOL), n = 1 + (Math.random() * 3 | 0);
-        if (b === BIOME.PLAINS && Math.random() < 0.35) { type = 'horse'; n = 2 + (Math.random() * 2 | 0); }
+        if (b === BIOME.PLAINS && Math.random() < 0.35) { type = Math.random() < 0.3 ? 'donkey' : 'horse'; n = 2 + (Math.random() * 2 | 0); }
         if ((b === BIOME.FOREST || b === BIOME.TAIGA || b === BIOME.BIRCH || b === BIOME.SNOWY) && Math.random() < 0.3) { type = 'wolf'; n = 2 + (Math.random() * 2 | 0); }
         for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y + 1, z + (Math.random() - 0.5) * 2);
       }
@@ -966,12 +1001,15 @@ function makeWorld(seed, legacy) {
   G.applyFog();
 }
 
-/* tamed animals, and any mob shut in a pen, are kept in the save, one list per dimension:
-   [type, x, y, z, sitting, flags (1 tame, 2 penned, 4 baby), time left to grow up, health] */
-const keepsForever = m => (m.tame || m.penned) && !m.dead && !m.remoteCtl;
+/* tamed animals, mobs shut in a pen or on a rope, and boats are kept in the save, one list per dimension:
+   [type, x, y, z, sitting, flags (1 tame, 2 penned, 4 baby, 8 boat or rope), time left to grow up, health,
+    horse armor, chest contents, rope ('p' = held by you, or the fence [x, y, z]), facing] */
+const keepsForever = m => (m.tame || m.penned || m.T.boat || m.leash) && !m.dead && !m.remoteCtl;
+const slotsJSON = sl => sl.map(s => (s ? [s.id, s.count] : 0));
 function serializeMob(m) {
   return [m.type, +m.pos.x.toFixed(2), +m.pos.y.toFixed(2), +m.pos.z.toFixed(2), m.sitting ? 1 : 0,
-    (m.tame ? 1 : 0) | (m.penned ? 2 : 0) | (m.baby ? 4 : 0), Math.round(m.growT || 0), Math.round(m.hp)];
+    (m.tame ? 1 : 0) | (m.penned ? 2 : 0) | (m.baby ? 4 : 0) | (m.T.boat || m.leash ? 8 : 0), Math.round(m.growT || 0), Math.round(m.hp),
+    m.armor || 0, m.chestSlots ? slotsJSON(m.chestSlots) : 0, m.leash === 'player' ? 'p' : m.leash ? [m.leash.x, m.leash.y, m.leash.z] : 0, +(m.yaw || 0).toFixed(2)];
 }
 function serializePets() {
   return G.mobs.filter(keepsForever).map(serializeMob).concat(G.guestPens || []);
@@ -981,7 +1019,7 @@ function restorePets(list) {
     if (!Array.isArray(p) || !MOB_TYPES[p[0]] || !p.slice(1, 4).every(Number.isFinite)) continue;
     const flags = Number.isInteger(p[5]) ? p[5] : 1;
     // in a friend's world the host looks after the animals; keep ours safe in the save meanwhile
-    if (!(flags & 1) && !Net.isHost()) { (G.guestPens = G.guestPens || []).push(p); continue; }
+    if (!(flags & 9) && !Net.isHost()) { (G.guestPens = G.guestPens || []).push(p); continue; }
     const m = spawnMob(p[0], p[1], p[2] + 0.05, p[3]);
     m.penned = !!(flags & 2); m.penCheckAt = Date.now() + 8000;
     if (flags & 4 && m.makeBaby) m.makeBaby(Number.isFinite(p[6]) ? p[6] : 240);
@@ -992,6 +1030,12 @@ function restorePets(list) {
       if (m.parts.saddle) m.parts.saddle.visible = true;
       if (m.type === 'wolf') m.hp = 20;
     }
+    if (typeof p[8] === 'string' && HORSE_ARMOR[p[8]]) m.armor = p[8];
+    if (Array.isArray(p[9])) { m.chestSlots = new Array(27).fill(null); p[9].slice(0, 27).forEach((a, i) => { if (Array.isArray(a) && DEFS[a[0]]) m.chestSlots[i] = { id: a[0], count: a[1] }; }); }
+    if (p[10] === 'p') m.leash = 'player';
+    else if (Array.isArray(p[10]) && p[10].every(Number.isInteger)) m.leash = { x: p[10][0], y: p[10][1], z: p[10][2] };
+    if (Number.isFinite(p[11])) { m.yaw = p[11]; m.mesh.rotation.y = p[11]; }
+    if (m.dress) m.dress();
   }
 }
 
@@ -1547,6 +1591,7 @@ function frame(now) {
     for (const m of G.mobs) m.update(dt);
     G.mobs = G.mobs.filter(m => !m.removed);
     separateMobs();
+    drawRopes();
     for (const d of G.dragons) d.update(dt);
     G.dragons = G.dragons.filter(d => !d.done || (G.dragonTimer = 240, false));
     for (const p of G.projectiles) p.update(dt);

@@ -117,7 +117,13 @@ class World {
     const c = this.chunks.get(k);
     if (!c) return;
     const lx = x & 15, lz = z & 15, i = lx + (lz << 4) + (y << 8);
+    const old = c.data[i];
     c.data[i] = id;
+    // a torch or lantern came or went: the light it gives reaches into the chunks around
+    if ((DEFS[old] && DEFS[old].emit) || (DEFS[id] && DEFS[id].emit)) {
+      c.emit = null;
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) if (dx || dz) this.markUrgent((x >> 4) + dx, (z >> 4) + dz);
+    }
     if (record) {
       let m = this.edits.get(k);
       if (!m) { m = new Map(); this.edits.set(k, m); }
@@ -635,6 +641,13 @@ class World {
     };
     const opq = (x, y, z) => { const id = get(x, y, z); return id && DEFS[id].opaque ? 1 : 0; };
     const O = { pos: [], uv: [], col: [], idx: [] }, T = { pos: [], uv: [], col: [], idx: [] };
+    // lights nearby (this chunk and the ones around it), in this chunk's coordinates
+    const lights = [];
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+      const n = this.chunks.get(this.key(cx + dx, cz + dz));
+      if (!n) continue;
+      for (const L of this.emitters(n)) lights.push([L[0] + dx * 16 + 0.5, L[1] + 0.5, L[2] + dz * 16 + 0.5, L[3]]);
+    }
     const data = c.data;
     for (let y = 0; y < WH; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const id = data[x + (z << 4) + (y << 8)];
@@ -681,8 +694,8 @@ class World {
     }
     for (const m of c.meshes) { this.group.remove(m); m.geometry.dispose(); }
     c.meshes = [];
-    if (O.idx.length) c.meshes.push(this.makeMesh(O, this.mats.opaque, cx, cz));
-    if (T.idx.length) { const m = this.makeMesh(T, this.mats.trans, cx, cz); m.renderOrder = 1; c.meshes.push(m); }
+    if (O.idx.length) c.meshes.push(this.makeMesh(O, this.mats.opaque, cx, cz, lights));
+    if (T.idx.length) { const m = this.makeMesh(T, this.mats.trans, cx, cz, lights); m.renderOrder = 1; c.meshes.push(m); }
     for (const m of c.meshes) this.group.add(m);
   }
 
@@ -736,8 +749,31 @@ class World {
     }
   }
 
-  makeMesh(A, mat, cx, cz) {
+  /* the torches, lanterns and glowstone in a chunk: [x, y, z, reach] (worked out once, again when one changes) */
+  emitters(c) {
+    if (c.emit) return c.emit;
+    const out = [], d = c.data;
+    for (let i = 0; i < d.length; i++) { const id = d[i]; if (id && DEFS[id].emit) out.push([i & 15, i >> 8, (i >> 4) & 15, DEFS[id].emit]); if (out.length > 200) break; }
+    c.emit = out;
+    return out;
+  }
+
+  makeMesh(A, mat, cx, cz, lights) {
     const g = new THREE.BufferGeometry();
+    // how much light from nearby torches each corner gets (0 = none, 1 = right next to one)
+    const n = A.pos.length / 3, glow = new Float32Array(n);
+    if (lights && lights.length) for (let v = 0; v < n; v++) {
+      const px = A.pos[v * 3], py = A.pos[v * 3 + 1], pz = A.pos[v * 3 + 2];
+      let best = 0;
+      for (const L of lights) {
+        const dx = px - L[0], dy = py - L[1], dz = pz - L[2];
+        if (Math.abs(dx) > L[3] || Math.abs(dy) > L[3] || Math.abs(dz) > L[3]) continue;
+        const k = 1 - (Math.abs(dx) + Math.abs(dy) + Math.abs(dz)) / L[3]; // fades block by block, like real torch light
+        if (k > best) best = k;
+      }
+      glow[v] = best > 0 ? Math.min(1, best * best * 1.25) : 0; // bright close by, fading quickly further away
+    }
+    g.setAttribute('glow', new THREE.BufferAttribute(glow, 1));
     g.setAttribute('position', new THREE.Float32BufferAttribute(A.pos, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(A.uv, 2));
     g.setAttribute('color', new THREE.Float32BufferAttribute(A.col, 3));

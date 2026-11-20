@@ -129,8 +129,15 @@ class Player {
       const ml = Math.hypot(mx, mz); if (ml > 1) { mx /= ml; mz /= ml; }
       const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
       const wx = -s * mz + c * mx, wz = -c * mz - s * mx;
-      h.drive = { x: wx, z: wz, jump: input.jump, yaw: Math.atan2(-s, -c) };
-      this.pos.set(h.pos.x, h.pos.y + 0.95, h.pos.z);
+      if (h.T.boat) {
+        // in a boat: the front seat steers, the back seat just comes along
+        if (this.seat === 0 && !h.remoteCtl) h.drive = { x: wx, z: wz };
+        const off = this.seat === 1 ? -0.55 : 0.25, by = h.mesh.rotation.y;
+        this.pos.set(h.pos.x + Math.sin(by) * off, h.pos.y + 0.05, h.pos.z + Math.cos(by) * off);
+      } else {
+        h.drive = { x: wx, z: wz, jump: input.jump, yaw: Math.atan2(-s, -c) };
+        this.pos.set(h.pos.x, h.pos.y + (h.type === 'donkey' ? 0.75 : 0.95), h.pos.z);
+      }
       this.vel.set(0, 0, 0); this.onGround = true; this.fallStart = null; this.flying = false;
       this.headInWater = false; this.inWater = false; this.inLava = false;
       if (!creative) this.survivalTick(dt, false);
@@ -210,16 +217,29 @@ class Player {
     }
   }
 
-  mount(h) {
-    this.riding = h; h.rider = this;
+  mount(h, seat = 0) {
+    this.riding = h; this.seat = seat;
+    if (seat === 0) h.rider = this;
     this.flying = false;
-    G.ui.message('Riding! Steer like walking, jump to leap, and press sneak (C, the down button, or R3) to get off.', 'gold');
+    if (h.T.boat) G.ui.message(seat === 0 ? 'In the boat! Steer like walking, and press sneak (C, the down button, or R3) to get out. A friend can sit in the back.' : 'You sit in the back of the boat. Press sneak to get out.', 'gold');
+    else G.ui.message('Riding! Steer like walking, jump to leap, and press sneak (C, the down button, or R3) to get off.', 'gold');
   }
 
   dismount() {
     const h = this.riding;
     this.riding = null;
-    if (h) { h.rider = null; h.drive = null; this.pos.set(h.pos.x + 1.2, h.pos.y + 0.2, h.pos.z); }
+    if (h) {
+      if (h.rider === this) { h.rider = null; h.drive = null; }
+      // step out onto the side that has room
+      const W = G.world;
+      let spot = null;
+      for (const [dx, dz] of [[1.3, 0], [-1.3, 0], [0, 1.3], [0, -1.3], [1.3, 1.3], [-1.3, -1.3]]) {
+        for (const dy of [0.3, 1.1]) if (!W.collides(h.pos.x + dx, h.pos.y + dy, h.pos.z + dz, this.w, this.h)) { spot = [h.pos.x + dx, h.pos.y + dy, h.pos.z + dz]; break; }
+        if (spot) break;
+      }
+      if (spot) this.pos.set(spot[0], spot[1], spot[2]); else this.pos.set(h.pos.x, h.pos.y + 1, h.pos.z);
+    }
+    this.seat = 0;
     this.vel.set(0, 4, 0);
   }
 
@@ -543,6 +563,29 @@ class Player {
     // a bucket on a cow: milk
     if (tgt.mob && tgt.mob.type === 'cow' && !tgt.mob.dead && hd && hd.key === 'bucket') { this.useCd = 0.4; this.swing = 1; this.swapHeld(ID.milk_bucket); G.sound.play('pickup'); return; }
     if (tgt.mob && tgt.mob.interact && tgt.mob.interact(this, hd)) { this.useCd = 0.35; this.swing = 1; return; }
+    // tie the animals on your rope to a fence
+    if (b && DEFS[b.id].fence) {
+      const mine = G.mobs.filter(m => m.leash === 'player' && !m.remoteCtl && !m.dead && m.pos.distanceTo(this.pos) < 16);
+      if (mine.length) {
+        for (const m of mine) m.leash = { x: b.x, y: b.y, z: b.z };
+        this.useCd = 0.4; this.swing = 1; G.sound.play('place', null, ID.oak_fence);
+        G.ui.message(mine.length === 1 ? 'Tied to the fence. Tap the animal to untie it.' : mine.length + ' animals tied to the fence.', 'gold');
+        return;
+      }
+    }
+    // put a boat on the water (or the ground)
+    if (hd && hd.placesBoat) {
+      const o = this.eyePos(), d = this.lookDir();
+      const hit = W.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 5, true);
+      if (hit) {
+        const top = hit.id === ID.water ? hit.y + 0.55 : hit.y + 1;
+        const bt = spawnMob('boat', hit.x + 0.5, top, hit.z + 0.5);
+        bt.yaw = this.yaw + Math.PI; bt.mesh.rotation.y = bt.yaw;
+        if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+        this.useCd = 0.5; this.swing = 1; G.sound.play('place', null, ID.oak_planks);
+        return;
+      }
+    }
     if (b && !this.sneaking) {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
       if (b.id === ID.bed || b.id === ID.bed_head) { this.useCd = 1; G.sleep(b); return; }

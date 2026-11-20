@@ -372,9 +372,10 @@ const Net = {
         rq: this.slim ? null : this.askRing, gv: this.slim ? null : this.giveRing,
         gm: this.slim ? null : this.giveMobRing,
         ws: this.wsInfo || null,
-        cs: this.slim ? null : this.chestRing, oc: G.ui.chest ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
+        rd: P.riding && P.riding.nid ? [P.riding.nid, P.seat || 0] : null,
+        cs: this.slim ? null : this.chestRing, oc: G.ui.chest && !G.ui.chest.mob ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
       });
-    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null, ws: null });
+    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null, ws: null, rd: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
@@ -442,7 +443,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v19 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v20 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -547,7 +548,8 @@ const Net = {
     const near = pos => players.some(q => Math.abs(q.x - pos.x) < 96 && Math.abs(q.z - pos.z) < 96);
     for (const m of G.mobs) {
       if (m.remoteCtl || m.removed || !near(m.pos) || out.length >= 45) continue;
-      const flags = (m.dead ? 1 : 0) | (m.tame ? 2 : 0) | (m.sitting ? 4 : 0) | (m.fuse > 0 ? 8 : 0) | (m.angry ? 16 : 0) | (m.baby ? 32 : 0);
+      const flags = (m.dead ? 1 : 0) | (m.tame ? 2 : 0) | (m.sitting ? 4 : 0) | (m.fuse > 0 ? 8 : 0) | (m.angry ? 16 : 0) | (m.baby ? 32 : 0)
+        | ((HORSE_ARMOR_KEYS.indexOf(m.armor) + 1) << 6) | (m.chestSlots ? 512 : 0);
       out.push([m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags]);
     }
     for (const d of G.dragons) {
@@ -573,6 +575,15 @@ const Net = {
     this.mobHits.push([this.mhSeq, m.remoteCtl, m.nid, Math.round(dmg), r2(P.pos.x), r2(P.pos.z), Math.round(kb || 6)]);
     if (this.mobHits.length > 16) this.mobHits.shift();
     this.sendT = 0;
+  },
+
+  /* which seats of a boat are taken: [front (steers), back] */
+  boatSeats(m) {
+    const t = [false, false], P = G.player;
+    if (P.riding === m) t[P.seat || 0] = true;
+    if (m.rider && m.rider !== P) t[0] = true;
+    for (const rp of this.peers.values()) if (rp.inWorld && rp.rd && rp.rd[0] === m.nid) t[rp.rd[1]] = true;
+    return t;
   },
 
   nameOf(peer) { const rp = this.peers.get(peer); return (rp && rp.name) || 'another player'; },
@@ -819,9 +830,9 @@ const Net = {
           if (target && !target.dead && h[7] === 'feed') { if (target.feed) target.feed(); }
           else if (h[7] === 'claim') {
             // they want to tame one of our wolves or horses: hand it over if nobody has tamed it
-            if (target && !target.dead && !target.tame && !target.rider && (target.type === 'wolf' || target.type === 'horse')) {
+            if (target && !target.dead && !target.tame && !target.rider && !target.leash && !target.T.hostile && G.player.riding !== target) {
               this.giveMobSeq++;
-              this.giveMobRing.push([this.giveMobSeq, rp.peer, target.type, r2(target.pos.x), r2(target.pos.y), r2(target.pos.z), r2(target.yaw), Math.round(target.hp), target.nid, target.tameProgress || 0]);
+              this.giveMobRing.push([this.giveMobSeq, rp.peer, target.type, r2(target.pos.x), r2(target.pos.y), r2(target.pos.z), r2(target.yaw), Math.round(target.hp), target.nid, target.tameProgress || 0, target.baby ? Math.round(target.growT || 1) : 0]);
               if (this.giveMobRing.length > 8) this.giveMobRing.shift();
               target.removeSilently();
               this.sendT = 0;
@@ -885,13 +896,14 @@ const Net = {
     }
     // a wolf or horse they handed over to us: it lives in our game now, and the taming we tried goes ahead
     if (Array.isArray(pr.gm)) for (const e of pr.gm) {
-      if (!Array.isArray(e) || e.length < 9 || e[1] !== this.uid || typeof e[8] !== 'string' || this.gotMobs.has(e[8]) || (e[2] !== 'wolf' && e[2] !== 'horse')) continue;
+      if (!Array.isArray(e) || e.length < 9 || e[1] !== this.uid || typeof e[8] !== 'string' || this.gotMobs.has(e[8]) || !MOB_TYPES[e[2]] || MOB_TYPES[e[2]].hostile) continue;
       if (!e.slice(3, 8).every(Number.isFinite)) continue;
       this.gotMobs.add(e[8]);
       for (const old of G.mobs) if (old.nid === e[8] && old.remoteCtl) old.removeSilently();
       const m = new Mob(e[2], e[3], e[4], e[5]);
       m.claimed = true; // handed over to us: keep it even though we don't run the wild animals
       m.nid = e[8]; m.yaw = e[6]; m.hp = Math.max(1, Math.min(m.T.hp + 10, e[7])); m.tameProgress = +e[9] || 0;
+      if (+e[10] > 0) m.makeBaby(+e[10]);
       G.mobs.push(m);
       const want = this.pendingClaims[e[8]];
       delete this.pendingClaims[e[8]];
@@ -1060,6 +1072,7 @@ const Net = {
     rp.dead = pr.x === 1;
     rp.held = isInt(pr.h) ? pr.h : 0;
     rp.sleeping = pr.sl === 1;
+    rp.rd = Array.isArray(pr.rd) && typeof pr.rd[0] === 'string' ? [pr.rd[0].slice(0, 24), pr.rd[1] === 1 ? 1 : 0] : null;
     rp.sleepBed = rp.sleeping && Array.isArray(pr.sb) && pr.sb.length === 3 && pr.sb.every(isInt) ? pr.sb : null;
     // lie their body down while they sleep
     if (rp.model) rp.model.group.rotation.x = rp.sleeping ? -Math.PI / 2 : 0;

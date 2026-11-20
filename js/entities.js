@@ -61,6 +61,7 @@ const FACES_DRAW = {
   iron_golem: px => { noisyFill(px, 8, ['#d6cfc4', '#cbc3b6', '#ddd7cc'], 31); px(0, 0, '#b8b0a2', 8, 2); px(1, 3, '#7a1f1f', 2, 1); px(5, 3, '#7a1f1f', 2, 1); px(2, 6, '#9a9286', 4, 1); px(0, 5, '#4f7a2a', 1, 3); },
   wolf: px => { px(0, 0, '#d8d4cc', 8, 8); px(1, 2, '#222', 1, 1); px(6, 2, '#222', 1, 1); px(2, 4, '#c8c2b8', 4, 4); px(3, 5, '#222', 2, 1); },
   horse: px => { px(0, 0, '#8a5a32', 8, 8); px(1, 2, '#1a1a1a', 1, 1); px(6, 2, '#1a1a1a', 1, 1); px(2, 5, '#6a4224', 4, 3); px(3, 6, '#3a2412', 2, 1); },
+  donkey: px => { px(0, 0, '#7d7468', 8, 8); px(1, 2, '#1a1a1a', 1, 1); px(6, 2, '#1a1a1a', 1, 1); px(2, 5, '#a89e90', 4, 3); px(3, 6, '#3a342c', 2, 1); },
   villager: px => { px(0, 0, '#c8a07a', 8, 8); px(0, 0, '#5a3a1e', 8, 2); px(1, 3, '#fff', 1, 1); px(2, 3, '#2a6a2a', 1, 1); px(5, 3, '#2a6a2a', 1, 1); px(6, 3, '#fff', 1, 1); px(1, 2, '#3a2512', 2, 1); px(5, 2, '#3a2512', 2, 1); px(3, 6, '#7a5040', 2, 1); },
   enderman: px => { noisyFill(px, 8, ['#161616', '#1c1c1c', '#121212'], 5); px(0, 4, '#e079fa', 3, 1); px(5, 4, '#e079fa', 3, 1); px(1, 4, '#cc00fa', 1, 1); px(6, 4, '#cc00fa', 1, 1); },
 };
@@ -187,7 +188,9 @@ const MOB_TYPES = {
   ghast: { name: 'Ghast', hp: 10, w: 3.6, h: 4, speed: 1.8, hostile: true, fly: 8, ranged: 'ghast', xp: 5, fireproof: true, drops: [['ghast_tear', 0, 1], ['gunpowder', 0, 2]] },
   iron_golem: { name: 'Iron Golem', hp: 100, w: 1.4, h: 2.7, speed: 1.6, neutral: true, golem: true, dmg: 10, xp: 0, drops: [['iron_ingot', 3, 5], ['rose', 0, 2]] },
   wolf: { name: 'Wolf', hp: 8, w: 0.6, h: 0.85, speed: 3.2, neutral: true, dmg: 3, xp: 1, drops: [], tameWith: 'bone' },
-  horse: { name: 'Horse', hp: 22, w: 1.3, h: 1.6, speed: 2.2, passive: true, rideable: true, xp: 1, drops: [['leather', 0, 2]] },
+  horse: { name: 'Horse', hp: 22, w: 1.3, h: 1.6, speed: 2.2, passive: true, rideable: true, horsey: true, xp: 1, drops: [['leather', 0, 2]] },
+  donkey: { name: 'Donkey', hp: 20, w: 1.1, h: 1.4, speed: 1.9, passive: true, rideable: true, horsey: true, xp: 1, drops: [['leather', 0, 2]] },
+  boat: { name: 'Boat', hp: 4, w: 1.3, h: 0.55, speed: 0, boat: true, xp: 0, drops: [['boat', 1, 1]] },
   villager: { name: 'Villager', hp: 20, w: 0.6, h: 1.95, speed: 1.2, passive: true, xp: 0, drops: [] },
   pig: { name: 'Pig', hp: 10, w: 0.9, h: 0.9, speed: 1.5, passive: true, xp: 2, drops: [['porkchop', 1, 3]] },
   cow: { name: 'Cow', hp: 10, w: 0.9, h: 1.4, speed: 1.4, passive: true, xp: 2, drops: [['beef', 1, 3], ['leather', 0, 2]] },
@@ -276,18 +279,36 @@ function buildMobModel(type) {
     addBox(head, 0.1, 0.12, 0.06, dark, -0.12, 0.23, -0.05); addBox(head, 0.1, 0.12, 0.06, dark, 0.12, 0.23, -0.05);
     const tail = addBox(g, 0.12, 0.12, 0.5, fur, 0, 0.72, -0.62); tail.rotation.x = 0.6; P.tail = tail;
     const collar = addBox(g, 0.44, 0.1, 0.44, lam(0xc8202a), 0, 0.84, 0.32); collar.visible = false; P.collar = collar;
-  } else if (type === 'horse') {
-    const coat = lam(0x8a5a32), mane = lam(0x3a2412);
-    addBox(g, 0.7, 0.7, 1.5, coat, 0, 1.3, 0);
-    for (const [x, z] of [[-0.24, 0.58], [0.24, 0.58], [-0.24, -0.58], [0.24, -0.58]]) P.legs.push(limb(g, 0.2, 0.98, 0.2, coat, x, 0.98, z));
-    const neck = new THREE.Group(); neck.position.set(0, 1.45, 0.7); neck.rotation.x = -0.6; g.add(neck);
+  } else if (type === 'horse' || type === 'donkey') {
+    // a donkey is a smaller, grey horse with long ears
+    const dk = type === 'donkey', b = new THREE.Group(); g.add(b);
+    if (dk) b.scale.setScalar(0.85);
+    const coat = lam(dk ? 0x7d7468 : 0x8a5a32), mane = lam(dk ? 0x3a342c : 0x3a2412);
+    addBox(b, 0.7, 0.7, 1.5, coat, 0, 1.3, 0);
+    for (const [x, z] of [[-0.24, 0.58], [0.24, 0.58], [-0.24, -0.58], [0.24, -0.58]]) P.legs.push(limb(b, 0.2, 0.98, 0.2, coat, x, 0.98, z));
+    const neck = new THREE.Group(); neck.position.set(0, 1.45, 0.7); neck.rotation.x = -0.6; b.add(neck);
     addBox(neck, 0.32, 0.8, 0.42, coat, 0, 0.35, 0);
     addBox(neck, 0.12, 0.8, 0.12, mane, 0, 0.35, -0.24);
-    const head = new THREE.Mesh(boxGeo(0.32, 0.32, 0.65), headMats('horse', 0x8a5a32));
+    const head = new THREE.Mesh(boxGeo(0.32, 0.32, 0.65), headMats(type, dk ? 0x7d7468 : 0x8a5a32));
     head.position.set(0, 0.75, 0.22); head.rotation.x = 0.6; neck.add(head); P.head = head;
-    addBox(head, 0.08, 0.14, 0.06, coat, -0.1, 0.2, -0.22); addBox(head, 0.08, 0.14, 0.06, coat, 0.1, 0.2, -0.22);
-    const tail = addBox(g, 0.14, 0.7, 0.14, mane, 0, 1.15, -0.8); tail.rotation.x = 0.3;
-    const saddle = addBox(g, 0.74, 0.12, 0.6, lam(0x5a3a1a), 0, 1.68, -0.05); saddle.visible = false; P.saddle = saddle;
+    const ear = dk ? 0.34 : 0.14;
+    addBox(head, 0.08, ear, 0.06, coat, -0.1, 0.13 + ear / 2, -0.22); addBox(head, 0.08, ear, 0.06, coat, 0.1, 0.13 + ear / 2, -0.22);
+    const tail = addBox(b, 0.14, 0.7, 0.14, mane, 0, 1.15, -0.8); tail.rotation.x = 0.3;
+    const saddle = addBox(b, 0.74, 0.12, 0.6, lam(0x5a3a1a), 0, 1.68, -0.05); saddle.visible = false; P.saddle = saddle;
+    // horse armor (coloured by what it's made of) and chests on its sides
+    P.armorParts = [addBox(b, 0.76, 0.4, 1.56, lam(0xd8d8d8), 0, 1.42, 0), addBox(neck, 0.36, 0.7, 0.46, lam(0xd8d8d8), 0, 0.4, 0.01)];
+    for (const a of P.armorParts) a.visible = false;
+    P.chests = [addBox(b, 0.16, 0.42, 0.5, lam(0x9a6a32), -0.43, 1.2, -0.3), addBox(b, 0.16, 0.42, 0.5, lam(0x9a6a32), 0.43, 1.2, -0.3)];
+    for (const c of P.chests) c.visible = false;
+  } else if (type === 'boat') {
+    const wood = lam(0x9a6a32), dark = lam(0x6e4a22);
+    addBox(g, 1.3, 0.12, 1.9, dark, 0, 0.06, 0);
+    addBox(g, 0.1, 0.42, 1.9, wood, -0.6, 0.3, 0); addBox(g, 0.1, 0.42, 1.9, wood, 0.6, 0.3, 0);
+    addBox(g, 1.3, 0.42, 0.1, wood, 0, 0.3, 0.9); addBox(g, 1.3, 0.42, 0.1, wood, 0, 0.3, -0.9);
+    addBox(g, 1.1, 0.07, 0.28, wood, 0, 0.26, 0.25); addBox(g, 1.1, 0.07, 0.28, wood, 0, 0.26, -0.55);
+    const oar = addBox(g, 0.06, 0.06, 1.1, dark, 0.72, 0.4, 0.2); oar.rotation.y = 0.5; const oar2 = addBox(g, 0.06, 0.06, 1.1, dark, -0.72, 0.4, 0.2); oar2.rotation.y = -0.5;
+    P.oars = [oar, oar2];
+    const head = new THREE.Group(); g.add(head); P.head = head;
   } else if (type === 'iron_golem') {
     const tex = faceTex('golem_body', 8, px => { noisyFill(px, 8, ['#d6cfc4', '#cbc3b6', '#ddd7cc', '#c4bcae'], 33); px(1, 2, '#4f7a2a', 1, 4); px(6, 4, '#4f7a2a', 1, 3); px(5, 1, '#5e8a32', 2, 1); });
     const body = lam(0xffffff, { map: tex });
@@ -423,6 +444,14 @@ class Mob {
 
   hurt(dmg, from, kb = 7, byPlayer = false) {
     if (this.dead) return;
+    if (this.T.boat && !this.remoteCtl) {
+      // two hits break a boat
+      this.hp -= dmg >= 1 ? 2 : 1; this.hurtT = 0.3;
+      G.sound.play('dig', this.pos, ID.oak_planks);
+      if (this.hp <= 0) this.die(true);
+      return;
+    }
+    if (this.armor && HORSE_ARMOR[this.armor]) dmg = Math.max(0.5, dmg * (1 - HORSE_ARMOR[this.armor].pts * 0.04));
     if (this.remoteCtl) {
       // another player's device runs this mob: send them the hit, just show the flash here
       if (byPlayer) { Net.mobHit(this, dmg, kb); this.hitByMeAt = Date.now(); }
@@ -446,7 +475,17 @@ class Mob {
   /* right-click (or tap) on an animal: feed, tame, sit or ride. Returns true if something happened. */
   interact(P, hd) {
     if (this.dead) return false;
-    if (this.remoteCtl && (this.type === 'wolf' || this.type === 'horse')) {
+    if (this.T.boat) return this.boatInteract(P);
+    // a rope: tie up an animal so it follows you, or untie it
+    if (this.leash && (!hd || hd.key === 'lead') && !this.remoteCtl) { this.unleash(false); P.inv.add(ID.lead, 1); P.inv.changed(); G.ui.message('You untied the ' + this.T.name.toLowerCase() + '.'); return true; }
+    if (hd && hd.key === 'lead' && !this.T.hostile && !this.leash) {
+      if (this.remoteCtl) { if (this.tame) { G.ui.message('This ' + this.T.name.toLowerCase() + ' belongs to ' + Net.nameOf(this.remoteCtl) + '.'); return true; } Net.claimMob(this, hd.id); return true; }
+      this.leash = 'player';
+      if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1);
+      G.ui.message('The ' + this.T.name.toLowerCase() + ' is on a rope and follows you. Tap a fence to tie it there.', 'gold');
+      return true;
+    }
+    if (this.remoteCtl && (this.type === 'wolf' || this.T.horsey)) {
       // a wolf or horse another player's game runs: if nobody tamed it yet, ask for it, then tame it here
       if (this.tame) { G.ui.message('This ' + this.T.name.toLowerCase() + ' is already tamed by ' + Net.nameOf(this.remoteCtl) + '.'); return true; }
       Net.claimMob(this, hd ? hd.id : 0);
@@ -475,7 +514,30 @@ class Mob {
       if (this.tame) { this.sitting = !this.sitting; G.ui.message(this.sitting ? 'Your wolf sits and waits.' : 'Your wolf follows you again.'); return true; }
       return false;
     }
-    if (this.type === 'horse') {
+    if (this.T.horsey) {
+      // a tamed horse or donkey: put on armor, strap on a chest, or (sneaking) open its chest / take the armor off
+      if (this.tame && hd && hd.horseArmor) {
+        if (this.type !== 'horse') { G.ui.message('Only horses can wear horse armor.'); return true; }
+        const old = this.armor;
+        this.armor = hd.key;
+        P.inv.takeFrom(P.sel, 1);
+        if (old) P.inv.add(ID[old], 1);
+        P.inv.changed(); this.dress();
+        G.sound.play('craft', this.pos);
+        G.ui.message('Your horse is wearing ' + hd.name.toLowerCase() + '.', 'gold');
+        return true;
+      }
+      if (this.tame && hd && hd.key === 'chest' && !this.chestSlots) {
+        this.chestSlots = new Array(27).fill(null);
+        P.inv.takeFrom(P.sel, 1); P.inv.changed(); this.dress();
+        G.sound.play('craft', this.pos);
+        G.ui.message('Chest strapped on! Ride it and open Items to use the chest, or tap it while sneaking.', 'gold');
+        return true;
+      }
+      if (this.tame && P.sneaking && !P.riding) {
+        if (this.chestSlots) { G.ui.openInventory('chest', { slots: this.chestSlots, mob: this }); return true; }
+        if (this.armor) { P.inv.add(ID[this.armor], 1); P.inv.changed(); this.armor = null; this.dress(); G.ui.message('You took the armor off.'); return true; }
+      }
       if (hd && (hd.key === 'apple' || hd.key === 'golden_apple' || hd.key === 'hay_bale' || hd.key === 'melon_slice')) {
         if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1);
         this.hp = Math.min(30, this.hp + 4);
@@ -490,7 +552,7 @@ class Mob {
       if (this.tameProgress >= 1) { this.makeTame(); P.mount(this); return true; }
       P.vel.set((Math.random() - 0.5) * 6, 6, (Math.random() - 0.5) * 6);
       G.particles.burst(this.pos.x, this.pos.y + 1.6, this.pos.z, [0x555555, 0x888888], 8, 1.5, 0.12);
-      G.ui.message('The horse threw you off! Keep trying, or feed it apples.');
+      G.ui.message('The ' + this.T.name.toLowerCase() + ' threw you off! Keep trying, or feed it apples.');
       return true;
     }
     return false;
@@ -502,15 +564,84 @@ class Mob {
     // holding food it loves (or a bucket for a cow): a tap feeds it instead of hitting it
     if (hd && lovesFood(this.type, hd.id)) return true;
     if (hd && hd.key === 'bucket' && this.type === 'cow') return true;
-    if (this.type === 'horse') return true;
+    if (this.T.horsey || this.T.boat || this.leash) return true;
+    if (hd && hd.key === 'lead' && !this.T.hostile) return true;
     if (this.type === 'wolf') return this.tame || !!(hd && hd.key === 'bone');
     return false;
+  }
+
+  /* show horse armor and chests */
+  dress() {
+    const a = this.armor && HORSE_ARMOR[this.armor];
+    if (this.parts.armorParts) for (const p of this.parts.armorParts) { p.visible = !!a; if (a) p.material.color.setHex(a.color); }
+    if (this.parts.chests) for (const c of this.parts.chests) c.visible = !!(this.chestSlots || this.chestShown);
+  }
+
+  /* where the rope pulls to: the player holding it, or the fence it's tied to (null if the fence is gone) */
+  leashTarget() {
+    if (this.leash === 'player') return G.player.dead ? null : G.player.pos;
+    const f = this.leash;
+    if (!f || !DEFS[G.world.getBlock(f.x, f.y, f.z)].fence) return G.world.isLoaded(f.x, f.z) ? null : { x: f.x + 0.5, z: f.z + 0.5 };
+    return { x: f.x + 0.5, z: f.z + 0.5 };
+  }
+  unleash(dropRope) {
+    if (!this.leash) return;
+    this.leash = null;
+    if (dropRope) G.spawnDrop(ID.lead, 1, this.pos.x, this.pos.y + 0.6, this.pos.z);
+  }
+
+  /* ---------- boats: two seats, the front one steers ---------- */
+  boatInteract(P) {
+    if (P.riding) return false;
+    const taken = Net.boatSeats(this);
+    if (this.remoteCtl && !taken[0]) { Net.claimMob(this, 0); return true; } // ask for it, then get in the front seat
+    for (const seat of [0, 1]) if (!taken[seat]) { P.mount(this, seat); return true; }
+    G.ui.message('This boat is full: it fits two.');
+    return true;
+  }
+  boatTick(dt) {
+    const W = G.world;
+    if (this.dead) { G.particles.burst(this.pos.x, this.pos.y + 0.3, this.pos.z, [0x9a6a32, 0x6e4a22], 14, 2); this.remove(); return; }
+    this.hurtT -= dt;
+    // float: find the water surface under or around the boat
+    const bx = Math.floor(this.pos.x), bz = Math.floor(this.pos.z);
+    let surf = null;
+    for (let y = Math.floor(this.pos.y + 0.6); y >= Math.floor(this.pos.y - 0.3); y--) {
+      if (W.getBlock(bx, y, bz) === ID.water) { let t = y; while (t < y + 4 && W.getBlock(bx, t + 1, bz) === ID.water) t++; surf = t + 0.875; break; }
+    }
+    if (surf !== null) {
+      const want = surf - 0.32;
+      this.vel.y += ((want - this.pos.y) * 8 - this.vel.y) * Math.min(1, dt * 6);
+    } else this.vel.y = Math.max(this.vel.y - 25 * dt, -30);
+    const onWater = surf !== null;
+    const dv = this.drive;
+    let mx = 0, mz = 0;
+    if (dv && (dv.x || dv.z)) {
+      mx = dv.x; mz = dv.z;
+      let d = Math.atan2(mx, mz) - this.yaw;
+      while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
+      this.yaw += clamp(d, -3 * dt, 3 * dt);
+    }
+    const speed = onWater ? 7 : 1.2;
+    const k = Math.min(1, (onWater ? 1.6 : 4) * dt);
+    this.vel.x += (mx * speed - this.vel.x) * k;
+    this.vel.z += (mz * speed - this.vel.z) * k;
+    W.moveBody(this, dt);
+    if (this.pos.y < -20) { this.remove(); return; }
+    const sp = Math.hypot(this.vel.x, this.vel.z);
+    if (this.parts.oars) { this.oarT = (this.oarT || 0) + sp * dt * 2.5; for (const [i, o] of this.parts.oars.entries()) o.rotation.x = Math.sin(this.oarT + i * Math.PI) * 0.5 * Math.min(1, sp); }
+    let d = this.yaw - this.mesh.rotation.y;
+    while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
+    this.mesh.rotation.y += d * Math.min(1, dt * 10);
+    this.mesh.position.copy(this.pos);
+    if (onWater) this.mesh.rotation.z = Math.sin(performance.now() / 600 + this.pos.x) * 0.03;
+    for (const m of this.mats) if (m.emissive) m.emissive.setRGB(this.hurtT > 0 ? 0.5 : 0, 0, 0);
   }
 
   makeTame() {
     this.tame = true; this.angry = false;
     if (this.type === 'wolf') { this.hp = 20; if (this.parts.collar) this.parts.collar.visible = true; G.ui.message('You tamed a wolf! It follows you and fights monsters. Tap it to make it sit.', 'gold'); }
-    if (this.type === 'horse') { if (this.parts.saddle) this.parts.saddle.visible = true; G.ui.message('You tamed the horse! Tap it to ride, and press sneak to get off.', 'gold'); }
+    if (this.T.horsey) { if (this.parts.saddle) this.parts.saddle.visible = true; G.ui.message('You tamed the ' + this.T.name.toLowerCase() + '! Tap it to ride, and press sneak to get off.' + (this.type === 'donkey' ? ' Tap it holding a chest to give it a chest.' : ' Tap it holding horse armor to protect it.'), 'gold'); }
     this.hearts();
     G.sound.play('levelup', this.pos);
   }
@@ -532,7 +663,13 @@ class Mob {
 
   die(byPlayer) {
     this.dead = true; this.deathT = 0;
-    G.sound.play('deathMob', this.pos);
+    G.sound.play(this.T.boat ? 'break' : 'deathMob', this.pos);
+    // whatever it carried falls out
+    const drop = (id, n) => { if (id && n > 0) G.spawnDrop(id, n, this.pos.x, this.pos.y + 0.6, this.pos.z); };
+    if (this.chestSlots) { for (const s of this.chestSlots) if (s) drop(s.id, s.count); drop(ID.chest, 1); this.chestSlots = null; }
+    if (this.armor) { drop(ID[this.armor], 1); this.armor = null; }
+    if (this.leash) this.unleash(true);
+    if (this.T.boat && !byPlayer) drop(ID.boat, 1);
     if (byPlayer) {
       if (!this.baby) for (const [k, a, b] of this.T.drops) {
         const n = a + Math.floor(Math.random() * (b - a + 1));
@@ -545,6 +682,7 @@ class Mob {
   update(dt) {
     if (this.remoteCtl) return this.puppetUpdate(dt);
     if (!G.world.isLoaded(this.pos.x, this.pos.z)) return; // the ground here isn't loaded: wait
+    if (this.T.boat) return this.boatTick(dt);
     const W = G.world, P = this.tame ? G.player : nearestPlayer(this.pos);
     if (this.dead) {
       this.deathT += dt;
@@ -686,6 +824,20 @@ class Mob {
     }
     if (this.type === 'enderman' && inLiquid && Math.random() < dt * 2) this.teleport();
 
+    // on a rope: follow whoever holds it, or stay near the fence it's tied to
+    if (this.leash && !this.rider) {
+      const t = this.leashTarget();
+      if (!t) this.unleash(true);
+      else {
+        const dx = t.x - this.pos.x, dz = t.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
+        if (this.leash === 'player' && l > 16) { this.unleash(true); G.ui.message('The rope snapped!'); }
+        else if (l > 3) {
+          moveX = dx / l; moveZ = dz / l; speed = Math.max(T.speed, l > 6 ? 5.5 : 3.5); this.yaw = Math.atan2(moveX, moveZ);
+          if (l > 7) { this.vel.x += moveX * 18 * dt; this.vel.z += moveZ * 18 * dt; } // pulled along
+        } else if (this.leash === 'player' && l < 2) { moveX = 0; moveZ = 0; }
+      }
+    }
+
     const accel = this.onGround ? 10 : 2;
     this.vel.x += (moveX * speed - this.vel.x) * Math.min(1, accel * dt);
     this.vel.z += (moveZ * speed - this.vel.z) * Math.min(1, accel * dt);
@@ -779,7 +931,9 @@ class Mob {
     const small = !!(f & 32);
     if (small !== this.baby) { if (small) this.makeBaby(9999); else this.growUp(); }
     if (this.parts.collar) this.parts.collar.visible = this.tame;
-    if (this.parts.saddle) this.parts.saddle.visible = this.tame && this.type === 'horse';
+    if (this.parts.saddle) this.parts.saddle.visible = this.tame && this.T.horsey;
+    const ai = (f >> 6) & 7, ch = !!(f & 512);
+    if (ai !== this.netArmor || ch !== this.netChest) { this.netArmor = ai; this.netChest = ch; this.armor = HORSE_ARMOR_KEYS[ai - 1] || null; this.chestShown = ch; this.dress(); }
     if (this.parts.ring) this.parts.ring.rotation.y += dt * 3;
     this.mesh.position.copy(this.pos);
     let d = this.yaw - this.mesh.rotation.y;

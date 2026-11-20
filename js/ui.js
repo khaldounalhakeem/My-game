@@ -232,7 +232,7 @@ const UI = {
     this.moveCursor();
   },
 
-  chestEdited() { if (this.chest) G.chestChanged(G.chestKey(this.chest.x, this.chest.y, this.chest.z)); },
+  chestEdited() { if (this.chest && !this.chest.mob) G.chestChanged(G.chestKey(this.chest.x, this.chest.y, this.chest.z)); },
 
   /* shift-click from your inventory into the open chest */
   toChest(i) {
@@ -381,10 +381,14 @@ const UI = {
 
   openInventory(station, chest, furnace) {
     if (G.state !== 'play') return;
+    // riding a horse or donkey with a chest: Items opens its chest too
+    const rd = G.player.riding;
+    if (!station && !chest && !furnace && rd && rd.chestSlots && !rd.remoteCtl) { station = 'chest'; chest = { slots: rd.chestSlots, mob: rd }; }
     this.station = station === 'chest' ? null : station || null;
     this.chest = chest || null;
     this.furnace = furnace || null;
     $('chest-box').hidden = !this.chest;
+    $('chest-box').querySelector('.label').textContent = this.chest && this.chest.mob ? 'Chest on your ' + this.chest.mob.T.name.toLowerCase() : 'Chest';
     $('furnace-box').hidden = !this.furnace;
     $('menu-inv').firstElementChild.classList.toggle('with-furnace', !!this.furnace);
     $('menu-inv').firstElementChild.classList.toggle('with-chest', !!this.chest);
@@ -414,7 +418,7 @@ const UI = {
     if (this.furnace) this.renderFurnace();
     if (this.chest) {
       // someone broke the chest while it was open
-      if (G.world.getBlock(this.chest.x, this.chest.y, this.chest.z) !== ID.chest) { this.closeInventory(); return; }
+      if (this.chest.mob ? this.chest.mob.dead || this.chest.mob.removed || !this.chest.mob.chestSlots : G.world.getBlock(this.chest.x, this.chest.y, this.chest.z) !== ID.chest) { this.closeInventory(); return; }
       for (let k = 0; k < 27; k++) this.fillSlot(this.invSlots[100 + k], this.chest.slots[k]);
     }
     if (G.player.mode === 'survival') this.renderRecipes();
@@ -489,7 +493,7 @@ const UI = {
   renderRecipes() {
     const title = { table: 'Crafting Table', furnace: 'Furnace' }[this.station] || 'Crafting';
     $('craft-title').textContent = title;
-    $('craft-hint').textContent = this.station === 'furnace' ? 'Put what you want to smelt in the top slot and fuel in the bottom slot. Each item takes 10 seconds. Coal smelts 8 items, wood or planks 1 and a half, a stick half of one.'
+    $('craft-hint').textContent = this.station === 'furnace' ? 'Put what you want to smelt in the top slot and fuel in the bottom slot. Each item takes 6 seconds. Coal smelts 5 items, wood or planks 1 and a half, a stick half of one.'
       : this.station === 'table' ? 'Every recipe is available here.' : 'Place a Crafting Table and ' + (Input.touch ? 'tap' : 'right-click') + ' it for tools, weapons and more.';
     const list = $('recipes');
     const rs = this.stationRecipes().map(r => [r, this.canCraft(r)]);
