@@ -279,6 +279,7 @@ class Player {
       this.lavaT -= dt;
       if (this.lavaT <= 0) { this.lavaT = 0.5; this.hurt(4, null, 0, true, 'You fell into lava.'); }
     }
+    if (W.touching(this, ID.fire, 0.02) && !this.inWater) this.fire = Math.max(this.fire || 0, 6);
     if (this.inWater) this.fire = 0;
     if (this.fire > 0) {
       this.fire -= dt; this.fireT -= dt;
@@ -614,6 +615,7 @@ class Player {
           G.sound.play('teleport');
           G.ui.message('The portal is open! Stand inside it to travel.', 'purple');
         } else if (b.id === ID.obsidian) G.ui.message('A portal needs a full obsidian frame: 4 wide and 5 tall, with an empty 2 by 3 middle.');
+        else G.lightFire(b);
         return;
       }
     }

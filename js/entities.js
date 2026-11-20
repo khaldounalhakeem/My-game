@@ -670,12 +670,16 @@ class Mob {
     if (this.armor) { drop(ID[this.armor], 1); this.armor = null; }
     if (this.leash) this.unleash(true);
     if (this.T.boat && !byPlayer) drop(ID.boat, 1);
-    if (byPlayer) {
-      if (!this.baby) for (const [k, a, b] of this.T.drops) {
+    // killed while burning (by you, or by the fire itself): the meat comes out cooked
+    const cooked = this.onFire > 0 || Date.now() - (this.burnedAt || 0) < 2500;
+    if (byPlayer || (cooked && !this.T.hostile)) {
+      const COOK = { porkchop: 'cooked_porkchop', beef: 'steak', chicken: 'cooked_chicken' };
+      if (!this.baby) for (const [k0, a, b] of this.T.drops) {
+        const k = cooked && COOK[k0] ? COOK[k0] : k0;
         const n = a + Math.floor(Math.random() * (b - a + 1));
         if (n > 0) G.spawnDrop(ID[k], n, this.pos.x, this.pos.y + 0.5, this.pos.z);
       }
-      G.player.addXp(this.T.xp);
+      if (byPlayer) G.player.addXp(this.T.xp);
     }
   }
 
@@ -858,6 +862,15 @@ class Mob {
     if (this.parts.ring) this.parts.ring.rotation.y += dt * 3;
     if (inLiquid === ID.lava && !T.fireproof && Math.random() < dt * 2) this.hurt(4, null);
     if (W.touching(this, ID.cactus, 0.05) && Math.random() < dt * 2) this.hurt(1, null);
+    // fire: an animal or monster that walks into it burns for a while (water puts it out)
+    if (!T.fireproof && W.touching(this, ID.fire, 0.02)) this.onFire = Math.max(this.onFire || 0, 6);
+    if (inLiquid === ID.water) this.onFire = 0;
+    if (this.onFire > 0) {
+      this.onFire -= dt; this.fireDmgT = (this.fireDmgT || 0) - dt;
+      if (this.fireDmgT <= 0) { this.fireDmgT = 1; this.burnedAt = Date.now(); this.hurt(1, null); }
+      if (Math.random() < dt * 8) G.particles.burst(this.pos.x, this.pos.y + this.h * 0.6, this.pos.z, [0xff7a00, 0xffc000, 0xff3a00], 2, 1.2, 0.12, -1);
+      if (T.passive && !this.rider) this.fleeT = Math.max(this.fleeT, 0.5);
+    }
     if (this.pos.y < -20) this.remove();
 
     // sounds

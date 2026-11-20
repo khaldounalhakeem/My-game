@@ -494,6 +494,46 @@ G.tickSigns = () => { for (const k in G.signs) if (!G.signMeshes[k] && k.startsW
 G.redrawSigns = () => { for (const k of Object.keys(G.signMeshes)) G.drawSign(k); for (const k in G.signs) G.drawSign(k); };
 
 /* grass slowly spreads onto dirt next to it that has open air above (about two minutes) */
+/* ---------- fire ---------- */
+/* flint and steel on a block lights a fire on top of it (it needs something solid underneath) */
+G.lightFire = (b) => {
+  const W = G.world;
+  let x = b.x + b.nx, y = b.y + b.ny, z = b.z + b.nz;
+  const free = (a, c, d) => { const id = W.getBlock(a, c, d); return !id || (DEFS[id].replaceable && !DEFS[id].liquid); };
+  const solidBelow = (a, c, d) => { const id = W.getBlock(a, c - 1, d); return id && DEFS[id].solid; };
+  if (!(free(x, y, z) && solidBelow(x, y, z))) { x = b.x; y = b.y + 1; z = b.z; } // on the side of a block: light the top instead
+  if (!(free(x, y, z) && solidBelow(x, y, z))) return false;
+  W.setBlock(x, y, z, ID.fire);
+  G.sound.play('fuse', new THREE.Vector3(x, y, z));
+  G.fires = G.fires || {};
+  G.fires[x + ',' + y + ',' + z] = 0;
+  return true;
+};
+/* the fires in this dimension's saved changes (after loading, or changing dimension) */
+G.findFires = () => {
+  G.fires = {};
+  for (const [k, m] of G.world.edits) {
+    const [cx, cz] = k.split(',').map(Number);
+    for (const [i, id] of m) if (id === ID.fire) G.fires[(cx * 16 + (i & 15)) + ',' + (i >> 8) + ',' + (cz * 16 + ((i >> 4) & 15))] = 0;
+  }
+};
+/* fires burn out after a while (on netherrack they burn forever); they never spread, so houses are safe */
+G.tickFires = () => {
+  const W = G.world;
+  G.fires = G.fires || {};
+  for (const k in G.fires) {
+    const [x, y, z] = k.split(',').map(Number);
+    if (!W.isLoaded(x, z)) continue;
+    if (W.getBlock(x, y, z) !== ID.fire) { delete G.fires[k]; continue; }
+    const below = W.getBlock(x, y - 1, z);
+    if (!below || !DEFS[below].solid) { W.setBlock(x, y, z, 0); delete G.fires[k]; continue; }
+    if (below === ID.netherrack) continue;
+    G.fires[k]++;
+    if (G.fires[k] > 25 + Math.random() * 20) { W.setBlock(x, y, z, 0); delete G.fires[k]; }
+  }
+  if (Math.random() < 0.3) for (const k in G.fires) { const [x, y, z] = k.split(',').map(Number); G.particles.burst(x + 0.5, y + 0.5, z + 0.5, [0x555555, 0x333333], 1, 0.6, 0.15, -1); }
+};
+
 G.tickGrass = () => {
   const P = G.player, W = G.world;
   if (G.dim !== 'overworld') return;
@@ -1100,6 +1140,7 @@ function useDim(to) {
   G.pets[to] = [];
   restoreDrops(to);
   G.redrawSigns();
+  G.findFires();
 }
 
 G.switchDimension = (to) => {
@@ -1342,6 +1383,7 @@ G.continueSaved = async (id) => {
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether' || s.dim === 'end') useDim(s.dim); else restoreDrops('overworld');
   G.chests = s.chests || {};
+  G.findFires();
   G.signs = s.signs || {};
   G.crops = s.crops || {};
   G.keepInventory = !!s.keepInventory;
@@ -1655,7 +1697,7 @@ function frame(now) {
       restorePets(ready);
     }
     G.spawnT -= dt;
-    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); G.tickSigns(); }
+    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); G.tickSigns(); G.tickFires(); }
     // no dragons outside the End
     if (G.dim !== 'end') for (const d of G.dragons) if (!d.done && !d.remoteCtl) d.remove();
     if (Date.now() - (G.fixAt || 0) > 3000) { G.fixAt = Date.now(); G.applyFixes(); }

@@ -363,6 +363,12 @@ makeTile('wool_orange', pWool(0xf07613));
 makeTile('wool_purple', pWool(0x7a2aac));
 makeTile('rose', pFlower(0xd0201c, 0x7a1010));
 makeTile('dandelion', pFlower(0xf4d521, 0xd08a10));
+makeTile('fire', pPlant(P => {
+  for (let x = 0; x < 16; x++) {
+    const h = 6 + ((Math.sin(x * 1.7) + 1) * 4 + P.rng() * 3 | 0);
+    for (let j = 0; j < h; j++) { const t = j / h; P.put(x, 15 - j, t < 0.35 ? 0xffe36a : t < 0.7 ? 0xff9a1a : 0xe0441a); }
+  }
+}));
 makeTile('tall_grass', pPlant(P => { for (let i = 0; i < 10; i++) { const x = 1 + P.rng() * 14 | 0, h = 5 + P.rng() * 10 | 0, lean = P.rng() < 0.5 ? -1 : 1; for (let j = 0; j < h; j++) P.put(x + (j > h * 0.6 ? lean : 0), 15 - j, P.vary(0x5fa043, 22)); } }));
 makeTile('dead_bush', pPlant(P => { P.line(8, 15, 8, 9, 0x7a5a32); P.line(8, 11, 4, 6, 0x7a5a32); P.line(8, 10, 12, 5, 0x7a5a32); P.line(6, 8, 7, 4, 0x6b4a28); P.line(11, 7, 13, 9, 0x6b4a28); }));
 makeTile('red_mushroom', pMushroom(0xc8221c, 0xf0f0f0));
@@ -689,6 +695,7 @@ for (const d of ['n', 's', 'w', 'e']) block('ladder_' + d, 'Ladder', 'ladder', {
 /* things that light up the area around them (emit = how far the light reaches) */
 block('torch', 'Torch', { side: 'torch', top: 'torch_top', bottom: 'torch_top' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0.4375, 0, 0.4375, 0.5625, 0.625, 0.5625], light: true, emit: 12, iconTile: 'i_torch' });
 block('lantern', 'Lantern', { side: 'lantern', top: 'lantern_top', bottom: 'lantern_top' }, { hardness: 1, opaque: false, cutout: true, box: [0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875], boxes: [[0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875]], light: true, emit: 14, iconTile: 'i_lantern' });
+block('fire', 'Fire', 'fire', { solid: false, opaque: false, cutout: true, cross: true, hardness: 0, drop: null, replaceable: true, light: true, emit: 11 });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {

@@ -156,6 +156,7 @@ class World {
   /* an edit made by another player: apply it now, or remember it for when the chunk loads */
   applyRemote(x, y, z, id) {
     if (y < 0 || y >= WH || !DEFS[id]) return;
+    if (id === ID.fire && G.fires && this === G.world) G.fires[x + ',' + y + ',' + z] = G.fires[x + ',' + y + ',' + z] || 0;
     const k = this.key(x >> 4, z >> 4), i = (x & 15) + ((z & 15) << 4) + (y << 8);
     if (this.chunks.has(k)) {
       if (this.getBlock(x, y, z) === id) return;
