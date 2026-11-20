@@ -419,3 +419,8 @@ body.touch:not(.pad) #crosshair { display: none; }
 /* the little "Take half" button on a stack you just picked up */
 #split-pop { position: fixed; z-index: 70; transform: translate(-50%, calc(-100% - 4px)); background: #ffd84a; color: #222; border: 2px solid #222; font: inherit; font-size: 14px; font-weight: bold; padding: 6px 10px; white-space: nowrap; box-shadow: 0 2px 0 #000; cursor: pointer; }
 #split-pop[hidden] { display: none; }
+
+/* searching the recipes */
+#craft-search { width: 100%; margin: 0 0 6px; padding: 8px 10px; font: inherit; font-size: 15px; background: #1b1b22; color: #eee; border: 2px solid #555; box-sizing: border-box; }
+#craft-search:focus { outline: 2px solid var(--gold); }
+.recipe .rhow { display: block; font-size: 12px; color: #c9c9a0; margin-top: 2px; white-space: normal; }

@@ -176,6 +176,8 @@ const UI = {
     for (let i = 9; i < 36; i++) mk($('inv-main'), i);
     for (let i = 0; i < 9; i++) mk($('inv-hot'), i);
     $('cat-search').addEventListener('input', () => this.renderSide());
+    $('craft-search').addEventListener('input', () => this.renderRecipes());
+    $('craft-search').addEventListener('keydown', e => e.stopPropagation()); // typing E or W here shouldn't close the inventory or walk
     for (const b of document.querySelectorAll('[data-tab]')) b.addEventListener('click', () => { this.tab = b.dataset.tab; this.renderSide(); });
     $('trash').addEventListener('pointerdown', e => { e.preventDefault(); this.cursor = null; this.moveCursor(); });
     document.addEventListener('pointerdown', e => {
@@ -496,9 +498,21 @@ const UI = {
     $('craft-hint').textContent = this.station === 'furnace' ? 'Put what you want to smelt in the top slot and fuel in the bottom slot. Each item takes 6 seconds. Coal smelts 5 items, wood or planks 1 and a half, a stick half of one.'
       : this.station === 'table' ? 'Every recipe is available here.' : 'Place a Crafting Table and ' + (Input.touch ? 'tap' : 'right-click') + ' it for tools, weapons and more.';
     const list = $('recipes');
-    const rs = this.stationRecipes().map(r => [r, this.canCraft(r)]);
-    rs.sort((a, b) => (b[1] - a[1]));
+    // searching shows every recipe whose result matches, wherever it's made, and what it needs
+    const q = ($('craft-search').value || '').trim().toLowerCase();
+    const here = new Set(this.stationRecipes());
+    const nameOf = k => (DEFS[ID[k]] ? DEFS[ID[k]].name : k);
+    const pool = q ? RECIPES.filter(r => nameOf(r[0]).toLowerCase().includes(q) || r[0].replace(/_/g, ' ').includes(q)) : this.stationRecipes();
+    const rs = pool.map(r => [r, here.has(r) && this.canCraft(r)]);
+    rs.sort((a, b) => (b[1] - a[1]) || (here.has(b[0]) - here.has(a[0])));
     list.innerHTML = '';
+    if (q && !rs.length) {
+      const found = Object.values(ID).map(i => DEFS[i]).find(d => d && d.name.toLowerCase().includes(q));
+      const p = document.createElement('p'); p.className = 'hint';
+      p.textContent = found ? found.name + " can't be crafted: you find it in the world (mine it, loot it from chests, or get it from mobs)." : 'Nothing called "' + q + '". Try another word.';
+      list.appendChild(p);
+      return;
+    }
     for (const [r, ok] of rs) {
       const row = document.createElement('button');
       row.className = 'recipe' + (ok ? ' ok' : '');
@@ -511,7 +525,14 @@ const UI = {
         const enough = this.have(k) >= r[2][k];
         ins += `<span class="need${enough ? '' : ' short'}"><img alt="" src="${iconURL(ID[shown])}">${r[2][k]}</span>`;
       }
-      row.innerHTML = `<span class="out"><img alt="" src="${iconURL(outId)}">${r[1] > 1 ? '<b>' + r[1] + '</b>' : ''}</span><span class="rname">${DEFS[outId].name}</span><span class="ins">${ins}</span>`;
+      let extra = '';
+      if (q) {
+        const needs = Object.keys(r[2]).map(k => r[2][k] + ' ' + (GROUPS[k] ? 'any ' + k.slice(1) : nameOf(k))).join(', ');
+        const where = r[3] === 'furnace' ? 'Smelt it in a Furnace' : r[3] === 'table' ? 'Make it at a Crafting Table' : 'Make it anywhere (in your inventory)';
+        extra = `<small class="rhow">${where}. Needs ${needs}.</small>`;
+      }
+      row.innerHTML = `<span class="out"><img alt="" src="${iconURL(outId)}">${r[1] > 1 ? '<b>' + r[1] + '</b>' : ''}</span><span class="rname">${DEFS[outId].name}${extra}</span><span class="ins">${ins}</span>`;
+      if (q && !here.has(r)) { row.className = 'recipe guide'; row.title = r[3] === 'furnace' ? 'Smelt it in a furnace' : 'Make it at a crafting table'; list.appendChild(row); continue; }
       if (this.station === 'furnace') { row.className = 'recipe guide' + (ok ? ' ok' : ''); row.title = 'Put it in the furnace to smelt it'; list.appendChild(row); continue; }
       row.title = ok ? 'Click to craft. Shift-click crafts as many as you can.' : 'Missing ingredients';
       row.addEventListener('click', e => { if (ok) { this.craft(r, e.shiftKey ? 64 : 1); this.renderInventory(); } });
