@@ -543,11 +543,11 @@ G.tickFires = () => {
       for (const [dx, dy, dz] of fuel) {
         const bx = x + dx, by = y + dy, bz = z + dz;
         // flames climb faster than they creep sideways or down
-        for (const [ex, ey, ez] of NEAR6) if (Math.random() < (ey === 1 ? 0.08 : 0.025)) {
+        for (const [ex, ey, ez] of NEAR6) if (Math.random() < (ey === 1 ? 0.25 : 0.1)) {
           const tx = bx + ex, ty = by + ey, tz = bz + ez;
           if (!W.getBlock(tx, ty, tz) && ty > 0 && ty < WH - 1) newFires.push([tx, ty, tz]);
         }
-        if (Math.random() < 0.02) { W.setBlock(bx, by, bz, Math.random() < 0.7 ? ID.fire : 0); if (W.getBlock(bx, by, bz) === ID.fire) G.fires[bx + ',' + by + ',' + bz] = 0; }
+        if (Math.random() < 0.06) { W.setBlock(bx, by, bz, Math.random() < 0.7 ? ID.fire : 0); if (W.getBlock(bx, by, bz) === ID.fire) G.fires[bx + ',' + by + ',' + bz] = 0; }
       }
       G.fires[k] = Math.max(0, G.fires[k] - 0.5); // it keeps going while it has something to burn
     }
