@@ -493,6 +493,55 @@ class World {
         if (rng() < 0.15) { x = x0; z = z0; y = roofs[x0 + z0 * 16] - 1; }
       }
     }
+    // ---- newer Nether things (their own random numbers, so the older parts of the Nether stay the same) ----
+    const r2 = mulberry32(hash3(cx, cz, this.seed + 4441));
+    // ancient debris: rare, deep down, hidden inside netherrack
+    for (let v = 0; v < 2; v++) {
+      if (r2() < 0.45) continue;
+      const x = r2() * 16 | 0, y = 8 + (r2() * 15 | 0), z = r2() * 16 | 0, n = 1 + (r2() * 2 | 0);
+      for (let s = 0; s < n; s++) if (get(x + s, y, z) === ID.netherrack) set(x + s, y, z, ID.ancient_debris);
+    }
+    // blobs of blackstone
+    for (let v = 0; v < 2; v++) {
+      let x = r2() * 16, y = 10 + r2() * 60, z = r2() * 16;
+      for (let s = 0; s < 18; s++) { const xi = x | 0, yi = y | 0, zi = z | 0; if (get(xi, yi, zi) === ID.netherrack) set(xi, yi, zi, ID.blackstone); x += r2() * 2 - 1; y += r2() * 2 - 1; z += r2() * 2 - 1; }
+    }
+    // areas: crimson forests (red), warped forests (blue-green) and basalt deltas (grey), on land above the lava
+    const areaOf = (wx, wz) => { const v = this.noiseB.noise2(wx / 140 + 31.7, wz / 140 - 12.3); return v > 0.28 ? 'crimson' : v < -0.28 ? 'warped' : Math.abs(this.noiseC.noise2(wx / 70 + 5.1, wz / 70 + 9.4)) < 0.07 ? 'basalt' : null; };
+    const trees = [];
+    for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+      const wx = cx * 16 + x, wz = cz * 16 + z, area = areaOf(wx, wz), fl = heights[x + z * 16];
+      if (!area || fl <= LAVA_Y || get(x, fl, z) !== ID.netherrack || get(x, fl + 1, z) !== 0) continue;
+      if (area === 'basalt') {
+        set(x, fl, z, r2() < 0.3 ? ID.blackstone : ID.basalt);
+        if (r2() < 0.05) { const h = 2 + (r2() * 5 | 0); for (let y = fl + 1; y <= fl + h && get(x, y, z) === 0; y++) set(x, y, z, ID.basalt); }
+        continue;
+      }
+      const crimson = area === 'crimson';
+      set(x, fl, z, crimson ? ID.crimson_nylium : ID.warped_nylium);
+      const r = r2();
+      if (r < 0.14) set(x, fl + 1, z, crimson ? ID.crimson_roots : ID.warped_roots);
+      else if (r < 0.165 && x >= 2 && x <= 13 && z >= 2 && z <= 13) trees.push([x, fl, z, crimson]);
+    }
+    // huge fungus trees: a tall stem with a big cap and glowing shroomlights
+    for (const [x, fl, z, crimson] of trees) {
+      const h = 5 + (r2() * 5 | 0), top = fl + h;
+      if (top + 2 >= roofs[x + z * 16]) continue;
+      const stem = crimson ? ID.crimson_stem : ID.warped_stem, wart = crimson ? ID.nether_wart_block : ID.warped_wart_block;
+      for (let y = fl + 1; y <= top; y++) set(x, y, z, stem);
+      for (let dy = -2; dy <= 1; dy++) {
+        const rad = dy === 1 ? 1 : 2;
+        for (let dz = -rad; dz <= rad; dz++) for (let dx = -rad; dx <= rad; dx++) {
+          if (Math.abs(dx) === 2 && Math.abs(dz) === 2) continue;
+          if (dy < 0 && Math.abs(dx) < 2 && Math.abs(dz) < 2) continue; // hollow underneath
+          const X = x + dx, Y = top + dy, Z = z + dz;
+          if (get(X, Y, Z) !== 0) continue;
+          set(X, Y, Z, r2() < 0.08 ? ID.shroomlight : wart);
+        }
+      }
+      set(x, top + 1, z, wart);
+    }
+
     // nether fortress bridges running east-west and north-south
     const BY = 52;
     const bridgeZ = ((cz % 6) + 6) % 6 === 0, bridgeX = ((cx % 6) + 6) % 6 === 0;

@@ -1,7 +1,7 @@
 'use strict';
 /* Block and item registry, procedural pixel-art textures, and inventory icons. */
 
-const TILE = 16, ATLAS_N = 16;
+const TILE = 16, ATLAS_N = 32; // room for 1024 pictures
 const atlasCanvas = document.createElement('canvas');
 atlasCanvas.width = atlasCanvas.height = TILE * ATLAS_N;
 const actx = atlasCanvas.getContext('2d', { willReadFrequently: true });
@@ -535,6 +535,33 @@ for (const [k, c] of [['wooden', 0xa8834f], ['stone', 0x8a8a8a], ['iron', 0xdcdc
 /* ---------- registry ---------- */
 const DEFS = [];
 const ID = Object.create(null);
+/* ---------- more of the Nether: netherite, crimson and warped forests, basalt ---------- */
+makeTile('ancient_debris_side', P => { P.fill(0x5e4234, 12); for (let i = 0; i < 5; i++) { const y = 2 + i * 3; P.rect(1, y, 14, 1, 0x7a5644, 6); } P.speck(0x3a2a22, 0.15, 5); P.speck(0x9a7a64, 0.06, 6); });
+makeTile('ancient_debris_top', P => { P.fill(0x4e3a2e, 10); for (let r = 2; r < 8; r += 2) for (let a = 0; a < 6.3; a += 0.3) P.put(7.5 + Math.cos(a) * r, 7.5 + Math.sin(a) * r, 0x6e5040); });
+makeTile('netherite_block', P => { P.fill(0x3e3a3c, 6); P.speck(0x4e484a, 0.25, 4); P.rect(0, 0, 16, 1, 0x5a5456); P.rect(0, 15, 16, 1, 0x2a2628); P.rect(0, 0, 1, 16, 0x5a5456); P.rect(15, 0, 1, 16, 0x2a2628); });
+makeTile('blackstone', P => { P.fill(0x2a2428, 10); P.speck(0x3c3438, 0.25, 6); P.speck(0x1a1618, 0.15, 4); });
+makeTile('basalt_side', P => { P.fill(0x58585e, 8); for (let x = 1; x < 16; x += 3) P.rect(x, 0, 1, 16, 0x46464c, 4); P.speck(0x6c6c72, 0.1, 5); });
+makeTile('basalt_top', P => { P.fill(0x505056, 8); for (let r = 2; r < 8; r += 3) for (let a = 0; a < 6.3; a += 0.25) P.put(7.5 + Math.cos(a) * r, 7.5 + Math.sin(a) * r, 0x68686e); });
+makeTile('crimson_nylium', P => { P.fill(0xa8202a, 16); P.speck(0xd23a3a, 0.2, 8); P.speck(0x701418, 0.15, 6); });
+makeTile('crimson_nylium_side', P => { pNetherrack(P); for (let x = 0; x < 16; x++) { const h = 3 + (P.rng() * 3 | 0); for (let y = 0; y < h; y++) P.put(x, y, P.vary(0xa8202a, 14)); } });
+makeTile('warped_nylium', P => { P.fill(0x1f8a7a, 16); P.speck(0x3ab8a0, 0.2, 8); P.speck(0x135a52, 0.15, 6); });
+makeTile('warped_nylium_side', P => { pNetherrack(P); for (let x = 0; x < 16; x++) { const h = 3 + (P.rng() * 3 | 0); for (let y = 0; y < h; y++) P.put(x, y, P.vary(0x1f8a7a, 14)); } });
+makeTile('crimson_stem', pLogSide(0x6a2238, 0x4a1426));
+makeTile('crimson_stem_top', pLogTop(0x4a1426, 0x9a3a4a, 0x7a2a3a));
+makeTile('warped_stem', pLogSide(0x2a5a5e, 0x1a3c40));
+makeTile('warped_stem_top', pLogTop(0x1a3c40, 0x3a8a80, 0x2a6a64));
+makeTile('crimson_planks', pPlanks(0x7a3a52));
+makeTile('warped_planks', pPlanks(0x2b6b62));
+makeTile('nether_wart_block', P => { P.fill(0x8a1414, 18); P.speck(0xb02424, 0.25, 8); P.speck(0x5a0a0a, 0.2, 6); });
+makeTile('warped_wart_block', P => { P.fill(0x147a6e, 18); P.speck(0x22a092, 0.25, 8); P.speck(0x0a4a44, 0.2, 6); });
+makeTile('shroomlight', P => { P.fill(0xf0a040, 12); P.speck(0xffd27a, 0.3, 8); P.speck(0xd07020, 0.15, 6); });
+makeTile('crimson_roots', pPlant(P => { for (let i = 0; i < 7; i++) { const x = 2 + P.rng() * 12 | 0, h = 4 + P.rng() * 8 | 0; for (let j = 0; j < h; j++) P.put(x + (j > h / 2 ? 1 : 0), 15 - j, P.vary(0xb0283a, 18)); } }));
+makeTile('warped_roots', pPlant(P => { for (let i = 0; i < 7; i++) { const x = 2 + P.rng() * 12 | 0, h = 4 + P.rng() * 8 | 0; for (let j = 0; j < h; j++) P.put(x + (j > h / 2 ? -1 : 0), 15 - j, P.vary(0x22a092, 18)); } }));
+makeTile('i_netherite_scrap', pPlant(P => { P.disc(8, 8, 5, 0x5e4234); P.disc(8, 8, 3, 0x7a5644); P.put(6, 6, 0x9a7a64); P.put(10, 9, 0x3a2a22); }));
+makeTile('i_netherite_ingot', pPlant(P => { P.rect(2, 6, 12, 5, 0x3e3a3c); P.rect(3, 5, 10, 1, 0x5a5456); P.rect(2, 10, 12, 1, 0x26222a); P.rect(4, 7, 3, 1, 0x6a6466); }));
+for (const kind of ['pick', 'sword', 'shovel', 'axe', 'hoe']) makeTile('i_netherite_' + { pick: 'pickaxe', sword: 'sword', shovel: 'shovel', axe: 'axe', hoe: 'hoe' }[kind], pTool(kind, 0x4a4448));
+for (const [piece] of ARMOR_PIECES) makeTile('i_netherite_' + piece, pArmor(piece, 0x4a4448));
+
 DEFS[0] = { id: 0, key: 'air', name: 'Air', isBlock: true, solid: false, opaque: false, hardness: 0, faces: [0, 0, 0, 0, 0, 0], color: [255, 255, 255] };
 ID.air = 0;
 let nextBlockId = 1;
@@ -700,6 +727,21 @@ block('lantern', 'Lantern', { side: 'lantern', top: 'lantern_top', bottom: 'lant
 block('fire', 'Fire', 'fire', { solid: false, opaque: false, cutout: true, cross: true, hardness: 0, drop: null, replaceable: true, light: true, emit: 11 });
 /* your flag: place it anywhere, then "Show flag" points the way back (one flag each) */
 block('flag', 'Flag', 'flag', { hardness: 0.3, solid: false, opaque: false, cutout: true, boxes: [[0.4375, 0, 0.4375, 0.5625, 1, 0.5625], [0.5625, 0.5, 0.47, 1, 0.94, 0.53]], iconTile: 'i_flag' });
+block('ancient_debris', 'Ancient Debris', { side: 'ancient_debris_side', top: 'ancient_debris_top' }, PICK(4, 12, { xp: 2 }));
+block('netherite_block', 'Block of Netherite', 'netherite_block', PICK(4, 15));
+block('blackstone', 'Blackstone', 'blackstone', PICK(1, 1.5));
+block('basalt', 'Basalt', { side: 'basalt_side', top: 'basalt_top' }, PICK(1, 1.25));
+block('crimson_nylium', 'Crimson Nylium', { top: 'crimson_nylium', side: 'crimson_nylium_side', bottom: 'netherrack' }, PICK(1, 0.4, { drop: 'netherrack', colorFace: 2 }));
+block('warped_nylium', 'Warped Nylium', { top: 'warped_nylium', side: 'warped_nylium_side', bottom: 'netherrack' }, PICK(1, 0.4, { drop: 'netherrack', colorFace: 2 }));
+block('crimson_stem', 'Crimson Stem', { top: 'crimson_stem_top', side: 'crimson_stem' }, { tool: 'axe', hardness: 2 });
+block('warped_stem', 'Warped Stem', { top: 'warped_stem_top', side: 'warped_stem' }, { tool: 'axe', hardness: 2 });
+block('crimson_planks', 'Crimson Planks', 'crimson_planks', { tool: 'axe', hardness: 2 });
+block('warped_planks', 'Warped Planks', 'warped_planks', { tool: 'axe', hardness: 2 });
+block('nether_wart_block', 'Nether Wart Block', 'nether_wart_block', { tool: 'hoe', hardness: 1 });
+block('warped_wart_block', 'Warped Wart Block', 'warped_wart_block', { tool: 'hoe', hardness: 1 });
+block('shroomlight', 'Shroomlight', 'shroomlight', { tool: 'hoe', hardness: 1, light: true, emit: 13 });
+block('crimson_roots', 'Crimson Roots', 'crimson_roots', Object.assign({ replaceable: true }, CROSS));
+block('warped_roots', 'Warped Roots', 'warped_roots', Object.assign({ replaceable: true }, CROSS));
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -786,6 +828,14 @@ const HORSE_ARMOR = {
 };
 const HORSE_ARMOR_KEYS = Object.keys(HORSE_ARMOR);
 for (const k of HORSE_ARMOR_KEYS) item(k, HORSE_ARMOR[k].name, k, { stack: 1, horseArmor: HORSE_ARMOR[k].pts });
+item('netherite_scrap', 'Netherite Scrap', 'netherite_scrap');
+item('netherite_ingot', 'Netherite Ingot', 'netherite_ingot');
+item('netherite_pickaxe', 'Netherite Pickaxe', 'netherite_pickaxe', { stack: 1, tool: { type: 'pick', tier: 5, speed: 10 }, damage: 6 });
+item('netherite_sword', 'Netherite Sword', 'netherite_sword', { stack: 1, damage: 9 });
+item('netherite_shovel', 'Netherite Shovel', 'netherite_shovel', { stack: 1, tool: { type: 'shovel', tier: 5, speed: 10 }, damage: 5 });
+item('netherite_axe', 'Netherite Axe', 'netherite_axe', { stack: 1, tool: { type: 'axe', tier: 5, speed: 10 }, damage: 10 });
+item('netherite_hoe', 'Netherite Hoe', 'netherite_hoe', { stack: 1, tool: { type: 'hoe', tier: 5, speed: 10 }, damage: 1 });
+ARMOR_PIECES.forEach(([piece, pn], slot) => item('netherite_' + piece, 'Netherite ' + pn, 'netherite_' + piece, { stack: 1, armor: { slot, points: [3, 9, 7, 3][slot] } }));
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -797,7 +847,7 @@ function getDrops(def, rng) {
 /* ---------- recipes ---------- */
 // [output, count, {input: count}, station]   '#planks' / '#log' match any wood type
 const GROUPS = {
-  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks'],
+  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks'],
   '#log': ['oak_log', 'birch_log', 'spruce_log'],
   '#wool': ['wool_white', 'wool_red', 'wool_blue', 'wool_green', 'wool_yellow', 'wool_black', 'wool_orange', 'wool_purple'],
 };
@@ -839,6 +889,19 @@ const RECIPES = [
   ['iron_chestplate', 1, { iron_ingot: 8 }, 'table'],
   ['iron_leggings', 1, { iron_ingot: 7 }, 'table'],
   ['iron_boots', 1, { iron_ingot: 4 }, 'table'],
+  ['netherite_scrap', 1, { ancient_debris: 1 }, 'furnace'],
+  ['netherite_ingot', 1, { netherite_scrap: 4, gold_ingot: 4 }, 'table'],
+  ['netherite_block', 1, { netherite_ingot: 9 }, 'table'], ['netherite_ingot', 9, { netherite_block: 1 }],
+  ['netherite_pickaxe', 1, { diamond_pickaxe: 1, netherite_ingot: 1 }, 'table'],
+  ['netherite_sword', 1, { diamond_sword: 1, netherite_ingot: 1 }, 'table'],
+  ['netherite_axe', 1, { diamond_axe: 1, netherite_ingot: 1 }, 'table'],
+  ['netherite_shovel', 1, { diamond_shovel: 1, netherite_ingot: 1 }, 'table'],
+  ['netherite_hoe', 1, { diamond_hoe: 1, netherite_ingot: 1 }, 'table'],
+  ['netherite_helmet', 1, { diamond_helmet: 1, netherite_ingot: 1 }, 'table'],
+  ['netherite_chestplate', 1, { diamond_chestplate: 1, netherite_ingot: 1 }, 'table'],
+  ['netherite_leggings', 1, { diamond_leggings: 1, netherite_ingot: 1 }, 'table'],
+  ['netherite_boots', 1, { diamond_boots: 1, netherite_ingot: 1 }, 'table'],
+  ['crimson_planks', 4, { crimson_stem: 1 }], ['warped_planks', 4, { warped_stem: 1 }],
   ['diamond_helmet', 1, { diamond: 5 }, 'table'],
   ['diamond_chestplate', 1, { diamond: 8 }, 'table'],
   ['diamond_leggings', 1, { diamond: 7 }, 'table'],
@@ -967,7 +1030,7 @@ function tileOf(id) { const d = DEFS[id]; return d.isBlock ? d.faces[0] : d.tile
 /* ---------- furnace: what smelts into what, and how long fuel burns (seconds; one item takes 6) ---------- */
 const SMELT_TIME = 6;
 const SMELT = {}; // input id -> [output id, count, xp]
-const SMELT_XP = { iron_ingot: 0.7, gold_ingot: 1, glass: 0.1, stone: 0.1, coal: 0.15, terracotta: 0.35, cooked_porkchop: 0.35, steak: 0.35, cooked_chicken: 0.35 };
+const SMELT_XP = { netherite_scrap: 2, iron_ingot: 0.7, gold_ingot: 1, glass: 0.1, stone: 0.1, coal: 0.15, terracotta: 0.35, cooked_porkchop: 0.35, steak: 0.35, cooked_chicken: 0.35 };
 for (const r of RECIPES) if (r[3] === 'furnace') for (const k in r[2]) for (const m of GROUPS[k] || [k]) if (ID[m] !== undefined) SMELT[ID[m]] = [ID[r[0]], r[1], SMELT_XP[r[0]] || 0.1];
 const FUEL = {};
 // (how many items each one smelts) x 6 seconds: coal smelts 5 items
