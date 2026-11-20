@@ -632,7 +632,7 @@ block('red_mushroom', 'Red Mushroom', 'red_mushroom', CROSS);
 block('brown_mushroom', 'Brown Mushroom', 'brown_mushroom', CROSS);
 block('soul_sand', 'Soul Sand', 'soul_sand', { tool: 'shovel', hardness: 0.5 });
 block('nether_bricks', 'Nether Bricks', 'nether_bricks', PICK(1, 2));
-block('nether_quartz_ore', 'Nether Quartz Ore', 'nether_quartz_ore', PICK(1, 3, { drop: 'quartz', xp: 2 }));
+block('nether_quartz_ore', 'Nether Quartz Ore', 'nether_quartz_ore', PICK(1, 3, { drop: (r) => [['quartz', 1 + (r() * 4 | 0)]], xp: 2 }));
 block('nether_gold_ore', 'Nether Gold Ore', 'nether_gold_ore', PICK(1, 3, { drop: 'gold_ingot', xp: 1 }));
 block('magma', 'Magma Block', 'magma', PICK(1, 0.5, { light: true }));
 block('bed', 'Bed', { top: 'bed_top', side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2, height: 0.5625, opaque: false, iconTile: 'i_bed' });
