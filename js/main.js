@@ -534,6 +534,24 @@ G.tickFires = () => {
   if (Math.random() < 0.3) for (const k in G.fires) { const [x, y, z] = k.split(',').map(Number); G.particles.burst(x + 0.5, y + 0.5, z + 0.5, [0x555555, 0x333333], 1, 0.6, 0.15, -1); }
 };
 
+/* ---------- your flag ---------- */
+G.placedFlag = (x, y, z) => {
+  const old = G.myFlag;
+  if (old && !(old.dim === G.dim && old.x === x && old.y === y && old.z === z)) {
+    // only one flag each: the old one comes down and goes back in your inventory
+    const W = G.worlds[old.dim];
+    if (W) {
+      if (W === G.world && W.isLoaded(old.x, old.z)) { if (W.getBlock(old.x, old.y, old.z) === ID.flag) W.setBlock(old.x, old.y, old.z, 0); }
+      else { const m = W.edits.get(W.key(old.x >> 4, old.z >> 4)), i = (old.x & 15) + ((old.z & 15) << 4) + (old.y << 8); if (m && m.get(i) === ID.flag) m.set(i, 0); }
+    }
+    G.player.inv.add(ID.flag, 1); G.player.inv.changed();
+    G.ui.message('Your old flag came down and went back in your inventory: you can have one flag at a time.');
+  }
+  G.myFlag = { dim: G.dim, x, y, z };
+  G.ui.message('Flag placed! Tap "Show flag" (top right) to find your way back to it.', 'gold');
+  G.save();
+};
+
 G.tickGrass = () => {
   const P = G.player, W = G.world;
   if (G.dim !== 'overworld') return;
@@ -1035,7 +1053,7 @@ function makeWorld(seed, legacy) {
     G.worlds[dim] = w;
   }
   G.dim = 'overworld';
-  G.pets = {}; G.pendingPets = []; G.guestPens = []; G.chests = {}; G.chestVer = {}; for (const k of Object.keys(G.signMeshes || {})) { G.scene.remove(G.signMeshes[k]); } G.signs = {}; G.signMeshes = {}; G.crops = {}; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
+  G.pets = {}; G.pendingPets = []; G.guestPens = []; G.chests = {}; G.chestVer = {}; for (const k of Object.keys(G.signMeshes || {})) { G.scene.remove(G.signMeshes[k]); } G.signs = {}; G.signMeshes = {}; G.crops = {}; G.myFlag = null; G.showFlag = false; G.keepInventory = false; G.dimDrops = {}; G.furnaces = {}; G.endDragonDead = false;
   G.world = G.worlds.overworld;
   G.scene.add(G.world.group);
   G.seed = seed;
@@ -1387,6 +1405,8 @@ G.continueSaved = async (id) => {
   G.signs = s.signs || {};
   G.crops = s.crops || {};
   G.keepInventory = !!s.keepInventory;
+  G.myFlag = s.myFlag && ['overworld', 'nether', 'end'].includes(s.myFlag.dim) && [s.myFlag.x, s.myFlag.y, s.myFlag.z].every(Number.isInteger) ? s.myFlag : null;
+  G.showFlag = false;
   G.difficulty = G.DIFFS[s.difficulty] ? s.difficulty : 'normal';
   G.chestVer = s.chestVer || {};
   G.furnaces = s.furnaces || {};
@@ -1450,7 +1470,7 @@ G.save = (opts) => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, keepInventory: !!G.keepInventory, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, keepInventory: !!G.keepInventory, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   let ok = true;
   G.lastSaveText = JSON.stringify(data);
@@ -1705,6 +1725,7 @@ function frame(now) {
     if (G.saveT > 30) { G.saveT = 0; G.save(); }
   }
   G.ui.updateFriendArrow();
+  G.ui.updateFlagArrow();
   Input.lookDX = Input.lookDY = 0;
   G.particles.update(active ? dt : 0);
   G.world.update(P.pos.x, P.pos.z, active ? 6 : 12);

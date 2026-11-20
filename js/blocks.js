@@ -369,6 +369,8 @@ makeTile('fire', pPlant(P => {
     for (let j = 0; j < h; j++) { const t = j / h; P.put(x, 15 - j, t < 0.35 ? 0xffe36a : t < 0.7 ? 0xff9a1a : 0xe0441a); }
   }
 }));
+makeTile('flag', P => { P.clear(); P.rect(7, 0, 2, 16, 0x8a6a3a); P.rect(9, 1, 7, 7, 0xd8302a); P.rect(9, 1, 7, 1, 0xf05a4a); P.rect(9, 7, 7, 1, 0xa01e1a); P.put(12, 4, 0xffd84a); P.put(13, 4, 0xffd84a); P.put(12, 3, 0xffd84a); });
+makeTile('i_flag', pPlant(P => { P.rect(4, 1, 2, 15, 0x8a6a3a); P.rect(6, 2, 8, 6, 0xd8302a); P.rect(6, 2, 8, 1, 0xf05a4a); P.rect(6, 7, 8, 1, 0xa01e1a); P.put(9, 4, 0xffd84a); P.put(10, 4, 0xffd84a); }));
 makeTile('tall_grass', pPlant(P => { for (let i = 0; i < 10; i++) { const x = 1 + P.rng() * 14 | 0, h = 5 + P.rng() * 10 | 0, lean = P.rng() < 0.5 ? -1 : 1; for (let j = 0; j < h; j++) P.put(x + (j > h * 0.6 ? lean : 0), 15 - j, P.vary(0x5fa043, 22)); } }));
 makeTile('dead_bush', pPlant(P => { P.line(8, 15, 8, 9, 0x7a5a32); P.line(8, 11, 4, 6, 0x7a5a32); P.line(8, 10, 12, 5, 0x7a5a32); P.line(6, 8, 7, 4, 0x6b4a28); P.line(11, 7, 13, 9, 0x6b4a28); }));
 makeTile('red_mushroom', pMushroom(0xc8221c, 0xf0f0f0));
@@ -696,6 +698,8 @@ for (const d of ['n', 's', 'w', 'e']) block('ladder_' + d, 'Ladder', 'ladder', {
 block('torch', 'Torch', { side: 'torch', top: 'torch_top', bottom: 'torch_top' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0.4375, 0, 0.4375, 0.5625, 0.625, 0.5625], light: true, emit: 12, iconTile: 'i_torch' });
 block('lantern', 'Lantern', { side: 'lantern', top: 'lantern_top', bottom: 'lantern_top' }, { hardness: 1, opaque: false, cutout: true, box: [0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875], boxes: [[0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875]], light: true, emit: 14, iconTile: 'i_lantern' });
 block('fire', 'Fire', 'fire', { solid: false, opaque: false, cutout: true, cross: true, hardness: 0, drop: null, replaceable: true, light: true, emit: 11 });
+/* your flag: place it anywhere, then "Show flag" points the way back (one flag each) */
+block('flag', 'Flag', 'flag', { hardness: 0.3, solid: false, opaque: false, cutout: true, boxes: [[0.4375, 0, 0.4375, 0.5625, 1, 0.5625], [0.5625, 0.5, 0.47, 1, 0.94, 0.53]], iconTile: 'i_flag' });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -867,6 +871,7 @@ const RECIPES = [
   ['wheat', 9, { hay_bale: 1 }],
   ['bread', 1, { wheat: 3 }],
   ['torch', 4, { coal: 1, stick: 1 }],
+  ['flag', 1, { stick: 2, '#wool': 3 }],
   ['boat', 1, { '#planks': 5 }, 'table'],
   ['lead', 2, { string: 4 }, 'table'],
   ['leather_horse_armor', 1, { leather: 7 }, 'table'],

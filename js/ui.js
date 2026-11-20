@@ -542,6 +542,28 @@ const UI = {
 
   /* ---------- menus ---------- */
   /* the arrow above the XP bar that points to the closest friend in this world */
+  /* "Show flag": a big arrow in the middle of the screen pointing to your flag */
+  toggleFlag() {
+    if (!G.myFlag) { G.showFlag = false; this.message('You have no flag yet. Craft one from 2 sticks and 3 wool, then place it.'); return; }
+    G.showFlag = !G.showFlag;
+    if (G.showFlag && G.myFlag.dim !== G.dim) this.message('Your flag is in the ' + { overworld: 'Overworld', nether: 'Nether', end: 'End' }[G.myFlag.dim] + '.');
+  },
+  updateFlagArrow() {
+    const btn = $('btn-flag'), box = $('flag-arrow'), playing = G.state === 'play';
+    const showBtn = playing && !!G.myFlag;
+    if (btn.hidden === showBtn) btn.hidden = !showBtn;
+    btn.textContent = G.showFlag ? 'Hide flag' : 'Show flag';
+    const f = G.myFlag, on = playing && G.showFlag && f && f.dim === G.dim;
+    if (!on) { if (!box.hidden) box.hidden = true; return; }
+    box.hidden = false;
+    const P = G.player, fx = f.x + 0.5, fz = f.z + 0.5, d = Math.hypot(fx - P.pos.x, fz - P.pos.z);
+    const rel = Math.atan2(-(fx - P.pos.x), -(fz - P.pos.z)) - P.yaw;
+    box.firstElementChild.style.transform = 'rotate(' + (-rel * 180 / Math.PI).toFixed(1) + 'deg)';
+    const up = f.y - P.pos.y, ud = Math.abs(up) > 4 ? (up > 0 ? ' up' : ' down') : '';
+    const text = d < 2 ? 'You are at your flag!' : 'Your flag · ' + Math.round(d) + ' blocks' + ud;
+    if (this.flagText !== text) { this.flagText = text; $('flag-label').textContent = text; }
+  },
+
   updateFriendArrow() {
     const P = G.player, box = $('friend-arrow');
     let best = null, bd = Infinity;
@@ -930,6 +952,7 @@ const UI = {
     hold('t-sneak', () => { Input.tSneak = true; }, () => { Input.tSneak = false; });
     hold('t-inv', () => { if (G.state === 'play') this.openInventory(null); else if (G.state === 'inventory') this.closeInventory(); });
     hold('t-pause', () => { if (G.state === 'play') G.pause(); });
+    $('btn-flag').addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); this.toggleFlag(); });
     hold('t-drop', () => { if (G.state === 'play') G.player.dropHeld(false); });
   },
 
@@ -937,6 +960,7 @@ const UI = {
     const P = G.player;
     if (k.startsWith('Digit')) { const n = +k.slice(5); if (n >= 1 && n <= 9) P.sel = n - 1; }
     else if (k === 'KeyE') { this.openInventory(null); G.unlock(); }
+    else if (k === 'KeyG') this.toggleFlag();
     else if (k === 'Escape' && Input.fallback) G.pause();
     else if (k === 'KeyQ') P.dropHeld(e.ctrlKey);
     else if (k === 'F3' || k === 'KeyH') { e.preventDefault(); $('debug').hidden = !$('debug').hidden; }

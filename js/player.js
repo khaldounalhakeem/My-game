@@ -347,6 +347,7 @@ class Player {
 
   breakBlock(x, y, z, id) {
     const def = DEFS[id], W = G.world;
+    if (id === ID.flag && G.myFlag && G.myFlag.dim === G.dim && G.myFlag.x === x && G.myFlag.y === y && G.myFlag.z === z) { G.myFlag = null; G.showFlag = false; }
     W.setBlock(x, y, z, 0);
     G.particles.blockBreak(x, y, z, id);
     G.sound.play('break', null, id);
@@ -690,6 +691,7 @@ class Player {
       if ((there && !DEFS[there].replaceable) || !under || !DEFS[under].solid) { G.ui.message('Not enough room for the bed here. It needs two blocks of flat floor.'); return; }
     }
     W.setBlock(px, py, pz, hd.id);
+    if (hd.id === ID.flag) G.placedFlag(px, py, pz);
     if (bedHead) W.setBlock(bedHead[0], bedHead[1], bedHead[2], ID.bed_head);
     W.settle(px, py, pz);
     if (hd.id === ID.pumpkin) G.tryBuildGolem(px, py, pz);
