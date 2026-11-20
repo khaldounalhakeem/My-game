@@ -459,6 +459,25 @@ class Player {
       G.sound.play('place'); this.useCd = 0.25; this.swing = 1;
       return true;
     }
+    if (hd.placesSlab && b) {
+      const k = hd.placesSlab, full = ID[DEFS[ID[k + '_slab_b']].slabFull];
+      const done = () => { if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1); G.sound.play('place', null, full); this.useCd = 0.2; this.swing = 1; return true; };
+      const hitDef = DEFS[b.id];
+      // a slab on the matching half of the same slab: it becomes a full block
+      if (hitDef.slab === k && ((hitDef.slabHalf === 'b' && b.ny === 1) || (hitDef.slabHalf === 't' && b.ny === -1))) { W.setBlock(b.x, b.y, b.z, full); return done(); }
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (hitDef.replaceable && !hitDef.slab) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz), cd = DEFS[cur];
+      if (cur && cd.slab === k) { W.setBlock(px, py, pz, full); return done(); }
+      if (cur && !cd.replaceable && !cd.liquid) return true;
+      // the bottom or the top half: tapping the underside of a block, or the upper half of a block's side, makes a top slab
+      const o = this.eyePos(), d = this.lookDir(), hitY = o.y + d.y * (b.dist || 0) - b.y;
+      const half = b.ny === -1 ? 't' : b.ny === 1 ? 'b' : (hitY > 0.5 ? 't' : 'b');
+      const e = 1e-3, y0 = py + (half === 't' ? 0.5 : 0);
+      if (this.pos.x + this.w / 2 > px + e && this.pos.x - this.w / 2 < px + 1 - e && this.pos.z + this.w / 2 > pz + e && this.pos.z - this.w / 2 < pz + 1 - e && this.pos.y < y0 + 0.5 && this.pos.y + this.h > y0) return true;
+      W.setBlock(px, py, pz, ID[k + '_slab_' + half]);
+      return done();
+    }
     if (hd.placesLadder && b) {
       if (!b.nx && !b.nz) { G.ui.message('Put a ladder on the side of a block.'); return true; }
       const px = b.x + b.nx, py = b.y, pz = b.z + b.nz, cur = W.getBlock(px, py, pz);

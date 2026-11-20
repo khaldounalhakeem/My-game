@@ -742,6 +742,19 @@ block('warped_wart_block', 'Warped Wart Block', 'warped_wart_block', { tool: 'ho
 block('shroomlight', 'Shroomlight', 'shroomlight', { tool: 'hoe', hardness: 1, light: true, emit: 13 });
 block('crimson_roots', 'Crimson Roots', 'crimson_roots', Object.assign({ replaceable: true }, CROSS));
 block('warped_roots', 'Warped Roots', 'warped_roots', Object.assign({ replaceable: true }, CROSS));
+/* slabs: half blocks, on the bottom or top half of a space. Two of the same make the full block. */
+const SLAB_MATS = [
+  ['oak', 'Oak', 'oak_planks', 'axe'], ['birch', 'Birch', 'birch_planks', 'axe'], ['spruce', 'Spruce', 'spruce_planks', 'axe'],
+  ['crimson', 'Crimson', 'crimson_planks', 'axe'], ['warped', 'Warped', 'warped_planks', 'axe'],
+  ['cobblestone', 'Cobblestone', 'cobblestone', 'pick'], ['stone', 'Stone', 'stone', 'pick'], ['stone_brick', 'Stone Brick', 'stone_bricks', 'pick'],
+  ['sandstone', 'Sandstone', 'sandstone', 'pick'], ['brick', 'Brick', 'bricks', 'pick'], ['blackstone', 'Blackstone', 'blackstone', 'pick'],
+  ['nether_brick', 'Nether Brick', 'nether_bricks', 'pick'], ['quartz', 'Quartz', 'quartz_block', 'pick'],
+];
+for (const [k, n, full, tool] of SLAB_MATS) for (const half of ['b', 't']) {
+  const f = DEFS[ID[full]];
+  const def = block(k + '_slab_' + half, n + ' Slab', 'stone', { tool, tier: tool === 'pick' ? 1 : 0, hardness: 2, opaque: false, boxes: [half === 'b' ? [0, 0, 0, 1, 0.5, 1] : [0, 0.5, 0, 1, 1, 1]], drop: k + '_slab', slab: k, slabFull: full, slabHalf: half });
+  def.faces = f.faces.slice(); def.color = f.color;
+}
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -836,6 +849,11 @@ item('netherite_shovel', 'Netherite Shovel', 'netherite_shovel', { stack: 1, too
 item('netherite_axe', 'Netherite Axe', 'netherite_axe', { stack: 1, tool: { type: 'axe', tier: 5, speed: 10 }, damage: 10 });
 item('netherite_hoe', 'Netherite Hoe', 'netherite_hoe', { stack: 1, tool: { type: 'hoe', tier: 5, speed: 10 }, damage: 1 });
 ARMOR_PIECES.forEach(([piece, pn], slot) => item('netherite_' + piece, 'Netherite ' + pn, 'netherite_' + piece, { stack: 1, armor: { slot, points: [3, 9, 7, 3][slot] } }));
+for (const [k, n, full] of SLAB_MATS) {
+  const c = DEFS[ID[full]].color, hi = c.map(v => Math.min(255, v + 30)), lo = c.map(v => Math.round(v * 0.6));
+  makeTile('i_' + k + '_slab', pPlant(P => { P.rect(1, 8, 14, 6, c); P.rect(1, 8, 14, 1, hi); P.rect(1, 13, 14, 1, lo); P.rect(1, 8, 1, 6, hi); P.rect(14, 8, 1, 6, lo); }));
+  item(k + '_slab', n + ' Slab', k + '_slab', { placesSlab: k });
+}
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -947,6 +965,11 @@ const RECIPES = [
   ['bucket', 1, { iron_ingot: 3 }, 'table'],
   ['oak_door', 3, { '#planks': 6 }, 'table'],
   ['oak_stairs', 4, { '#planks': 6 }, 'table'],
+  ['oak_slab', 6, { oak_planks: 3 }, 'table'], ['birch_slab', 6, { birch_planks: 3 }, 'table'], ['spruce_slab', 6, { spruce_planks: 3 }, 'table'],
+  ['crimson_slab', 6, { crimson_planks: 3 }, 'table'], ['warped_slab', 6, { warped_planks: 3 }, 'table'],
+  ['cobblestone_slab', 6, { cobblestone: 3 }, 'table'], ['stone_slab', 6, { stone: 3 }, 'table'], ['stone_brick_slab', 6, { stone_bricks: 3 }, 'table'],
+  ['sandstone_slab', 6, { sandstone: 3 }, 'table'], ['brick_slab', 6, { bricks: 3 }, 'table'], ['blackstone_slab', 6, { blackstone: 3 }, 'table'],
+  ['nether_brick_slab', 6, { nether_bricks: 3 }, 'table'], ['quartz_slab', 6, { quartz_block: 3 }, 'table'],
   ['cobblestone_stairs', 4, { cobblestone: 6 }, 'table'],
   ['stone_brick_stairs', 4, { stone_bricks: 6 }, 'table'],
   ['oak_fence', 3, { '#planks': 4, stick: 2 }, 'table'],

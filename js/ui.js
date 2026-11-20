@@ -442,7 +442,7 @@ const UI = {
     box.innerHTML = '';
     const ids = [];
     for (const d of DEFS) {
-      if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.door || d.trapdoor || d.stair || d.ladder || d.gate || d.sign || d.key === 'wheat_sprout') continue;
+      if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.door || d.trapdoor || d.stair || d.slab || d.ladder || d.gate || d.sign || d.key === 'wheat_sprout') continue;
       if (q ? !d.name.toLowerCase().includes(q) : (this.tab === 'blocks') !== d.isBlock) continue;
       ids.push(d.id);
     }
