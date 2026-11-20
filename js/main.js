@@ -690,10 +690,11 @@ G.breakChest = (x, y, z, wasLoot) => {
   if (G.chests && G.chests[chestKey(x, y, z)]) { delete G.chests[chestKey(x, y, z)]; G.chestChanged(chestKey(x, y, z)); }
 };
 
+/* dragons live only in the End: once the Ender Dragon is beaten, a dragon egg (or the button) calls another one */
 G.summonDragon = (kind) => {
-  if (G.dim !== 'nether') { G.ui.message('Dragons can only be summoned in the Nether. Build an obsidian portal and light it with Flint and Steel.', 'purple'); return false; }
+  if (G.dim !== 'end') { G.ui.message('Dragons only live in the End. Find a stronghold, fill the portal with Eyes of Ender and jump in.', 'purple'); return false; }
   if (G.dragons.some(d => !d.done)) { G.ui.message('A dragon is already flying around!', 'purple'); return false; }
-  kind = kind && kind !== 'ender' ? kind : ['fire', 'ice'][(Math.random() * 2) | 0];
+  kind = kind || ['ender', 'fire', 'ice'][(Math.random() * 3) | 0];
   const P = G.player;
   const center = new THREE.Vector3(P.pos.x, G.world.groundY(P.pos.x, P.pos.z), P.pos.z);
   const d = new Dragon(kind, center);
@@ -1130,7 +1131,6 @@ G.switchDimension = (to) => {
   Sound.play('teleport');
   if (to === 'nether') {
     G.ui.message('Welcome to the Nether! Watch out for lava, ghasts and blazes.', 'purple');
-    if (!G.netherVisited) { G.ui.message('You hear a dragon roaring somewhere in the darkness...', 'purple'); G.dragonTimer = Math.min(G.dragonTimer, 25); }
     G.netherVisited = true;
   } else G.ui.message('Back in the Overworld.', 'gold');
   G.save();
@@ -1282,7 +1282,7 @@ G.startNew = (mode, name) => {
   $('menu-start').hidden = true;
   G.ui.message(mode === 'creative' ? 'Creative mode: unlimited blocks, double-tap jump to fly.' : 'Survival mode: punch trees, craft tools, survive the night!', 'gold');
   G.ui.message((Input.touch ? 'Tap Items' : 'Press E') + ' for inventory and crafting.');
-  G.ui.message('There is an obsidian portal frame near you. Light it with Flint and Steel to enter the Nether, where the dragons live.', 'purple');
+  G.ui.message('There is an obsidian portal frame near you. Light it with Flint and Steel to enter the Nether. Dragons live in the End.', 'purple');
   G.resume();
   G.save();
   Net.joinWorld(G.seed);
@@ -1656,10 +1656,8 @@ function frame(now) {
     }
     G.spawnT -= dt;
     if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); G.tickSigns(); }
-    if (!G.dragons.length && G.dim === 'nether' && Net.isHost()) {
-      G.dragonTimer -= dt;
-      if (G.dragonTimer <= 0) { G.dragonTimer = 240; G.summonDragon(null); }
-    }
+    // no dragons outside the End
+    if (G.dim !== 'end') for (const d of G.dragons) if (!d.done && !d.remoteCtl) d.remove();
     if (Date.now() - (G.fixAt || 0) > 3000) { G.fixAt = Date.now(); G.applyFixes(); }
     G.saveT += dt;
     if (G.saveT > 30) { G.saveT = 0; G.save(); }

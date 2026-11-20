@@ -809,7 +809,7 @@ const UI = {
     $('sens').value = Input.sens; $('sens-val').textContent = Input.sens.toFixed(1);
     $('btn-time').textContent = G.isNight() ? 'Make it day' : 'Make it night';
     $('btn-cam').textContent = 'Camera: ' + ['First person', 'Behind', 'Front'][G.camMode];
-    $('btn-dragon').textContent = G.dim === 'nether' ? 'Summon a dragon' : 'Summon a dragon (Nether only)';
+    $('btn-dragon').textContent = G.dim === 'end' ? 'Summon a dragon' : 'Summon a dragon (End only)';
     $('btn-dragon').classList.toggle('gold', G.dim === 'nether');
     const names = Net.names();
     $('players').textContent = Net.status === 'on'

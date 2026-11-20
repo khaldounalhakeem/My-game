@@ -603,7 +603,7 @@ class Player {
       }
       if (b.id === ID.dragon_egg) {
         this.useCd = 1;
-        if (G.dim !== 'nether') G.ui.message('Dragons can only be summoned in the Nether.', 'purple');
+        if (G.dim !== 'end') G.ui.message('Dragons can only be summoned in the End.', 'purple');
         else if (!G.dragons.some(d => !d.done)) { W.setBlock(b.x, b.y, b.z, 0); G.summonDragon(); }
         else G.ui.message('A dragon is already in the sky.', 'purple');
         return;
