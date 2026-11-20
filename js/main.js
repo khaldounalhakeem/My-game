@@ -721,9 +721,10 @@ G.tickFurnaces = (dt) => {
       if (f.slots[1].id === ID.lava_bucket) f.slots[1] = { id: ID.bucket, count: 1 };
       else if (--f.slots[1].count <= 0) f.slots[1] = null;
     }
-    if (f.burn > 0) {
+    // the fire only burns while something is smelting: with nothing left to smelt it waits, so no fuel is wasted
+    if (f.burn > 0 && can) {
       f.burn = Math.max(0, f.burn - dt);
-      if (can) {
+      {
         f.cook += dt;
         if (f.cook >= SMELT_TIME) {
           f.cook = 0;
@@ -733,7 +734,7 @@ G.tickFurnaces = (dt) => {
           f.xp += xp;
           if (G.player.pos.distanceTo(new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5)) < 16) Sound.play('smelt');
         }
-      } else f.cook = 0;
+      }
       if (Math.random() < dt * 3) G.particles.burst(x + 0.5, y + 0.4, z + 0.5, [0xff9a20, 0xffd060, 0x707070], 2, 0.4, 0.08, 1);
     } else if (f.cook > 0) f.cook = Math.max(0, f.cook - dt * 2);
   }

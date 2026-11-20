@@ -301,7 +301,8 @@ const UI = {
     for (let k = 0; k < 3; k++) { this.fillSlot(this.invSlots[200 + k], f.slots[k]); this.invSlots[200 + k].classList.toggle('empty', !f.slots[k]); }
     $('f-flame').style.height = (f.burnMax ? Math.round(100 * f.burn / f.burnMax) : 0) + '%';
     $('f-arrow').style.width = Math.round(100 * f.cook / SMELT_TIME) + '%';
-    const st = f.burn > 0 ? (f.slots[0] && SMELT[f.slots[0].id] ? 'Smelting...' : 'Burning') : !f.slots[0] ? 'Put something to smelt on top' : !f.slots[1] ? 'Add fuel below (coal, wood or planks)' : '';
+    const st = !f.slots[0] ? (f.burn > 0 ? 'Fire saved for later: put something to smelt on top' : 'Put something to smelt on top')
+      : !SMELT[f.slots[0].id] ? 'That can\'t be smelted' : f.burn > 0 ? 'Smelting...' : !f.slots[1] ? 'Add fuel below (coal, wood or planks)' : '';
     if ($('f-status').textContent !== st) $('f-status').textContent = st;
   },
 
