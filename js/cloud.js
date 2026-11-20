@@ -16,7 +16,7 @@ const slugOf = n => String(n || '').toLowerCase().replace(/[^a-z0-9]/g, '').slic
 const randomName = n => /^Player\d{3}$/.test(n || '');
 
 const Cloud = {
-  ready: false, col: null, dev: '', index: [], players: [], timers: {}, pushing: {}, lastPush: {}, status: '',
+  ready: false, col: null, dev: '', fixList: [], index: [], players: [], timers: {}, pushing: {}, lastPush: {}, status: '',
 
   async init() {
     let knowsMe = false;
@@ -134,6 +134,17 @@ const Cloud = {
       await this.col.doc(pre).set(Object.assign({}, m, { done: true, usedAt: Date.now() }));
       return { text, from: typeof m.from === 'string' ? m.from.slice(0, 40) : '' };
     } catch (e) { return null; }
+  },
+
+  /* blocks known to be wrong in a world (left by whoever looks after the game): [dim, x, y, z, wrong id, right id] */
+  async loadFixes(id) {
+    this.fixList = [];
+    if (!this.ready) return;
+    try {
+      const snap = await this.col.doc('fix_' + id).get();
+      const l = snap.exists && Array.isArray(snap.data().list) ? snap.data().list : [];
+      this.fixList = l.filter(e => Array.isArray(e) && e.length === 6 && e.every(Number.isInteger) && DEFS[e[5]] && DEFS[e[5]].isBlock);
+    } catch (e) { this.fixList = []; }
   },
 
   /* upload soon (at most every 60 seconds per world), or right away when asked */

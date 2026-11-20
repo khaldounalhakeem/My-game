@@ -1290,6 +1290,8 @@ G.startNew = (mode, name) => {
 
 G.continueSaved = async (id) => {
   Sound.init();
+  // let the online saves finish starting up first (a few seconds at most), so nothing waiting online is missed
+  if (G.cloudInit && !Cloud.ready) { G.ui.message('Getting your online saves...'); await Promise.race([G.cloudInit, new Promise(r => setTimeout(r, 6000))]); }
   const entry = id ? G.findWorld(id) : G.worldList()[0];
   // your own online copy is used when this device has none or an older one. Someone else's copy is
   // only used if you pick it yourself.
@@ -1329,11 +1331,13 @@ G.continueSaved = async (id) => {
   G.cloudCopy = null;
   if (!s) { G.ui.message('No saved world found.'); return; }
   translateSave(s);
+  if (Cloud.ready) await Cloud.loadFixes(entry.id); else Cloud.fixList = [];
   G.worldId = entry.id; G.worldName = entry.name;
   makeWorld(s.seed, !s.gen); // saves from before seed personalities keep their old landscape
   G.worlds.overworld.loadEdits(s.edits || {});
   G.worlds.nether.loadEdits(s.netherEdits || {});
   G.worlds.end.loadEdits(s.endEdits || {});
+  G.applyFixes();
   G.endDragonDead = !!s.endDragonDead;
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether' || s.dim === 'end') useDim(s.dim); else restoreDrops('overworld');
@@ -1363,6 +1367,20 @@ G.continueSaved = async (id) => {
   setTimeout(() => G.redrawSigns(), 1500);
   G.resume();
   Net.joinWorld(G.seed);
+};
+
+/* put back blocks that are known to be wrong (from Cloud.fixList), again whenever they come back
+   (for example from a friend's game that still has them wrong) */
+G.applyFixes = () => {
+  const DIMN = ['overworld', 'nether', 'end'];
+  for (const [d, x, y, z, wrong, right] of Cloud.fixList || []) {
+    const W = G.worlds && G.worlds[DIMN[d]];
+    if (!W) continue;
+    const k = W.key(x >> 4, z >> 4), i = (x & 15) + ((z & 15) << 4) + (y << 8), m = W.edits.get(k);
+    if (!m || m.get(i) !== wrong) continue;
+    if (W.chunks.has(k) && W === G.world) W.setBlock(x, y, z, right); // shows at once, and tells friends
+    else m.set(i, right);
+  }
 };
 
 /* translate every block and item number in a save written with different numbers */
@@ -1642,6 +1660,7 @@ function frame(now) {
       G.dragonTimer -= dt;
       if (G.dragonTimer <= 0) { G.dragonTimer = 240; G.summonDragon(null); }
     }
+    if (Date.now() - (G.fixAt || 0) > 3000) { G.fixAt = Date.now(); G.applyFixes(); }
     G.saveT += dt;
     if (G.saveT > 30) { G.saveT = 0; G.save(); }
   }
@@ -1730,7 +1749,7 @@ function boot() {
   Net.init();
   migrateOldSave();
   recoverWorlds();
-  Cloud.init();
+  G.cloudInit = Cloud.init();
   const recent = G.worldList()[0];
   refreshContinue();
   G.setState('title');
