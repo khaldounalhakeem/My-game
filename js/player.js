@@ -68,6 +68,7 @@ class Player {
 
   hurt(amount, from, kb = 6, force = false, cause = '') {
     if (this.dead || this.mode === 'creative') return;
+    if (!(amount >= 1)) return; // nothing to lose: no hurt, no message
     if (this.hurtCd > 0 && !force) return;
     if (this.sleeping) G.wake('You were woken up!');
     // armor softens every kind of hurt except falling, drowning, starving and the void (4% per armor point, like Minecraft)
@@ -201,7 +202,7 @@ class Player {
     else if (!this.onGround) this.fallStart = this.fallStart === null ? this.pos.y : Math.max(this.fallStart, this.pos.y);
     if (this.onGround && !wasGround && this.fallStart !== null) {
       const d = this.fallStart - this.pos.y;
-      if (d > 3.4) this.hurt(Math.floor(d - 3), null, 0, true, 'You fell from too high.');
+      if (d >= 4) this.hurt(Math.floor(d - 3), null, 0, true, 'You fell from too high.'); // a short drop doesn't hurt at all
       if (d > 1) G.sound.play('land');
       this.fallStart = null;
     }
