@@ -588,6 +588,7 @@ G.growTree = (x, y, z, kind) => {
 
 /* crops: planted seeds grow into ripe wheat after a few minutes (only while their area is loaded) */
 const CROP_TIME = 300; // five minutes from planting to ripe
+const SAPLING_TIME = 180; // saplings: three minutes at most
 const RIPE = () => ({ [ID.wheat_sprout]: ID.wheat_crop, [ID.carrot_sprout]: ID.carrot_crop, [ID.potato_sprout]: ID.potato_crop, [ID.pumpkin_stem]: ID.pumpkin });
 G.plantCrop = (x, y, z) => { G.crops = G.crops || {}; G.crops[chestKey(x, y, z)] = CROP_TIME; };
 G.waterNear = (x, y, z) => {
@@ -604,7 +605,15 @@ G.tickCrops = () => {
     if (!G.world.isLoaded(x, z)) continue;
     const here = G.world.getBlock(x, y, z), sap = DEFS[here].sapling, ripe = RIPE()[here];
     if (!ripe && !sap) { delete G.crops[k]; continue; }
-    if (sap) { if (Math.random() < 1 / 200 && G.growTree(x, y, z, sap)) delete G.crops[k]; continue; }
+    // saplings grow into a tree within 3 minutes (between 2 and 3); with no room above they try again every 10 seconds
+    if (sap) {
+      let t = typeof G.crops[k] === 'number' ? G.crops[k] : SAPLING_TIME;
+      if (t > SAPLING_TIME) t = 120 + Math.random() * 60;
+      t -= 1;
+      if (t <= 0) { if (G.growTree(x, y, z, sap)) { delete G.crops[k]; continue; } t = 10; }
+      G.crops[k] = t;
+      continue;
+    }
     // crops count down while their area is loaded (one tick a second)
     G.crops[k] = (typeof G.crops[k] === 'number' && G.crops[k] > 1 ? G.crops[k] : 1) - 1;
     if (G.crops[k] <= 0) {
