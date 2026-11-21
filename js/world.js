@@ -40,6 +40,10 @@ class Chunk {
   }
 }
 
+/* the deepslate version of each ore (used deep down) */
+const DEEP_ORE = {};
+for (const k of ['coal', 'iron', 'gold', 'diamond', 'redstone', 'emerald', 'lapis']) DEEP_ORE[ID[k + '_ore']] = ID['deepslate_' + k + '_ore'];
+
 class World {
   constructor(seed, materials, dim, legacy) {
     this.dim = dim || 'overworld';
@@ -282,6 +286,9 @@ class World {
     const d = c.data;
     const rng = mulberry32(hash3(cx, cz, this.seed));
     const heights = new Int16Array(256), biomes = new Uint8Array(256);
+    // newer underground (deepslate, more caves, ravines, big caverns) — but never where someone has
+    // built or dug nearby, so the ground under and around your builds stays exactly as it was
+    const fresh = !this.legacy && !(this.oldGen && this.oldGen.has(this.key(cx, cz)));
     const set = (x, y, z, id) => { if (x >= 0 && x < 16 && z >= 0 && z < 16 && y > 0 && y < WH) d[x + (z << 4) + (y << 8)] = id; };
     const get = (x, y, z) => (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= 0 && y < WH) ? d[x + (z << 4) + (y << 8)] : -1;
 
@@ -307,6 +314,7 @@ class World {
         if (y === 0) id = ID.bedrock;
         else if (y <= 3 && rng() < (4 - y) * 0.22) id = ID.bedrock;
         else if (y < h - 3) id = (deep === ID.sandstone && y < h - 7) ? ID.stone : deep;
+        if (fresh && id === ID.stone && y <= 13 + ((this.noiseC.noise2(wx / 9, wz / 9) + 1) * 2 | 0)) id = ID.deepslate;
         else if (y < h) id = fill;
         else if (y === h) id = top;
         else id = (y === SEA && (b === BIOME.SNOWY || b === BIOME.TAIGA)) ? ID.ice : ID.water;
@@ -324,11 +332,23 @@ class World {
         if (id === ID.bedrock || id === ID.water) continue;
         const n1 = this.noiseB.noise3(wx / 22, y / 14, wz / 22);
         const n2 = this.noiseC.noise3(wx / 22, y / 14 + 40, wz / 22);
-        let cave = n1 * n1 + n2 * n2 < 0.0045;
+        let cave = n1 * n1 + n2 * n2 < (fresh ? 0.0075 : 0.0045);
         if (!cave && y < h - 10) cave = this.noise.noise3(wx / 34, y / 18, wz / 34 + 200) > 0.42;
+        if (fresh && !cave) {
+          // a second set of winding tunnels, many of them opening onto the surface
+          const n3 = this.noiseB.noise3(wx / 26 + 300, y / 11, wz / 26 - 300), n4 = this.noiseC.noise3(wx / 26 - 120, y / 11 + 70, wz / 26 + 90);
+          cave = n3 * n3 + n4 * n4 < 0.006;
+          // big caverns deep down (lava lakes at the very bottom)
+          if (!cave && y >= 4 && y <= 24) cave = this.noise.noise3(wx / 48 + 700, y / 10, wz / 48 - 700) > 0.3 - (24 - y) * 0.006;
+          // ravines: long cracks from the surface deep into the ground
+          if (!cave && y > 7 && h > SEA + 1) {
+            const rv = Math.abs(this.noiseB.noise2(wx / 160 + 55, wz / 160 - 77)), wide = 0.006 + (y / h) * 0.012;
+            if (rv < wide && this.noiseC.noise2(wx / 90 + 13, wz / 90) > 0.05) cave = true;
+          }
+        }
         if (cave) {
           if (y + 1 < WH && d[i + 256] === ID.water) continue;
-          d[i] = y <= 8 ? ID.lava : 0;
+          d[i] = y <= (fresh ? 6 : 8) ? ID.lava : 0;
         }
       }
     }
@@ -339,6 +359,7 @@ class World {
       [ID.diamond_ore, 3, 2, 16, 5], [ID.redstone_ore, 6, 2, 18, 6], [ID.lapis_ore, 3, 4, 32, 5],
       [ID.gravel, 5, 5, 70, 14], [ID.dirt, 6, 5, 70, 14], [ID.obsidian, 1, 2, 10, 5],
     ];
+    if (fresh) ORE.push([ID.diamond_ore, 2, 2, 14, 4], [ID.emerald_ore, 2, 4, 70, 2], [ID.gold_ore, 3, 2, 18, 7], [ID.redstone_ore, 4, 2, 14, 7]);
     const mountainChunk = biomes[136] === BIOME.MOUNTAIN;
     if (mountainChunk) ORE.push([ID.emerald_ore, 4, 4, 80, 2], [ID.gold_ore, 4, 30, 80, 6], [ID.iron_ore, 8, 30, 90, 9]);
     if (biomes[136] === BIOME.DESERT) ORE.push([ID.gold_ore, 4, 20, 50, 6]);
@@ -347,7 +368,9 @@ class World {
         let x = rng() * 16, y = y0 + rng() * (y1 - y0), z = rng() * 16;
         for (let s = 0; s < size; s++) {
           const xi = x | 0, yi = y | 0, zi = z | 0;
-          if (get(xi, yi, zi) === ID.stone) set(xi, yi, zi, ore);
+          const here = get(xi, yi, zi);
+          if (here === ID.stone) set(xi, yi, zi, ore);
+          else if (here === ID.deepslate && DEEP_ORE[ore]) set(xi, yi, zi, DEEP_ORE[ore]);
           x += rng() * 2 - 1; y += rng() * 2 - 1; z += rng() * 2 - 1;
         }
       }
@@ -977,6 +1000,16 @@ class World {
     const out = {};
     for (const [k, m] of this.edits) if (m.size) out[k] = Array.from(m.entries()).flat();
     return out;
+  }
+  /* the places that keep the older underground: everywhere someone had built or dug (and around it)
+     the first time this version of the game opened the world. Decided once and saved, so it never changes. */
+  computeOldGen() {
+    this.oldGen = new Set();
+    for (const [k, m] of this.edits) {
+      if (!m.size) continue;
+      const [cx, cz] = k.split(',').map(Number);
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) this.oldGen.add(this.key(cx + dx, cz + dz));
+    }
   }
   loadEdits(obj) {
     this.edits = new Map();

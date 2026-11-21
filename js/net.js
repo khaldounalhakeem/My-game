@@ -444,7 +444,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v41 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v42 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -731,7 +731,7 @@ const Net = {
     this.wsBusy = true;
     try {
       const data = {
-        pal: ID_PALETTE, ed: DIMS.map(d => G.worlds[d].serializeEdits()), ch: G.chests || {}, cv: G.chestVer || {}, sg: G.signs || {},
+        pal: ID_PALETTE, og: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], ed: DIMS.map(d => G.worlds[d].serializeEdits()), ch: G.chests || {}, cv: G.chestVer || {}, sg: G.signs || {},
         cr: G.crops || {}, fu: G.furnaces || {}, dd: G.endDragonDead ? 1 : 0,
       };
       const text = JSON.stringify(data), t = Date.now(), CH = 80000, parts = Math.ceil(text.length / CH), dev = this.dbRoom.dev;
@@ -772,6 +772,8 @@ const Net = {
   },
   mergeWorld(data, theirsWin) {
     if (!data || typeof data !== 'object' || !Array.isArray(data.ed)) return 0;
+    // the places that keep the older underground: both copies of the world agree on the same ones
+    if (Array.isArray(data.og)) { const og = G.worlds.overworld.oldGen || (G.worlds.overworld.oldGen = new Set()); for (const k of data.og) if (typeof k === 'string' && /^-?\d+,-?\d+$/.test(k)) og.add(k); }
     let n = 0;
     DIMS.forEach((d, di) => {
       const w = G.worlds[d], obj = data.ed[di];

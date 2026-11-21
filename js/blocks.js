@@ -570,6 +570,16 @@ for (const [k, , c] of STAINS) makeTile('stained_glass_' + k, P => {
   for (let i = 0; i < 16; i++) { P.put(i, 0, hi, 230); P.put(0, i, hi, 230); P.put(i, 15, lo, 230); P.put(15, i, lo, 230); }
   P.pts([[3, 4], [4, 3], [4, 5], [5, 4], [11, 10], [10, 11]], hi);
 });
+/* deepslate: the dark stone deep underground, and its ores */
+const pDeepslate = P => { P.fill(0x4a4a50, 8); for (let y = 1; y < 16; y += 3) for (let x = 0; x < 16; x++) if (P.rng() < 0.55) P.put(x, y, P.vary(0x3a3a40, 4)); P.speck(0x5c5c62, 0.08, 4); };
+makeTile('deepslate', pDeepslate);
+makeTile('deepslate_top', P => { P.fill(0x46464c, 8); P.speck(0x38383e, 0.25, 4); P.speck(0x56565c, 0.1, 4); });
+makeTile('cobbled_deepslate', P => { P.fill(0x3e3e44, 10); for (let i = 0; i < 9; i++) { const x = P.rng() * 13 | 0, y = P.rng() * 13 | 0; P.rect(x, y, 3 + (P.rng() * 2 | 0), 2 + (P.rng() * 2 | 0), 0x56565c, 6); } P.speck(0x2a2a2e, 0.15, 4); });
+const pDeepOre = (col, hi) => P => {
+  pDeepslate(P);
+  for (let i = 0; i < 6; i++) { const x = 1 + (P.rng() * 12 | 0), y = 1 + (P.rng() * 12 | 0); P.put(x, y, col); P.put(x + 1, y, col); P.put(x, y + 1, shadeC(col, 0.8)); P.put(x + 1, y + 1, P.rng() < 0.6 ? hi : col); }
+};
+for (const [k, c, h] of [['coal', 0x1a1a1a, 0x3a3a3a], ['iron', 0xd8af93, 0xeccbb5], ['gold', 0xfcd33c, 0xfff3a0], ['diamond', 0x5decf5, 0xd2fffc], ['redstone', 0xc4140c, 0xff5a4a], ['emerald', 0x17c544, 0x8affab], ['lapis', 0x1f45b5, 0x5a85ff]]) makeTile('deepslate_' + k + '_ore', pDeepOre(c, h));
 DEFS[0] = { id: 0, key: 'air', name: 'Air', isBlock: true, solid: false, opaque: false, hardness: 0, faces: [0, 0, 0, 0, 0, 0], color: [255, 255, 255] };
 ID.air = 0;
 let nextBlockId = 1;
@@ -768,6 +778,15 @@ for (const [k, n] of STAINS) {
   block('stained_glass_' + k, n + ' Stained Glass', 'stained_glass_' + k, { opaque: false, translucent: true, hardness: 0.3, glassy: true });
   block('stained_glass_pane_' + k, n + ' Stained Glass Pane', 'stained_glass_' + k, { opaque: false, translucent: true, hardness: 0.3, pane: true, iconTile: 'stained_glass_' + k });
 }
+block('deepslate', 'Deepslate', { side: 'deepslate', top: 'deepslate_top' }, PICK(1, 3, { drop: 'cobbled_deepslate' }));
+block('cobbled_deepslate', 'Cobbled Deepslate', 'cobbled_deepslate', PICK(1, 3.5));
+block('deepslate_coal_ore', 'Deepslate Coal Ore', 'deepslate_coal_ore', PICK(1, 4.5, { drop: 'coal', xp: 1 }));
+block('deepslate_iron_ore', 'Deepslate Iron Ore', 'deepslate_iron_ore', PICK(2, 4.5, { drop: 'iron_ore', xp: 1 }));
+block('deepslate_gold_ore', 'Deepslate Gold Ore', 'deepslate_gold_ore', PICK(3, 4.5, { drop: 'gold_ore', xp: 2 }));
+block('deepslate_diamond_ore', 'Deepslate Diamond Ore', 'deepslate_diamond_ore', PICK(3, 4.5, { drop: 'diamond', xp: 6 }));
+block('deepslate_redstone_ore', 'Deepslate Redstone Ore', 'deepslate_redstone_ore', PICK(3, 4.5, { drop: (r) => [['redstone', 4 + (r() * 2 | 0)]], xp: 2 }));
+block('deepslate_emerald_ore', 'Deepslate Emerald Ore', 'deepslate_emerald_ore', PICK(3, 4.5, { drop: 'emerald', xp: 6 }));
+block('deepslate_lapis_ore', 'Deepslate Lapis Ore', 'deepslate_lapis_ore', PICK(2, 4.5, { drop: (r) => [['lapis', 4 + (r() * 4 | 0)]], xp: 3 }));
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -878,6 +897,7 @@ function getDrops(def, rng) {
 /* ---------- recipes ---------- */
 // [output, count, {input: count}, station]   '#planks' / '#log' match any wood type
 const GROUPS = {
+  '#cobble': ['cobblestone', 'cobbled_deepslate', 'blackstone'],
   '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks'],
   '#log': ['oak_log', 'birch_log', 'spruce_log'],
   '#wool': ['wool_white', 'wool_red', 'wool_blue', 'wool_green', 'wool_yellow', 'wool_black', 'wool_orange', 'wool_purple'],
@@ -887,21 +907,21 @@ const RECIPES = [
   ['stick', 4, { '#planks': 2 }],
   ['crafting_table', 1, { '#planks': 4 }],
   ['chest', 1, { '#planks': 8 }, 'table'],
-  ['furnace', 1, { cobblestone: 8 }, 'table'],
+  ['furnace', 1, { '#cobble': 8 }, 'table'],
   ['wooden_pickaxe', 1, { '#planks': 3, stick: 2 }, 'table'],
-  ['stone_pickaxe', 1, { cobblestone: 3, stick: 2 }, 'table'],
+  ['stone_pickaxe', 1, { '#cobble': 3, stick: 2 }, 'table'],
   ['iron_pickaxe', 1, { iron_ingot: 3, stick: 2 }, 'table'],
   ['golden_pickaxe', 1, { gold_ingot: 3, stick: 2 }, 'table'],
   ['diamond_pickaxe', 1, { diamond: 3, stick: 2 }, 'table'],
   ['wooden_sword', 1, { '#planks': 2, stick: 1 }, 'table'],
-  ['stone_sword', 1, { cobblestone: 2, stick: 1 }, 'table'],
+  ['stone_sword', 1, { '#cobble': 2, stick: 1 }, 'table'],
   ['iron_sword', 1, { iron_ingot: 2, stick: 1 }, 'table'],
   ['golden_sword', 1, { gold_ingot: 2, stick: 1 }, 'table'],
   ['diamond_sword', 1, { diamond: 2, stick: 1 }, 'table'],
   ['wooden_shovel', 1, { '#planks': 1, stick: 2 }, 'table'],
   ['wooden_axe', 1, { '#planks': 3, stick: 2 }, 'table'],
-  ['stone_shovel', 1, { cobblestone: 1, stick: 2 }, 'table'],
-  ['stone_axe', 1, { cobblestone: 3, stick: 2 }, 'table'],
+  ['stone_shovel', 1, { '#cobble': 1, stick: 2 }, 'table'],
+  ['stone_axe', 1, { '#cobble': 3, stick: 2 }, 'table'],
   ['iron_shovel', 1, { iron_ingot: 1, stick: 2 }, 'table'],
   ['iron_axe', 1, { iron_ingot: 3, stick: 2 }, 'table'],
   ['golden_shovel', 1, { gold_ingot: 1, stick: 2 }, 'table'],
@@ -979,6 +999,7 @@ const RECIPES = [
   ['oak_door', 3, { '#planks': 6 }, 'table'],
   ['oak_stairs', 4, { '#planks': 6 }, 'table'],
   ['glass_pane', 16, { glass: 6 }, 'table'],
+  ['deepslate', 1, { cobbled_deepslate: 1 }, 'furnace'],
   ...STAINS.flatMap(([k]) => [['stained_glass_' + k, 8, { glass: 8, ['wool_' + k]: 1 }, 'table'], ['stained_glass_pane_' + k, 16, { ['stained_glass_' + k]: 6 }, 'table']]),
   ['oak_slab', 6, { oak_planks: 3 }, 'table'], ['birch_slab', 6, { birch_planks: 3 }, 'table'], ['spruce_slab', 6, { spruce_planks: 3 }, 'table'],
   ['crimson_slab', 6, { crimson_planks: 3 }, 'table'], ['warped_slab', 6, { warped_planks: 3 }, 'table'],
@@ -993,7 +1014,7 @@ const RECIPES = [
   ['oak_sign', 3, { '#planks': 6, stick: 1 }, 'table'],
   ['oak_trapdoor', 2, { '#planks': 6 }, 'table'],
   ['wooden_hoe', 1, { '#planks': 2, stick: 2 }, 'table'],
-  ['stone_hoe', 1, { cobblestone: 2, stick: 2 }, 'table'],
+  ['stone_hoe', 1, { '#cobble': 2, stick: 2 }, 'table'],
   ['iron_hoe', 1, { iron_ingot: 2, stick: 2 }, 'table'],
   ['golden_hoe', 1, { gold_ingot: 2, stick: 2 }, 'table'],
   ['diamond_hoe', 1, { diamond: 2, stick: 2 }, 'table'],
@@ -1068,7 +1089,7 @@ function tileOf(id) { const d = DEFS[id]; return d.isBlock ? d.faces[0] : d.tile
 /* ---------- furnace: what smelts into what, and how long fuel burns (seconds; one item takes 6) ---------- */
 const SMELT_TIME = 6;
 const SMELT = {}; // input id -> [output id, count, xp]
-const SMELT_XP = { netherite_scrap: 2, iron_ingot: 0.7, gold_ingot: 1, glass: 0.1, stone: 0.1, coal: 0.15, terracotta: 0.35, cooked_porkchop: 0.35, steak: 0.35, cooked_chicken: 0.35 };
+const SMELT_XP = { deepslate: 0.1, netherite_scrap: 2, iron_ingot: 0.7, gold_ingot: 1, glass: 0.1, stone: 0.1, coal: 0.15, terracotta: 0.35, cooked_porkchop: 0.35, steak: 0.35, cooked_chicken: 0.35 };
 for (const r of RECIPES) if (r[3] === 'furnace') for (const k in r[2]) for (const m of GROUPS[k] || [k]) if (ID[m] !== undefined) SMELT[ID[m]] = [ID[r[0]], r[1], SMELT_XP[r[0]] || 0.1];
 const FUEL = {};
 // (how many items each one smelts) x 6 seconds: coal smelts 5 items
