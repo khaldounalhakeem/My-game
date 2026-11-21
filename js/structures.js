@@ -39,6 +39,30 @@ World.prototype.pyramidChunk = function (cx, cz) {
   return !!s && s[0] === cx && s[1] === cz;
 };
 
+/* newer structures: each square of chunks tries several spots and uses the first in the right land
+   (only on fresh ground, so nothing appears on top of a build) */
+const SPOTS = {
+  jungleTemple: { cell: 16, gap: 3, salt: 921, tries: 16, ok: b => b === BIOME.JUNGLE },
+  ruins: { cell: 14, gap: 3, salt: 922, tries: 8, ok: b => b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.BIRCH || b === BIOME.TAIGA },
+};
+World.prototype.spotPick = function (cx, cz, kind) {
+  if (this.legacy || (this.oldGen && this.oldGen.has(this.key(cx, cz)))) return false;
+  const S = SPOTS[kind], gx = Math.floor(cx / S.cell), gz = Math.floor(cz / S.cell), key = kind + gx + ',' + gz;
+  this.spotCache = this.spotCache || new Map();
+  if (!this.spotCache.has(key)) {
+    const r = mulberry32(hash3(gx, gz, this.seed + S.salt));
+    let spot = null;
+    for (let t = 0; t < S.tries && !spot; t++) {
+      const px = gx * S.cell + 1 + (r() * (S.cell - S.gap) | 0), pz = gz * S.cell + 1 + (r() * (S.cell - S.gap) | 0);
+      const wx = px * 16 + 8, wz = pz * 16 + 8, h = this.heightAt(wx, wz);
+      if (h > SEA + 1 && S.ok(this.biomeAt(wx, wz, h)) && !(this.oldGen && this.oldGen.has(this.key(px, pz)))) spot = [px, pz];
+    }
+    this.spotCache.set(key, spot);
+  }
+  const s = this.spotCache.get(key);
+  return !!s && s[0] === cx && s[1] === cz;
+};
+
 /* which village (if any) owns this chunk: {cx, cz, style, radius} */
 World.prototype.villageAt = function (cx, cz) {
   const gx = Math.floor(cx / VILLAGE_CELL), gz = Math.floor(cz / VILLAGE_CELL);
@@ -87,6 +111,10 @@ World.prototype.buildStructures = function (c, set, get, heights, biomes, rng) {
 
   const v = this.villageAt(cx, cz);
   if (v) { this.buildVillageChunk(S, v); return; }
+
+  if (center === BIOME.JUNGLE && this.spotPick(cx, cz, 'jungleTemple')) { this.buildJungleTemple(S); return; }
+  if (this.spotPick(cx, cz, 'ruins')) this.buildRuins(S);
+  if (center === BIOME.DESERT && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(cx, cz))) && mulberry32(hash3(cx, cz, this.seed + 923))() < 0.025) this.buildDesertWell(S);
 
   if (center === BIOME.SNOWY && this.regionPick(cx, cz, 'igloo')) this.buildIgloo(S);
   else if (center === BIOME.OCEAN && this.regionPick(cx, cz, 'shipwreck')) this.buildShipwreck(S);
@@ -386,6 +414,71 @@ World.prototype.buildLibrary = function (S) {
 };
 
 /* ---------- surface ---------- */
+/* a jungle temple: a mossy stone building in two tiers, with treasure upstairs and in a hidden room below */
+World.prototype.buildJungleTemple = function (S) {
+  const { set, H, rng } = S;
+  const x0 = 2, z0 = 1, W = 11, D = 13, base = H(7, 7);
+  if (base <= SEA) return;
+  const stone = () => (rng() < 0.45 ? ID.mossy_cobblestone : ID.cobblestone);
+  for (let x = x0; x < x0 + W; x++) for (let z = z0; z < z0 + D; z++) {
+    for (let y = base + 1; y <= base + 11; y++) set(x, y, z, 0);
+    for (let y = Math.min(H(x, z), base) - 1; y <= base; y++) set(x, y, z, stone()); // foundation
+  }
+  // ground floor: thick walls, a doorway at the front, a few windows
+  for (let x = x0; x < x0 + W; x++) for (let z = z0; z < z0 + D; z++) {
+    const edge = x === x0 || x === x0 + W - 1 || z === z0 || z === z0 + D - 1;
+    for (let y = base + 1; y <= base + 4; y++) if (edge) set(x, y, z, stone());
+    set(x, base + 5, z, stone()); // ceiling / upper floor
+  }
+  for (let y = base + 1; y <= base + 2; y++) { set(x0 + 5, y, z0, 0); }
+  for (const z of [z0 + 4, z0 + 8]) { set(x0, base + 3, z, 0); set(x0 + W - 1, base + 3, z, 0); }
+  // upper tier
+  for (let x = x0 + 2; x < x0 + W - 2; x++) for (let z = z0 + 2; z < z0 + D - 2; z++) {
+    const edge = x === x0 + 2 || x === x0 + W - 3 || z === z0 + 2 || z === z0 + D - 3;
+    for (let y = base + 6; y <= base + 8; y++) if (edge) set(x, y, z, stone());
+    set(x, base + 9, z, stone());
+  }
+  for (let y = base + 6; y <= base + 7; y++) set(x0 + 5, y, z0 + 2, 0);
+  // steps up the front to the upper door
+  for (let i = 0; i < 5; i++) set(x0 + 5, base + 1 + i, z0 - 1 + Math.min(i, 0), 0);
+  set(x0 + 4, base + 6, z0 + 1, stone()); set(x0 + 6, base + 6, z0 + 1, stone());
+  // treasure upstairs, and a hidden room under the floor with a ladder down
+  set(x0 + 3, base + 6, z0 + D - 4, ID.chest_loot);
+  for (let x = x0 + 3; x <= x0 + 7; x++) for (let z = z0 + 4; z <= z0 + 8; z++) for (let y = base - 4; y <= base - 1; y++) set(x, y, z, (x === x0 + 3 || x === x0 + 7 || z === z0 + 4 || z === z0 + 8 || y === base - 4) ? stone() : 0);
+  for (let y = base - 3; y <= base; y++) set(x0 + 5, y, z0 + 5, ID.ladder_s);
+  set(x0 + 6, base - 3, z0 + 7, ID.chest_loot);
+  set(x0 + 4, base - 3, z0 + 7, ID.chest_loot);
+  // vines of leaves hanging off the walls
+  for (let i = 0; i < 14; i++) { const x = x0 + (rng() * W | 0), z = rng() < 0.5 ? z0 - 1 : z0 + D, y = base + 1 + (rng() * 5 | 0); set(x, y, z, ID.jungle_leaves); }
+};
+
+/* overgrown ruins: broken mossy walls, with a chest buried in the middle */
+World.prototype.buildRuins = function (S) {
+  const { set, H, rng } = S;
+  const h = H(8, 8);
+  if (h <= SEA) return;
+  const pick = () => [ID.stone_bricks, ID.mossy_cobblestone, ID.cobblestone, ID.gravel][(rng() * 4) | 0];
+  for (let dx = -3; dx <= 3; dx++) for (let dz = -3; dz <= 3; dz++) {
+    const x = 8 + dx, z = 8 + dz, gh = H(x, z);
+    if (Math.abs(dx) === 3 || Math.abs(dz) === 3) { const tall = (rng() * 4) | 0; for (let y = 1; y <= tall; y++) set(x, gh + y, z, pick()); }
+    else if (rng() < 0.5) set(x, gh, z, pick());
+  }
+  set(8, h - 1, 8, ID.chest_loot);
+  set(8, h, 8, ID.gravel);
+};
+
+/* a desert well: sandstone around a little pool of water, with a roof on four posts */
+World.prototype.buildDesertWell = function (S) {
+  const { set, H } = S;
+  const h = H(8, 8);
+  if (h <= SEA) return;
+  for (let dx = -2; dx <= 2; dx++) for (let dz = -2; dz <= 2; dz++) { set(8 + dx, h, 8 + dz, ID.sandstone); for (let y = h + 1; y <= h + 4; y++) set(8 + dx, y, 8 + dz, 0); }
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (Math.abs(dx) + Math.abs(dz) === 1) set(8 + dx, h + 1, 8 + dz, ID.sandstone_slab_b);
+  set(8, h, 8, ID.water); set(8, h - 1, 8, ID.water); set(8, h - 2, 8, ID.sandstone);
+  for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let y = h + 1; y <= h + 2; y++) set(8 + dx, y, 8 + dz, ID.sandstone);
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) set(8 + dx, h + 3, 8 + dz, ID.sandstone_slab_b);
+};
+
 World.prototype.buildIgloo = function (S) {
   const { set, H } = S;
   const h = H(8, 8);
@@ -459,6 +552,10 @@ const LOOT_TABLES = {
     ['coal', 1, 4, 10], ['iron_ingot', 1, 4, 10], ['gold_ingot', 1, 4, 5], ['redstone', 1, 4, 5], ['golden_apple', 1, 1, 3], ['saddle', 1, 1, 5], ['diamond', 1, 2, 1]]],
   mineshaft: [4, 8, [['bread', 1, 3, 15], ['coal', 3, 8, 10], ['iron_ingot', 1, 5, 10], ['gold_ingot', 1, 3, 5], ['redstone', 4, 9, 5], ['lapis', 4, 9, 5],
     ['diamond', 1, 2, 3], ['iron_pickaxe', 1, 1, 1], ['golden_apple', 1, 1, 2], ['oak_planks', 4, 12, 8], ['string', 1, 4, 5]]],
+  jungle: [2, 6, [['bone', 4, 6, 20], ['rotten_flesh', 3, 7, 16], ['gold_ingot', 2, 7, 15], ['iron_ingot', 1, 5, 15], ['emerald', 1, 3, 10], ['diamond', 1, 3, 3],
+    ['saddle', 1, 1, 3], ['golden_apple', 1, 1, 2], ['iron_horse_armor', 1, 1, 1], ['golden_horse_armor', 1, 1, 1], ['diamond_horse_armor', 1, 1, 1], ['cocoa_beans', 1, 4, 10]]],
+  ruins: [2, 5, [['coal', 1, 4, 15], ['wheat', 1, 5, 15], ['emerald', 1, 2, 6], ['iron_ingot', 1, 3, 10], ['gold_ingot', 1, 2, 6], ['stone_axe', 1, 1, 5],
+    ['bread', 1, 3, 12], ['string', 1, 3, 8], ['lead', 1, 1, 5], ['diamond', 1, 1, 1]]],
   igloo: [3, 6, [['apple', 1, 3, 15], ['coal', 1, 4, 15], ['gold_ingot', 1, 3, 10], ['stone_axe', 1, 1, 2], ['rotten_flesh', 1, 1, 10], ['emerald', 1, 1, 1],
     ['wheat', 2, 3, 10], ['golden_apple', 1, 1, 1]]],
   shipwreck: [4, 8, [['iron_ingot', 1, 5, 90], ['gold_ingot', 1, 5, 10], ['emerald', 1, 5, 40], ['diamond', 1, 1, 5], ['coal', 2, 8, 20], ['wheat', 8, 21, 20],

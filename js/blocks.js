@@ -580,6 +580,12 @@ const pDeepOre = (col, hi) => P => {
   for (let i = 0; i < 6; i++) { const x = 1 + (P.rng() * 12 | 0), y = 1 + (P.rng() * 12 | 0); P.put(x, y, col); P.put(x + 1, y, col); P.put(x, y + 1, shadeC(col, 0.8)); P.put(x + 1, y + 1, P.rng() < 0.6 ? hi : col); }
 };
 for (const [k, c, h] of [['coal', 0x1a1a1a, 0x3a3a3a], ['iron', 0xd8af93, 0xeccbb5], ['gold', 0xfcd33c, 0xfff3a0], ['diamond', 0x5decf5, 0xd2fffc], ['redstone', 0xc4140c, 0xff5a4a], ['emerald', 0x17c544, 0x8affab], ['lapis', 0x1f45b5, 0x5a85ff]]) makeTile('deepslate_' + k + '_ore', pDeepOre(c, h));
+/* jungle wood */
+makeTile('log_jungle', pLogSide(0x5e4a26, 0x423318));
+makeTile('log_jungle_top', pLogTop(0x423318, 0xb08850, 0x8c6a3a));
+makeTile('leaves_jungle', pLeaves(0x2f9a24));
+makeTile('planks_jungle', pPlanks(0xa8744a));
+makeTile('jungle_sapling', pSapling(0x2f9a24, 0x5e4a26));
 DEFS[0] = { id: 0, key: 'air', name: 'Air', isBlock: true, solid: false, opaque: false, hardness: 0, faces: [0, 0, 0, 0, 0, 0], color: [255, 255, 255] };
 ID.air = 0;
 let nextBlockId = 1;
@@ -787,6 +793,10 @@ block('deepslate_diamond_ore', 'Deepslate Diamond Ore', 'deepslate_diamond_ore',
 block('deepslate_redstone_ore', 'Deepslate Redstone Ore', 'deepslate_redstone_ore', PICK(3, 4.5, { drop: (r) => [['redstone', 4 + (r() * 2 | 0)]], xp: 2 }));
 block('deepslate_emerald_ore', 'Deepslate Emerald Ore', 'deepslate_emerald_ore', PICK(3, 4.5, { drop: 'emerald', xp: 6 }));
 block('deepslate_lapis_ore', 'Deepslate Lapis Ore', 'deepslate_lapis_ore', PICK(2, 4.5, { drop: (r) => [['lapis', 4 + (r() * 4 | 0)]], xp: 3 }));
+block('jungle_log', 'Jungle Log', { top: 'log_jungle_top', side: 'log_jungle' }, { tool: 'axe', hardness: 2 });
+block('jungle_leaves', 'Jungle Leaves', 'leaves_jungle', Object.assign({ drop: (r) => (r() < 0.04 ? [['jungle_sapling', 1]] : r() < 0.05 ? [['cocoa_beans', 1]] : r() < 0.07 ? [['stick', 1]] : []) }, LEAVES));
+block('jungle_planks', 'Jungle Planks', 'planks_jungle', { tool: 'axe', hardness: 2 });
+block('jungle_sapling', 'Jungle Sapling', 'jungle_sapling', Object.assign({ sapling: 'jungle' }, CROSS));
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -881,6 +891,10 @@ item('netherite_shovel', 'Netherite Shovel', 'netherite_shovel', { stack: 1, too
 item('netherite_axe', 'Netherite Axe', 'netherite_axe', { stack: 1, tool: { type: 'axe', tier: 5, speed: 10 }, damage: 10 });
 item('netherite_hoe', 'Netherite Hoe', 'netherite_hoe', { stack: 1, tool: { type: 'hoe', tier: 5, speed: 10 }, damage: 1 });
 ARMOR_PIECES.forEach(([piece, pn], slot) => item('netherite_' + piece, 'Netherite ' + pn, 'netherite_' + piece, { stack: 1, armor: { slot, points: [3, 9, 7, 3][slot] } }));
+makeTile('i_cocoa_beans', pPlant(P => { for (const [x, y] of [[4, 5], [9, 4], [6, 10], [11, 9]]) { P.disc(x, y, 2.2, 0x7a4a22); P.put(x - 1, y - 1, 0xa8703a); } }));
+item('cocoa_beans', 'Cocoa Beans', 'cocoa_beans');
+makeTile('i_cookie', pPlant(P => { P.disc(7.5, 7.5, 5.5, 0xc8884a); P.disc(7.5, 7.5, 4.5, 0xd8985a); for (const [x, y] of [[5, 5], [10, 6], [7, 9], [4, 9], [10, 10]]) { P.put(x, y, 0x4a2a12); P.put(x + 1, y, 0x5a3418); } }));
+item('cookie', 'Cookie', 'cookie', { food: 2 });
 for (const [k, n, full] of SLAB_MATS) {
   const c = DEFS[ID[full]].color, hi = c.map(v => Math.min(255, v + 30)), lo = c.map(v => Math.round(v * 0.6));
   makeTile('i_' + k + '_slab', pPlant(P => { P.rect(1, 8, 14, 6, c); P.rect(1, 8, 14, 1, hi); P.rect(1, 13, 14, 1, lo); P.rect(1, 8, 1, 6, hi); P.rect(14, 8, 1, 6, lo); }));
@@ -898,8 +912,8 @@ function getDrops(def, rng) {
 // [output, count, {input: count}, station]   '#planks' / '#log' match any wood type
 const GROUPS = {
   '#cobble': ['cobblestone', 'cobbled_deepslate', 'blackstone'],
-  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks'],
-  '#log': ['oak_log', 'birch_log', 'spruce_log'],
+  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks', 'jungle_planks'],
+  '#log': ['oak_log', 'birch_log', 'spruce_log', 'jungle_log'],
   '#wool': ['wool_white', 'wool_red', 'wool_blue', 'wool_green', 'wool_yellow', 'wool_black', 'wool_orange', 'wool_purple'],
 };
 const RECIPES = [
@@ -952,6 +966,7 @@ const RECIPES = [
   ['netherite_chestplate', 1, { diamond_chestplate: 1, netherite_ingot: 1 }, 'table'],
   ['netherite_leggings', 1, { diamond_leggings: 1, netherite_ingot: 1 }, 'table'],
   ['netherite_boots', 1, { diamond_boots: 1, netherite_ingot: 1 }, 'table'],
+  ['jungle_planks', 4, { jungle_log: 1 }], ['cookie', 8, { wheat: 2, cocoa_beans: 1 }],
   ['crimson_planks', 4, { crimson_stem: 1 }], ['warped_planks', 4, { warped_stem: 1 }],
   ['diamond_helmet', 1, { diamond: 5 }, 'table'],
   ['diamond_chestplate', 1, { diamond: 8 }, 'table'],
@@ -1094,7 +1109,7 @@ for (const r of RECIPES) if (r[3] === 'furnace') for (const k in r[2]) for (cons
 const FUEL = {};
 // (how many items each one smelts) x 6 seconds: coal smelts 5 items
 for (const [k, n] of [['lava_bucket', 100], ['coal', 5], ['coal_block', 45], ['blaze_rod', 12], ['stick', 0.5], ['crafting_table', 1.5], ['chest', 1.5], ['bookshelf', 1.5],
-  ['oak_log', 1.5], ['birch_log', 1.5], ['spruce_log', 1.5], ['oak_planks', 1.5], ['birch_planks', 1.5], ['spruce_planks', 1.5], ['bow', 1.5],
+  ['oak_log', 1.5], ['birch_log', 1.5], ['spruce_log', 1.5], ['jungle_log', 1.5], ['oak_planks', 1.5], ['birch_planks', 1.5], ['spruce_planks', 1.5], ['jungle_planks', 1.5], ['bow', 1.5],
   ['wooden_pickaxe', 1], ['wooden_sword', 1], ['wooden_axe', 1], ['wooden_shovel', 1], ['dead_bush', 0.5], ['boat', 6]]) if (ID[k] !== undefined) FUEL[ID[k]] = n * SMELT_TIME;
 
 /* ---------- what each number means ----------

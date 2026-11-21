@@ -2,8 +2,8 @@
 /* Voxel world: chunk storage, terrain generation, meshing, raycasting and collision. */
 
 const CS = 16, WH = 96, SEA = 32;
-const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8 };
-const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga'];
+const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9 };
+const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle'];
 
 const FACES = [
   { n: [1, 0, 0], c: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], shade: 0.8 },
@@ -100,6 +100,8 @@ class World {
     if (temp < -0.12) return moist > 0.0 ? BIOME.TAIGA : BIOME.SNOWY;
     if (temp > 0.1 && moist < 0.04) return BIOME.DESERT;
     if (h <= SEA + 1) return BIOME.BEACH;
+    // hot and wet: jungle (only on fresh ground, so places you built in keep their forest)
+    if (moist > 0.1 && temp > 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.JUNGLE;
     if (moist > 0.04) return temp > -0.02 ? BIOME.FOREST : BIOME.BIRCH;
     return BIOME.PLAINS;
   }
@@ -314,10 +316,11 @@ class World {
         if (y === 0) id = ID.bedrock;
         else if (y <= 3 && rng() < (4 - y) * 0.22) id = ID.bedrock;
         else if (y < h - 3) id = (deep === ID.sandstone && y < h - 7) ? ID.stone : deep;
-        if (fresh && id === ID.stone && y <= 13 + ((this.noiseC.noise2(wx / 9, wz / 9) + 1) * 2 | 0)) id = ID.deepslate;
         else if (y < h) id = fill;
         else if (y === h) id = top;
         else id = (y === SEA && (b === BIOME.SNOWY || b === BIOME.TAIGA)) ? ID.ice : ID.water;
+        // deepslate near the bottom (fresh ground)
+        if (fresh && id === ID.stone && y <= 13 + ((this.noiseC.noise2(wx / 9, wz / 9) + 1) * 2 | 0)) id = ID.deepslate;
         d[x + (z << 4) + (y << 8)] = id;
       }
     }
@@ -355,12 +358,17 @@ class World {
     }
 
     // ores & pockets
-    const ORE = [
+    const ORE = fresh ? [
+      // fresh ground: diamonds and redstone only deep down, and no lumps of dirt or gravel down there
+      [ID.coal_ore, 22, 5, 90, 10], [ID.iron_ore, 26, 4, 80, 9], [ID.gold_ore, 6, 4, 34, 7],
+      [ID.diamond_ore, 3, 2, 11, 5], [ID.redstone_ore, 6, 2, 13, 6], [ID.lapis_ore, 3, 4, 32, 5],
+      [ID.gravel, 4, 26, 70, 12], [ID.dirt, 4, 30, 70, 12], [ID.obsidian, 1, 2, 10, 5],
+    ] : [
       [ID.coal_ore, 22, 5, 90, 10], [ID.iron_ore, 26, 4, 80, 9], [ID.gold_ore, 6, 4, 34, 7],
       [ID.diamond_ore, 3, 2, 16, 5], [ID.redstone_ore, 6, 2, 18, 6], [ID.lapis_ore, 3, 4, 32, 5],
       [ID.gravel, 5, 5, 70, 14], [ID.dirt, 6, 5, 70, 14], [ID.obsidian, 1, 2, 10, 5],
     ];
-    if (fresh) ORE.push([ID.diamond_ore, 2, 2, 14, 4], [ID.emerald_ore, 2, 4, 70, 2], [ID.gold_ore, 3, 2, 18, 7], [ID.redstone_ore, 4, 2, 14, 7]);
+    if (fresh) ORE.push([ID.diamond_ore, 2, 2, 11, 4], [ID.emerald_ore, 2, 4, 70, 2], [ID.gold_ore, 3, 2, 18, 7], [ID.redstone_ore, 4, 2, 14, 7]);
     const mountainChunk = biomes[136] === BIOME.MOUNTAIN;
     if (mountainChunk) ORE.push([ID.emerald_ore, 4, 4, 80, 2], [ID.gold_ore, 4, 30, 80, 6], [ID.iron_ore, 8, 30, 90, 9]);
     if (biomes[136] === BIOME.DESERT) ORE.push([ID.gold_ore, 4, 20, 50, 6]);
@@ -379,7 +387,7 @@ class World {
 
     // decorations
     const center = biomes[136];
-    const treeCount = { [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
+    const treeCount = { [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
     const trees = Math.floor(treeCount * this.style.trees + rng());
     for (let t = 0; t < trees; t++) {
       const x = 2 + (rng() * 12 | 0), z = 2 + (rng() * 12 | 0), h = heights[x + z * 16];
@@ -387,7 +395,8 @@ class World {
       if (ground !== ID.grass && ground !== ID.snow_grass) continue;
       if (h + 10 >= WH || get(x, h + 1, z) !== 0) continue;
       const b = biomes[x + z * 16];
-      if (b === BIOME.TAIGA || b === BIOME.SNOWY || (b === BIOME.MOUNTAIN && rng() < 0.7)) this.spruceTree(set, get, x, h + 1, z, rng);
+      if (b === BIOME.JUNGLE) { if (rng() < 0.6) this.jungleTree(set, get, x, h + 1, z, rng); else this.jungleBush(set, get, x, h + 1, z, rng); }
+      else if (b === BIOME.TAIGA || b === BIOME.SNOWY || (b === BIOME.MOUNTAIN && rng() < 0.7)) this.spruceTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.BIRCH || (b === BIOME.FOREST && rng() < 0.25)) this.oakTree(set, get, x, h + 1, z, rng, ID.birch_log, ID.birch_leaves, 5);
       else this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4);
       set(x, h, z, ID.dirt);
@@ -399,6 +408,7 @@ class World {
       }
     };
     if (center === BIOME.PLAINS) { plant(28, [ID.tall_grass], ID.grass); plant(5, [ID.rose, ID.dandelion], ID.grass); }
+    if (center === BIOME.JUNGLE) { plant(30, [ID.tall_grass], ID.grass); if (rng() < 0.5) plant(3, [ID.melon], ID.grass); }
     if (center === BIOME.FOREST || center === BIOME.BIRCH) { plant(14, [ID.tall_grass], ID.grass); plant(3, [ID.rose, ID.dandelion, ID.red_mushroom, ID.brown_mushroom], ID.grass); }
     if (center === BIOME.TAIGA) { plant(8, [ID.tall_grass], ID.grass); plant(2, [ID.brown_mushroom, ID.red_mushroom], ID.grass); }
     if (center === BIOME.DESERT) {
@@ -608,6 +618,24 @@ class World {
     }
     if (get(x, y + h + 1, z) === 0) set(x, y + h + 1, z, leaves);
     for (let dy = 0; dy <= h; dy++) set(x, y + dy, z, log);
+  }
+
+  /* a tall jungle tree with a wide, flat crown */
+  jungleTree(set, get, x, y, z, rng) {
+    const h = 8 + (rng() * 6 | 0);
+    for (let dy = h - 2; dy <= h + 1; dy++) {
+      const r = dy >= h ? 2 : 3;
+      for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+        if (dx * dx + dz * dz > r * r + 1) continue;
+        if (get(x + dx, y + dy, z + dz) === 0) set(x + dx, y + dy, z + dz, ID.jungle_leaves);
+      }
+    }
+    for (let dy = 0; dy <= h; dy++) set(x, y + dy, z, ID.jungle_log);
+  }
+  /* a low jungle bush: one log with leaves around it */
+  jungleBush(set, get, x, y, z, rng) {
+    for (let dy = 0; dy <= 1; dy++) for (let dx = -2 + dy; dx <= 2 - dy; dx++) for (let dz = -2 + dy; dz <= 2 - dy; dz++) if (get(x + dx, y + dy, z + dz) === 0 && rng() < 0.85) set(x + dx, y + dy, z + dz, ID.jungle_leaves);
+    set(x, y, z, ID.jungle_log);
   }
 
   spruceTree(set, get, x, y, z, rng) {

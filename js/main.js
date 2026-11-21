@@ -519,7 +519,7 @@ G.findFires = () => {
 };
 /* what burns: wood, leaves, wool, hay and dry plants (not Nether wood, chests, crafting tables or doors) */
 const FLAMMABLE = new Set();
-for (const d of DEFS) if (d && d.isBlock && (/^(oak|birch|spruce)_(log|planks|leaves|stairs_.|slab_.)$|^wool_|^bookshelf$|^hay_bale$|^oak_fence$|^tall_grass$|^dead_bush$/.test(d.key))) FLAMMABLE.add(d.id);
+for (const d of DEFS) if (d && d.isBlock && (/^(oak|birch|spruce|jungle)_(log|planks|leaves|stairs_.|slab_.)$|^wool_|^bookshelf$|^hay_bale$|^oak_fence$|^tall_grass$|^dead_bush$/.test(d.key))) FLAMMABLE.add(d.id);
 const NEAR6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 /* fires burn out after a while (on netherrack they burn forever). With Fire Spreads on, fire next to
    wood, leaves or wool jumps to the spaces around them and slowly burns those blocks away. */
@@ -605,11 +605,12 @@ G.tickGrass = () => {
 
 /* a sapling grows into a tree, if there is room above it */
 G.growTree = (x, y, z, kind) => {
-  const W = G.world, need = kind === 'spruce' ? 9 : 7;
+  const W = G.world, need = kind === 'spruce' ? 9 : kind === 'jungle' ? 14 : 7;
   for (let dy = 1; dy <= need; dy++) { const id = W.getBlock(x, y + dy, z); if (id && !DEFS[id].leaves) return false; }
   const set = (a, b, c, id) => W.setBlock(a, b, c, id), get = (a, b, c) => W.getBlock(a, b, c);
   if (kind === 'spruce') W.spruceTree(set, get, x, y, z, Math.random);
   else if (kind === 'birch') W.oakTree(set, get, x, y, z, Math.random, ID.birch_log, ID.birch_leaves, 5);
+  else if (kind === 'jungle') W.jungleTree(set, get, x, y, z, Math.random);
   else W.oakTree(set, get, x, y, z, Math.random, ID.oak_log, ID.oak_leaves, 4);
   return true;
 };
@@ -683,6 +684,8 @@ G.chestKind = (x, y, z) => {
   if (G.dim === 'end') return 'library';
   if (W.regionPick) {
     if (W.pyramidChunk(cx, cz)) return 'desert';
+    if (W.spotPick && W.spotPick(cx, cz, 'jungleTemple')) return 'jungle';
+    if (W.spotPick && W.spotPick(cx, cz, 'ruins')) return 'ruins';
     if (W.regionPick(cx, cz, 'igloo')) return 'igloo';
     if (W.regionPick(cx, cz, 'shipwreck')) return 'shipwreck';
     if (W.regionPick(cx, cz, 'ruinedPortal')) return 'ruined_portal';
