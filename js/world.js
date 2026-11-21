@@ -332,12 +332,13 @@ class World {
         if (id === ID.bedrock || id === ID.water) continue;
         const n1 = this.noiseB.noise3(wx / 22, y / 14, wz / 22);
         const n2 = this.noiseC.noise3(wx / 22, y / 14 + 40, wz / 22);
-        let cave = n1 * n1 + n2 * n2 < (fresh ? 0.0075 : 0.0045);
-        if (!cave && y < h - 10) cave = this.noise.noise3(wx / 34, y / 18, wz / 34 + 200) > 0.42;
+        // fresh ground: tunnels wide and tall enough to walk through (about 4 or 5 blocks), like Minecraft
+        let cave = n1 * n1 + n2 * n2 < (fresh ? 0.024 : 0.0045);
+        if (!cave && y < h - 10) cave = this.noise.noise3(wx / 34, y / 18, wz / 34 + 200) > (fresh ? 0.36 : 0.42);
         if (fresh && !cave) {
           // a second set of winding tunnels, many of them opening onto the surface
           const n3 = this.noiseB.noise3(wx / 26 + 300, y / 11, wz / 26 - 300), n4 = this.noiseC.noise3(wx / 26 - 120, y / 11 + 70, wz / 26 + 90);
-          cave = n3 * n3 + n4 * n4 < 0.006;
+          cave = n3 * n3 + n4 * n4 < 0.018;
           // big caverns deep down (lava lakes at the very bottom)
           if (!cave && y >= 4 && y <= 24) cave = this.noise.noise3(wx / 48 + 700, y / 10, wz / 48 - 700) > 0.3 - (24 - y) * 0.006;
           // ravines: long cracks from the surface deep into the ground
@@ -409,7 +410,7 @@ class World {
         for (let k = 1; k <= ch; k++) set(x, h + k, z, ID.cactus);
       }
       rng(); // keeps the rest of the chunk the same as before
-      if (this.regionPick && this.regionPick(cx, cz, 'pyramid') && !(this.villageAt && this.villageAt(cx, cz))) this.pyramid(set, get, heights, rng);
+      if (this.pyramidChunk && this.pyramidChunk(cx, cz) && !(this.villageAt && this.villageAt(cx, cz))) this.pyramid(set, get, heights, rng);
     }
     if ((center === BIOME.PLAINS || center === BIOME.FOREST) && rng() < 0.08) plant(3, [ID.pumpkin, ID.melon], ID.grass);
     if (this.buildStructures) this.buildStructures(c, set, get, heights, biomes, rng);

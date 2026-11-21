@@ -682,7 +682,7 @@ G.chestKind = (x, y, z) => {
   if (G.dim === 'nether') return 'ruined_portal';
   if (G.dim === 'end') return 'library';
   if (W.regionPick) {
-    if (W.regionPick(cx, cz, 'pyramid')) return 'desert';
+    if (W.pyramidChunk(cx, cz)) return 'desert';
     if (W.regionPick(cx, cz, 'igloo')) return 'igloo';
     if (W.regionPick(cx, cz, 'shipwreck')) return 'shipwreck';
     if (W.regionPick(cx, cz, 'ruinedPortal')) return 'ruined_portal';

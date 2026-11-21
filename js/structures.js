@@ -18,6 +18,27 @@ World.prototype.regionPick = function (cx, cz, kind) {
   return cx === gx * cell + (r() * (cell - gap) | 0) && cz === gz * cell + (r() * (cell - gap) | 0);
 };
 
+/* desert temples: each square of 20 x 20 chunks tries up to 16 spots and puts its temple on the first one
+   in a desert (one fixed spot per square made them almost impossible to find). Places where someone had
+   already built keep the old rule, so nothing appears on top of a build. */
+World.prototype.pyramidChunk = function (cx, cz) {
+  if (this.oldGen && this.oldGen.has(this.key(cx, cz))) return this.regionPick(cx, cz, 'pyramid');
+  const CELL = 20, GAP = 4, gx = Math.floor(cx / CELL), gz = Math.floor(cz / CELL), key = gx + ',' + gz;
+  this.pyramidCache = this.pyramidCache || new Map();
+  if (!this.pyramidCache.has(key)) {
+    const r = mulberry32(hash3(gx, gz, this.seed + 913));
+    let spot = null;
+    for (let t = 0; t < 16 && !spot; t++) {
+      const px = gx * CELL + 1 + (r() * (CELL - GAP) | 0), pz = gz * CELL + 1 + (r() * (CELL - GAP) | 0);
+      const wx = px * 16 + 8, wz = pz * 16 + 8, h = this.heightAt(wx, wz);
+      if (this.biomeAt(wx, wz, h) === BIOME.DESERT && h > SEA + 1 && !(this.oldGen && this.oldGen.has(this.key(px, pz)))) spot = [px, pz];
+    }
+    this.pyramidCache.set(key, spot);
+  }
+  const s = this.pyramidCache.get(key);
+  return !!s && s[0] === cx && s[1] === cz;
+};
+
 /* which village (if any) owns this chunk: {cx, cz, style, radius} */
 World.prototype.villageAt = function (cx, cz) {
   const gx = Math.floor(cx / VILLAGE_CELL), gz = Math.floor(cz / VILLAGE_CELL);
