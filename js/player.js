@@ -140,7 +140,11 @@ class Player {
         this.pos.set(h.pos.x, h.pos.y + (h.type === 'donkey' ? 0.75 : 0.95), h.pos.z);
       }
       this.vel.set(0, 0, 0); this.onGround = true; this.fallStart = null; this.flying = false;
-      this.headInWater = false; this.inWater = false; this.inLava = false;
+      // riding doesn't let you breathe under water: your head is still where it is
+      const W = G.world;
+      this.headInWater = W.liquidAt(this.pos.x, this.pos.y + this.eye, this.pos.z) === ID.water;
+      this.inWater = this.headInWater || W.liquidAt(this.pos.x, this.pos.y + 0.4, this.pos.z) === ID.water;
+      this.inLava = W.liquidAt(this.pos.x, this.pos.y + 0.4, this.pos.z) === ID.lava;
       if (!creative) this.survivalTick(dt, false);
       return;
     }
