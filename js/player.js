@@ -346,6 +346,14 @@ class Player {
     this.hungerDrain(0.025);
   }
 
+  putOutFire(x, y, z) {
+    G.world.setBlock(x, y, z, 0);
+    if (G.fires) delete G.fires[x + ',' + y + ',' + z];
+    G.particles.burst(x + 0.5, y + 0.3, z + 0.5, [0x777777, 0x555555, 0x999999], 8, 1.2, 0.15, -1);
+    G.sound.play('fuse', new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5));
+    this.useCd = 0.15; this.breakCd = 0.15; this.swing = 1;
+  }
+
   breakBlock(x, y, z, id) {
     const def = DEFS[id], W = G.world;
     if (id === ID.flag && G.myFlag && G.myFlag.dim === G.dim && G.myFlag.x === x && G.myFlag.y === y && G.myFlag.z === z) { G.myFlag = null; G.showFlag = false; }
@@ -398,6 +406,7 @@ class Player {
     }
     const b = tgt.block;
     if (!b) { this.breaking = null; if (pressed) this.swing = 1; return; }
+    if (b.id === ID.fire) { if (pressed) this.putOutFire(b.x, b.y, b.z); this.breaking = null; return; }
     const def = DEFS[b.id];
     if (def.hardness === Infinity) { this.breaking = null; return; }
     if (creative) {
@@ -582,6 +591,8 @@ class Player {
     if (this.useCd > 0) return;
     const W = G.world, held = this.heldSlot(), hd = held ? DEFS[held.id] : null;
     const b = tgt.block;
+    // one tap on fire puts it out
+    if (b && b.id === ID.fire) { this.putOutFire(b.x, b.y, b.z); return; }
     // a bucket on a cow: milk
     if (tgt.mob && tgt.mob.type === 'cow' && !tgt.mob.dead && hd && hd.key === 'bucket') { this.useCd = 0.4; this.swing = 1; this.swapHeld(ID.milk_bucket); G.sound.play('pickup'); return; }
     if (tgt.mob && tgt.mob.interact && tgt.mob.interact(this, hd)) { this.useCd = 0.35; this.swing = 1; return; }
