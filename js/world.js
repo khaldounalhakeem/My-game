@@ -705,7 +705,7 @@ class World {
       const def = DEFS[id];
       if (def.cross) { this.addCross(O, x, y, z, def); continue; }
       if (def.box) { this.addBox(O, x, y, z, def); continue; }
-      if (def.boxes || def.fence || def.pane) { for (const bx of this.shapeBoxes(def, (a, b, c) => get(a, b, c), x, y, z, true)) this.addBox(O, x, y, z, { box: bx, faces: def.faces }); continue; }
+      if (def.boxes || def.fence || def.pane) { for (const bx of this.shapeBoxes(def, (a, b, c) => get(a, b, c), x, y, z, true)) this.addBox(def.translucent ? T : O, x, y, z, { box: bx, faces: def.faces }); continue; }
       const out = def.translucent ? T : O;
       const topH = def.height ? def.height : def.liquid && get(x, y + 1, z) !== id ? 0.875 : 1;
       for (let f = 0; f < 6; f++) {
@@ -754,7 +754,7 @@ class World {
     if (def.boxes) return !forDrawing && def.cboxes ? def.cboxes : def.boxes;
     if (def.pane) {
       // a glass pane: a thin middle post, with arms reaching out to panes, glass and walls beside it
-      const link = (dx, dz) => { const n = get(x + dx, y, z + dz); return n && (DEFS[n].pane || n === ID.glass || (DEFS[n].opaque && DEFS[n].solid)); };
+      const link = (dx, dz) => { const n = get(x + dx, y, z + dz); return n && (DEFS[n].pane || DEFS[n].glassy || (DEFS[n].opaque && DEFS[n].solid)); };
       const a = 0.4375, b = 0.5625, out = [[a, 0, a, b, 1, b]];
       if (link(1, 0)) out.push([b, 0, a, 1, 1, b]);
       if (link(-1, 0)) out.push([0, 0, a, a, 1, b]);

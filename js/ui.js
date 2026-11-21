@@ -157,11 +157,13 @@ const UI = {
       s.addEventListener('pointerdown', e => {
         e.preventDefault();
         this.closeSplit();
+        const fsig = this.furnSig();
         // picking up a whole stack: a little "Take half" button pops up on that slot
         const st = !e.shiftKey && !this.cursor && i !== 202 && e.button !== 2 ? this.slotBox(i) : null;
         const big = st && st.box[st.k] && st.box[st.k].count > 1 ? st.box[st.k].count : 0;
         this.clickSlot(i, e.button, e.shiftKey);
         if (big && this.cursor && this.cursor.count === big) this.openSplit(i, s);
+        this.furnaceEdited(fsig);
       });
       s.addEventListener('contextmenu', e => e.preventDefault());
       s.addEventListener('pointerenter', () => this.tip(s.dataset.name));
@@ -328,7 +330,16 @@ const UI = {
     this.split = { i };
   },
   closeSplit() { const b = $('split-pop'); if (b) b.hidden = true; this.split = null; },
+  /* what's in the open furnace, to notice when you change it (so your friends see it too) */
+  furnSig() { const f = this.furnace; return f ? JSON.stringify(f.slots) : null; },
+  furnaceEdited(before) {
+    const f = this.furnace;
+    if (!f || before === null || JSON.stringify(f.slots) === before) return;
+    G.furnaceChanged(G.chestKey(f.x, f.y, f.z), true);
+  },
   takeSplit() {
+    const fsig = this.furnSig();
+    setTimeout(() => this.furnaceEdited(fsig), 0);
     const sp = this.split, cur = this.cursor;
     this.closeSplit();
     if (!sp || !cur || cur.count < 2) return;

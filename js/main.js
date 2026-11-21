@@ -736,7 +736,14 @@ G.openFurnace = (x, y, z) => {
 G.breakFurnace = (x, y, z) => {
   const f = G.furnaceAt(x, y, z, false);
   if (f) for (const s of f.slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5);
-  if (G.furnaces) delete G.furnaces[chestKey(x, y, z)];
+  if (G.furnaces) { delete G.furnaces[chestKey(x, y, z)]; G.furnaceChanged(chestKey(x, y, z), true); }
+};
+/* a furnace changed: tell the others in a shared world (the first player's game runs the furnaces;
+   an edit made by someone else goes to that game, which shares the result with everyone) */
+G.furnaceChanged = (k, byHand) => {
+  G.furnVer = G.furnVer || {};
+  if (!byHand || !Net.inShared() || Net.isHost()) G.furnVer[k] = (G.furnVer[k] || 0) + 1;
+  Net.furnaceChanged(k, byHand);
 };
 function furnaceCanSmelt(f) {
   const [inp, , out] = f.slots, r = inp && SMELT[inp.id];
@@ -745,7 +752,11 @@ function furnaceCanSmelt(f) {
 /* furnaces keep working while you do other things, as long as they are in the loaded world */
 G.tickFurnaces = (dt) => {
   if (!G.furnaces) return;
+  // in a shared world only the first player's game runs furnaces; the others show what it shares
+  if (Net.inShared() && !Net.isHost()) { if (G.ui.furnace) G.ui.renderFurnace(); return; }
   const pre = G.dim + ':';
+  const shareNow = Date.now() - (G.furnShareAt || 0) > 1000;
+  if (shareNow) G.furnShareAt = Date.now();
   for (const k in G.furnaces) {
     if (!k.startsWith(pre)) continue;
     const f = G.furnaces[k];
@@ -754,6 +765,7 @@ G.tickFurnaces = (dt) => {
     if (G.world.getBlock(x, y, z) !== ID.furnace) { delete G.furnaces[k]; continue; }
     const can = furnaceCanSmelt(f);
     if (f.burn <= 0 && can && f.slots[1] && FUEL[f.slots[1].id]) {
+      G.furnaceChanged(k);
       f.burn = f.burnMax = FUEL[f.slots[1].id];
       if (f.slots[1].id === ID.lava_bucket) f.slots[1] = { id: ID.bucket, count: 1 };
       else if (--f.slots[1].count <= 0) f.slots[1] = null;
@@ -769,9 +781,11 @@ G.tickFurnaces = (dt) => {
           if (--f.slots[0].count <= 0) f.slots[0] = null;
           if (f.slots[2]) f.slots[2].count += n; else f.slots[2] = { id: outId, count: n };
           f.xp += xp;
+          G.furnaceChanged(k);
           if (G.player.pos.distanceTo(new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5)) < 16) Sound.play('smelt');
         }
       }
+      if (shareNow && Net.inShared()) G.furnaceChanged(k); // the fire and the arrow move for everyone
       if (Math.random() < dt * 3) G.particles.burst(x + 0.5, y + 0.4, z + 0.5, [0xff9a20, 0xffd060, 0x707070], 2, 0.4, 0.08, 1);
     } else if (f.cook > 0) f.cook = Math.max(0, f.cook - dt * 2);
   }

@@ -233,7 +233,7 @@ function makeMultiRoom(rooms, me) {
 const Net = {
   room: null, perms: null, status: 'connecting', error: '', connected: false,
   world: null, peers: new Map(), others: [], seq: 0, ring: [], sendT: 0, hits: [], hitSeq: 0, blasts: [], blastSeq: 0,
-  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, askRing: [], askSeq: 0, giveMobRing: [], giveMobSeq: 0, gotMobs: new Set(), pendingClaims: {}, chestRing: [], signRing: [], signSeq: 0, giveRing: [], giveSeq: 0, gotDrops: new Set(), seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
+  ringMax: 40, sendOk: 0, idSeq: 0, mobHits: [], mhSeq: 0, dropRing: [], drSeq: 0, pickRing: [], pkSeq: 0, askRing: [], askSeq: 0, giveMobRing: [], giveMobSeq: 0, gotMobs: new Set(), pendingClaims: {}, chestRing: [], furnRing: [], furnEditSeq: 0, signRing: [], signSeq: 0, giveRing: [], giveSeq: 0, gotDrops: new Set(), seenDrops: new Set(), pickedDrops: new Set(), sendErr: '', heardAt: 0, rawPeers: 0,
   nick: '', color: SHIRT_COLORS[0],
 
   async init() {
@@ -373,9 +373,10 @@ const Net = {
         gm: this.slim ? null : this.giveMobRing,
         ws: this.wsInfo || null,
         rd: P.riding && P.riding.nid ? [P.riding.nid, P.seat || 0] : null,
+        fu: this.slim ? null : this.furnRing,
         cs: this.slim ? null : this.chestRing, oc: G.ui.chest && !G.ui.chest.mob ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
       });
-    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null, ws: null, rd: null });
+    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null, ws: null, rd: null, fu: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
@@ -443,7 +444,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v39 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v40 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -654,6 +655,27 @@ const Net = {
   },
 
   /* a chest changed here: send its whole contents with its version (the last 12 changed chests) */
+  /* a furnace's slots, fire and progress: [key, version, slots, burn, burnMax, cook, edit number (an edit for the first player's game)] */
+  furnaceChanged(key, byHand) {
+    if (!this.inShared()) return;
+    const f = G.furnaces && G.furnaces[key];
+    const edit = byHand && !this.isHost() ? ++this.furnEditSeq : 0;
+    const entry = [key, (G.furnVer || {})[key] || 0, f ? f.slots.map(s => (s ? [s.id, s.count] : 0)) : null, f ? Math.round(f.burn * 10) / 10 : 0, f ? f.burnMax : 0, f ? Math.round(f.cook * 10) / 10 : 0, edit];
+    this.furnRing = this.furnRing.filter(e => e[0] !== key);
+    this.furnRing.push(entry);
+    if (this.furnRing.length > 12) this.furnRing.shift();
+    this.sendT = 0;
+  },
+  applyFurnace(key, slots, burn, burnMax, cook) {
+    G.furnaces = G.furnaces || {};
+    const open = G.ui.furnace && G.chestKey(G.ui.furnace.x, G.ui.furnace.y, G.ui.furnace.z) === key;
+    if (!Array.isArray(slots)) { delete G.furnaces[key]; if (open) G.ui.closeInventory(); return; }
+    const f = G.furnaces[key] || (G.furnaces[key] = { slots: [null, null, null], burn: 0, burnMax: 0, cook: 0, xp: 0 });
+    for (let k = 0; k < 3; k++) { const v = slots[k]; f.slots[k] = Array.isArray(v) && DEFS[v[0]] && v[1] > 0 ? { id: v[0], count: Math.min(64, v[1] | 0) } : null; }
+    f.burn = Math.max(0, +burn || 0); f.burnMax = Math.max(0, +burnMax || 0); f.cook = Math.max(0, +cook || 0);
+    if (open) G.ui.renderInventory();
+  },
+
   chestChanged(key) {
     if (!this.inShared()) return;
     const slots = G.chests[key];
@@ -895,6 +917,28 @@ const Net = {
       const slots = G.chests[e[0]] || (G.chests[e[0]] = new Array(27).fill(null));
       for (let k = 0; k < 27; k++) { const v = e[2][k]; slots[k] = Array.isArray(v) && DEFS[v[0]] && v[1] > 0 ? { id: v[0], count: Math.min(64, v[1] | 0) } : null; }
       if (G.ui.chest && G.ui.chest.slots === slots) G.ui.renderInventory();
+    }
+    // furnaces: the first player's game runs them; edits from the others go to it, its results go to everyone
+    if (Array.isArray(pr.fu)) {
+      rp.furnSeen = rp.furnSeen || {};
+      G.furnVer = G.furnVer || {};
+      const host = this.isHost();
+      for (const e of pr.fu) {
+        if (!Array.isArray(e) || e.length < 7 || typeof e[0] !== 'string' || !/^\w+:-?\d+,-?\d+,-?\d+$/.test(e[0]) || !Number.isInteger(e[1])) continue;
+        const [key, ver, slots, burn, burnMax, cook, edit] = e;
+        if (edit) {
+          if (!host || edit <= (rp.furnSeen[key] || 0)) continue;
+          rp.furnSeen[key] = edit;
+          this.applyFurnace(key, slots, burn, burnMax, cook);
+          G.furnaceChanged(key);
+          continue;
+        }
+        // results from the game that runs the furnaces: newer than the last one it sent us
+        rp.furnLast = rp.furnLast || {};
+        if (host || ver <= (rp.furnLast[key] || 0)) continue;
+        rp.furnLast[key] = ver;
+        this.applyFurnace(key, slots, burn, burnMax, cook);
+      }
     }
     // both opened the same chest at the same moment: the one with the smaller id keeps it
     if (rp.openChest && G.ui.chest && rp.openChest === G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) && this.uid > rp.peer) {

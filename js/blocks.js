@@ -562,6 +562,14 @@ makeTile('i_netherite_ingot', pPlant(P => { P.rect(2, 6, 12, 5, 0x3e3a3c); P.rec
 for (const kind of ['pick', 'sword', 'shovel', 'axe', 'hoe']) makeTile('i_netherite_' + { pick: 'pickaxe', sword: 'sword', shovel: 'shovel', axe: 'axe', hoe: 'hoe' }[kind], pTool(kind, 0x4a4448));
 for (const [piece] of ARMOR_PIECES) makeTile('i_netherite_' + piece, pArmor(piece, 0x4a4448));
 
+/* coloured (stained) glass: see-through and tinted */
+const STAINS = [['white', 'White', 0xf2f2f2], ['red', 'Red', 0xc83232], ['blue', 'Blue', 0x3c50d0], ['green', 'Green', 0x4a9a32], ['yellow', 'Yellow', 0xf0d03a], ['black', 'Black', 0x2a2a2a], ['orange', 'Orange', 0xf0882a], ['purple', 'Purple', 0x8a3ac8]];
+for (const [k, , c] of STAINS) makeTile('stained_glass_' + k, P => {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P.put(x, y, c, 120);
+  const hi = rgb(c).map(v => Math.min(255, v + 50)), lo = rgb(c).map(v => Math.round(v * 0.7));
+  for (let i = 0; i < 16; i++) { P.put(i, 0, hi, 230); P.put(0, i, hi, 230); P.put(i, 15, lo, 230); P.put(15, i, lo, 230); }
+  P.pts([[3, 4], [4, 3], [4, 5], [5, 4], [11, 10], [10, 11]], hi);
+});
 DEFS[0] = { id: 0, key: 'air', name: 'Air', isBlock: true, solid: false, opaque: false, hardness: 0, faces: [0, 0, 0, 0, 0, 0], color: [255, 255, 255] };
 ID.air = 0;
 let nextBlockId = 1;
@@ -605,7 +613,7 @@ block('redstone_ore', 'Redstone Ore', 'redstone_ore', PICK(3, 3, { drop: (r) => 
 block('emerald_ore', 'Emerald Ore', 'emerald_ore', PICK(3, 3, { drop: 'emerald', xp: 6 }));
 block('lapis_ore', 'Lapis Lazuli Ore', 'lapis_ore', PICK(2, 3, { drop: (r) => [['lapis', 4 + (r() * 4 | 0)]], xp: 3 }));
 block('bedrock', 'Bedrock', 'bedrock', { hardness: Infinity });
-block('glass', 'Glass', 'glass', { opaque: false, cutout: true, hardness: 0.3, drop: null });
+block('glass', 'Glass', 'glass', { opaque: false, cutout: true, hardness: 0.3, drop: null, glassy: true });
 block('bricks', 'Bricks', 'bricks', PICK(1, 2));
 block('snow_grass', 'Snowy Grass', { top: 'snow', side: 'snow_side', bottom: 'dirt' }, { tool: 'shovel', hardness: 0.6, drop: 'dirt', colorFace: 2 });
 block('snow', 'Snow Block', 'snow', { tool: 'shovel', hardness: 0.2 });
@@ -756,6 +764,10 @@ for (const [k, n, full, tool] of SLAB_MATS) for (const half of ['b', 't']) {
   def.faces = f.faces.slice(); def.color = f.color;
 }
 block('glass_pane', 'Glass Pane', 'glass', { opaque: false, cutout: true, hardness: 0.3, pane: true, iconTile: 'glass' });
+for (const [k, n] of STAINS) {
+  block('stained_glass_' + k, n + ' Stained Glass', 'stained_glass_' + k, { opaque: false, translucent: true, hardness: 0.3, glassy: true });
+  block('stained_glass_pane_' + k, n + ' Stained Glass Pane', 'stained_glass_' + k, { opaque: false, translucent: true, hardness: 0.3, pane: true, iconTile: 'stained_glass_' + k });
+}
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -967,6 +979,7 @@ const RECIPES = [
   ['oak_door', 3, { '#planks': 6 }, 'table'],
   ['oak_stairs', 4, { '#planks': 6 }, 'table'],
   ['glass_pane', 16, { glass: 6 }, 'table'],
+  ...STAINS.flatMap(([k]) => [['stained_glass_' + k, 8, { glass: 8, ['wool_' + k]: 1 }, 'table'], ['stained_glass_pane_' + k, 16, { ['stained_glass_' + k]: 6 }, 'table']]),
   ['oak_slab', 6, { oak_planks: 3 }, 'table'], ['birch_slab', 6, { birch_planks: 3 }, 'table'], ['spruce_slab', 6, { spruce_planks: 3 }, 'table'],
   ['crimson_slab', 6, { crimson_planks: 3 }, 'table'], ['warped_slab', 6, { warped_planks: 3 }, 'table'],
   ['cobblestone_slab', 6, { cobblestone: 3 }, 'table'], ['stone_slab', 6, { stone: 3 }, 'table'], ['stone_brick_slab', 6, { stone_bricks: 3 }, 'table'],
