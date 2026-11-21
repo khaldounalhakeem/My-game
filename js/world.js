@@ -705,7 +705,7 @@ class World {
       const def = DEFS[id];
       if (def.cross) { this.addCross(O, x, y, z, def); continue; }
       if (def.box) { this.addBox(O, x, y, z, def); continue; }
-      if (def.boxes || def.fence) { for (const bx of this.shapeBoxes(def, (a, b, c) => get(a, b, c), x, y, z, true)) this.addBox(O, x, y, z, { box: bx, faces: def.faces }); continue; }
+      if (def.boxes || def.fence || def.pane) { for (const bx of this.shapeBoxes(def, (a, b, c) => get(a, b, c), x, y, z, true)) this.addBox(O, x, y, z, { box: bx, faces: def.faces }); continue; }
       const out = def.translucent ? T : O;
       const topH = def.height ? def.height : def.liquid && get(x, y + 1, z) !== id ? 0.875 : 1;
       for (let f = 0; f < 6; f++) {
@@ -752,6 +752,16 @@ class World {
   /* the boxes that make up a stair or fence block (fences join up with fences and solid blocks beside them) */
   shapeBoxes(def, get, x, y, z, forDrawing) {
     if (def.boxes) return !forDrawing && def.cboxes ? def.cboxes : def.boxes;
+    if (def.pane) {
+      // a glass pane: a thin middle post, with arms reaching out to panes, glass and walls beside it
+      const link = (dx, dz) => { const n = get(x + dx, y, z + dz); return n && (DEFS[n].pane || n === ID.glass || (DEFS[n].opaque && DEFS[n].solid)); };
+      const a = 0.4375, b = 0.5625, out = [[a, 0, a, b, 1, b]];
+      if (link(1, 0)) out.push([b, 0, a, 1, 1, b]);
+      if (link(-1, 0)) out.push([0, 0, a, a, 1, b]);
+      if (link(0, 1)) out.push([a, 0, b, b, 1, 1]);
+      if (link(0, -1)) out.push([a, 0, 0, b, 1, a]);
+      return out;
+    }
     const joins = (dx, dz) => { const n = get(x + dx, y, z + dz); return n && (DEFS[n].fence || DEFS[n].gate || (DEFS[n].opaque && DEFS[n].solid)); };
     const top = forDrawing ? 1 : 1.5, out = [[0.375, 0, 0.375, 0.625, top, 0.625]];
     const rails = forDrawing ? [[0.375, 0.5625], [0.75, 0.9375]] : [[0, top]];
@@ -869,7 +879,7 @@ class World {
     for (let y = y0 - (mob ? 2 : 1); y <= y1; y++) for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) {
       if (!this.isSolid(x, y, z)) continue;
       const def = DEFS[this.getBlock(x, y, z)];
-      if (def.boxes || def.fence) {
+      if (def.boxes || def.fence || def.pane) {
         const raise = mob && (def.fence || def.gate) ? 1 : 0;
         if (y < y0 - 1 && !raise) continue;
         for (const b of this.shapeBoxes(def, (a, b2, c) => this.getBlock(a, b2, c), x, y, z, false)) {
@@ -893,7 +903,7 @@ class World {
       for (const yy of [y, y - 1]) {
         if (!this.isSolid(x, yy, z)) continue;
         const def = DEFS[this.getBlock(x, yy, z)];
-        if (def.boxes || def.fence) {
+        if (def.boxes || def.fence || def.pane) {
           for (const b of this.shapeBoxes(def, (a, b2, c) => this.getBlock(a, b2, c), x, yy, z, false))
             if (px + r - e > x + b[0] && px - r + e < x + b[3] && pz + r - e > z + b[2] && pz - r + e < z + b[5] && yy + b[4] <= py + 0.36) top = Math.max(top, yy - y + b[4]); // only things you are landing on, never lift onto a fence
         } else if (yy === y) top = Math.max(top, def.height || 1);

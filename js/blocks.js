@@ -755,6 +755,7 @@ for (const [k, n, full, tool] of SLAB_MATS) for (const half of ['b', 't']) {
   const def = block(k + '_slab_' + half, n + ' Slab', 'stone', { tool, tier: tool === 'pick' ? 1 : 0, hardness: 2, opaque: false, boxes: [half === 'b' ? [0, 0, 0, 1, 0.5, 1] : [0, 0.5, 0, 1, 1, 1]], drop: k + '_slab', slab: k, slabFull: full, slabHalf: half });
   def.faces = f.faces.slice(); def.color = f.color;
 }
+block('glass_pane', 'Glass Pane', 'glass', { opaque: false, cutout: true, hardness: 0.3, pane: true, iconTile: 'glass' });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -965,6 +966,7 @@ const RECIPES = [
   ['bucket', 1, { iron_ingot: 3 }, 'table'],
   ['oak_door', 3, { '#planks': 6 }, 'table'],
   ['oak_stairs', 4, { '#planks': 6 }, 'table'],
+  ['glass_pane', 16, { glass: 6 }, 'table'],
   ['oak_slab', 6, { oak_planks: 3 }, 'table'], ['birch_slab', 6, { birch_planks: 3 }, 'table'], ['spruce_slab', 6, { spruce_planks: 3 }, 'table'],
   ['crimson_slab', 6, { crimson_planks: 3 }, 'table'], ['warped_slab', 6, { warped_planks: 3 }, 'table'],
   ['cobblestone_slab', 6, { cobblestone: 3 }, 'table'], ['stone_slab', 6, { stone: 3 }, 'table'], ['stone_brick_slab', 6, { stone_bricks: 3 }, 'table'],
