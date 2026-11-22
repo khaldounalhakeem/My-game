@@ -547,9 +547,9 @@ const UI = {
     const here = new Set(this.stationRecipes());
     const nameOf = k => (DEFS[ID[k]] ? DEFS[ID[k]].name : k);
     const pool = q ? RECIPES.filter(r => nameOf(r[0]).toLowerCase().includes(q) || r[0].replace(/_/g, ' ').includes(q)) : this.stationRecipes();
-    // always the same order, like Minecraft's creative inventory (what you can make is lit up, not moved)
+    // what you can make right now on top, then the rest; each part in Minecraft's creative inventory order
     const rs = pool.map(r => [r, here.has(r) && this.canCraft(r)]);
-    rs.sort((a, b) => mcRank(a[0][0]) - mcRank(b[0][0]));
+    rs.sort((a, b) => (b[1] - a[1]) || (mcRank(a[0][0]) - mcRank(b[0][0])));
     list.innerHTML = '';
     if (q && !rs.length) {
       const found = Object.values(ID).map(i => DEFS[i]).find(d => d && d.name.toLowerCase().includes(q));
