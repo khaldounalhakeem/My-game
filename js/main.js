@@ -444,14 +444,15 @@ G.tryBuildGolem = (x, y, z) => {
 /* open or close a door (both halves) or a trapdoor */
 G.toggleDoor = (x, y, z) => {
   const W = G.world, d = DEFS[W.getBlock(x, y, z)];
+  const st = d.gate || d.trapdoor || d.door, p = st && st.wood ? st.wood + '_' : ''; // oak has no wood name
   if (d.gate) {
-    W.setBlock(x, y, z, ID['gate_' + d.gate.ax + (d.gate.open ? 'c' : 'o')]);
+    W.setBlock(x, y, z, ID[p + 'gate_' + d.gate.ax + (d.gate.open ? 'c' : 'o')]);
   } else if (d.trapdoor) {
-    W.setBlock(x, y, z, ID['trapdoor_' + d.trapdoor.ax + (d.trapdoor.open ? 'c' : 'o')]);
+    W.setBlock(x, y, z, ID[p + 'trapdoor_' + d.trapdoor.ax + (d.trapdoor.open ? 'c' : 'o')]);
   } else if (d.door) {
     const op = d.door.open ? 'c' : 'o', ly = d.door.half === 'lower' ? y : y - 1;
-    W.setBlock(x, ly, z, ID['door_' + d.door.ax + op + '_lower']);
-    if (DEFS[W.getBlock(x, ly + 1, z)].door) W.setBlock(x, ly + 1, z, ID['door_' + d.door.ax + op + '_upper']);
+    W.setBlock(x, ly, z, ID[p + 'door_' + d.door.ax + op + '_lower']);
+    if (DEFS[W.getBlock(x, ly + 1, z)].door) W.setBlock(x, ly + 1, z, ID[p + 'door_' + d.door.ax + op + '_upper']);
   }
   Sound.play('click', new THREE.Vector3(x, y, z));
 };
@@ -519,7 +520,7 @@ G.findFires = () => {
 };
 /* what burns: wood, leaves, wool, hay and dry plants (not Nether wood, chests, crafting tables or doors) */
 const FLAMMABLE = new Set();
-for (const d of DEFS) if (d && d.isBlock && (/^(oak|birch|spruce|jungle|dark_oak)_(log|planks|leaves|stairs_.|slab_.)$|^wool_|^bookshelf$|^hay_bale$|^oak_fence$|^tall_grass$|^dead_bush$/.test(d.key))) FLAMMABLE.add(d.id);
+for (const d of DEFS) if (d && d.isBlock && (/^(oak|birch|spruce|jungle|dark_oak)_(log|planks|leaves|stairs_.|slab_.|fence)$|^wool_|^bookshelf$|^hay_bale$|^tall_grass$|^dead_bush$/.test(d.key))) FLAMMABLE.add(d.id);
 const NEAR6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 /* fires burn out after a while (on netherrack they burn forever). With Fire Spreads on, fire next to
    wood, leaves or wool jumps to the spaces around them and slowly burns those blocks away. */
@@ -687,6 +688,7 @@ G.chestKind = (x, y, z) => {
     if (W.pyramidChunk(cx, cz)) return 'desert';
     if (W.spotPick && W.spotPick(cx, cz, 'jungleTemple')) return 'jungle';
     if (W.spotPick && W.spotPick(cx, cz, 'ruins')) return 'ruins';
+    if (W.spotPick && W.spotPick(cx, cz, 'outpost')) return 'outpost';
     if (W.regionPick(cx, cz, 'igloo')) return 'igloo';
     if (W.regionPick(cx, cz, 'shipwreck')) return 'shipwreck';
     if (W.regionPick(cx, cz, 'ruinedPortal')) return 'ruined_portal';
@@ -1058,6 +1060,14 @@ function structureSpawns() {
           const top = W.getBlock(Math.floor(x), y, Math.floor(z));
           if (top && DEFS[top].solid && !DEFS[top].leaves && y > SEA) spawnMob('villager', x, y + 1, z);
         }
+      }
+    }
+    // pillagers guard their outposts
+    if (c.outpost && G.diff().mobs > 0) {
+      const o = c.outpost, near = G.mobs.filter(m => !m.dead && m.type === 'pillager' && Math.hypot(m.pos.x - o.x, m.pos.z - o.z) < 40).length;
+      if (near < 4 && Math.random() < 0.3 && Math.hypot(P.pos.x - o.x, P.pos.z - o.z) > 10) {
+        const a = Math.random() * Math.PI * 2, x = o.x + Math.cos(a) * (6 + Math.random() * 6), z = o.z + Math.sin(a) * (6 + Math.random() * 6);
+        if (W.isLoaded(x, z)) { const y = W.surfaceY(x, z); if (y > SEA && !W.getBlock(Math.floor(x), y + 1, Math.floor(z)) && !W.getBlock(Math.floor(x), y + 2, Math.floor(z))) spawnMob('pillager', x, y + 1, z); }
       }
     }
     for (const [sx, sy, sz] of c.spawners || []) {

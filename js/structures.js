@@ -43,6 +43,7 @@ World.prototype.pyramidChunk = function (cx, cz) {
    (only on fresh ground, so nothing appears on top of a build) */
 const SPOTS = {
   jungleTemple: { cell: 16, gap: 3, salt: 921, tries: 16, ok: b => b === BIOME.JUNGLE },
+  outpost: { cell: 18, gap: 4, salt: 924, tries: 10, ok: b => b === BIOME.PLAINS || b === BIOME.DESERT || b === BIOME.TAIGA || b === BIOME.SNOWY || b === BIOME.DARK_FOREST },
   ruins: { cell: 14, gap: 3, salt: 922, tries: 8, ok: b => b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.BIRCH || b === BIOME.TAIGA || b === BIOME.DARK_FOREST },
 };
 World.prototype.spotPick = function (cx, cz, kind) {
@@ -113,6 +114,7 @@ World.prototype.buildStructures = function (c, set, get, heights, biomes, rng) {
   if (v) { this.buildVillageChunk(S, v); return; }
 
   if (center === BIOME.JUNGLE && this.spotPick(cx, cz, 'jungleTemple')) { this.buildJungleTemple(S); return; }
+  if (this.spotPick(cx, cz, 'outpost')) { this.buildOutpost(S); return; }
   if (this.spotPick(cx, cz, 'ruins')) this.buildRuins(S);
   if (center === BIOME.DESERT && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(cx, cz))) && mulberry32(hash3(cx, cz, this.seed + 923))() < 0.025) this.buildDesertWell(S);
 
@@ -156,6 +158,12 @@ World.prototype.buildVillageChunk = function (S, v) {
   // lamp post at the crossing
   const lh = H(9, 9);
   if (lh > SEA && !isCentre) { for (let y = 1; y <= 3; y++) set(9, lh + y, 9, M.post); set(9, lh + 4, 9, ID.glowstone); }
+  // newer villages: work blocks by the crossing, so villagers get jobs and have things to trade
+  if (lh > SEA && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(c.cx, c.cz)))) {
+    const jobs = ['composter', 'lectern', 'smoker', 'blast_furnace', 'grindstone', 'fletching_table'];
+    const a = (rng() * jobs.length) | 0, b2 = (a + 1 + ((rng() * (jobs.length - 1)) | 0)) % jobs.length;
+    for (const [jx, jz, j] of [[8, 11, jobs[a]], [11, 8, jobs[b2]]]) { const jh = H(jx, jz); if (jh > SEA && !get(jx, jh + 1, jz)) set(jx, jh + 1, jz, ID[j]); }
+  }
 };
 
 /* what each plot in a village becomes */
@@ -452,6 +460,43 @@ World.prototype.buildJungleTemple = function (S) {
   for (let i = 0; i < 14; i++) { const x = x0 + (rng() * W | 0), z = rng() < 0.5 ? z0 - 1 : z0 + D, y = base + 1 + (rng() * 5 | 0); set(x, y, z, ID.jungle_leaves); }
 };
 
+/* a pillager outpost: a dark wooden watchtower with a lookout on top (and treasure up there); pillagers guard it */
+World.prototype.buildOutpost = function (S) {
+  const { set, H, rng, c } = S;
+  const h = H(7, 7);
+  if (h <= SEA) return;
+  const x0 = 4, z0 = 4, N = 7, top = h + 13;
+  for (let x = x0 - 1; x <= x0 + N; x++) for (let z = z0 - 1; z <= z0 + N; z++) {
+    for (let y = h + 1; y <= top + 4; y++) set(x, y, z, 0);
+    for (let y = Math.min(H(x, z), h) - 1; y <= h; y++) set(x, y, z, ID.cobblestone);
+  }
+  for (let fl = 0; fl < 3; fl++) {
+    const y0 = h + 1 + fl * 4;
+    for (let x = x0; x < x0 + N; x++) for (let z = z0; z < z0 + N; z++) {
+      const ex = x === x0 || x === x0 + N - 1, ez = z === z0 || z === z0 + N - 1;
+      if (fl > 0) set(x, y0 - 1, z, ID.dark_oak_planks); // floors
+      if (!ex && !ez) continue;
+      for (let y = y0; y < y0 + 3; y++) {
+        const window = y === y0 + 1 && ((ex && z === z0 + 3) || (ez && x === x0 + 3));
+        set(x, y, z, ex && ez ? ID.dark_oak_log : window ? 0 : (fl === 0 ? ID.cobblestone : ID.birch_planks));
+      }
+    }
+    set(x0 + 3, y0, z0, fl === 0 ? 0 : ID.birch_planks); if (fl === 0) set(x0 + 3, y0 + 1, z0, 0); // the door
+  }
+  // ladder up the middle of the back wall, through holes in each floor
+  for (let y = h + 1; y <= top; y++) { set(x0 + 3, y, z0 + N - 2, ID.ladder_s); }
+  // the lookout: a wider platform with a railing, and the chest
+  for (let x = x0 - 1; x <= x0 + N; x++) for (let z = z0 - 1; z <= z0 + N; z++) {
+    set(x, top, z, ID.dark_oak_planks);
+    if (x === x0 - 1 || x === x0 + N || z === z0 - 1 || z === z0 + N) set(x, top + 1, z, ID.dark_oak_fence);
+  }
+  set(x0 + 3, top, z0 + N - 2, ID.ladder_s);
+  for (const [x, z] of [[x0, z0], [x0 + N - 1, z0], [x0, z0 + N - 1], [x0 + N - 1, z0 + N - 1]]) for (let y = top + 1; y <= top + 3; y++) set(x, y, z, ID.dark_oak_log);
+  for (let x = x0; x < x0 + N; x++) for (let z = z0; z < z0 + N; z++) set(x, top + 4, z, ID.dark_oak_planks);
+  set(x0 + 2, top + 1, z0 + 2, ID.chest_loot);
+  c.outpost = { x: c.cx * 16 + 7, y: h + 1, z: c.cz * 16 + 7 };
+};
+
 /* overgrown ruins: broken mossy walls, with a chest buried in the middle */
 World.prototype.buildRuins = function (S) {
   const { set, H, rng } = S;
@@ -554,6 +599,8 @@ const LOOT_TABLES = {
     ['diamond', 1, 2, 3], ['iron_pickaxe', 1, 1, 1], ['golden_apple', 1, 1, 2], ['oak_planks', 4, 12, 8], ['string', 1, 4, 5]]],
   jungle: [2, 6, [['bone', 4, 6, 20], ['rotten_flesh', 3, 7, 16], ['gold_ingot', 2, 7, 15], ['iron_ingot', 1, 5, 15], ['emerald', 1, 3, 10], ['diamond', 1, 3, 3],
     ['saddle', 1, 1, 3], ['golden_apple', 1, 1, 2], ['iron_horse_armor', 1, 1, 1], ['golden_horse_armor', 1, 1, 1], ['diamond_horse_armor', 1, 1, 1], ['cocoa_beans', 1, 4, 10]]],
+  outpost: [2, 6, [['arrow', 2, 7, 15], ['wheat', 3, 5, 10], ['carrot', 3, 5, 10], ['potato', 2, 5, 10], ['dark_oak_log', 2, 3, 8], ['iron_ingot', 1, 3, 10], ['string', 1, 6, 10],
+    ['emerald', 1, 3, 6], ['bow', 1, 1, 4], ['iron_axe', 1, 1, 3], ['golden_apple', 1, 1, 1]]],
   ruins: [2, 5, [['coal', 1, 4, 15], ['wheat', 1, 5, 15], ['emerald', 1, 2, 6], ['iron_ingot', 1, 3, 10], ['gold_ingot', 1, 2, 6], ['stone_axe', 1, 1, 5],
     ['bread', 1, 3, 12], ['string', 1, 3, 8], ['lead', 1, 1, 5], ['diamond', 1, 1, 1]]],
   igloo: [3, 6, [['apple', 1, 3, 15], ['coal', 1, 4, 15], ['gold_ingot', 1, 3, 10], ['stone_axe', 1, 1, 2], ['rotten_flesh', 1, 1, 10], ['emerald', 1, 1, 1],

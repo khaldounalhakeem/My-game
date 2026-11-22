@@ -381,7 +381,7 @@ class Player {
     if (DEFS[id].door) {
       const oy = DEFS[id].door.half === 'lower' ? y + 1 : y - 1, other = W.getBlock(x, oy, z);
       if (other && DEFS[other].door) W.setBlock(x, oy, z, 0);
-      if (DEFS[id].door.half === 'upper' && this.mode === 'survival') G.spawnDrop(ID.oak_door, 1, x + 0.5, y - 0.5, z + 0.5);
+      if (DEFS[id].door.half === 'upper' && this.mode === 'survival') G.spawnDrop(ID[(DEFS[id].door.wood || 'oak') + '_door'], 1, x + 0.5, y - 0.5, z + 0.5);
     }
     if (id === ID.bed || id === ID.bed_head) {
       const other = id === ID.bed ? ID.bed_head : ID.bed;
@@ -458,7 +458,7 @@ class Player {
       const cur = W.getBlock(px, py, pz);
       if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return true;
       const L = this.lookDir(), alongX = Math.abs(L.x) > Math.abs(L.z);
-      if (hd.placesGate) W.setBlock(px, py, pz, ID['gate_' + (alongX ? 'z' : 'x') + 'c']);
+      if (hd.placesGate) W.setBlock(px, py, pz, ID[(hd.placesGate === true ? '' : hd.placesGate + '_') + 'gate_' + (alongX ? 'z' : 'x') + 'c']);
       else {
         // on a wall: flat against it; on the floor: on a post, writing toward you
         let id;
@@ -521,17 +521,18 @@ class Player {
       G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
       return true;
     }
-    if ((k === 'oak_door' || k === 'oak_trapdoor') && b) {
+    if ((k === 'oak_door' || k === 'oak_trapdoor' || hd.placesDoor || hd.placesTrapdoor) && b) {
+      const isDoor = k === 'oak_door' || !!hd.placesDoor, wp = hd.placesDoor || hd.placesTrapdoor ? (hd.placesDoor || hd.placesTrapdoor) + '_' : '';
       let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
       if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
       const free = (x, y, z) => { const id = W.getBlock(x, y, z); return !id || DEFS[id].replaceable; };
       const ax = Math.abs(Math.sin(this.yaw)) > Math.abs(Math.cos(this.yaw)) ? 'z' : 'x'; // a door faces you
-      if (k === 'oak_door') {
+      if (isDoor) {
         if (!free(px, py, pz) || !free(px, py + 1, pz) || !W.isSolid(px, py - 1, pz)) { G.ui.message('A door needs two blocks of space and a floor.'); return true; }
-        W.setBlock(px, py, pz, ID['door_' + ax + 'c_lower']); W.setBlock(px, py + 1, pz, ID['door_' + ax + 'c_upper']);
+        W.setBlock(px, py, pz, ID[wp + 'door_' + ax + 'c_lower']); W.setBlock(px, py + 1, pz, ID[wp + 'door_' + ax + 'c_upper']);
       } else {
         if (!free(px, py, pz)) return true;
-        W.setBlock(px, py, pz, ID['trapdoor_' + ax + 'c']);
+        W.setBlock(px, py, pz, ID[wp + 'trapdoor_' + ax + 'c']);
       }
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       G.sound.play('place'); this.useCd = 0.25; this.swing = 1;

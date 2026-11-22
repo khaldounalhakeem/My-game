@@ -673,6 +673,56 @@ const UI = {
     }
   },
 
+  /* trading with a villager: what it wants and what it gives; tap a trade to make it */
+  openTrades(v) {
+    if (G.state !== 'play') return;
+    const job = VILLAGER_JOBS[v.prof];
+    if (!job) { this.message("This villager has no job yet. Put a work block near it: composter (farmer), lectern (librarian), smoker (butcher), blast furnace (armorer), grindstone (weaponsmith) or fletching table (fletcher)."); return; }
+    G.sound.play('mob_villager', v.pos);
+    let box = $('trade-pop');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'trade-pop'; box.className = 'copy-pick';
+      box.innerHTML = '<div class="copy-card trade-card"><h3 class="trade-title"></h3><p class="trade-hint">Tap a trade to make it. You need what is on the left.</p><div class="trade-list"></div><button type="button" class="btn trade-close">Close</button></div>';
+      box.addEventListener('pointerdown', e => { if (e.target === box) this.closeTrades(); });
+      box.querySelector('.trade-close').addEventListener('click', () => this.closeTrades());
+      document.body.appendChild(box);
+    }
+    this.tradeWith = v;
+    box.querySelector('.trade-title').textContent = job.name;
+    this.renderTrades();
+    box.hidden = false;
+    G.setState('trade'); G.unlock();
+  },
+  renderTrades() {
+    const v = this.tradeWith, job = v && VILLAGER_JOBS[v.prof], list = $('trade-pop').querySelector('.trade-list'), inv = G.player.inv;
+    list.innerHTML = '';
+    if (!job) return;
+    const icon = (k, n) => `<span class="need"><img alt="" src="${iconURL(ID[k])}"><b>${n}</b></span>`;
+    for (const [give, get] of job.trades) {
+      if (give.some(([k]) => ID[k] === undefined) || ID[get[0]] === undefined) continue;
+      const ok = give.every(([k, n]) => inv.count(ID[k]) >= n);
+      const row = document.createElement('button'); row.type = 'button'; row.className = 'recipe trade' + (ok ? ' ok' : '');
+      row.innerHTML = `<span class="ins">${give.map(([k, n]) => icon(k, n)).join('')}</span><span class="arrow">➜</span>${icon(get[0], get[1])}<span class="rname">${DEFS[ID[get[0]]].name}</span>`;
+      row.title = give.map(([k, n]) => n + ' ' + DEFS[ID[k]].name).join(' + ') + ' for ' + get[1] + ' ' + DEFS[ID[get[0]]].name;
+      row.addEventListener('click', () => {
+        if (!give.every(([k, n]) => inv.count(ID[k]) >= n)) { this.message('You need ' + give.map(([k, n]) => n + ' ' + DEFS[ID[k]].name).join(' and ') + '.'); return; }
+        for (const [k, n] of give) inv.remove(ID[k], n);
+        const left = inv.add(ID[get[0]], get[1]);
+        if (left) { const P = G.player; G.spawnDrop(ID[get[0]], left, P.pos.x, P.pos.y + 1, P.pos.z); }
+        inv.changed(); G.sound.play('levelup'); G.player.addXp(1);
+        if (v.mesh) G.particles.burst(v.pos.x, v.pos.y + 2.1, v.pos.z, [0x4ad84a, 0x9aff9a], 6, 1, 0.1, -1);
+        this.renderTrades();
+      });
+      list.appendChild(row);
+    }
+  },
+  closeTrades() {
+    const box = $('trade-pop');
+    if (box) box.hidden = true;
+    this.tradeWith = null;
+    if (G.state === 'trade') G.resume();
+  },
+
   /* the device forgot who's playing: pick your name from the players saved online. Resolves to a name, or null. */
   whoIsPlaying(players) {
     return new Promise(done => {
@@ -878,6 +928,7 @@ const UI = {
         if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(k)) e.preventDefault();
         if (!Input.keys[k]) this.keyPress(k, e);
       } else if (G.state === 'inventory' && (k === 'KeyE' || k === 'Escape')) { this.closeInventory(); G.lock(); e.preventDefault(); }
+      else if (G.state === 'trade' && (k === 'KeyE' || k === 'Escape')) { this.closeTrades(); e.preventDefault(); }
       else if (G.state === 'pause' && k === 'Escape' && Input.fallback) { G.resume(); }
       Input.keys[k] = true;
     });

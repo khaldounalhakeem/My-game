@@ -434,3 +434,11 @@ body.touch:not(.pad) #crosshair { display: none; }
 #flag-arrow svg { width: 54px; height: 54px; transition: transform 0.08s linear; filter: drop-shadow(3px 3px 0 #000); }
 #flag-arrow path { fill: #ff5a4a; stroke: #6a0e0a; stroke-width: 1.5; stroke-linejoin: round; }
 #flag-arrow span { font-family: var(--font-display); font-size: 14px; color: #fff; text-shadow: 2px 2px 0 #000; background: rgba(0,0,0,0.45); padding: 4px 8px; white-space: nowrap; }
+
+/* trading with villagers */
+.trade-card { max-width: 520px; max-height: 86vh; overflow-y: auto; }
+.trade-list { display: flex; flex-direction: column; gap: 4px; }
+.recipe.trade { display: flex; align-items: center; gap: 8px; }
+.recipe.trade .arrow { font-size: 22px; color: #ffd84a; }
+.recipe.trade .rname { font-size: 15px; white-space: normal; }
+.trade-hint { font-size: 13px; }

@@ -61,6 +61,7 @@ const FACES_DRAW = {
   iron_golem: px => { noisyFill(px, 8, ['#d6cfc4', '#cbc3b6', '#ddd7cc'], 31); px(0, 0, '#b8b0a2', 8, 2); px(1, 3, '#7a1f1f', 2, 1); px(5, 3, '#7a1f1f', 2, 1); px(2, 6, '#9a9286', 4, 1); px(0, 5, '#4f7a2a', 1, 3); },
   wolf: px => { px(0, 0, '#d8d4cc', 8, 8); px(1, 2, '#222', 1, 1); px(6, 2, '#222', 1, 1); px(2, 4, '#c8c2b8', 4, 4); px(3, 5, '#222', 2, 1); },
   horse: px => { px(0, 0, '#8a5a32', 8, 8); px(1, 2, '#1a1a1a', 1, 1); px(6, 2, '#1a1a1a', 1, 1); px(2, 5, '#6a4224', 4, 3); px(3, 6, '#3a2412', 2, 1); },
+  pillager: px => { px(0, 0, '#9a9a9a', 8, 8); px(0, 0, '#3a3a3a', 8, 2); px(1, 2, '#1a1a1a', 2, 1); px(5, 2, '#1a1a1a', 2, 1); px(1, 3, '#e8e8e8', 1, 1); px(2, 3, '#4a6a8a', 1, 1); px(5, 3, '#4a6a8a', 1, 1); px(6, 3, '#e8e8e8', 1, 1); px(3, 4, '#7a7a7a', 2, 2); px(2, 6, '#5a5a5a', 4, 1); },
   donkey: px => { px(0, 0, '#7d7468', 8, 8); px(1, 2, '#1a1a1a', 1, 1); px(6, 2, '#1a1a1a', 1, 1); px(2, 5, '#a89e90', 4, 3); px(3, 6, '#3a342c', 2, 1); },
   villager: px => { px(0, 0, '#c8a07a', 8, 8); px(0, 0, '#5a3a1e', 8, 2); px(1, 3, '#fff', 1, 1); px(2, 3, '#2a6a2a', 1, 1); px(5, 3, '#2a6a2a', 1, 1); px(6, 3, '#fff', 1, 1); px(1, 2, '#3a2512', 2, 1); px(5, 2, '#3a2512', 2, 1); px(3, 6, '#7a5040', 2, 1); },
   enderman: px => { noisyFill(px, 8, ['#161616', '#1c1c1c', '#121212'], 5); px(0, 4, '#e079fa', 3, 1); px(5, 4, '#e079fa', 3, 1); px(1, 4, '#cc00fa', 1, 1); px(6, 4, '#cc00fa', 1, 1); },
@@ -191,6 +192,7 @@ const MOB_TYPES = {
   horse: { name: 'Horse', hp: 22, w: 1.3, h: 1.6, speed: 2.2, passive: true, rideable: true, horsey: true, xp: 1, drops: [['leather', 0, 2]] },
   donkey: { name: 'Donkey', hp: 20, w: 1.1, h: 1.4, speed: 1.9, passive: true, rideable: true, horsey: true, xp: 1, drops: [['leather', 0, 2]] },
   boat: { name: 'Boat', hp: 4, w: 1.3, h: 0.55, speed: 0, boat: true, xp: 0, drops: [['boat', 1, 1]] },
+  pillager: { name: 'Pillager', hp: 24, w: 0.6, h: 1.95, speed: 2.6, hostile: true, ranged: true, dmg: 4, xp: 5, drops: [['arrow', 0, 2], ['emerald', 0, 1]] },
   villager: { name: 'Villager', hp: 20, w: 0.6, h: 1.95, speed: 1.2, passive: true, xp: 0, drops: [] },
   pig: { name: 'Pig', hp: 10, w: 0.9, h: 0.9, speed: 1.5, passive: true, xp: 2, drops: [['porkchop', 1, 3]] },
   cow: { name: 'Cow', hp: 10, w: 0.9, h: 1.4, speed: 1.4, passive: true, xp: 2, drops: [['beef', 1, 3], ['leather', 0, 2]] },
@@ -201,11 +203,11 @@ const MOB_TYPES = {
 function buildMobModel(type) {
   const g = new THREE.Group();
   const P = { legs: [], arms: [], head: null, wings: [] };
-  if (type === 'zombie' || type === 'skeleton' || type === 'enderman' || type === 'player' || type === 'zombified_piglin' || type === 'wither_skeleton' || type === 'villager') {
+  if (type === 'zombie' || type === 'skeleton' || type === 'enderman' || type === 'player' || type === 'zombified_piglin' || type === 'wither_skeleton' || type === 'villager' || type === 'pillager') {
     const thin = type === 'skeleton' || type === 'enderman' || type === 'wither_skeleton', tall = type === 'enderman';
-    const skin = { zombie: 0x5c8a3e, skeleton: 0xc9c9c9, enderman: 0x161616, player: 0xc89878, zombified_piglin: 0xe39a8f, wither_skeleton: 0x2a2a2a, villager: 0xc8a07a }[type];
-    const shirt = { zombie: 0x2f8fa3, skeleton: 0xbdbdbd, enderman: 0x1a1a1a, player: 0x2fb5c8, zombified_piglin: 0x7a5a32, wither_skeleton: 0x262626, villager: 0x6b4a2e }[type];
-    const pants = { zombie: 0x3b3f8f, skeleton: 0xa6a6a6, enderman: 0x161616, player: 0x3b3f9f, zombified_piglin: 0x5a3a20, wither_skeleton: 0x202020, villager: 0x5e3f24 }[type];
+    const skin = { zombie: 0x5c8a3e, skeleton: 0xc9c9c9, enderman: 0x161616, player: 0xc89878, zombified_piglin: 0xe39a8f, wither_skeleton: 0x2a2a2a, villager: 0xc8a07a, pillager: 0x9a9a9a }[type];
+    const shirt = { zombie: 0x2f8fa3, skeleton: 0xbdbdbd, enderman: 0x1a1a1a, player: 0x2fb5c8, zombified_piglin: 0x7a5a32, wither_skeleton: 0x262626, villager: 0x6b4a2e, pillager: 0x3a3a4a }[type];
+    const pants = { zombie: 0x3b3f8f, skeleton: 0xa6a6a6, enderman: 0x161616, player: 0x3b3f9f, zombified_piglin: 0x5a3a20, wither_skeleton: 0x202020, villager: 0x5e3f24, pillager: 0x2a2a34 }[type];
     const mSkin = lam(skin), mShirt = lam(shirt), mPants = lam(pants);
     const lw = thin ? 0.13 : 0.25, legL = tall ? 1.5 : 0.75, bodyH = 0.75, hip = legL;
     P.legs.push(limb(g, lw, legL, lw, mPants, -0.125, hip, 0), limb(g, lw, legL, lw, mPants, 0.125, hip, 0));
@@ -221,7 +223,10 @@ function buildMobModel(type) {
       addBox(head, 0.12, 0.22, 0.12, lam(0xb88a64), 0, -0.08, 0.3);
       addBox(g, 0.54, 0.5, 0.29, mShirt, 0, hip + 0.1, 0);
       for (const a of P.arms) a.rotation.x = -0.9;
+      // a work apron, coloured by the villager's job (hidden while it has none)
+      P.robe = addBox(g, 0.56, 0.9, 0.31, lam(0xffffff), 0, hip + 0.25, 0); P.robe.visible = false;
     }
+    if (type === 'pillager') { P.arms[1].rotation.x = -Math.PI / 2; const bow = addBox(P.arms[1], 0.5, 0.06, 0.06, lam(0x5a3c1c), 0, -0.7, 0.12); addBox(P.arms[1], 0.06, 0.06, 0.4, lam(0x3a3a3a), 0, -0.7, 0.12); }
     if (type === 'zombified_piglin' || type === 'wither_skeleton') {
       P.arms[1].rotation.x = -0.6;
       const blade = addBox(P.arms[1], 0.08, 0.8, 0.08, lam(type === 'wither_skeleton' ? 0x707070 : 0xf5cc2e), 0, -0.9, 0.1);
@@ -361,6 +366,17 @@ function nearestPlayer(pos) {
 }
 
 /* ---------- entity base ---------- */
+/* villager jobs (from the work block they stand by) and what each one trades: [what you give, what you get] */
+const VILLAGER_JOBS = {
+  farmer: { name: 'Farmer', color: 0xc8a040, block: 'composter', trades: [[[['wheat', 20]], ['emerald', 1]], [[['potato', 26]], ['emerald', 1]], [[['carrot', 22]], ['emerald', 1]], [[['pumpkin', 6]], ['emerald', 1]], [[['emerald', 1]], ['bread', 6]], [[['emerald', 1]], ['cookie', 12]], [[['emerald', 3]], ['golden_apple', 1]]] },
+  librarian: { name: 'Librarian', color: 0xe8e8e8, block: 'lectern', trades: [[[['string', 24]], ['emerald', 1]], [[['emerald', 1]], ['glass', 4]], [[['emerald', 1]], ['lantern', 1]], [[['emerald', 6]], ['bookshelf', 1]], [[['emerald', 4]], ['lead', 2]], [[['emerald', 12]], ['ender_pearl', 1]]] },
+  butcher: { name: 'Butcher', color: 0xd84a3a, block: 'smoker', trades: [[[['chicken', 14]], ['emerald', 1]], [[['porkchop', 7]], ['emerald', 1]], [[['beef', 10]], ['emerald', 1]], [[['coal', 15]], ['emerald', 1]], [[['emerald', 1]], ['cooked_porkchop', 5]], [[['emerald', 1]], ['steak', 5]]] },
+  armorer: { name: 'Armorer', color: 0x3a3a3a, block: 'blast_furnace', trades: [[[['coal', 15]], ['emerald', 1]], [[['iron_ingot', 4]], ['emerald', 1]], [[['emerald', 5]], ['iron_helmet', 1]], [[['emerald', 9]], ['iron_chestplate', 1]], [[['emerald', 7]], ['iron_leggings', 1]], [[['emerald', 4]], ['iron_boots', 1]], [[['emerald', 18]], ['diamond_chestplate', 1]]] },
+  weaponsmith: { name: 'Weaponsmith', color: 0x6a2a2a, block: 'grindstone', trades: [[[['coal', 15]], ['emerald', 1]], [[['iron_ingot', 4]], ['emerald', 1]], [[['emerald', 3]], ['iron_axe', 1]], [[['emerald', 2]], ['iron_sword', 1]], [[['emerald', 13]], ['diamond_sword', 1]], [[['emerald', 16]], ['diamond_axe', 1]]] },
+  fletcher: { name: 'Fletcher', color: 0x5a8a3a, block: 'fletching_table', trades: [[[['stick', 32]], ['emerald', 1]], [[['flint', 26]], ['emerald', 1]], [[['string', 14]], ['emerald', 1]], [[['emerald', 1]], ['arrow', 16]], [[['emerald', 2]], ['bow', 1]], [[['emerald', 1]], ['flint', 10]]] },
+};
+const JOB_NAMES = [null, ...Object.keys(VILLAGER_JOBS)];
+
 class Mob {
   constructor(type, x, y, z) {
     const T = MOB_TYPES[type];
@@ -466,6 +482,7 @@ class Mob {
     }
     if (this.T.passive) this.fleeT = 4;
     if (byPlayer && (this.T.neutral || this.T.nightOnly)) this.angry = true;
+    if (byPlayer && this.type === 'villager') for (const m of G.mobs) if (m.type === 'iron_golem' && !m.dead && m.pos.distanceTo(this.pos) < 32) m.angry = true; // hit a villager and the golems come for you
     if (byPlayer && this.type === 'zombified_piglin') for (const m of G.mobs) if (m.type === this.type && m.pos.distanceTo(this.pos) < 20) m.angry = true;
     G.sound.play('hurtMob', this.pos);
     if (this.type === 'enderman' && Math.random() < 0.6 && this.hp > 0) this.teleport();
@@ -476,6 +493,7 @@ class Mob {
   interact(P, hd) {
     if (this.dead) return false;
     if (this.T.boat) return this.boatInteract(P);
+    if (this.type === 'villager' && !(hd && hd.key === 'lead')) { G.ui.openTrades(this); return true; }
     // a rope: tie up an animal so it follows you, or untie it
     if (this.leash && (!hd || hd.key === 'lead') && !this.remoteCtl) { this.unleash(false); P.inv.add(ID.lead, 1); P.inv.changed(); G.ui.message('You untied the ' + this.T.name.toLowerCase() + '.'); return true; }
     if (hd && hd.key === 'lead' && !this.T.hostile && !this.leash) {
@@ -564,10 +582,37 @@ class Mob {
     // holding food it loves (or a bucket for a cow): a tap feeds it instead of hitting it
     if (hd && lovesFood(this.type, hd.id)) return true;
     if (hd && hd.key === 'bucket' && this.type === 'cow') return true;
-    if (this.T.horsey || this.T.boat || this.leash) return true;
+    if (this.T.horsey || this.T.boat || this.leash || this.type === 'villager') return true;
     if (hd && hd.key === 'lead' && !this.T.hostile) return true;
     if (this.type === 'wolf') return this.tame || !!(hd && hd.key === 'bone');
     return false;
+  }
+
+  /* villagers: take the job of a free work block nearby (and lose it if the block goes) */
+  jobTick(dt) {
+    this.jobT = (this.jobT || Math.random() * 2) - dt;
+    if (this.jobT > 0) return;
+    this.jobT = 4;
+    const W = G.world, j = this.job;
+    if (j && DEFS[W.getBlock(j.x, j.y, j.z)].job !== this.prof) { this.job = null; this.prof = null; this.dressJob(); }
+    if (this.job) return;
+    const bx = Math.floor(this.pos.x), by = Math.floor(this.pos.y), bz = Math.floor(this.pos.z);
+    for (let dy = -2; dy <= 2; dy++) for (let dz = -8; dz <= 8; dz++) for (let dx = -8; dx <= 8; dx++) {
+      const id = W.getBlock(bx + dx, by + dy, bz + dz), job = DEFS[id] && DEFS[id].job;
+      if (!job) continue;
+      const x = bx + dx, y = by + dy, z = bz + dz;
+      if (G.mobs.some(m => m !== this && m.job && m.job.x === x && m.job.y === y && m.job.z === z)) continue;
+      this.job = { x, y, z }; this.prof = job; this.dressJob();
+      G.particles.burst(this.pos.x, this.pos.y + 2.1, this.pos.z, [0x4ad84a, 0x9aff9a], 8, 1.2, 0.12, -1);
+      return;
+    }
+  }
+  dressJob() {
+    const r = this.parts.robe;
+    if (!r) return;
+    const c = VILLAGER_JOBS[this.prof];
+    r.visible = !!c;
+    if (c) r.material.color.setHex(c.color);
   }
 
   /* show horse armor and chests */
@@ -687,6 +732,7 @@ class Mob {
     if (this.remoteCtl) return this.puppetUpdate(dt);
     if (!G.world.isLoaded(this.pos.x, this.pos.z)) return; // the ground here isn't loaded: wait
     if (this.T.boat) return this.boatTick(dt);
+    if (this.type === 'villager') this.jobTick(dt);
     const W = G.world, P = this.tame ? G.player : nearestPlayer(this.pos);
     if (this.dead) {
       this.deathT += dt;
@@ -945,6 +991,7 @@ class Mob {
     if (small !== this.baby) { if (small) this.makeBaby(9999); else this.growUp(); }
     if (this.parts.collar) this.parts.collar.visible = this.tame;
     if (this.parts.saddle) this.parts.saddle.visible = this.tame && this.T.horsey;
+    if (this.type === 'villager') { const pj = JOB_NAMES[(f >> 10) & 7] || null; if (pj !== this.prof) { this.prof = pj; this.dressJob(); } }
     const ai = (f >> 6) & 7, ch = !!(f & 512);
     if (ai !== this.netArmor || ch !== this.netChest) { this.netArmor = ai; this.netChest = ch; this.armor = HORSE_ARMOR_KEYS[ai - 1] || null; this.chestShown = ch; this.dress(); }
     if (this.parts.ring) this.parts.ring.rotation.y += dt * 3;
