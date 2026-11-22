@@ -38,21 +38,37 @@ const Input = {
   joy: { x: 0, y: 0, id: null }, tJump: false, tSneak: false, lastSpace: 0,
 };
 
-/* the groups recipes are shown in, in this order */
-const RECIPE_GROUPS = ['Tools', 'Weapons & Armor', 'Food', 'Lights', 'Doors, Fences, Stairs & Slabs', 'Workstations & Storage', 'Travel & Animals', 'Building Blocks', 'Materials'];
-function recipeGroup(d) {
-  if (!d) return 'Materials';
-  const k = d.key;
-  if (d.tool && !d.isBlock) return 'Tools';
-  if (d.armor || d.horseArmor || (d.damage && !d.tool) || k === 'bow' || k === 'arrow') return 'Weapons & Armor';
-  if (d.food || /^(cake|golden_apple|cookie|bread)$/.test(k)) return 'Food';
-  if (d.emit || /torch|lantern|glowstone/.test(k)) return 'Lights';
-  if (d.placesDoor || d.placesTrapdoor || d.placesGate || d.placesStair || d.placesSlab || d.placesSign || d.placesLadder || d.fence || d.pane || /door|fence|stairs|slab|sign|ladder|pane/.test(k)) return 'Doors, Fences, Stairs & Slabs';
-  if (d.job || /^(crafting_table|furnace|chest|bed|bookshelf|flag)$/.test(k)) return 'Workstations & Storage';
-  if (d.placesBoat || /^(lead|saddle|boat)$/.test(k)) return 'Travel & Animals';
-  if (d.isBlock) return 'Building Blocks';
-  return 'Materials';
-}
+/* recipes are always listed in the same order as Minecraft's creative inventory:
+   building blocks, colored blocks, natural, functional, redstone, tools, combat, food, ingredients */
+const MC_ORDER = (() => {
+  const woods = ['oak', 'spruce', 'birch', 'jungle', 'acacia', 'dark_oak', 'mangrove', 'cherry', 'crimson', 'warped'];
+  const colors = ['white', 'light_gray', 'gray', 'black', 'brown', 'red', 'orange', 'yellow', 'lime', 'green', 'cyan', 'light_blue', 'blue', 'purple', 'magenta', 'pink'];
+  const mats = ['wooden', 'stone', 'iron', 'golden', 'diamond', 'netherite'];
+  const o = [];
+  for (const w of woods) for (const t of ['planks', 'stairs', 'slab', 'fence', 'fence_gate', 'door', 'trapdoor']) o.push(w + '_' + t);
+  o.push('stone_slab', 'cobblestone_stairs', 'cobblestone_slab', 'mossy_cobblestone', 'stone_bricks', 'stone_brick_stairs', 'stone_brick_slab',
+    'sandstone', 'sandstone_slab', 'bricks', 'brick_slab', 'nether_bricks', 'nether_brick_slab', 'blackstone_slab', 'quartz_block', 'quartz_slab',
+    'coal_block', 'iron_block', 'gold_block', 'redstone_block', 'emerald_block', 'lapis_block', 'diamond_block', 'netherite_block');
+  for (const c of colors) o.push('wool_' + c);
+  for (const c of colors) o.push('stained_glass_' + c);
+  o.push('glass_pane');
+  for (const c of colors) o.push('stained_glass_pane_' + c);
+  o.push('bed', 'flag');
+  o.push('melon', 'pumpkin', 'hay_bale', 'glowstone', 'pumpkin_seeds');
+  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
+  o.push('redstone', 'tnt');
+  for (const m of mats) for (const t of ['shovel', 'pickaxe', 'axe', 'hoe']) o.push(m + '_' + t);
+  o.push('bucket', 'flint_and_steel', 'lead', 'boat', 'saddle', 'eye_of_ender');
+  for (const m of mats) o.push(m + '_sword');
+  for (const m of ['leather', 'chainmail', 'iron', 'golden', 'diamond', 'netherite']) for (const t of ['helmet', 'chestplate', 'leggings', 'boots']) o.push(m + '_' + t);
+  for (const m of ['leather', 'iron', 'golden', 'diamond']) o.push(m + '_horse_armor');
+  o.push('bow', 'arrow');
+  o.push('golden_apple', 'melon_slice', 'bread', 'cookie', 'cake');
+  o.push('coal', 'emerald', 'lapis', 'diamond', 'quartz', 'iron_ingot', 'gold_ingot', 'netherite_ingot', 'stick', 'wheat', 'leather', 'blaze_powder');
+  const m = {}; o.forEach((k, i) => { if (!(k in m)) m[k] = i; });
+  return m;
+})();
+const mcRank = k => (k in MC_ORDER ? MC_ORDER[k] : 100000 + (ID[k] || 0));
 
 const UI = {
   cursor: null, station: null, invVersion: -1, sel: -1, sig: '', tab: 'blocks',
@@ -531,12 +547,10 @@ const UI = {
     const here = new Set(this.stationRecipes());
     const nameOf = k => (DEFS[ID[k]] ? DEFS[ID[k]].name : k);
     const pool = q ? RECIPES.filter(r => nameOf(r[0]).toLowerCase().includes(q) || r[0].replace(/_/g, ' ').includes(q)) : this.stationRecipes();
-    // grouped like the creative inventory: tools, weapons and armor, food... each group A to Z,
-    // with what you can make right now first
-    const rs = pool.map(r => [r, here.has(r) && this.canCraft(r), recipeGroup(DEFS[ID[r[0]]])]);
-    rs.sort((a, b) => (RECIPE_GROUPS.indexOf(a[2]) - RECIPE_GROUPS.indexOf(b[2])) || (b[1] - a[1]) || (here.has(b[0]) - here.has(a[0])) || DEFS[ID[a[0][0]]].name.localeCompare(DEFS[ID[b[0][0]]].name));
+    // always the same order, like Minecraft's creative inventory (what you can make is lit up, not moved)
+    const rs = pool.map(r => [r, here.has(r) && this.canCraft(r)]);
+    rs.sort((a, b) => mcRank(a[0][0]) - mcRank(b[0][0]));
     list.innerHTML = '';
-    let lastGroup = null;
     if (q && !rs.length) {
       const found = Object.values(ID).map(i => DEFS[i]).find(d => d && d.name.toLowerCase().includes(q));
       const p = document.createElement('p'); p.className = 'hint';
@@ -544,12 +558,7 @@ const UI = {
       list.appendChild(p);
       return;
     }
-    for (const [r, ok, grp] of rs) {
-      if (grp !== lastGroup && this.station !== 'furnace') {
-        lastGroup = grp;
-        const h = document.createElement('div'); h.className = 'recipe-head'; h.textContent = grp;
-        list.appendChild(h);
-      }
+    for (const [r, ok] of rs) {
       const row = document.createElement('button');
       row.className = 'recipe' + (ok ? ' ok' : '');
       row.type = 'button';
