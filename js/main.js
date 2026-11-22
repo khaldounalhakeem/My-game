@@ -362,15 +362,24 @@ G.sleep = (b) => {
   // find both halves of the bed: the foot (where you sleep from) and the head
   const W = G.world;
   let foot = { x: b.x, y: b.y, z: b.z }, head = null;
-  const other = W.getBlock(b.x, b.y, b.z) === ID.bed ? ID.bed_head : ID.bed;
-  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (W.getBlock(b.x + dx, b.y, b.z + dz) === other) { head = { x: b.x + dx, y: b.y, z: b.z + dz }; break; }
-  if (other === ID.bed && head) { const t = foot; foot = head; head = t; }
+  const bd = DEFS[W.getBlock(b.x, b.y, b.z)];
+  if (bd.bedDir) {
+    // a bed that knows its direction: no mixing up with a bed next to it
+    const [dx, dz] = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }[bd.bedDir];
+    if (bd.bedPart === 'head') foot = { x: b.x - dx, y: b.y, z: b.z - dz };
+    head = { x: foot.x + dx, y: foot.y, z: foot.z + dz };
+  } else {
+    const other = W.getBlock(b.x, b.y, b.z) === ID.bed ? ID.bed_head : ID.bed;
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (W.getBlock(b.x + dx, b.y, b.z + dz) === other) { head = { x: b.x + dx, y: b.y, z: b.z + dz }; break; }
+    if (other === ID.bed && head) { const t = foot; foot = head; head = t; }
+  }
   // one sleeper per bed
   const taken = Net.bedTaken(foot);
   if (taken) { G.ui.message(taken + ' is already sleeping in this bed.', 'purple'); return; }
   // lie down on the bed; the night only ends once everyone in the world is in bed
   P.sleeping = { x: foot.x, y: foot.y, z: foot.z, t: 0, from: P.pos.clone() };
-  const hx = head ? (foot.x + head.x) / 2 : foot.x, hz = head ? (foot.z + head.z) / 2 : foot.z;
+  // lie along the bed: your head on the pillow, looking down the bed towards your feet
+  const hx = head ? head.x * 0.8 + foot.x * 0.2 : foot.x, hz = head ? head.z * 0.8 + foot.z * 0.2 : foot.z;
   P.pos.set(hx + 0.5, foot.y + 0.5625, hz + 0.5);
   if (head) P.yaw = Math.atan2(-(head.x - foot.x), -(head.z - foot.z)) + Math.PI; // head on the pillow, looking toward the foot
   P.pitch = 0.35;
@@ -450,9 +459,14 @@ G.toggleDoor = (x, y, z) => {
   } else if (d.trapdoor) {
     W.setBlock(x, y, z, ID[p + 'trapdoor_' + d.trapdoor.ax + (d.trapdoor.open ? 'c' : 'o')]);
   } else if (d.door) {
-    const op = d.door.open ? 'c' : 'o', ly = d.door.half === 'lower' ? y : y - 1;
-    W.setBlock(x, ly, z, ID[p + 'door_' + d.door.ax + op + '_lower']);
-    if (DEFS[W.getBlock(x, ly + 1, z)].door) W.setBlock(x, ly + 1, z, ID[p + 'door_' + d.door.ax + op + '_upper']);
+    const op = d.door.open ? 'c' : 'o', ly = d.door.half === 'lower' ? y : y - 1, hg = d.door.hinge ? '_r' : '';
+    W.setBlock(x, ly, z, ID[p + 'door_' + d.door.ax + op + hg + '_lower']);
+    if (DEFS[W.getBlock(x, ly + 1, z)].door) W.setBlock(x, ly + 1, z, ID[p + 'door_' + d.door.ax + op + hg + '_upper']);
+    // a double door: its partner beside it (hinged the other way) opens and closes with it
+    if (!G.togglingPair) {
+      const s = d.door.hinge ? -1 : 1, px = d.door.ax === 'x' ? x + s : x, pz = d.door.ax === 'z' ? z + s : z, pd = DEFS[W.getBlock(px, ly, pz)].door;
+      if (pd && pd.ax === d.door.ax && !!pd.hinge !== !!d.door.hinge && pd.open === d.door.open) { G.togglingPair = true; G.toggleDoor(px, ly, pz); G.togglingPair = false; return; }
+    }
   }
   Sound.play('click', new THREE.Vector3(x, y, z));
 };
@@ -502,8 +516,10 @@ G.lightFire = (b) => {
   let x = b.x + b.nx, y = b.y + b.ny, z = b.z + b.nz;
   const free = (a, c, d) => { const id = W.getBlock(a, c, d); return !id || (DEFS[id].replaceable && !DEFS[id].liquid); };
   const solidBelow = (a, c, d) => { const id = W.getBlock(a, c - 1, d); return id && DEFS[id].solid; };
-  if (!(free(x, y, z) && solidBelow(x, y, z))) { x = b.x; y = b.y + 1; z = b.z; } // on the side of a block: light the top instead
-  if (!(free(x, y, z) && solidBelow(x, y, z))) return false;
+  // fire can sit on top of a block or cling to its side (the block you lit must be solid)
+  const clicked = W.getBlock(b.x, b.y, b.z), onSolid = clicked && DEFS[clicked].solid;
+  if (!(free(x, y, z) && (solidBelow(x, y, z) || onSolid))) { x = b.x; y = b.y + 1; z = b.z; }
+  if (!(free(x, y, z) && (solidBelow(x, y, z) || onSolid))) return false;
   W.setBlock(x, y, z, ID.fire);
   G.sound.play('fuse', new THREE.Vector3(x, y, z));
   G.fires = G.fires || {};
@@ -537,7 +553,8 @@ G.tickFires = () => {
     count++;
     const below = W.getBlock(x, y - 1, z);
     const fuel = NEAR6.filter(([dx, dy, dz]) => FLAMMABLE.has(W.getBlock(x + dx, y + dy, z + dz)));
-    if ((!below || !DEFS[below].solid) && !fuel.length) { W.setBlock(x, y, z, 0); delete G.fires[k]; continue; }
+    // fire needs something to hold on to: a solid block under it or beside it (or something burning)
+    if (!NEAR6.some(([dx, dy, dz]) => { const n = W.getBlock(x + dx, y + dy, z + dz); return n && DEFS[n].solid; }) && !fuel.length) { W.setBlock(x, y, z, 0); delete G.fires[k]; continue; }
     if (below === ID.netherrack) continue;
     if (spread && fuel.length) {
       // the fire eats into the wood next to it, and jumps to empty spaces beside burning things
@@ -853,6 +870,20 @@ function drawRopes() {
   for (let i = n; i < ropeLines.length; i++) ropeLines[i].visible = false;
 }
 
+/* is there light from a torch, lantern, glowstone, fire...? (monsters don't appear in it) */
+G.lightNear = (x, y, z) => {
+  const W = G.world, cx = x >> 4, cz = z >> 4;
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    const c = W.chunks.get(W.key(cx + dx, cz + dz));
+    if (!c) continue;
+    for (const L of W.emitters(c)) {
+      const lx = (cx + dx) * 16 + L[0], lz = (cz + dz) * 16 + L[2];
+      if (Math.abs(lx - x) + Math.abs(L[1] - y) + Math.abs(lz - z) < L[3]) return true;
+    }
+  }
+  return false;
+};
+
 /* mobs take up space: two that overlap are pushed apart (only along the ground, and never into a wall) */
 function separateMobs() {
   const W = G.world, grid = new Map(), live = [];
@@ -969,6 +1000,7 @@ function spawnTick() {
       if (W.getBlock(x, y, z) || W.getBlock(x, y + 1, z)) continue;
       if (y > top && !night) continue;
       if (y <= top && W.skyExposed(x, y, z)) continue;
+      if (G.lightNear(x, y, z)) continue; // torches, lanterns and glowstone keep monsters away
       let type = pick(HOSTILE_POOL);
       if (type === 'enderman' && (W.getBlock(x, y + 2, z))) type = 'zombie';
       if (type === 'spider' && (W.getBlock(x + 1, y, z) || W.getBlock(x - 1, y, z))) type = 'skeleton';

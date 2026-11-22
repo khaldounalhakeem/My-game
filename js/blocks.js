@@ -620,6 +620,20 @@ makeTile('blast_side', P => { P.fill(0x6a6a70, 6); P.rect(0, 0, 16, 2, 0x3a3a3e)
 makeTile('grindstone', P => { P.fill(0x8a8a8a, 8); P.disc(7.5, 7.5, 6, 0x9a9a9a, 6); P.disc(7.5, 7.5, 2, 0x5a3c1c); });
 makeTile('fletching_side', P => { pPlanks(0xc8b48a)(P); P.rect(3, 4, 10, 8, 0xe8e0c8); P.line(4, 11, 11, 5, 0x7a5a32); P.rect(10, 4, 2, 2, 0xeeeeee); });
 makeTile('fletching_top', P => { pPlanks(0xc8b48a)(P); P.rect(2, 2, 12, 12, 0xd8c8a0, 6); });
+/* beds that know which way they face: the pillow sits at the head end, the rails run along the bed */
+const BED_RED = 0xb02626, BED_RAIL = 0x7a5a32;
+const pBedTop = (axis, pillowAt) => P => {
+  P.fill(BED_RED, 8); P.speck(0x8a1a1a, 0.2, 5);
+  for (let i = 0; i < 16; i++) { if (axis === 'z') { P.put(0, i, BED_RAIL); P.put(15, i, BED_RAIL); } else { P.put(i, 0, BED_RAIL); P.put(i, 15, BED_RAIL); } }
+  if (pillowAt === 'top') P.rect(2, 1, 12, 7, 0xeeeeee, 4);
+  if (pillowAt === 'bottom') P.rect(2, 8, 12, 7, 0xeeeeee, 4);
+  if (pillowAt === 'left') P.rect(1, 2, 7, 12, 0xeeeeee, 4);
+  if (pillowAt === 'right') P.rect(8, 2, 7, 12, 0xeeeeee, 4);
+  if (!pillowAt) { if (axis === 'z') P.rect(1, 0, 14, 3, 0xd84a4a, 4); else P.rect(0, 1, 3, 14, 0xd84a4a, 4); }
+};
+makeTile('bed_foot_top_z', pBedTop('z')); makeTile('bed_foot_top_x', pBedTop('x'));
+makeTile('bed_head_top_n', pBedTop('z', 'top')); makeTile('bed_head_top_s', pBedTop('z', 'bottom'));
+makeTile('bed_head_top_w', pBedTop('x', 'left')); makeTile('bed_head_top_e', pBedTop('x', 'right'));
 DEFS[0] = { id: 0, key: 'air', name: 'Air', isBlock: true, solid: false, opaque: false, hardness: 0, faces: [0, 0, 0, 0, 0, 0], color: [255, 255, 255] };
 ID.air = 0;
 let nextBlockId = 1;
@@ -856,6 +870,18 @@ block('smoker', 'Smoker', { side: 'smoker_side', front: 'smoker_front', top: 'sm
 block('blast_furnace', 'Blast Furnace', { side: 'blast_side', front: 'blast_front', top: 'blast_side', bottom: 'blast_side' }, PICK(1, 3.5, { job: 'armorer' }));
 block('grindstone', 'Grindstone', 'grindstone', PICK(1, 2, { job: 'weaponsmith' }));
 block('fletching_table', 'Fletching Table', { side: 'fletching_side', top: 'fletching_top', bottom: 'planks_oak' }, { tool: 'axe', hardness: 2.5, job: 'fletcher' });
+/* beds facing a direction (from the foot towards the head): n, s, e or w */
+for (const d of ['n', 's', 'e', 'w']) {
+  const ax = d === 'n' || d === 's' ? 'z' : 'x';
+  block('bed_foot_' + d, 'Bed', { top: 'bed_foot_top_' + ax, side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2, height: 0.5625, opaque: false, drop: 'bed', bedPart: 'foot', bedDir: d });
+  block('bed_head_' + d, 'Bed', { top: 'bed_head_top_' + d, side: 'bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.2, height: 0.5625, opaque: false, drop: 'bed', bedPart: 'head', bedDir: d });
+}
+/* doors hinged on the other side, so two doors side by side open like one double door */
+const DOOR_BOX_R = { xc: DOOR_BOX.xc, xo: [0.8125, 0, 0, 1, 1, 1], zc: DOOR_BOX.zc, zo: [0, 0, 0.8125, 1, 1, 1] };
+for (const [w, n] of [['', 'Oak'], ...WOODS.map(([k, nm]) => [k + '_', nm])]) for (const ax of ['x', 'z']) for (const op of ['c', 'o']) for (const half of ['lower', 'upper']) {
+  const wood = w ? w.slice(0, -1) : undefined, tile = w ? w + 'door_' + half : 'door_' + half;
+  block(w + 'door_' + ax + op + '_r_' + half, n + ' Door', tile, { tool: 'axe', hardness: 1.5, opaque: false, solid: op === 'c', box: DOOR_BOX_R[ax + op], drop: half === 'lower' ? (wood || 'oak') + '_door' : null, door: { ax, open: op === 'o', half, wood, hinge: 'r' } });
+}
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {

@@ -36,6 +36,8 @@ class Inventory {
   load(arr) { this.slots = arr.map(a => (a && DEFS[a[0]] ? { id: a[0], count: a[1] } : null)); while (this.slots.length < 40) this.slots.push(null); this.changed(); }
 }
 
+const BED_DIRS = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
+
 class Player {
   constructor() {
     this.pos = new THREE.Vector3(); this.vel = new THREE.Vector3();
@@ -383,7 +385,11 @@ class Player {
       if (other && DEFS[other].door) W.setBlock(x, oy, z, 0);
       if (DEFS[id].door.half === 'upper' && this.mode === 'survival') G.spawnDrop(ID[(DEFS[id].door.wood || 'oak') + '_door'], 1, x + 0.5, y - 0.5, z + 0.5);
     }
-    if (id === ID.bed || id === ID.bed_head) {
+    if (DEFS[id].bedDir) {
+      // the other half is exactly one block towards (or away from) the head
+      const [dx, dz] = BED_DIRS[DEFS[id].bedDir], s = DEFS[id].bedPart === 'foot' ? 1 : -1, o = W.getBlock(x + dx * s, y, z + dz * s);
+      if (DEFS[o].bedDir === DEFS[id].bedDir && DEFS[o].bedPart !== DEFS[id].bedPart) W.setBlock(x + dx * s, y, z + dz * s, 0);
+    } else if (id === ID.bed || id === ID.bed_head) {
       const other = id === ID.bed ? ID.bed_head : ID.bed;
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (W.getBlock(x + dx, y, z + dz) === other) { W.setBlock(x + dx, y, z + dz, 0); break; }
     }
@@ -529,7 +535,10 @@ class Player {
       const ax = Math.abs(Math.sin(this.yaw)) > Math.abs(Math.cos(this.yaw)) ? 'z' : 'x'; // a door faces you
       if (isDoor) {
         if (!free(px, py, pz) || !free(px, py + 1, pz) || !W.isSolid(px, py - 1, pz)) { G.ui.message('A door needs two blocks of space and a floor.'); return true; }
-        W.setBlock(px, py, pz, ID[wp + 'door_' + ax + 'c_lower']); W.setBlock(px, py + 1, pz, ID[wp + 'door_' + ax + 'c_upper']);
+        // next to another door in the same wall: hinge on the other side, so the two open like a double door
+        const nx = ax === 'x' ? px - 1 : px, nz = ax === 'z' ? pz - 1 : pz, nd = DEFS[W.getBlock(nx, py, nz)].door;
+        const hinge = nd && nd.ax === ax && nd.half === 'lower' && !nd.hinge ? '_r' : '';
+        W.setBlock(px, py, pz, ID[wp + 'door_' + ax + 'c' + hinge + '_lower']); W.setBlock(px, py + 1, pz, ID[wp + 'door_' + ax + 'c' + hinge + '_upper']);
       } else {
         if (!free(px, py, pz)) return true;
         W.setBlock(px, py, pz, ID[wp + 'trapdoor_' + ax + 'c']);
@@ -626,7 +635,7 @@ class Player {
     }
     if (b && !this.sneaking) {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
-      if (b.id === ID.bed || b.id === ID.bed_head) { this.useCd = 1; G.sleep(b); return; }
+      if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
       if (DEFS[b.id].door || DEFS[b.id].trapdoor || DEFS[b.id].gate) { this.useCd = 0.3; this.swing = 1; G.toggleDoor(b.x, b.y, b.z); return; }
@@ -726,9 +735,13 @@ class Player {
       const there = W.getBlock(...bedHead), under = W.getBlock(bedHead[0], py - 1, bedHead[2]);
       if ((there && !DEFS[there].replaceable) || !under || !DEFS[under].solid) { G.ui.message('Not enough room for the bed here. It needs two blocks of flat floor.'); return; }
     }
-    W.setBlock(px, py, pz, hd.id);
+    if (bedHead) {
+      // a bed that remembers which way it faces (from the foot towards the head)
+      const d = bedHead[0] > px ? 'e' : bedHead[0] < px ? 'w' : bedHead[2] > pz ? 's' : 'n';
+      W.setBlock(px, py, pz, ID['bed_foot_' + d]);
+      W.setBlock(bedHead[0], bedHead[1], bedHead[2], ID['bed_head_' + d]);
+    } else W.setBlock(px, py, pz, hd.id);
     if (hd.id === ID.flag) G.placedFlag(px, py, pz);
-    if (bedHead) W.setBlock(bedHead[0], bedHead[1], bedHead[2], ID.bed_head);
     W.settle(px, py, pz);
     if (hd.id === ID.pumpkin) G.tryBuildGolem(px, py, pz);
     G.sound.play('place', null, hd.id);
