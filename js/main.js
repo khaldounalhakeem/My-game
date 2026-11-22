@@ -410,7 +410,8 @@ G.wake = (msg) => {
 G.sleepTick = (dt) => {
   const P = G.player;
   if (!P.sleeping) return;
-  if (P.dead || G.dim !== 'overworld' || G.world.getBlock(P.sleeping.x, P.sleeping.y, P.sleeping.z) !== ID.bed) return G.wake();
+  const under = G.world.getBlock(P.sleeping.x, P.sleeping.y, P.sleeping.z);
+  if (P.dead || G.dim !== 'overworld' || !(under === ID.bed || DEFS[under].bedPart === 'foot')) return G.wake(); // the bed is gone
   if (!G.isNight()) return G.wake('Good morning!');
   if (Input.jump) return G.wake();
   const waiting = Net.notSleeping();
