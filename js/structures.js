@@ -43,7 +43,7 @@ World.prototype.pyramidChunk = function (cx, cz) {
    (only on fresh ground, so nothing appears on top of a build) */
 const SPOTS = {
   jungleTemple: { cell: 16, gap: 3, salt: 921, tries: 16, ok: b => b === BIOME.JUNGLE },
-  ruins: { cell: 14, gap: 3, salt: 922, tries: 8, ok: b => b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.BIRCH || b === BIOME.TAIGA },
+  ruins: { cell: 14, gap: 3, salt: 922, tries: 8, ok: b => b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.BIRCH || b === BIOME.TAIGA || b === BIOME.DARK_FOREST },
 };
 World.prototype.spotPick = function (cx, cz, kind) {
   if (this.legacy || (this.oldGen && this.oldGen.has(this.key(cx, cz)))) return false;
