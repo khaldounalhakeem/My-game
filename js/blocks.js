@@ -922,7 +922,7 @@ item('arrow', 'Arrow', 'arrow');
 item('flint_and_steel', 'Flint and Steel', 'flint_and_steel', { stack: 1 });
 const TOOL_MATS = [
   ['wooden', 'Wooden', 1, 2, 4], ['stone', 'Stone', 2, 4, 5], ['iron', 'Iron', 3, 6, 6],
-  ['golden', 'Golden', 1, 12, 4], ['diamond', 'Diamond', 4, 8, 7],
+  ['golden', 'Golden', 1, 12, 4], ['diamond', 'Diamond', 4, 8, 8],
 ];
 for (const [k, n, tier, speed, dmg] of TOOL_MATS) {
   item(k + '_pickaxe', n + ' Pickaxe', k + '_pickaxe', { stack: 1, tool: { type: 'pick', tier, speed }, damage: dmg - 2 });
@@ -971,7 +971,7 @@ for (const k of HORSE_ARMOR_KEYS) item(k, HORSE_ARMOR[k].name, k, { stack: 1, ho
 item('netherite_scrap', 'Netherite Scrap', 'netherite_scrap');
 item('netherite_ingot', 'Netherite Ingot', 'netherite_ingot');
 item('netherite_pickaxe', 'Netherite Pickaxe', 'netherite_pickaxe', { stack: 1, tool: { type: 'pick', tier: 5, speed: 10 }, damage: 6 });
-item('netherite_sword', 'Netherite Sword', 'netherite_sword', { stack: 1, damage: 9 });
+item('netherite_sword', 'Netherite Sword', 'netherite_sword', { stack: 1, damage: 10 });
 item('netherite_shovel', 'Netherite Shovel', 'netherite_shovel', { stack: 1, tool: { type: 'shovel', tier: 5, speed: 10 }, damage: 5 });
 item('netherite_axe', 'Netherite Axe', 'netherite_axe', { stack: 1, tool: { type: 'axe', tier: 5, speed: 10 }, damage: 10 });
 item('netherite_hoe', 'Netherite Hoe', 'netherite_hoe', { stack: 1, tool: { type: 'hoe', tier: 5, speed: 10 }, damage: 1 });

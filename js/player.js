@@ -18,6 +18,8 @@ class Inventory {
   }
   count(id) { let n = 0; for (let i = 0; i < 36; i++) { const s = this.slots[i]; if (s && s.id === id) n += s.count; } return n; }
   armorPoints() { let n = 0; for (let i = 36; i < 40; i++) { const s = this.slots[i]; if (s && DEFS[s.id].armor) n += DEFS[s.id].armor.points; } return n; }
+  /* diamond and netherite armor are tougher: they hold up better against big hits */
+  armorToughness() { let n = 0; for (let i = 36; i < 40; i++) { const s = this.slots[i], k = s && DEFS[s.id].key; if (k && DEFS[s.id].armor) n += /^netherite_/.test(k) ? 3 : /^diamond_/.test(k) ? 2 : 0; } return n; }
   remove(id, count) {
     for (let i = 35; i >= 0 && count > 0; i--) {
       const s = this.slots[i];
@@ -75,7 +77,13 @@ class Player {
     if (this.sleeping) G.wake('You were woken up!');
     // armor softens every kind of hurt except falling, drowning, starving and the void (4% per armor point, like Minecraft)
     const bypass = !from && /fell from|fell out|drown|starv|void|pearl/i.test(cause || '');
-    if (!bypass) amount = Math.max(1, Math.round(amount * (1 - Math.min(0.8, this.inv.armorPoints() * 0.04))));
+    // armor works like Minecraft: big hits get through more than small ones; damage is kept in halves, so
+    // a stronger sword always does more (no rounding two different swords to the same number)
+    if (!bypass) {
+      const a = this.inv.armorPoints(), t = this.inv.armorToughness();
+      const cut = clamp(Math.max(a / 5, a - amount / (2 + t / 4)), 0, 20) / 25;
+      amount = Math.max(0.5, Math.round(amount * (1 - cut) * 2) / 2);
+    }
     this.deathCause = cause || (from ? 'You were defeated by a monster or an explosion.' : 'You died.');
     if (from && G.lastAttacker && !G.lastAttacker.dead) for (const m of G.mobs) if (m.tame && m.type === 'wolf') m.petTarget = G.lastAttacker;
     G.lastAttacker = null;
