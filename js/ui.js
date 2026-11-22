@@ -38,6 +38,22 @@ const Input = {
   joy: { x: 0, y: 0, id: null }, tJump: false, tSneak: false, lastSpace: 0,
 };
 
+/* the groups recipes are shown in, in this order */
+const RECIPE_GROUPS = ['Tools', 'Weapons & Armor', 'Food', 'Lights', 'Doors, Fences, Stairs & Slabs', 'Workstations & Storage', 'Travel & Animals', 'Building Blocks', 'Materials'];
+function recipeGroup(d) {
+  if (!d) return 'Materials';
+  const k = d.key;
+  if (d.tool && !d.isBlock) return 'Tools';
+  if (d.armor || d.horseArmor || (d.damage && !d.tool) || k === 'bow' || k === 'arrow') return 'Weapons & Armor';
+  if (d.food || /^(cake|golden_apple|cookie|bread)$/.test(k)) return 'Food';
+  if (d.emit || /torch|lantern|glowstone/.test(k)) return 'Lights';
+  if (d.placesDoor || d.placesTrapdoor || d.placesGate || d.placesStair || d.placesSlab || d.placesSign || d.placesLadder || d.fence || d.pane || /door|fence|stairs|slab|sign|ladder|pane/.test(k)) return 'Doors, Fences, Stairs & Slabs';
+  if (d.job || /^(crafting_table|furnace|chest|bed|bookshelf|flag)$/.test(k)) return 'Workstations & Storage';
+  if (d.placesBoat || /^(lead|saddle|boat)$/.test(k)) return 'Travel & Animals';
+  if (d.isBlock) return 'Building Blocks';
+  return 'Materials';
+}
+
 const UI = {
   cursor: null, station: null, invVersion: -1, sel: -1, sig: '', tab: 'blocks',
 
@@ -515,9 +531,12 @@ const UI = {
     const here = new Set(this.stationRecipes());
     const nameOf = k => (DEFS[ID[k]] ? DEFS[ID[k]].name : k);
     const pool = q ? RECIPES.filter(r => nameOf(r[0]).toLowerCase().includes(q) || r[0].replace(/_/g, ' ').includes(q)) : this.stationRecipes();
-    const rs = pool.map(r => [r, here.has(r) && this.canCraft(r)]);
-    rs.sort((a, b) => (b[1] - a[1]) || (here.has(b[0]) - here.has(a[0])));
+    // grouped like the creative inventory: tools, weapons and armor, food... each group A to Z,
+    // with what you can make right now first
+    const rs = pool.map(r => [r, here.has(r) && this.canCraft(r), recipeGroup(DEFS[ID[r[0]]])]);
+    rs.sort((a, b) => (RECIPE_GROUPS.indexOf(a[2]) - RECIPE_GROUPS.indexOf(b[2])) || (b[1] - a[1]) || (here.has(b[0]) - here.has(a[0])) || DEFS[ID[a[0][0]]].name.localeCompare(DEFS[ID[b[0][0]]].name));
     list.innerHTML = '';
+    let lastGroup = null;
     if (q && !rs.length) {
       const found = Object.values(ID).map(i => DEFS[i]).find(d => d && d.name.toLowerCase().includes(q));
       const p = document.createElement('p'); p.className = 'hint';
@@ -525,7 +544,12 @@ const UI = {
       list.appendChild(p);
       return;
     }
-    for (const [r, ok] of rs) {
+    for (const [r, ok, grp] of rs) {
+      if (grp !== lastGroup && this.station !== 'furnace') {
+        lastGroup = grp;
+        const h = document.createElement('div'); h.className = 'recipe-head'; h.textContent = grp;
+        list.appendChild(h);
+      }
       const row = document.createElement('button');
       row.className = 'recipe' + (ok ? ' ok' : '');
       row.type = 'button';
