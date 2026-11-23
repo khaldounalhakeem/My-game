@@ -2,8 +2,9 @@
 /* Voxel world: chunk storage, terrain generation, meshing, raycasting and collision. */
 
 const CS = 16, WH = 96, SEA = 32;
-const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13 };
-const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove'];
+const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14 };
+const GEN_VER = 3; // which newer biomes exist (see genVerAt)
+const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle'];
 
 const FACES = [
   { n: [1, 0, 0], c: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], shade: 0.8 },
@@ -100,17 +101,17 @@ class World {
     if (temp < -0.12) return moist > 0.0 ? BIOME.TAIGA : BIOME.SNOWY;
     if (temp > 0.1 && moist < 0.04) return BIOME.DESERT;
     // hot, very wet and low: a mangrove swamp (fresh ground only)
-    if (temp > 0.1 && moist > 0.14 && h <= SEA + 4 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.MANGROVE;
+    if (temp > 0.1 && moist > 0.14 && h <= SEA + 4 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4))) && this.genVerAt(x, z) >= 2) return BIOME.MANGROVE;
     if (h <= SEA + 1) return BIOME.BEACH;
     // hot and wet: jungle (only on fresh ground, so places you built in keep their forest)
-    if (moist > 0.1 && temp > 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.JUNGLE;
+    if (moist > 0.1 && temp > 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return this.noiseB.fbm2(x / 160 - 900, z / 160 + 400, 2) > 0.18 && this.genVerAt(x, z) >= 3 ? BIOME.BAMBOO : BIOME.JUNGLE;
     // very wet but not hot: a dark forest of big dark oaks (fresh ground only, like the jungle)
     if (moist > 0.17 && temp > -0.02 && temp <= 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.DARK_FOREST;
     // hot and dry-ish: a savanna with flat-topped acacia trees (fresh ground only)
-    if (temp > 0.08 && moist <= 0.1 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.SAVANNA;
+    if (temp > 0.08 && moist <= 0.1 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4))) && this.genVerAt(x, z) >= 1) return BIOME.SAVANNA;
     if (moist > 0.04) return temp > -0.02 ? BIOME.FOREST : BIOME.BIRCH;
     // mild, dryish hills: a pink cherry grove (fresh ground only)
-    if (temp > -0.08 && temp <= 0.08 && h >= SEA + 7 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.CHERRY;
+    if (temp > -0.08 && temp <= 0.08 && h >= SEA + 7 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4))) && this.genVerAt(x, z) >= 2) return BIOME.CHERRY;
     return BIOME.PLAINS;
   }
 
@@ -122,6 +123,17 @@ class World {
     if (!c) return 0;
     return c.data[(x & 15) + ((z & 15) << 4) + (y << 8)];
   }
+
+  /* Newer biomes (savanna = 1, mangrove and cherry = 2, bamboo = 3) only grow where nobody had built yet.
+     The first time a place is built in, it (and the land around it) remembers which biomes existed then,
+     so a new kind of tree can never pop up inside a house later. */
+  genVerAt(x, z) { const v = this.genVer && this.genVer.get(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)); return v === undefined ? GEN_VER : v; }
+  stampGen(cx, cz, ver) {
+    if (!this.genVer) this.genVer = new Map();
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) { const k = this.key(cx + dx, cz + dz); if (!this.genVer.has(k)) this.genVer.set(k, ver); }
+  }
+  /* a save from before this was kept: every place already built in keeps the biomes from before savannas */
+  stampOldEdits() { for (const [k, m] of this.edits) if (m.size) { const [cx, cz] = k.split(',').map(Number); this.stampGen(cx, cz, 0); } }
 
   isLoaded(x, z) { return this.chunks.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)); }
 
@@ -142,6 +154,7 @@ class World {
       let m = this.edits.get(k);
       if (!m) { m = new Map(); this.edits.set(k, m); }
       m.set(i, id);
+      if (this.dim === 'overworld' && !(this.genVer && this.genVer.has(k))) this.stampGen(cx, cz, GEN_VER);
       if (this.onEdit && !this.applyingRemote) this.onEdit(x, y, z, id);
     }
     this.urgent.add(c);
@@ -395,7 +408,7 @@ class World {
 
     // decorations
     const center = biomes[136];
-    const treeCount = { [BIOME.DARK_FOREST]: 6, [BIOME.MANGROVE]: 5, [BIOME.CHERRY]: 3, [BIOME.SAVANNA]: rng() < 0.7 ? 1 + (rng() < 0.4 ? 1 : 0) : 0, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
+    const treeCount = { [BIOME.DARK_FOREST]: 6, [BIOME.BAMBOO]: 3, [BIOME.MANGROVE]: 5, [BIOME.CHERRY]: 3, [BIOME.SAVANNA]: rng() < 0.7 ? 1 + (rng() < 0.4 ? 1 : 0) : 0, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
     const trees = Math.floor(treeCount * this.style.trees + rng());
     for (let t = 0; t < trees; t++) {
       const x = 2 + (rng() * 12 | 0), z = 2 + (rng() * 12 | 0), h = heights[x + z * 16];
@@ -407,6 +420,7 @@ class World {
       else if (b === BIOME.SAVANNA) this.acaciaTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.MANGROVE) this.mangroveTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.CHERRY) this.cherryTree(set, get, x, h + 1, z, rng);
+      else if (b === BIOME.BAMBOO) { if (rng() < 0.5) this.jungleTree(set, get, x, h + 1, z, rng); else this.jungleBush(set, get, x, h + 1, z, rng); }
       else if (b === BIOME.JUNGLE) { if (rng() < 0.6) this.jungleTree(set, get, x, h + 1, z, rng); else this.jungleBush(set, get, x, h + 1, z, rng); }
       else if (b === BIOME.TAIGA || b === BIOME.SNOWY || (b === BIOME.MOUNTAIN && rng() < 0.7)) this.spruceTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.BIRCH || (b === BIOME.FOREST && rng() < 0.25)) this.oakTree(set, get, x, h + 1, z, rng, ID.birch_log, ID.birch_leaves, 5);
@@ -422,6 +436,23 @@ class World {
     if (center === BIOME.PLAINS) { plant(28, [ID.tall_grass], ID.grass); plant(5, [ID.rose, ID.dandelion], ID.grass); }
     if (center === BIOME.DARK_FOREST) { plant(10, [ID.tall_grass], ID.grass); plant(4, [ID.red_mushroom, ID.brown_mushroom], ID.grass); }
     if (center === BIOME.SAVANNA) plant(40, [ID.tall_grass], ID.grass);
+    // sugar cane on the shore, right next to water (only on land nobody had built on before it existed)
+    if (fresh && this.genVerAt(cx * 16, cz * 16) >= 3 && center !== BIOME.DESERT) for (let i = 0; i < 40; i++) {
+      const x = 1 + (rng() * 14 | 0), z = 1 + (rng() * 14 | 0), h = heights[x + z * 16], g = get(x, h, z);
+      if (h > SEA + 2 || (g !== ID.grass && g !== ID.sand) || get(x, h + 1, z) !== 0) continue;
+      if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => get(x + a, h, z + b) === ID.water)) continue;
+      const tall = 1 + (rng() * 3 | 0);
+      for (let k = 1; k <= tall; k++) set(x, h + k, z, ID.sugar_cane);
+    }
+    if (center === BIOME.BAMBOO) { // thick bamboo everywhere
+      plant(20, [ID.tall_grass], ID.grass);
+      for (let i = 0; i < 60; i++) {
+        const x = rng() * 16 | 0, z = rng() * 16 | 0, h = heights[x + z * 16];
+        if (get(x, h, z) !== ID.grass || get(x, h + 1, z) !== 0 || h + 16 >= WH) continue;
+        const tall = 4 + (rng() * 9 | 0);
+        for (let k = 1; k <= tall; k++) { if (get(x, h + k, z) !== 0) break; set(x, h + k, z, ID.bamboo); }
+      }
+    }
     if (center === BIOME.CHERRY) { plant(20, [ID.tall_grass], ID.grass); plant(4, [ID.rose, ID.dandelion], ID.grass); }
     if (center === BIOME.MANGROVE) { // shallow puddles between the trees
       plant(12, [ID.tall_grass], ID.grass);

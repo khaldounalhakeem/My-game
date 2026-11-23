@@ -46,6 +46,7 @@ const MC_ORDER = (() => {
   const mats = ['wooden', 'stone', 'iron', 'golden', 'diamond', 'netherite'];
   const o = [];
   for (const w of woods) for (const t of ['planks', 'stairs', 'slab', 'fence', 'fence_gate', 'door', 'trapdoor']) o.push(w + '_' + t);
+  o.push('bamboo_block', 'bamboo_planks');
   o.push('stone_slab', 'cobblestone_stairs', 'cobblestone_slab', 'mossy_cobblestone', 'stone_bricks', 'stone_brick_stairs', 'stone_brick_slab',
     'sandstone', 'sandstone_slab', 'bricks', 'brick_slab', 'nether_bricks', 'nether_brick_slab', 'blackstone_slab', 'quartz_block', 'quartz_slab',
     'coal_block', 'iron_block', 'gold_block', 'redstone_block', 'emerald_block', 'lapis_block', 'diamond_block', 'netherite_block');
@@ -54,8 +55,8 @@ const MC_ORDER = (() => {
   o.push('glass_pane');
   for (const c of colors) o.push('stained_glass_pane_' + c);
   o.push('bed', 'flag');
-  o.push('melon', 'pumpkin', 'hay_bale', 'glowstone', 'pumpkin_seeds');
-  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
+  o.push('melon', 'pumpkin', 'hay_bale', 'glowstone', 'pumpkin_seeds', 'bamboo', 'sugar_cane');
+  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
   o.push('redstone', 'tnt');
   for (const m of mats) for (const t of ['shovel', 'pickaxe', 'axe', 'hoe']) o.push(m + '_' + t);
   o.push('bucket', 'flint_and_steel', 'lead', 'boat', 'saddle', 'eye_of_ender');
@@ -64,7 +65,7 @@ const MC_ORDER = (() => {
   for (const m of ['leather', 'iron', 'golden', 'diamond']) o.push(m + '_horse_armor');
   o.push('bow', 'arrow');
   o.push('golden_apple', 'melon_slice', 'bread', 'cookie', 'cake');
-  o.push('coal', 'emerald', 'lapis', 'diamond', 'quartz', 'iron_ingot', 'gold_ingot', 'netherite_ingot', 'stick', 'wheat', 'leather', 'blaze_powder');
+  o.push('coal', 'emerald', 'lapis', 'diamond', 'quartz', 'iron_ingot', 'gold_ingot', 'netherite_ingot', 'stick', 'wheat', 'leather', 'paper', 'book', 'blaze_powder');
   const m = {}; o.forEach((k, i) => { if (!(k in m)) m[k] = i; });
   return m;
 })();
@@ -168,9 +169,10 @@ const UI = {
       if (img.getAttribute('src') !== url) img.src = url;
       img.style.visibility = 'visible';
       cnt.textContent = s.count > 1 ? s.count : '';
-      el.dataset.name = DEFS[s.id].name;
+      el.dataset.name = DEFS[s.id].name + (s.e ? ' (' + enchText(s.e) + ')' : '');
+      el.classList.toggle('ench', !!s.e);
     } else {
-      img.style.visibility = 'hidden'; cnt.textContent = ''; el.dataset.name = '';
+      img.style.visibility = 'hidden'; cnt.textContent = ''; el.dataset.name = ''; el.classList.remove('ench');
     }
   },
 
@@ -250,15 +252,15 @@ const UI = {
       const left = inv.add(s.id, s.count);
       if (left) s.count = left; else box[k] = null;
     } else if (button === 2) {
-      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = { id: s.id, count: half }; s.count -= half; if (!s.count) box[k] = null; }
+      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = s.e ? { id: s.id, count: half, e: s.e } : { id: s.id, count: half }; s.count -= half; if (!s.count) box[k] = null; }
       else if (cur && (!s || (s.id === cur.id && s.count < DEFS[s.id].stack))) {
-        if (!s) box[k] = { id: cur.id, count: 1 }; else s.count++;
+        if (!s) box[k] = cur.e ? { id: cur.id, count: 1, e: cur.e } : { id: cur.id, count: 1 }; else s.count++;
         cur.count--; if (!cur.count) this.cursor = null;
       }
     } else {
       if (!cur) { this.cursor = s; box[k] = null; }
       else if (!s) { box[k] = cur; this.cursor = null; }
-      else if (s.id === cur.id) { const n = Math.min(DEFS[s.id].stack - s.count, cur.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null; }
+      else if (s.id === cur.id && !s.e && !cur.e) { const n = Math.min(DEFS[s.id].stack - s.count, cur.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null; }
       else { box[k] = cur; this.cursor = s; }
     }
     G.sound.play('click');
@@ -275,7 +277,7 @@ const UI = {
     const box = this.chest.slots, inv = G.player.inv, s = inv.slots[i];
     const max = DEFS[s.id].stack;
     for (let k = 0; k < 27 && s.count; k++) { const t = box[k]; if (t && t.id === s.id && t.count < max) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; } }
-    for (let k = 0; k < 27 && s.count; k++) if (!box[k]) { box[k] = { id: s.id, count: s.count }; s.count = 0; }
+    for (let k = 0; k < 27 && s.count; k++) if (!box[k]) { box[k] = Object.assign({}, s); s.count = 0; }
     if (!s.count) inv.slots[i] = null;
     G.sound.play('click'); inv.changed(); this.chestEdited(); this.renderInventory();
   },
@@ -322,7 +324,7 @@ const UI = {
     const k = SMELT[s.id] ? 0 : FUEL[s.id] ? 1 : -1;
     if (k < 0) { G.ui.message(DEFS[s.id].name + ' can\'t be smelted or burned.'); return; }
     const t = f.slots[k], max = DEFS[s.id].stack;
-    if (!t) { f.slots[k] = { id: s.id, count: s.count }; inv.slots[i] = null; }
+    if (!t) { f.slots[k] = Object.assign({}, s); inv.slots[i] = null; }
     else if (t.id === s.id) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; if (!s.count) inv.slots[i] = null; }
     else return;
     G.sound.play('click'); inv.changed(); this.renderInventory();
@@ -378,7 +380,7 @@ const UI = {
     const st = this.slotBox(sp.i);
     if (!st || st.box[st.k]) return;
     const back = Math.floor(cur.count / 2);
-    st.box[st.k] = { id: cur.id, count: back };
+    st.box[st.k] = cur.e ? { id: cur.id, count: back, e: cur.e } : { id: cur.id, count: back };
     cur.count -= back;
     G.sound.play('click');
     G.player.inv.changed();
@@ -406,18 +408,18 @@ const UI = {
       const [a, b] = i < 9 ? [9, 36] : [0, 9];
       const max = DEFS[s.id].stack;
       for (let k = a; k < b && s.count; k++) { const t = inv.slots[k]; if (t && t.id === s.id && t.count < max) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; } }
-      for (let k = a; k < b && s.count; k++) if (!inv.slots[k]) { inv.slots[k] = { id: s.id, count: s.count }; s.count = 0; }
+      for (let k = a; k < b && s.count; k++) if (!inv.slots[k]) { inv.slots[k] = Object.assign({}, s); s.count = 0; }
       if (!s.count) inv.slots[i] = null;
     } else if (button === 2) {
-      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = { id: s.id, count: half }; s.count -= half; if (!s.count) inv.slots[i] = null; }
+      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = s.e ? { id: s.id, count: half, e: s.e } : { id: s.id, count: half }; s.count -= half; if (!s.count) inv.slots[i] = null; }
       else if (cur && (!s || (s.id === cur.id && s.count < DEFS[s.id].stack))) {
-        if (!s) inv.slots[i] = { id: cur.id, count: 1 }; else s.count++;
+        if (!s) inv.slots[i] = cur.e ? { id: cur.id, count: 1, e: cur.e } : { id: cur.id, count: 1 }; else s.count++;
         cur.count--; if (!cur.count) this.cursor = null;
       }
     } else {
       if (!cur) { this.cursor = s; inv.slots[i] = null; }
       else if (!s) { inv.slots[i] = cur; this.cursor = null; }
-      else if (s.id === cur.id) { const n = Math.min(DEFS[s.id].stack - s.count, cur.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null; }
+      else if (s.id === cur.id && !s.e && !cur.e) { const n = Math.min(DEFS[s.id].stack - s.count, cur.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null; }
       else { inv.slots[i] = cur; this.cursor = s; }
     }
     G.sound.play('click');
@@ -447,8 +449,8 @@ const UI = {
   closeInventory() {
     this.closeSplit();
     if (this.cursor) {
-      const left = G.player.inv.add(this.cursor.id, this.cursor.count);
-      if (left) { const P = G.player; G.spawnDrop(this.cursor.id, left, P.pos.x, P.pos.y + 1.2, P.pos.z); }
+      const left = G.player.inv.add(this.cursor.id, this.cursor.count, this.cursor.e);
+      if (left) { const P = G.player; G.spawnDrop(this.cursor.id, left, P.pos.x, P.pos.y + 1.2, P.pos.z, undefined, this.cursor.e ? { e: this.cursor.e } : undefined); }
       this.cursor = null; this.moveCursor();
     }
     this.tip('');
@@ -749,9 +751,96 @@ const UI = {
       list.appendChild(row);
     }
   },
+  /* ---------- the enchanting table ----------
+     Pick a tool, weapon, armor piece or bow, then one of three offers. Each costs lapis lazuli and
+     levels (1, 2 or 3) and needs a high enough level. Bookshelves around the table (with a one block
+     gap, up to 15) make the offers stronger, like in Minecraft. */
+  openEnchant(x, y, z) {
+    if (G.state !== 'play') return;
+    const W = G.world;
+    let shelves = 0;
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+      if (Math.max(Math.abs(dx), Math.abs(dz)) !== 2) continue;
+      for (let dy = 0; dy <= 1; dy++) if (W.getBlock(x + dx, y + dy, z + dz) === ID.bookshelf && !W.getBlock(x + Math.sign(dx), y + dy, z + Math.sign(dz))) shelves++;
+    }
+    let box = $('ench-pop');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'ench-pop'; box.className = 'copy-pick';
+      box.innerHTML = '<div class="copy-card trade-card"><h3>Enchanting Table</h3><p class="trade-hint ench-hint"></p><div class="ench-items"></div><div class="trade-list ench-offers"></div><button type="button" class="btn trade-close">Close</button></div>';
+      box.addEventListener('pointerdown', e => { if (e.target === box) this.closeTrades(); });
+      box.querySelector('.trade-close').addEventListener('click', () => this.closeTrades());
+      document.body.appendChild(box);
+    }
+    this.ench = { x, y, z, shelves: Math.min(15, shelves), pick: null };
+    if (G.enchSeed === undefined) G.enchSeed = Math.random() * 1e9 | 0;
+    this.renderEnchant();
+    box.hidden = false;
+    G.sound.play('click');
+    G.setState('trade'); G.unlock();
+  },
+  enchOffers(slot) {
+    const sh = this.ench.shelves, def = DEFS[slot.id], kinds = enchKinds(def);
+    const r = mulberry32((G.enchSeed ^ (slot.id * 2654435761)) >>> 0), ri = n => r() * n | 0;
+    const base = 1 + ri(8) + (sh >> 1) + ri(sh + 1);
+    const lvls = [Math.max(base / 3 | 0, 1), (base * 2 / 3 | 0) + 1, Math.max(base, sh * 2)];
+    const pool = Object.keys(ENCHANTS).filter(k => ENCHANTS[k].on.some(o => kinds.includes(o)));
+    return lvls.map((L, i) => {
+      const e = {}, pick = () => {
+        const left = pool.filter(k => !e[k] && !(k === 'fortune' && e.silk));
+        if (!left.length) return;
+        const k = left[ri(left.length)], mx = ENCHANTS[k].max;
+        e[k] = Math.max(1, Math.min(mx, Math.ceil(L / 30 * mx * (0.6 + r() * 0.7))));
+      };
+      pick();
+      if (r() < L / 45) pick();
+      if (r() < L / 90) pick();
+      return { L, cost: i + 1, e };
+    });
+  },
+  renderEnchant() {
+    const box = $('ench-pop'), st = this.ench, P = G.player, inv = P.inv, lapis = inv.count(ID.lapis), creative = P.mode === 'creative';
+    box.querySelector('.ench-hint').textContent = 'Your level: ' + P.level + ' · Lapis lazuli: ' + lapis + ' · Bookshelves: ' + st.shelves + ' of 15. ' + (st.pick === null ? 'Pick what you want to enchant.' : 'Pick an enchantment.') + (st.shelves < 15 ? ' Put bookshelves around the table, one block away, for stronger magic.' : '');
+    const items = box.querySelector('.ench-items'), offers = box.querySelector('.ench-offers');
+    items.innerHTML = ''; offers.innerHTML = '';
+    const can = [];
+    for (let i = 0; i < 40; i++) { const s = inv.slots[i]; if (s && !s.e && canEnchant(DEFS[s.id])) can.push(i); }
+    if (st.pick !== null && !can.includes(st.pick)) st.pick = null;
+    if (!can.length) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'You have nothing to enchant. Bring a sword, a tool, armor or a bow (one that is not enchanted yet).'; items.appendChild(p); return; }
+    for (const i of can) {
+      const s = inv.slots[i], b = document.createElement('button');
+      b.type = 'button'; b.className = 'ench-item' + (st.pick === i ? ' sel' : '');
+      b.innerHTML = `<img alt="" src="${iconURL(s.id)}"><span>${DEFS[s.id].name}</span>`;
+      b.addEventListener('click', () => { st.pick = i; G.sound.play('click'); this.renderEnchant(); });
+      items.appendChild(b);
+    }
+    if (st.pick === null) return;
+    const slot = inv.slots[st.pick];
+    for (const o of this.enchOffers(slot)) {
+      const ok = creative || (P.level >= o.L && lapis >= o.cost);
+      const row = document.createElement('button'); row.type = 'button'; row.className = 'recipe ench-offer' + (ok ? ' ok' : '');
+      row.innerHTML = `<span class="ench-lv">${o.L}</span><span class="rname">${enchText(o.e)}<small class="rhow">Needs level ${o.L} · costs ${o.cost} lapis and ${o.cost} level${o.cost > 1 ? 's' : ''}</small></span><span class="ins"><span class="need${lapis >= o.cost ? '' : ' short'}"><img alt="" src="${iconURL(ID.lapis)}">${o.cost}</span></span>`;
+      row.addEventListener('click', () => {
+        if (!creative && P.level < o.L) { this.message('You need level ' + o.L + ' for this. Get more XP by mining ores, smelting and defeating mobs.'); return; }
+        if (!creative && lapis < o.cost) { this.message('You need ' + o.cost + ' lapis lazuli.'); return; }
+        if (!creative) { inv.remove(ID.lapis, o.cost); P.level = Math.max(0, P.level - o.cost); }
+        slot.e = o.e; inv.changed();
+        G.enchSeed = Math.random() * 1e9 | 0; // new offers next time, like Minecraft
+        G.sound.play('levelup');
+        G.particles.burst(st.x + 0.5, st.y + 1.2, st.z + 0.5, [0xb07aff, 0x7a5aff, 0xe8d8ff], 18, 2, 0.1, -1);
+        this.message(DEFS[slot.id].name + ' is now enchanted with ' + enchText(o.e) + '!', 'purple');
+        st.pick = null;
+        this.renderEnchant();
+      });
+      offers.appendChild(row);
+    }
+  },
+
   closeTrades() {
     const box = $('trade-pop');
     if (box) box.hidden = true;
+    const eb = $('ench-pop');
+    if (eb) eb.hidden = true;
+    this.ench = null;
     this.tradeWith = null;
     if (G.state === 'trade') G.resume();
   },

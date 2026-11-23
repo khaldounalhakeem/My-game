@@ -627,6 +627,22 @@ for (const [w, bark, inner, ring, leaf, plank] of [['mangrove', 0x54392d, 0x7a3a
   makeTile('i_' + w + '_slab', pPlant(P => { P.rect(1, 8, 14, 6, c); P.rect(1, 8, 14, 1, shadeC(c, 1.2)); P.rect(1, 13, 14, 1, shadeC(c, 0.6)); }));
 }
 makeTile('mangrove_roots', P => { for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) { const on = (i + j) % 6 < 2 || (i - j + 32) % 7 < 2; if (on) P.put(i, j, P.vary(0x4a3226, 10)); else P.erase(i, j); } });
+/* bamboo */
+makeTile('bamboo_side', P => { P.clear(); P.rect(6, 0, 4, 16, 0x5d9e2a, 10); P.rect(6, 0, 1, 16, 0x4a8420); P.rect(9, 0, 1, 16, 0x76b83a); for (const y of [3, 11]) P.rect(6, y, 4, 1, 0x3e6e1a); P.put(10, 5, 0x5d9e2a); P.put(11, 4, 0x7ec04a); P.put(12, 4, 0x7ec04a); });
+makeTile('bamboo_top', P => { P.clear(); P.rect(6, 6, 4, 4, 0x8ac84a); P.rect(7, 7, 2, 2, 0xc8d88a); });
+makeTile('i_bamboo', pPlant(P => { P.line(4, 15, 11, 1, 0x5d9e2a); P.line(5, 15, 12, 1, 0x4a8420); for (const t of [5, 10]) P.put(4 + (7 * (15 - t) / 14 | 0), t, 0x3e6e1a); P.put(12, 3, 0x7ec04a); P.put(13, 2, 0x7ec04a); P.put(10, 4, 0x7ec04a); }));
+makeTile('planks_bamboo', P => { P.fill(0xd8c25a, 6); for (let x = 0; x < 16; x += 4) P.rect(x, 0, 1, 16, 0xb09a3a); for (let y = 0; y < 16; y += 8) P.rect(0, y, 16, 1, 0xa08a32); });
+makeTile('bamboo_block_side', P => { P.fill(0x6aa02e, 8); for (let x = 0; x < 16; x += 4) P.rect(x, 0, 1, 16, 0x4a7a1e); for (const y of [5, 12]) P.rect(0, y, 16, 1, 0x3e6e1a); });
+makeTile('bamboo_block_top', P => { P.fill(0x4a7a1e, 6); for (const [x, y] of [[1, 1], [6, 1], [11, 1], [1, 6], [6, 6], [11, 6], [1, 11], [6, 11], [11, 11]]) { P.rect(x, y, 4, 4, 0x8ac84a); P.rect(x + 1, y + 1, 2, 2, 0xc8d88a); } });
+/* sugar cane, paper, book and the enchanting table */
+makeTile('sugar_cane', P => { P.clear(); for (const x of [3, 8, 12]) { P.rect(x, 0, 2, 16, 0x8ac85a, 8); P.put(x, 5, 0x5a9a3a); P.put(x + 1, 5, 0x5a9a3a); P.put(x, 12, 0x5a9a3a); P.put(x + 1, 12, 0x5a9a3a); } P.put(5, 3, 0x9ad86a); P.put(10, 8, 0x9ad86a); });
+makeTile('i_sugar_cane', pPlant(P => { for (const x of [4, 8, 11]) { P.rect(x, 2, 2, 13, 0x8ac85a); P.rect(x, 6, 2, 1, 0x5a9a3a); P.rect(x, 11, 2, 1, 0x5a9a3a); } }));
+makeTile('i_paper', pPlant(P => { P.rect(3, 2, 10, 12, 0xf4f0e2); P.rect(3, 2, 10, 1, 0xd8d2c0); P.rect(12, 2, 1, 12, 0xd8d2c0); for (let y = 5; y < 13; y += 2) P.rect(5, y, 6, 1, 0xc8c2b0); }));
+makeTile('i_book', pPlant(P => { P.rect(3, 2, 10, 12, 0x7a3a1e); P.rect(4, 3, 8, 10, 0x8a4a2a); P.rect(11, 3, 2, 11, 0xf0ead8); P.rect(3, 13, 10, 1, 0x5a2a12); P.rect(6, 6, 4, 2, 0xd8b84a); }));
+makeTile('i_enchanted_book', pPlant(P => { P.rect(3, 2, 10, 12, 0x6a2a8a); P.rect(4, 3, 8, 10, 0x8a3aaa); P.rect(11, 3, 2, 11, 0xf0ead8); P.rect(3, 13, 10, 1, 0x4a1a6a); P.rect(6, 6, 4, 2, 0xffd84a); P.put(5, 10, 0xe8b8ff); P.put(9, 4, 0xe8b8ff); }));
+makeTile('ench_top', P => { P.fill(0x3a1018, 6); P.rect(0, 0, 16, 1, 0x2a0a10); P.rect(3, 4, 10, 8, 0x7a3a1e); P.rect(4, 5, 4, 6, 0xf0ead8); P.rect(8, 5, 4, 6, 0xe8e0cc); P.rect(8, 5, 1, 6, 0x9a8a6a); P.put(5, 7, 0x6a5aaa); P.put(10, 8, 0x6a5aaa); });
+makeTile('ench_side', P => { P.fill(0x15101f, 5); P.speck(0x3a2860, 0.15, 6); P.rect(0, 0, 16, 4, 0x8a1a2a, 6); P.rect(0, 3, 16, 1, 0xd8b84a); for (const x of [2, 7, 12]) P.rect(x, 1, 2, 2, 0x5ae8e8); });
+makeTile('ench_bottom', P => { P.fill(0x15101f, 5); P.speck(0x3a2860, 0.15, 6); });
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -923,6 +939,12 @@ for (const [w, n, sap] of [['mangrove', 'Mangrove', 'Mangrove Propagule'], ['che
   rightDoors(w + '_', n);
 }
 block('mangrove_roots', 'Mangrove Roots', 'mangrove_roots', { tool: 'axe', hardness: 0.7, opaque: false, cutout: true });
+/* bamboo: a thin stalk you can stack; breaking one breaks everything above */
+block('bamboo', 'Bamboo', { side: 'bamboo_side', top: 'bamboo_top', bottom: 'bamboo_top' }, { tool: 'axe', hardness: 0.5, opaque: false, cutout: true, box: [0.375, 0, 0.375, 0.625, 1, 0.625], boxes: [[0.375, 0, 0.375, 0.625, 1, 0.625]], iconTile: 'i_bamboo' });
+block('bamboo_block', 'Block of Bamboo', { top: 'bamboo_block_top', side: 'bamboo_block_side' }, { tool: 'axe', hardness: 2 });
+block('bamboo_planks', 'Bamboo Planks', 'planks_bamboo', { tool: 'axe', hardness: 2 });
+block('sugar_cane', 'Sugar Cane', 'sugar_cane', { solid: false, opaque: false, cutout: true, cross: true, hardness: 0, iconTile: 'i_sugar_cane' });
+block('enchanting_table', 'Enchanting Table', { top: 'ench_top', side: 'ench_side', bottom: 'ench_bottom' }, PICK(1, 5, { height: 0.75, opaque: false, light: true, emit: 7 }));
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1048,6 +1070,8 @@ for (const [w, n] of [['mangrove', 'Mangrove'], ['cherry', 'Cherry']]) {
   item(w + '_stairs', n + ' Stairs', w + '_stairs', { placesStair: w });
   item(w + '_slab', n + ' Slab', w + '_slab', { placesSlab: w });
 }
+item('paper', 'Paper', 'paper');
+item('book', 'Book', 'book');
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -1056,11 +1080,47 @@ function getDrops(def, rng) {
   return def.drop(rng).map(([k, n]) => [ID[k], n]);
 }
 
+/* ---------- enchantments ----------
+   An enchanted item keeps its enchantments on its slot as e: { sharpness: 2, ... } */
+const ENCHANTS = {
+  sharpness: { name: 'Sharpness', max: 5, on: ['sword', 'axe'] },
+  knockback: { name: 'Knockback', max: 2, on: ['sword'] },
+  fire_aspect: { name: 'Fire Aspect', max: 2, on: ['sword'] },
+  looting: { name: 'Looting', max: 3, on: ['sword'] },
+  efficiency: { name: 'Efficiency', max: 5, on: ['pick', 'axe', 'shovel', 'hoe'] },
+  fortune: { name: 'Fortune', max: 3, on: ['pick', 'axe', 'shovel', 'hoe'] },
+  protection: { name: 'Protection', max: 4, on: ['armor'] },
+  feather_falling: { name: 'Feather Falling', max: 4, on: ['boots'] },
+  power: { name: 'Power', max: 5, on: ['bow'] },
+  flame: { name: 'Flame', max: 1, on: ['bow'] },
+  infinity: { name: 'Infinity', max: 1, on: ['bow'] },
+};
+const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
+/* what kinds of enchantment an item can take ([] = none) */
+function enchKinds(def) {
+  if (!def) return [];
+  if (/_sword$/.test(def.key)) return ['sword'];
+  if (def.tool) return [def.tool.type];
+  if (def.armor) return def.armor.slot === 3 ? ['armor', 'boots'] : ['armor'];
+  if (def.key === 'bow') return ['bow'];
+  return [];
+}
+const canEnchant = def => enchKinds(def).length > 0;
+const enchLv = (slot, k) => (slot && slot.e && slot.e[k]) || 0;
+const enchText = e => (e ? Object.keys(e).filter(k => ENCHANTS[k]).map(k => ENCHANTS[k].name + (ENCHANTS[k].max > 1 ? ' ' + ROMAN[e[k]] : '')).join(', ') : '');
+/* keep only real enchantments with sensible levels (from saves or other players) */
+function cleanEnch(e) {
+  if (!e || typeof e !== 'object') return undefined;
+  const o = {};
+  for (const k in e) if (ENCHANTS[k] && Number.isInteger(e[k]) && e[k] >= 1) o[k] = Math.min(e[k], ENCHANTS[k].max);
+  return Object.keys(o).length ? o : undefined;
+}
+
 /* ---------- recipes ---------- */
 // [output, count, {input: count}, station]   '#planks' / '#log' match any wood type
 const GROUPS = {
   '#cobble': ['cobblestone', 'cobbled_deepslate', 'blackstone'],
-  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks', 'jungle_planks', 'dark_oak_planks', 'acacia_planks', 'mangrove_planks', 'cherry_planks'],
+  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks', 'jungle_planks', 'dark_oak_planks', 'acacia_planks', 'mangrove_planks', 'cherry_planks', 'bamboo_planks'],
   '#log': ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'dark_oak_log', 'acacia_log', 'mangrove_log', 'cherry_log'],
   '#wool': ['wool_white', 'wool_red', 'wool_blue', 'wool_green', 'wool_yellow', 'wool_black', 'wool_orange', 'wool_purple'],
 };
@@ -1166,6 +1226,9 @@ const RECIPES = [
   ['jungle_slab', 6, { jungle_planks: 3 }, 'table'],
   ['acacia_planks', 4, { acacia_log: 1 }], ['acacia_stairs', 4, { acacia_planks: 6 }, 'table'], ['acacia_slab', 6, { acacia_planks: 3 }, 'table'],
   ['acacia_door', 3, { acacia_planks: 6 }, 'table'], ['acacia_trapdoor', 2, { acacia_planks: 6 }, 'table'], ['acacia_fence', 3, { acacia_planks: 4, stick: 2 }, 'table'], ['acacia_fence_gate', 1, { acacia_planks: 2, stick: 4 }, 'table'],
+  ['paper', 3, { sugar_cane: 3 }, 'table'], ['book', 1, { paper: 3, leather: 1 }], ['bookshelf', 1, { '#planks': 6, book: 3 }, 'table'],
+  ['enchanting_table', 1, { book: 1, diamond: 2, obsidian: 4 }, 'table'],
+  ['bamboo_block', 1, { bamboo: 9 }], ['bamboo_planks', 2, { bamboo_block: 1 }], ['stick', 1, { bamboo: 2 }],
   ...['mangrove', 'cherry'].flatMap(w => { const pk = w + '_planks'; return [[pk, 4, { [w + '_log']: 1 }], [w + '_stairs', 4, { [pk]: 6 }, 'table'], [w + '_slab', 6, { [pk]: 3 }, 'table'], [w + '_door', 3, { [pk]: 6 }, 'table'], [w + '_trapdoor', 2, { [pk]: 6 }, 'table'], [w + '_fence', 3, { [pk]: 4, stick: 2 }, 'table'], [w + '_fence_gate', 1, { [pk]: 2, stick: 4 }, 'table']]; }),
   ['composter', 1, { '#planks': 4 }, 'table'], ['lectern', 1, { bookshelf: 1, '#planks': 4 }, 'table'],
   ['smoker', 1, { furnace: 1, '#log': 4 }, 'table'], ['blast_furnace', 1, { furnace: 1, iron_ingot: 5, stone: 3 }, 'table'],
@@ -1266,7 +1329,7 @@ for (const r of RECIPES) if (r[3] === 'furnace') for (const k in r[2]) for (cons
 const FUEL = {};
 // (how many items each one smelts) x 6 seconds: coal smelts 5 items
 for (const [k, n] of [['lava_bucket', 100], ['coal', 5], ['coal_block', 45], ['blaze_rod', 12], ['stick', 0.5], ['crafting_table', 1.5], ['chest', 1.5], ['bookshelf', 1.5],
-  ['oak_log', 1.5], ['birch_log', 1.5], ['spruce_log', 1.5], ['jungle_log', 1.5], ['dark_oak_log', 1.5], ['acacia_log', 1.5], ['acacia_planks', 1.5], ['mangrove_log', 1.5], ['mangrove_planks', 1.5], ['cherry_log', 1.5], ['cherry_planks', 1.5], ['dark_oak_planks', 1.5], ['oak_planks', 1.5], ['birch_planks', 1.5], ['spruce_planks', 1.5], ['jungle_planks', 1.5], ['bow', 1.5],
+  ['oak_log', 1.5], ['birch_log', 1.5], ['spruce_log', 1.5], ['jungle_log', 1.5], ['dark_oak_log', 1.5], ['acacia_log', 1.5], ['acacia_planks', 1.5], ['mangrove_log', 1.5], ['mangrove_planks', 1.5], ['cherry_log', 1.5], ['cherry_planks', 1.5], ['bamboo', 0.25], ['bamboo_planks', 1.5], ['bamboo_block', 1.5], ['dark_oak_planks', 1.5], ['oak_planks', 1.5], ['birch_planks', 1.5], ['spruce_planks', 1.5], ['jungle_planks', 1.5], ['bow', 1.5],
   ['wooden_pickaxe', 1], ['wooden_sword', 1], ['wooden_axe', 1], ['wooden_shovel', 1], ['dead_bush', 0.5], ['boat', 6]]) if (ID[k] !== undefined) FUEL[ID[k]] = n * SMELT_TIME;
 
 /* ---------- what each number means ----------

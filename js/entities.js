@@ -51,6 +51,7 @@ const FACES_DRAW = {
   pig: px => { px(0, 0, '#f0a5a2', 8, 8); px(1, 2, '#fff', 1, 1); px(2, 2, '#222', 1, 1); px(5, 2, '#222', 1, 1); px(6, 2, '#fff', 1, 1); px(2, 4, '#e07f84', 4, 3); px(3, 5, '#8a3f44', 1, 1); px(4, 5, '#8a3f44', 1, 1); },
   cow: px => { px(0, 0, '#433626', 8, 8); px(0, 0, '#e8e8e8', 3, 3); px(1, 3, '#fff', 1, 1); px(2, 3, '#111', 1, 1); px(5, 3, '#111', 1, 1); px(6, 3, '#fff', 1, 1); px(2, 5, '#bfa48f', 4, 3); px(2, 6, '#5a4030', 1, 1); px(5, 6, '#5a4030', 1, 1); },
   sheep: px => { px(0, 0, '#d8c4a8', 8, 8); px(1, 3, '#fff', 1, 1); px(2, 3, '#111', 1, 1); px(5, 3, '#111', 1, 1); px(6, 3, '#fff', 1, 1); px(3, 5, '#e3a8a8', 2, 1); },
+  panda: px => { px(0, 0, '#f2f2f2', 8, 8); px(0, 0, '#1a1a1a', 2, 1); px(6, 0, '#1a1a1a', 2, 1); px(1, 2, '#1a1a1a', 2, 3); px(5, 2, '#1a1a1a', 2, 3); px(2, 3, '#ffffff', 1, 1); px(5, 3, '#ffffff', 1, 1); px(3, 5, '#1a1a1a', 2, 1); px(3, 6, '#9a9a9a', 2, 1); },
   chicken: px => { px(0, 0, '#f4f4f4', 8, 8); px(1, 2, '#111', 1, 1); px(6, 2, '#111', 1, 1); px(2, 3, '#f0a020', 4, 2); px(3, 5, '#d02020', 2, 2); },
   spider: px => { noisyFill(px, 8, ['#2a2523', '#332c29', '#241f1d'], 4); px(1, 3, '#d01010', 2, 1); px(5, 3, '#d01010', 2, 1); px(2, 2, '#ff3030', 1, 1); px(5, 2, '#ff3030', 1, 1); px(0, 4, '#a01010', 1, 1); px(7, 4, '#a01010', 1, 1); },
   player: px => { px(0, 0, '#c89878', 8, 8); px(0, 0, '#4a2f1a', 8, 2); px(0, 2, '#4a2f1a', 1, 1); px(7, 2, '#4a2f1a', 1, 1); px(1, 4, '#fff', 1, 1); px(2, 4, '#3a5ad0', 1, 1); px(5, 4, '#3a5ad0', 1, 1); px(6, 4, '#fff', 1, 1); px(3, 5, '#a86a50', 2, 1); px(2, 6, '#7a3f2a', 4, 1); },
@@ -173,7 +174,7 @@ function dressModel(m, ids) {
 }
 
 /* what each farm animal loves: holding it makes them follow you, feeding two of them makes a baby */
-const BREED_FOOD = { cow: ['wheat'], sheep: ['wheat'], pig: ['carrot', 'potato', 'apple'], chicken: ['wheat_seeds'] };
+const BREED_FOOD = { panda: ['bamboo'], cow: ['wheat'], sheep: ['wheat'], pig: ['carrot', 'potato', 'apple'], chicken: ['wheat_seeds'] };
 const lovesFood = (type, id) => !!(id && DEFS[id] && BREED_FOOD[type] && BREED_FOOD[type].includes(DEFS[id].key));
 
 /* ---------- mob definitions ---------- */
@@ -197,6 +198,7 @@ const MOB_TYPES = {
   pig: { name: 'Pig', hp: 10, w: 0.9, h: 0.9, speed: 1.5, passive: true, xp: 2, drops: [['porkchop', 1, 3]] },
   cow: { name: 'Cow', hp: 10, w: 0.9, h: 1.4, speed: 1.4, passive: true, xp: 2, drops: [['beef', 1, 3], ['leather', 0, 2]] },
   sheep: { name: 'Sheep', hp: 8, w: 0.9, h: 1.3, speed: 1.4, passive: true, xp: 2, drops: [['wool_white', 1, 2]] },
+  panda: { name: 'Panda', hp: 20, w: 1.2, h: 1.25, speed: 1.1, passive: true, xp: 2, drops: [['bamboo', 0, 2]] },
   chicken: { name: 'Chicken', hp: 4, w: 0.45, h: 0.7, speed: 1.6, passive: true, xp: 1, drops: [['chicken', 1, 1], ['feather', 0, 2]] },
 };
 
@@ -257,6 +259,16 @@ function buildMobModel(type) {
       L.userData.baseY = L.rotation.y;
       g.add(L); P.legs.push(L);
     }
+  } else if (type === 'panda') {
+    // white with black legs, a black band over the shoulders, black ears and eye patches
+    const white = lam(0xf2f2f2), black = lam(0x1a1a1a);
+    addBox(g, 0.9, 0.75, 1.3, white, 0, 0.82, 0);
+    addBox(g, 0.94, 0.79, 0.4, black, 0, 0.82, 0.3);
+    for (const [x, z] of [[-0.3, 0.42], [0.3, 0.42], [-0.3, -0.45], [0.3, -0.45]]) P.legs.push(limb(g, 0.3, 0.45, 0.3, black, x, 0.45, z));
+    const head = new THREE.Mesh(boxGeo(0.62, 0.55, 0.5), headMats('panda', 0xf2f2f2));
+    head.position.set(0, 1.0, 0.85); g.add(head); P.head = head;
+    addBox(head, 0.16, 0.14, 0.08, black, -0.24, 0.32, -0.05); addBox(head, 0.16, 0.14, 0.08, black, 0.24, 0.32, -0.05);
+    addBox(head, 0.22, 0.14, 0.1, white, 0, -0.14, 0.28); addBox(head, 0.08, 0.05, 0.02, black, 0, -0.1, 0.33);
   } else if (type === 'pig' || type === 'cow' || type === 'sheep') {
     const S = {
       pig: { body: [0.6, 0.5, 0.9], by: 0.6, leg: 0.36, head: [0.5, 0.5, 0.45], hy: 0.75, hz: 0.6, col: 0xf0a5a2 },
@@ -711,7 +723,7 @@ class Mob {
     G.sound.play(this.T.boat ? 'break' : 'deathMob', this.pos);
     // whatever it carried falls out
     const drop = (id, n) => { if (id && n > 0) G.spawnDrop(id, n, this.pos.x, this.pos.y + 0.6, this.pos.z); };
-    if (this.chestSlots) { for (const s of this.chestSlots) if (s) drop(s.id, s.count); drop(ID.chest, 1); this.chestSlots = null; }
+    if (this.chestSlots) { for (const s of this.chestSlots) if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 0.6, this.pos.z, undefined, s.e ? { e: s.e } : undefined); drop(ID.chest, 1); this.chestSlots = null; }
     if (this.armor) { drop(ID[this.armor], 1); this.armor = null; }
     if (this.leash) this.unleash(true);
     if (this.T.boat && !byPlayer) drop(ID.boat, 1);
@@ -721,7 +733,7 @@ class Mob {
       const COOK = { porkchop: 'cooked_porkchop', beef: 'steak', chicken: 'cooked_chicken' };
       if (!this.baby) for (const [k0, a, b] of this.T.drops) {
         const k = cooked && COOK[k0] ? COOK[k0] : k0;
-        const n = a + Math.floor(Math.random() * (b - a + 1));
+        const n = a + Math.floor(Math.random() * (b - a + 1)) + (byPlayer && G.looting ? Math.floor(Math.random() * (G.looting + 1)) : 0); // Looting: a few extra
         if (n > 0) G.spawnDrop(ID[k], n, this.pos.x, this.pos.y + 0.5, this.pos.z);
       }
       if (byPlayer) G.player.addXp(this.T.xp);
@@ -1310,7 +1322,8 @@ class Projectile {
         if (t !== null && t < bestT) { best = dr; bestT = t; }
       }
       if (best && this.kind === 'arrow') {
-        const dmg = Math.max(2, Math.round(this.vel.length() / 5));
+        const dmg = Math.max(2, Math.round(this.vel.length() / 5 * (this.power ? 1 + 0.25 * (this.power + 1) : 1)));
+        if (this.flame && best instanceof Mob && !best.T.fireproof) { best.onFire = Math.max(best.onFire || 0, 5); best.burnedAt = Date.now(); }
         if (best instanceof Dragon) best.hurt(dmg); else best.hurt(dmg, this.pos, 4, true);
         return this.finish();
       }
@@ -1405,8 +1418,8 @@ function itemGeometry(id) {
 }
 
 class ItemDrop {
-  constructor(id, count, x, y, z, vel, did) {
-    this.id = id; this.count = count; this.did = did;
+  constructor(id, count, x, y, z, vel, did, e) {
+    this.id = id; this.count = count; this.did = did; this.e = e;
     this.pos = new V3(x, y, z);
     this.vel = vel ? vel.clone() : new V3((Math.random() - 0.5) * 3, 4 + Math.random() * 2, (Math.random() - 0.5) * 3);
     this.w = 0.3; this.h = 0.3; this.age = 0; this.done = false; this.pickDelay = 0.6;
@@ -1438,7 +1451,7 @@ class ItemDrop {
         if (this.owner && Net.ownerHere(this.owner)) {
           if (!this.askedAt || performance.now() - this.askedAt > 2500) { this.askedAt = performance.now(); Net.askForDrop(this); }
         } else {
-          const left = P.inv.add(this.id, this.count);
+          const left = P.inv.add(this.id, this.count, this.e);
           if (left < this.count) G.sound.play('pickup');
           this.count = left;
           if (left === 0) { Net.dropPicked(this.did); return this.finish(); }

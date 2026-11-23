@@ -444,7 +444,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v54 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v55 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -613,7 +613,7 @@ const Net = {
     if (!this.inShared()) return;
     this.drSeq++;
     this.seenDrops.add(d.did);
-    this.dropRing.push([this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), dimCode(G.dim)]);
+    this.dropRing.push(d.e ? [this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), dimCode(G.dim), d.e] : [this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), dimCode(G.dim)]);
     if (this.dropRing.length > 45) this.dropRing.shift();
     this.sendT = 0;
   },
@@ -671,7 +671,7 @@ const Net = {
     const open = G.ui.furnace && G.chestKey(G.ui.furnace.x, G.ui.furnace.y, G.ui.furnace.z) === key;
     if (!Array.isArray(slots)) { delete G.furnaces[key]; if (open) G.ui.closeInventory(); return; }
     const f = G.furnaces[key] || (G.furnaces[key] = { slots: [null, null, null], burn: 0, burnMax: 0, cook: 0, xp: 0 });
-    for (let k = 0; k < 3; k++) { const v = slots[k]; f.slots[k] = Array.isArray(v) && DEFS[v[0]] && v[1] > 0 ? { id: v[0], count: Math.min(64, v[1] | 0) } : null; }
+    for (let k = 0; k < 3; k++) { const v = slots[k]; f.slots[k] = Array.isArray(v) && DEFS[v[0]] && v[1] > 0 ? (cleanEnch(v[2]) ? { id: v[0], count: 1, e: cleanEnch(v[2]) } : { id: v[0], count: Math.min(64, v[1] | 0) }) : null; }
     f.burn = Math.max(0, +burn || 0); f.burnMax = Math.max(0, +burnMax || 0); f.cook = Math.max(0, +cook || 0);
     if (open) G.ui.renderInventory();
   },
@@ -679,7 +679,7 @@ const Net = {
   chestChanged(key) {
     if (!this.inShared()) return;
     const slots = G.chests[key];
-    const entry = [key, (G.chestVer || {})[key] || 0, slots ? slots.map(s => (s ? [s.id, s.count] : 0)) : null];
+    const entry = [key, (G.chestVer || {})[key] || 0, slots ? slots.map(s => (s ? (s.e ? [s.id, s.count, s.e] : [s.id, s.count]) : 0)) : null];
     this.chestRing = this.chestRing.filter(e => e[0] !== key);
     this.chestRing.push(entry);
     if (this.chestRing.length > 12) this.chestRing.shift();
@@ -731,7 +731,7 @@ const Net = {
     this.wsBusy = true;
     try {
       const data = {
-        pal: ID_PALETTE, og: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], ed: DIMS.map(d => G.worlds[d].serializeEdits()), ch: G.chests || {}, cv: G.chestVer || {}, sg: G.signs || {},
+        pal: ID_PALETTE, og: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], gv: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, ed: DIMS.map(d => G.worlds[d].serializeEdits()), ch: G.chests || {}, cv: G.chestVer || {}, sg: G.signs || {},
         cr: G.crops || {}, fu: G.furnaces || {}, dd: G.endDragonDead ? 1 : 0,
       };
       const text = JSON.stringify(data), t = Date.now(), CH = 80000, parts = Math.ceil(text.length / CH), dev = this.dbRoom.dev;
@@ -774,6 +774,8 @@ const Net = {
     if (!data || typeof data !== 'object' || !Array.isArray(data.ed)) return 0;
     // the places that keep the older underground: both copies of the world agree on the same ones
     if (Array.isArray(data.og)) { const og = G.worlds.overworld.oldGen || (G.worlds.overworld.oldGen = new Set()); for (const k of data.og) if (typeof k === 'string' && /^-?\d+,-?\d+$/.test(k)) og.add(k); }
+    // which biomes each built-in place keeps: the older (smaller) answer wins, so nothing grows into a build
+    if (data.gv && typeof data.gv === 'object') { const ow = G.worlds.overworld; if (!ow.genVer) ow.genVer = new Map(); for (const k in data.gv) { const v = data.gv[k]; if (/^-?\d+,-?\d+$/.test(k) && Number.isInteger(v)) { const cur = ow.genVer.get(k); if (cur === undefined || v < cur) ow.genVer.set(k, v); } } }
     let n = 0;
     DIMS.forEach((d, di) => {
       const w = G.worlds[d], obj = data.ed[di];
@@ -886,7 +888,7 @@ const Net = {
       if (this.seenDrops.has(did) || this.pickedDrops.has(did)) continue;
       this.seenDrops.add(did);
       if (DIMS[dim] !== G.dim || !DEFS[id] || !Number.isFinite(x + y + z) || !(count > 0)) continue;
-      const nd = G.spawnDrop(id, Math.min(64, count | 0), x, y, z, new THREE.Vector3(0, 0, 0), { did, remote: true });
+      const nd = G.spawnDrop(id, Math.min(64, count | 0), x, y, z, new THREE.Vector3(0, 0, 0), { did, remote: true, e: e[8] });
       nd.owner = rp.peer;
     }
     // they asked for an item our game dropped: give it to the first one to ask, if it is still there
@@ -898,7 +900,7 @@ const Net = {
           const d = G.drops.find(o => o.did === e[1] && !o.done && !o.owner);
           if (d) {
             this.giveSeq++;
-            this.giveRing.push([this.giveSeq, d.did, rp.peer, d.id, d.count]);
+            this.giveRing.push(d.e ? [this.giveSeq, d.did, rp.peer, d.id, d.count, d.e] : [this.giveSeq, d.did, rp.peer, d.id, d.count]);
             if (this.giveRing.length > 20) this.giveRing.shift();
             this.dropPicked(d.did);
             d.finish();
@@ -917,7 +919,7 @@ const Net = {
       G.chestVer[e[0]] = e[1];
       if (!Array.isArray(e[2])) { delete G.chests[e[0]]; continue; }
       const slots = G.chests[e[0]] || (G.chests[e[0]] = new Array(27).fill(null));
-      for (let k = 0; k < 27; k++) { const v = e[2][k]; slots[k] = Array.isArray(v) && DEFS[v[0]] && v[1] > 0 ? { id: v[0], count: Math.min(64, v[1] | 0) } : null; }
+      for (let k = 0; k < 27; k++) { const v = e[2][k]; slots[k] = Array.isArray(v) && DEFS[v[0]] && v[1] > 0 ? (cleanEnch(v[2]) ? { id: v[0], count: 1, e: cleanEnch(v[2]) } : { id: v[0], count: Math.min(64, v[1] | 0) }) : null; }
       if (G.ui.chest && G.ui.chest.slots === slots) G.ui.renderInventory();
     }
     // furnaces: the first player's game runs them; edits from the others go to it, its results go to everyone
@@ -969,9 +971,9 @@ const Net = {
       this.gotDrops.add(e[1]);
       for (const d of G.drops) if (d.did === e[1]) d.finish();
       if (!DEFS[e[3]] || !(e[4] > 0)) continue;
-      const P = G.player, left = P.inv.add(e[3], Math.min(64, e[4] | 0));
+      const P = G.player, ge = cleanEnch(e[5]), left = P.inv.add(e[3], ge ? 1 : Math.min(64, e[4] | 0), ge);
       G.sound.play('pickup');
-      if (left) G.spawnDrop(e[3], left, P.pos.x, P.pos.y + 1, P.pos.z, new THREE.Vector3(0, 0, 0));
+      if (left) G.spawnDrop(e[3], left, P.pos.x, P.pos.y + 1, P.pos.z, new THREE.Vector3(0, 0, 0), ge ? { e: ge } : undefined);
     }
     if (Array.isArray(pr.pk)) for (const e of pr.pk) {
       if (!Array.isArray(e) || typeof e[1] !== 'string' || this.pickedDrops.has(e[1])) continue;

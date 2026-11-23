@@ -280,7 +280,7 @@ function updateSky(dt) {
 
 /* ---------- world helpers exposed to entities ---------- */
 G.spawnDrop = (id, count, x, y, z, vel, opts) => {
-  const d = new ItemDrop(id, count, x, y, z, vel, opts && opts.did ? opts.did : Net.newId());
+  const d = new ItemDrop(id, count, x, y, z, vel, opts && opts.did ? opts.did : Net.newId(), opts && cleanEnch(opts.e));
   G.drops.push(d);
   if (!(opts && opts.remote)) Net.dropAdded(d); // everyone in the world sees the same items on the ground
   return d;
@@ -656,6 +656,15 @@ G.tickCrops = () => {
     const [x, y, z] = k.slice(pre.length).split(',').map(Number);
     if (!G.world.isLoaded(x, z)) continue;
     const here = G.world.getBlock(x, y, z), sap = DEFS[here].sapling, ripe = RIPE()[here];
+    // planted bamboo grows one block every minute or so, up to 12 tall; sugar cane up to 3
+    if (here === ID.bamboo || here === ID.sugar_cane) {
+      let t = typeof G.crops[k] === 'number' && G.crops[k] <= 90 ? G.crops[k] : 40 + Math.random() * 40;
+      if (--t > 0) { G.crops[k] = t; continue; }
+      delete G.crops[k];
+      let base = y; while (G.world.getBlock(x, base - 1, z) === here) base--;
+      if (y - base + 1 < (here === ID.bamboo ? 12 : 3) && y + 1 < WH && !G.world.getBlock(x, y + 1, z)) { G.world.setBlock(x, y + 1, z, here); G.crops[chestKey(x, y + 1, z)] = 40 + Math.random() * 40; }
+      continue;
+    }
     if (!ripe && !sap) { delete G.crops[k]; continue; }
     // saplings grow into a tree within 3 minutes (between 2 and 3); with no room above they try again every 10 seconds
     if (sap) {
@@ -823,7 +832,7 @@ G.tickFurnaces = (dt) => {
 G.breakChest = (x, y, z, wasLoot) => {
   let slots = G.chestSlots(x, y, z, false);
   if (!slots && wasLoot) slots = rollLoot(mulberry32(hash3(x, y * 31 + z, G.seed + 77)), G.chestKind(x, y, z)).map(([id, count]) => ({ id, count }));
-  if (slots) for (const s of slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5);
+  if (slots) for (const s of slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5, undefined, s.e ? { e: s.e } : undefined);
   if (G.chests && G.chests[chestKey(x, y, z)]) { delete G.chests[chestKey(x, y, z)]; G.chestChanged(chestKey(x, y, z)); }
 };
 
@@ -982,7 +991,8 @@ function spawnTick() {
       if (W.getBlock(Math.floor(x), y, Math.floor(z)) === ID.grass) {
         const b = W.biomeAt(x, z, W.heightAt(x, z));
         let type = pick(PASSIVE_POOL), n = 1 + (Math.random() * 3 | 0);
-        if ((b === BIOME.PLAINS || b === BIOME.SAVANNA) && Math.random() < 0.35) { type = Math.random() < 0.3 ? 'donkey' : 'horse'; n = 2 + (Math.random() * 2 | 0); }
+        if (b === BIOME.BAMBOO && Math.random() < 0.6) { type = 'panda'; n = 1 + (Math.random() * 2 | 0); }
+        else if ((b === BIOME.PLAINS || b === BIOME.SAVANNA) && Math.random() < 0.35) { type = Math.random() < 0.3 ? 'donkey' : 'horse'; n = 2 + (Math.random() * 2 | 0); }
         if ((b === BIOME.FOREST || b === BIOME.TAIGA || b === BIOME.BIRCH || b === BIOME.SNOWY) && Math.random() < 0.3) { type = 'wolf'; n = 2 + (Math.random() * 2 | 0); }
         for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y + 1, z + (Math.random() - 0.5) * 2);
       }
@@ -1166,7 +1176,7 @@ function makeWorld(seed, legacy) {
    [type, x, y, z, sitting, flags (1 tame, 2 penned, 4 baby, 8 boat or rope), time left to grow up, health,
     horse armor, chest contents, rope ('p' = held by you, or the fence [x, y, z]), facing] */
 const keepsForever = m => (m.tame || m.penned || m.T.boat || m.leash) && !m.dead && !m.remoteCtl;
-const slotsJSON = sl => sl.map(s => (s ? [s.id, s.count] : 0));
+const slotsJSON = sl => sl.map(s => (s ? (s.e ? [s.id, s.count, s.e] : [s.id, s.count]) : 0));
 function serializeMob(m) {
   return [m.type, +m.pos.x.toFixed(2), +m.pos.y.toFixed(2), +m.pos.z.toFixed(2), m.sitting ? 1 : 0,
     (m.tame ? 1 : 0) | (m.penned ? 2 : 0) | (m.baby ? 4 : 0) | (m.T.boat || m.leash ? 8 : 0), Math.round(m.growT || 0), Math.round(m.hp),
@@ -1192,7 +1202,7 @@ function restorePets(list) {
       if (m.type === 'wolf') m.hp = 20;
     }
     if (typeof p[8] === 'string' && HORSE_ARMOR[p[8]]) m.armor = p[8];
-    if (Array.isArray(p[9])) { m.chestSlots = new Array(27).fill(null); p[9].slice(0, 27).forEach((a, i) => { if (Array.isArray(a) && DEFS[a[0]]) m.chestSlots[i] = { id: a[0], count: a[1] }; }); }
+    if (Array.isArray(p[9])) { m.chestSlots = new Array(27).fill(null); p[9].slice(0, 27).forEach((a, i) => { if (Array.isArray(a) && DEFS[a[0]]) m.chestSlots[i] = cleanEnch(a[2]) ? { id: a[0], count: 1, e: cleanEnch(a[2]) } : { id: a[0], count: a[1] }; }); }
     if (p[10] === 'p') m.leash = 'player';
     else if (Array.isArray(p[10]) && p[10].every(Number.isInteger)) m.leash = { x: p[10][0], y: p[10][1], z: p[10][2] };
     if (Number.isFinite(p[11])) { m.yaw = p[11]; m.mesh.rotation.y = p[11]; }
@@ -1500,6 +1510,9 @@ G.continueSaved = async (id) => {
   G.worlds.end.loadEdits(s.endEdits || {});
   if (Array.isArray(s.oldGen)) G.worlds.overworld.oldGen = new Set(s.oldGen.filter(k => typeof k === 'string'));
   else G.worlds.overworld.computeOldGen(); // first time this world is opened with the new caves
+  { const ow = G.worlds.overworld; ow.genVer = new Map();
+    if (s.genVer && typeof s.genVer === 'object') { for (const k in s.genVer) if (/^-?\d+,-?\d+$/.test(k) && Number.isInteger(s.genVer[k])) ow.genVer.set(k, s.genVer[k]); }
+    else ow.stampOldEdits(); }
   G.applyFixes();
   G.endDragonDead = !!s.endDragonDead;
   G.netherVisited = !!s.netherVisited;
@@ -1575,7 +1588,7 @@ G.save = (opts) => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   let ok = true;
   G.lastSaveText = JSON.stringify(data);

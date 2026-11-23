@@ -443,3 +443,14 @@ body.touch:not(.pad) #crosshair { display: none; }
 .recipe.trade .rname { font-size: 15px; white-space: normal; }
 .trade-hint { font-size: 13px; }
 
+
+/* enchanted items shimmer purple */
+.slot.ench { box-shadow: inset 0 0 10px 2px rgba(176, 122, 255, .75); animation: ench-glint 2.4s linear infinite; }
+@keyframes ench-glint { 0%, 100% { box-shadow: inset 0 0 8px 1px rgba(176, 122, 255, .55); } 50% { box-shadow: inset 0 0 14px 4px rgba(214, 180, 255, .95); } }
+/* the enchanting table screen */
+.ench-items { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.ench-item { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.15); color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+.ench-item img { width: 24px; height: 24px; image-rendering: pixelated; }
+.ench-item.sel { border-color: #b07aff; background: rgba(176, 122, 255, .25); }
+.ench-offer .ench-lv { min-width: 30px; text-align: center; font-weight: bold; color: #7aff7a; }
+.ench-offer .rname { color: #d8c0ff; }

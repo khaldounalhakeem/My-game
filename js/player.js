@@ -4,8 +4,9 @@
 class Inventory {
   constructor() { this.slots = new Array(40).fill(null); this.version = 0; } // 0-8 hotbar, 9-35 backpack, 36-39 armor
   changed() { this.version++; }
-  add(id, count) {
+  add(id, count, e) {
     const max = DEFS[id].stack || 64;
+    if (e) { for (let i = 0; i < 36 && count > 0; i++) if (!this.slots[i]) { this.slots[i] = { id, count: 1, e }; count--; } this.changed(); return count; }
     for (let i = 0; i < 36 && count > 0; i++) {
       const s = this.slots[i];
       if (s && s.id === id && s.count < max) { const n = Math.min(max - s.count, count); s.count += n; count -= n; }
@@ -34,8 +35,8 @@ class Inventory {
     if (s.count <= 0) this.slots[slot] = null;
     this.changed();
   }
-  toJSON() { return this.slots.map(s => (s ? [s.id, s.count] : 0)); }
-  load(arr) { this.slots = arr.map(a => (a && DEFS[a[0]] ? { id: a[0], count: a[1] } : null)); while (this.slots.length < 40) this.slots.push(null); this.changed(); }
+  toJSON() { return this.slots.map(s => (s ? (s.e ? [s.id, s.count, s.e] : [s.id, s.count]) : 0)); }
+  load(arr) { this.slots = arr.map(a => (a && DEFS[a[0]] ? (cleanEnch(a[2]) ? { id: a[0], count: a[1], e: cleanEnch(a[2]) } : { id: a[0], count: a[1] }) : null)); while (this.slots.length < 40) this.slots.push(null); this.changed(); }
 }
 
 const BED_DIRS = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
@@ -79,6 +80,10 @@ class Player {
     const bypass = !from && /fell from|fell out|drown|starv|void|pearl/i.test(cause || '');
     // armor works like Minecraft: big hits get through more than small ones; damage is kept in halves, so
     // a stronger sword always does more (no rounding two different swords to the same number)
+    // Protection on armor and Feather Falling on boots (4% less for each point, at most 80%)
+    { let epf = 0; const fall = /fell from/i.test(cause || '');
+      if (!/starv|void/i.test(cause || '')) for (let i = 36; i < 40; i++) { const s = this.inv.slots[i]; epf += enchLv(s, 'protection'); if (fall) epf += 3 * enchLv(s, 'feather_falling'); }
+      if (epf) amount = Math.max(0.5, Math.round(amount * (1 - Math.min(20, epf) / 25) * 2) / 2); }
     if (!bypass) {
       const a = this.inv.armorPoints(), t = this.inv.armorToughness();
       const cut = clamp(Math.max(a / 5, a - amount / (2 + t / 4)), 0, 20) / 25;
@@ -104,7 +109,7 @@ class Player {
     if (G.keepInventory) { G.ui.showDeath(); return; } // keep inventory: items and XP stay with you
     for (let i = 0; i < 40; i++) {
       const s = this.inv.slots[i];
-      if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 1, this.pos.z, new THREE.Vector3((Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6));
+      if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 1, this.pos.z, new THREE.Vector3((Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6), s.e ? { e: s.e } : undefined);
     }
     this.inv.slots.fill(null); this.inv.changed();
     this.xp = 0; this.level = 0;
@@ -335,7 +340,8 @@ class Player {
     if (def.hardness === 0) return 0.05;
     const held = this.heldDef(), tool = held && held.tool;
     const canHarvest = !def.tool || !def.tier || (tool && tool.type === def.tool && tool.tier >= def.tier);
-    const speed = def.tool && tool && tool.type === def.tool ? tool.speed : 1;
+    const ef = enchLv(this.heldSlot(), 'efficiency');
+    const speed = def.tool && tool && tool.type === def.tool ? tool.speed + (ef ? ef * ef + 1 : 0) : 1;
     return def.hardness * (canHarvest ? 1.5 : 5) / speed;
   }
 
@@ -348,14 +354,21 @@ class Player {
   attack(target) {
     if (this.attackCd > 0) return;
     const held = this.heldDef();
-    let dmg = held && held.damage ? held.damage : 1;
+    const hs = this.heldSlot(), sharp = enchLv(hs, 'sharpness');
+    let dmg = (held && held.damage ? held.damage : 1) + (sharp ? 0.5 * sharp + 0.5 : 0);
     const crit = !this.onGround && this.vel.y < -1 && !this.flying;
     if (crit) dmg = Math.round(dmg * 1.5);
     this.attackCd = 0.45; this.swing = 1;
     if (target instanceof Mob && !target.tame) for (const m of G.mobs) if (m.tame && m.type === 'wolf' && m !== target) m.petTarget = target;
-    if (target.remote) Net.hit(target.remote, dmg, this.sprinting ? 10 : 6);
+    const kb = (this.sprinting ? 10 : 6) + 6 * enchLv(hs, 'knockback'), fa = enchLv(hs, 'fire_aspect');
+    if (target.remote) Net.hit(target.remote, dmg, kb);
     else if (target instanceof Dragon) target.hurt(dmg);
-    else target.hurt(dmg, this.pos, this.sprinting ? 10 : 6, true);
+    else {
+      if (fa && target instanceof Mob && !target.T.fireproof) { target.onFire = Math.max(target.onFire || 0, 4 * fa); target.burnedAt = Date.now(); }
+      G.looting = enchLv(hs, 'looting');
+      target.hurt(dmg, this.pos, kb, true);
+      G.looting = 0;
+    }
     if (crit) G.particles.burst(target.pos.x, target.pos.y + 1, target.pos.z, [0xffffff, 0xdddddd], 8, 3, 0.1);
     this.hungerDrain(0.025);
   }
@@ -376,7 +389,8 @@ class Player {
     G.sound.play('break', null, id);
     if (this.mode === 'survival') {
       if (this.canHarvest(def)) {
-        for (const [did, n] of getDrops(def, Math.random)) G.spawnDrop(did, n, x + 0.5, y + 0.3, z + 0.5);
+        const fortune = def.xp && def.drop !== undefined ? enchLv(this.heldSlot(), 'fortune') : 0; // ores give more with Fortune
+        for (const [did, n] of getDrops(def, Math.random)) G.spawnDrop(did, n * (fortune ? 1 + Math.max(0, (Math.random() * (fortune + 2) | 0) - 1) : 1), x + 0.5, y + 0.3, z + 0.5);
         if (def.xp && def.drop !== undefined) this.addXp(def.xp);
       }
       this.hungerDrain(0.005);
@@ -384,7 +398,7 @@ class Player {
     }
     // plants and cactus above lose their support
     const above = W.getBlock(x, y + 1, z);
-    if (above && (DEFS[above].cross || above === ID.cactus)) this.breakBlock(x, y + 1, z, above);
+    if (above && (DEFS[above].cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane)) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
     if (id === ID.furnace) G.breakFurnace(x, y, z);
     if (DEFS[id].sign) G.setSign(x, y, z, null);
@@ -510,6 +524,33 @@ class Player {
       const px = b.x + b.nx, py = b.y, pz = b.z + b.nz, cur = W.getBlock(px, py, pz);
       if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return true;
       W.setBlock(px, py, pz, ID['ladder_' + (b.nx === 1 ? 'w' : b.nx === -1 ? 'e' : b.nz === 1 ? 'n' : 's')]);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
+      return true;
+    }
+    if (hd.id === ID.sugar_cane && b) {
+      // sugar cane needs grass, dirt or sand right next to water (or more sugar cane under it)
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz), under = W.getBlock(px, py - 1, pz);
+      if (cur && !DEFS[cur].replaceable) return true;
+      const wet = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, c]) => W.getBlock(px + a, py - 1, pz + c) === ID.water);
+      if (!(under === ID.sugar_cane || ([ID.grass, ID.dirt, ID.sand].includes(under) && wet))) { G.ui.message('Sugar cane grows on grass, dirt or sand right next to water.'); this.useCd = 0.3; return true; }
+      W.setBlock(px, py, pz, ID.sugar_cane);
+      G.plantCrop(px, py, pz);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
+      return true;
+    }
+    if (hd.id === ID.bamboo && b) {
+      // bamboo goes on grass, dirt, sand or on top of more bamboo
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz), under = W.getBlock(px, py - 1, pz);
+      if (cur && !DEFS[cur].replaceable) return true;
+      if (![ID.grass, ID.dirt, ID.sand, ID.bamboo, ID.gravel].includes(under)) { G.ui.message('Bamboo grows on grass, dirt, sand or more bamboo.'); this.useCd = 0.3; return true; }
+      W.setBlock(px, py, pz, ID.bamboo);
+      G.plantCrop(px, py, pz);
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
       return true;
@@ -643,6 +684,7 @@ class Player {
     }
     if (b && !this.sneaking) {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
+      if (b.id === ID.enchanting_table) { G.ui.openEnchant(b.x, b.y, b.z); return; }
       if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
@@ -704,10 +746,11 @@ class Player {
     if (hd.key === 'bow') {
       if (this.mode === 'survival') {
         if (!this.inv.count(ID.arrow)) { G.ui.message('You need arrows to shoot the bow.'); this.useCd = 0.5; return; }
-        this.inv.remove(ID.arrow, 1);
+        if (!enchLv(this.heldSlot(), 'infinity')) this.inv.remove(ID.arrow, 1);
       }
       const o = this.eyePos(), d = this.lookDir();
       G.spawnProjectile('arrow', o.addScaledVector(d, 0.5), d.multiplyScalar(38), this);
+      { const pr = G.projectiles[G.projectiles.length - 1], bs = this.heldSlot(); if (pr) { pr.power = enchLv(bs, 'power'); pr.flame = enchLv(bs, 'flame'); } }
       G.sound.play('bow');
       this.useCd = 0.45; this.swing = 1;
       return;
@@ -769,7 +812,7 @@ class Player {
     if (!s) return;
     const n = all ? s.count : 1;
     const o = this.eyePos(), d = this.lookDir();
-    const drop = G.spawnDrop(s.id, n, o.x + d.x * 0.6, o.y - 0.3, o.z + d.z * 0.6, d.clone().multiplyScalar(6).setY(d.y * 6 + 2));
+    const drop = G.spawnDrop(s.id, n, o.x + d.x * 0.6, o.y - 0.3, o.z + d.z * 0.6, d.clone().multiplyScalar(6).setY(d.y * 6 + 2), s.e ? { e: s.e } : undefined);
     drop.pickDelay = 1.5;
     this.inv.takeFrom(this.sel, n);
   }
