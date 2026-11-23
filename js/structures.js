@@ -43,7 +43,7 @@ World.prototype.pyramidChunk = function (cx, cz) {
    (only on fresh ground, so nothing appears on top of a build) */
 const SPOTS = {
   jungleTemple: { cell: 16, gap: 3, salt: 921, tries: 16, ok: b => b === BIOME.JUNGLE },
-  outpost: { cell: 18, gap: 4, salt: 924, tries: 10, ok: b => b === BIOME.PLAINS || b === BIOME.DESERT || b === BIOME.TAIGA || b === BIOME.SNOWY || b === BIOME.DARK_FOREST },
+  outpost: { cell: 18, gap: 4, salt: 924, tries: 10, ok: b => b === BIOME.PLAINS || b === BIOME.SAVANNA || b === BIOME.DESERT || b === BIOME.TAIGA || b === BIOME.SNOWY || b === BIOME.DARK_FOREST },
   ruins: { cell: 14, gap: 3, salt: 922, tries: 8, ok: b => b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.BIRCH || b === BIOME.TAIGA || b === BIOME.DARK_FOREST },
 };
 World.prototype.spotPick = function (cx, cz, kind) {
@@ -76,7 +76,7 @@ World.prototype.villageAt = function (cx, cz) {
     for (let tries = 0; tries < 6 && !v; tries++) {
       const ccx = gx * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0), ccz = gz * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0);
       const wx = ccx * 16 + 8, wz = ccz * 16 + 8, h = this.heightAt(wx, wz), b = this.biomeAt(wx, wz, h);
-      const style = { [BIOME.PLAINS]: 'oak', [BIOME.FOREST]: 'oak', [BIOME.BIRCH]: 'oak', [BIOME.DESERT]: 'sand', [BIOME.SNOWY]: 'spruce', [BIOME.TAIGA]: 'spruce' }[b];
+      const style = { [BIOME.PLAINS]: 'oak', [BIOME.FOREST]: 'oak', [BIOME.BIRCH]: 'oak', [BIOME.DESERT]: 'sand', [BIOME.SAVANNA]: 'oak', [BIOME.SNOWY]: 'spruce', [BIOME.TAIGA]: 'spruce' }[b];
       const big = r() < 0.5;
       if (style && h > SEA + 1) v = { cx: ccx, cz: ccz, style, radius: 1 + (big ? 1 : 0), x: wx, z: wz };
     }

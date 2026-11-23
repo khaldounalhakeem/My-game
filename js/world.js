@@ -2,8 +2,8 @@
 /* Voxel world: chunk storage, terrain generation, meshing, raycasting and collision. */
 
 const CS = 16, WH = 96, SEA = 32;
-const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10 };
-const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest'];
+const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11 };
+const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna'];
 
 const FACES = [
   { n: [1, 0, 0], c: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], shade: 0.8 },
@@ -104,6 +104,8 @@ class World {
     if (moist > 0.1 && temp > 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.JUNGLE;
     // very wet but not hot: a dark forest of big dark oaks (fresh ground only, like the jungle)
     if (moist > 0.17 && temp > -0.02 && temp <= 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.DARK_FOREST;
+    // hot and dry-ish: a savanna with flat-topped acacia trees (fresh ground only)
+    if (temp > 0.08 && moist <= 0.1 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.SAVANNA;
     if (moist > 0.04) return temp > -0.02 ? BIOME.FOREST : BIOME.BIRCH;
     return BIOME.PLAINS;
   }
@@ -389,7 +391,7 @@ class World {
 
     // decorations
     const center = biomes[136];
-    const treeCount = { [BIOME.DARK_FOREST]: 6, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
+    const treeCount = { [BIOME.DARK_FOREST]: 6, [BIOME.SAVANNA]: rng() < 0.7 ? 1 + (rng() < 0.4 ? 1 : 0) : 0, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
     const trees = Math.floor(treeCount * this.style.trees + rng());
     for (let t = 0; t < trees; t++) {
       const x = 2 + (rng() * 12 | 0), z = 2 + (rng() * 12 | 0), h = heights[x + z * 16];
@@ -398,6 +400,7 @@ class World {
       if (h + 10 >= WH || get(x, h + 1, z) !== 0) continue;
       const b = biomes[x + z * 16];
       if (b === BIOME.DARK_FOREST) { if (rng() < 0.8) this.darkOakTree(set, get, x, h + 1, z, rng); else this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4); }
+      else if (b === BIOME.SAVANNA) this.acaciaTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.JUNGLE) { if (rng() < 0.6) this.jungleTree(set, get, x, h + 1, z, rng); else this.jungleBush(set, get, x, h + 1, z, rng); }
       else if (b === BIOME.TAIGA || b === BIOME.SNOWY || (b === BIOME.MOUNTAIN && rng() < 0.7)) this.spruceTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.BIRCH || (b === BIOME.FOREST && rng() < 0.25)) this.oakTree(set, get, x, h + 1, z, rng, ID.birch_log, ID.birch_leaves, 5);
@@ -412,6 +415,7 @@ class World {
     };
     if (center === BIOME.PLAINS) { plant(28, [ID.tall_grass], ID.grass); plant(5, [ID.rose, ID.dandelion], ID.grass); }
     if (center === BIOME.DARK_FOREST) { plant(10, [ID.tall_grass], ID.grass); plant(4, [ID.red_mushroom, ID.brown_mushroom], ID.grass); }
+    if (center === BIOME.SAVANNA) plant(40, [ID.tall_grass], ID.grass);
     if (center === BIOME.JUNGLE) { plant(30, [ID.tall_grass], ID.grass); if (rng() < 0.5) plant(3, [ID.melon], ID.grass); }
     if (center === BIOME.FOREST || center === BIOME.BIRCH) { plant(14, [ID.tall_grass], ID.grass); plant(3, [ID.rose, ID.dandelion, ID.red_mushroom, ID.brown_mushroom], ID.grass); }
     if (center === BIOME.TAIGA) { plant(8, [ID.tall_grass], ID.grass); plant(2, [ID.brown_mushroom, ID.red_mushroom], ID.grass); }
@@ -649,6 +653,30 @@ class World {
     }
     for (let dy = 0; dy <= h; dy++) for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(x + ox, y + dy, z + oz, ID.dark_oak_log);
     for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) if (get(x + ox, y - 1, z + oz) === ID.grass) set(x + ox, y - 1, z + oz, ID.dirt);
+  }
+
+  /* an acacia: the trunk leans to one side, then opens into a wide, flat crown (sometimes a second, smaller one) */
+  acaciaTree(set, get, x, y, z, rng) {
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]], [ddx, ddz] = dirs[rng() * 4 | 0];
+    const h = 5 + (rng() * 3 | 0), bend = h - 1 - (rng() * 2 | 0);
+    let tx = x, tz = z, ty = y;
+    for (let dy = 0; dy < h; dy++) {
+      if (dy >= bend) { tx += ddx; tz += ddz; }
+      ty = y + dy; set(tx, ty, tz, ID.acacia_log);
+    }
+    const crown = (cx, cy, cz, r) => {
+      for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+        if (Math.abs(dx) + Math.abs(dz) > r + 1) continue;
+        if (get(cx + dx, cy, cz + dz) === 0) set(cx + dx, cy, cz + dz, ID.acacia_leaves);
+      }
+      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) if (get(cx + dx, cy + 1, cz + dz) === 0) set(cx + dx, cy + 1, cz + dz, ID.acacia_leaves);
+    };
+    crown(tx, ty + 1, tz, 3);
+    if (rng() < 0.5) { // a second branch the other way
+      const bx = x - ddx, bz = z - ddz, by = y + bend - 1;
+      set(bx, by, bz, ID.acacia_log); set(bx - ddx, by + 1, bz - ddz, ID.acacia_log);
+      crown(bx - ddx, by + 2, bz - ddz, 2);
+    }
   }
 
   /* a low jungle bush: one log with leaves around it */
