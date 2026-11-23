@@ -444,7 +444,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v58 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v59 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -551,7 +551,7 @@ const Net = {
       if (m.remoteCtl || m.removed || !near(m.pos) || out.length >= 45) continue;
       const flags = (m.dead ? 1 : 0) | (m.tame ? 2 : 0) | (m.sitting ? 4 : 0) | (m.fuse > 0 ? 8 : 0) | (m.angry ? 16 : 0) | (m.baby ? 32 : 0)
         | ((HORSE_ARMOR_KEYS.indexOf(m.armor) + 1) << 6) | (m.chestSlots ? 512 : 0) | (Math.max(0, JOB_NAMES.indexOf(m.prof || null)) << 10);
-      out.push([m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags]);
+      out.push(m.customName ? [m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags, m.customName] : [m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags]);
     }
     for (const d of G.dragons) {
       if (d.remoteCtl || d.done) continue;
@@ -600,6 +600,14 @@ const Net = {
     this.sendT = 0;
   },
 
+  /* naming a mob that another device runs: ask them to name it */
+  mobName(m, n) {
+    this.mhSeq++;
+    const P = G.player;
+    this.mobHits.push([this.mhSeq, m.remoteCtl, m.nid, 0, r2(P.pos.x), r2(P.pos.z), 0, 'name', n]);
+    if (this.mobHits.length > 16) this.mobHits.shift();
+    this.sendT = 0;
+  },
   /* feeding an animal that another device runs: ask them to feed it */
   mobFeed(m) {
     this.mhSeq++;
@@ -613,7 +621,9 @@ const Net = {
     if (!this.inShared()) return;
     this.drSeq++;
     this.seenDrops.add(d.did);
-    this.dropRing.push(d.e ? [this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), dimCode(G.dim), d.e] : [this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), dimCode(G.dim)]);
+    const dre = [this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), dimCode(G.dim)];
+    if (d.e || d.n) dre.push(d.e || 0); if (d.n) dre.push(d.n);
+    this.dropRing.push(dre);
     if (this.dropRing.length > 45) this.dropRing.shift();
     this.sendT = 0;
   },
@@ -671,7 +681,7 @@ const Net = {
     const open = G.ui.furnace && G.chestKey(G.ui.furnace.x, G.ui.furnace.y, G.ui.furnace.z) === key;
     if (!Array.isArray(slots)) { delete G.furnaces[key]; if (open) G.ui.closeInventory(); return; }
     const f = G.furnaces[key] || (G.furnaces[key] = { slots: [null, null, null], burn: 0, burnMax: 0, cook: 0, xp: 0 });
-    for (let k = 0; k < 3; k++) { const v = slots[k]; f.slots[k] = Array.isArray(v) && DEFS[v[0]] && v[1] > 0 ? (cleanEnch(v[2]) ? { id: v[0], count: 1, e: cleanEnch(v[2]) } : { id: v[0], count: Math.min(64, v[1] | 0) }) : null; }
+    for (let k = 0; k < 3; k++) { const v = slots[k]; f.slots[k] = slotFromArr(v); }
     f.burn = Math.max(0, +burn || 0); f.burnMax = Math.max(0, +burnMax || 0); f.cook = Math.max(0, +cook || 0);
     if (open) G.ui.renderInventory();
   },
@@ -679,7 +689,7 @@ const Net = {
   chestChanged(key) {
     if (!this.inShared()) return;
     const slots = G.chests[key];
-    const entry = [key, (G.chestVer || {})[key] || 0, slots ? slots.map(s => (s ? (s.e ? [s.id, s.count, s.e] : [s.id, s.count]) : 0)) : null];
+    const entry = [key, (G.chestVer || {})[key] || 0, slots ? slots.map(slotToArr) : null];
     this.chestRing = this.chestRing.filter(e => e[0] !== key);
     this.chestRing.push(entry);
     if (this.chestRing.length > 12) this.chestRing.shift();
@@ -847,6 +857,7 @@ const Net = {
           m = new Mob(type, x, y, z); m.remoteCtl = rp.peer; m.nid = nid; G.mobs.push(m);
         }
         m.hp = hp; m.netFlags = flags;
+        if ((e[8] || undefined) !== m.customName) m.setName(e[8]);
         if (flags & 1) m.netDead = true;
         this.noteArrival(m, pr.ts); this.addPoint(m, pr.ts, x, y, z, yaw);
       }
@@ -861,6 +872,7 @@ const Net = {
         if (rp.mhReady && h[0] > (rp.lastMh || 0) && h[1] === this.uid) {
           const target = G.mobs.find(m => !m.remoteCtl && m.nid === h[2]) || G.dragons.find(d => !d.remoteCtl && d.nid === h[2]);
           if (target && !target.dead && h[7] === 'feed') { if (target.feed) target.feed(); }
+          else if (target && !target.dead && h[7] === 'name' && target.setName) target.setName(h[8]);
           else if (h[7] === 'claim') {
             // they want to tame one of our wolves or horses: hand it over if nobody has tamed it
             if (target && !target.dead && !target.tame && !target.rider && !target.leash && !target.T.hostile && G.player.riding !== target) {
@@ -888,7 +900,7 @@ const Net = {
       if (this.seenDrops.has(did) || this.pickedDrops.has(did)) continue;
       this.seenDrops.add(did);
       if (DIMS[dim] !== G.dim || !DEFS[id] || !Number.isFinite(x + y + z) || !(count > 0)) continue;
-      const nd = G.spawnDrop(id, Math.min(64, count | 0), x, y, z, new THREE.Vector3(0, 0, 0), { did, remote: true, e: e[8] });
+      const nd = G.spawnDrop(id, Math.min(64, count | 0), x, y, z, new THREE.Vector3(0, 0, 0), { did, remote: true, e: e[8], n: e[9] });
       nd.owner = rp.peer;
     }
     // they asked for an item our game dropped: give it to the first one to ask, if it is still there
@@ -900,7 +912,7 @@ const Net = {
           const d = G.drops.find(o => o.did === e[1] && !o.done && !o.owner);
           if (d) {
             this.giveSeq++;
-            this.giveRing.push(d.e ? [this.giveSeq, d.did, rp.peer, d.id, d.count, d.e] : [this.giveSeq, d.did, rp.peer, d.id, d.count]);
+            this.giveRing.push(d.e || d.n ? [this.giveSeq, d.did, rp.peer, d.id, d.count, d.e || 0, d.n || 0] : [this.giveSeq, d.did, rp.peer, d.id, d.count]);
             if (this.giveRing.length > 20) this.giveRing.shift();
             this.dropPicked(d.did);
             d.finish();
@@ -919,7 +931,7 @@ const Net = {
       G.chestVer[e[0]] = e[1];
       if (!Array.isArray(e[2])) { delete G.chests[e[0]]; continue; }
       const slots = G.chests[e[0]] || (G.chests[e[0]] = new Array(27).fill(null));
-      for (let k = 0; k < 27; k++) { const v = e[2][k]; slots[k] = Array.isArray(v) && DEFS[v[0]] && v[1] > 0 ? (cleanEnch(v[2]) ? { id: v[0], count: 1, e: cleanEnch(v[2]) } : { id: v[0], count: Math.min(64, v[1] | 0) }) : null; }
+      for (let k = 0; k < 27; k++) { const v = e[2][k]; slots[k] = slotFromArr(v); }
       if (G.ui.chest && G.ui.chest.slots === slots) G.ui.renderInventory();
     }
     // furnaces: the first player's game runs them; edits from the others go to it, its results go to everyone
@@ -971,9 +983,9 @@ const Net = {
       this.gotDrops.add(e[1]);
       for (const d of G.drops) if (d.did === e[1]) d.finish();
       if (!DEFS[e[3]] || !(e[4] > 0)) continue;
-      const P = G.player, ge = cleanEnch(e[5]), left = P.inv.add(e[3], ge ? 1 : Math.min(64, e[4] | 0), ge);
+      const P = G.player, ge = cleanEnch(e[5]), gn = cleanName(e[6]), left = P.inv.add(e[3], ge ? 1 : Math.min(64, e[4] | 0), ge, gn);
       G.sound.play('pickup');
-      if (left) G.spawnDrop(e[3], left, P.pos.x, P.pos.y + 1, P.pos.z, new THREE.Vector3(0, 0, 0), ge ? { e: ge } : undefined);
+      if (left) G.spawnDrop(e[3], left, P.pos.x, P.pos.y + 1, P.pos.z, new THREE.Vector3(0, 0, 0), ge || gn ? { e: ge, n: gn } : undefined);
     }
     if (Array.isArray(pr.pk)) for (const e of pr.pk) {
       if (!Array.isArray(e) || typeof e[1] !== 'string' || this.pickedDrops.has(e[1])) continue;

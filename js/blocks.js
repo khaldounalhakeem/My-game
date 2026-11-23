@@ -650,6 +650,11 @@ makeTile('i_stone_button', pPlant(P => { P.rect(4, 6, 8, 5, 0x8a8a8a, 6); P.rect
 makeTile('i_oak_button', pPlant(P => { P.rect(4, 6, 8, 5, 0xa8834f, 6); P.rect(4, 6, 8, 1, 0xc8a36f); P.rect(4, 10, 8, 1, 0x6a5030); }));
 makeTile('i_stone_pressure_plate', pPlant(P => { P.rect(1, 10, 14, 3, 0x8a8a8a, 6); P.rect(1, 10, 14, 1, 0xaaaaaa); P.rect(1, 12, 14, 1, 0x5a5a5a); }));
 makeTile('i_oak_pressure_plate', pPlant(P => { P.rect(1, 10, 14, 3, 0xa8834f, 6); P.rect(1, 10, 14, 1, 0xc8a36f); P.rect(1, 12, 14, 1, 0x6a5030); }));
+/* anvil and name tag */
+makeTile('anvil', P => { P.fill(0x484848, 6); P.speck(0x3a3a3a, 0.2, 4); P.speck(0x5a5a5a, 0.1, 4); P.rect(0, 0, 16, 1, 0x5e5e5e); });
+makeTile('anvil_top', P => { P.fill(0x4a4a4a, 5); P.rect(2, 2, 12, 12, 0x3e3e3e, 4); P.rect(3, 3, 10, 10, 0x444444, 4); });
+makeTile('i_anvil', pPlant(P => { P.rect(1, 3, 14, 4, 0x4a4a4a, 4); P.rect(1, 3, 14, 1, 0x6a6a6a); P.rect(0, 4, 2, 2, 0x4a4a4a); P.rect(5, 7, 6, 4, 0x3e3e3e); P.rect(3, 11, 10, 3, 0x4a4a4a, 4); P.rect(3, 13, 10, 1, 0x2e2e2e); }));
+makeTile('i_name_tag', pPlant(P => { P.rect(4, 4, 10, 8, 0xd8c8a0); P.rect(4, 4, 10, 1, 0xf0e4c4); P.rect(4, 11, 10, 1, 0xa8986a); P.put(6, 7, 0x6a5a3a); P.put(6, 8, 0x6a5a3a); P.line(1, 2, 5, 7, 0xe8e8e8); P.rect(8, 7, 4, 1, 0x9a8a6a); }));
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -969,6 +974,8 @@ for (const [k, n, tile] of [['stone', 'Stone', 'stone'], ['oak', 'Oak', 'planks_
   const bx = [0.0625, 0, 0.0625, 0.9375, on ? 0.03125 : 0.0625, 0.9375];
   block(k + '_plate_' + on, n + ' Pressure Plate', tile, { hardness: 0.5, solid: false, opaque: false, box: bx, boxes: [bx], drop: k + '_pressure_plate', plate: { on: !!on, kind: k }, iconTile: 'i_' + k + '_pressure_plate' });
 }
+/* the anvil: name your things, and join enchantments (from a second item of the same kind, or a book) */
+block('anvil', 'Anvil', { side: 'anvil', top: 'anvil_top', bottom: 'anvil' }, PICK(1, 5, { opaque: false, boxes: [[0.125, 0, 0.125, 0.875, 0.25, 0.875], [0.3125, 0.25, 0.25, 0.6875, 0.625, 0.75], [0, 0.625, 0.1875, 1, 1, 0.8125]], iconTile: 'i_anvil' }));
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1101,6 +1108,8 @@ item('stone_button', 'Stone Button', 'stone_button', { placesSwitch: 'stone_butt
 item('oak_button', 'Oak Button', 'oak_button', { placesSwitch: 'oak_button' });
 item('stone_pressure_plate', 'Stone Pressure Plate', 'stone_pressure_plate', { placesPlate: 'stone' });
 item('oak_pressure_plate', 'Oak Pressure Plate', 'oak_pressure_plate', { placesPlate: 'oak' });
+item('name_tag', 'Name Tag', 'name_tag');
+item('enchanted_book', 'Enchanted Book', 'enchanted_book', { stack: 1 });
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -1131,12 +1140,28 @@ function enchKinds(def) {
   if (/_sword$/.test(def.key)) return ['sword'];
   if (def.tool) return [def.tool.type];
   if (def.armor) return def.armor.slot === 3 ? ['armor', 'boots'] : ['armor'];
+  if (def.key === 'book' || def.key === 'enchanted_book') return ['book'];
   if (def.key === 'bow') return ['bow'];
   return [];
 }
 const canEnchant = def => enchKinds(def).length > 0;
 const enchLv = (slot, k) => (slot && slot.e && slot.e[k]) || 0;
 const enchText = e => (e ? Object.keys(e).filter(k => ENCHANTS[k]).map(k => ENCHANTS[k].name + (ENCHANTS[k].max > 1 ? ' ' + ROMAN[e[k]] : '')).join(', ') : '');
+/* an item's own name (given at an anvil): plain text, up to 30 letters */
+const cleanName = n => (typeof n === 'string' ? n.replace(/[\u0000-\u001f]/g, '').trim().slice(0, 30) || undefined : undefined);
+/* slots with their extras (enchantments e, name n) as they are saved and sent: [id, count, e or 0, name] */
+function slotToArr(s) { if (!s) return 0; const a = [s.id, s.count]; if (s.e || s.n) a.push(s.e || 0); if (s.n) a.push(s.n); return a; }
+function slotFromArr(a, cap) {
+  if (!Array.isArray(a) || !DEFS[a[0]] || !(a[1] > 0)) return null;
+  const e = cleanEnch(a[2]), n = cleanName(a[3]), s = { id: a[0], count: e ? 1 : Math.min(cap || 64, a[1] | 0) };
+  if (e) s.e = e; if (n) s.n = n;
+  return s;
+}
+function copySlot(s, count) { const o = { id: s.id, count }; if (s.e) o.e = s.e; if (s.n) o.n = s.n; return o; }
+const slotExtras = s => (s && (s.e || s.n) ? { e: s.e, n: s.n } : undefined);
+/* two stacks can join only if they are the same plain item (enchanted or named ones keep apart) */
+const sameStack = (a, b) => a.id === b.id && !a.e && !b.e && (a.n || '') === (b.n || '');
+const slotName = s => (s.n ? s.n : DEFS[s.id].name);
 /* keep only real enchantments with sensible levels (from saves or other players) */
 function cleanEnch(e) {
   if (!e || typeof e !== 'object') return undefined;
@@ -1257,6 +1282,7 @@ const RECIPES = [
   ['acacia_door', 3, { acacia_planks: 6 }, 'table'], ['acacia_trapdoor', 2, { acacia_planks: 6 }, 'table'], ['acacia_fence', 3, { acacia_planks: 4, stick: 2 }, 'table'], ['acacia_fence_gate', 1, { acacia_planks: 2, stick: 4 }, 'table'],
   ['paper', 3, { sugar_cane: 3 }, 'table'], ['book', 1, { paper: 3, leather: 1 }], ['bookshelf', 1, { '#planks': 6, book: 3 }, 'table'],
   ['enchanting_table', 1, { book: 1, diamond: 2, obsidian: 4 }, 'table'],
+  ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
   ['lever', 1, { stick: 1, cobblestone: 1 }], ['stone_button', 1, { stone: 1 }], ['oak_button', 1, { '#planks': 1 }], ['stone_pressure_plate', 1, { stone: 2 }, 'table'], ['oak_pressure_plate', 1, { '#planks': 2 }, 'table'],
   ['bamboo_block', 1, { bamboo: 9 }], ['bamboo_planks', 2, { bamboo_block: 1 }], ['stick', 1, { bamboo: 2 }],
   ...['mangrove', 'cherry'].flatMap(w => { const pk = w + '_planks'; return [[pk, 4, { [w + '_log']: 1 }], [w + '_stairs', 4, { [pk]: 6 }, 'table'], [w + '_slab', 6, { [pk]: 3 }, 'table'], [w + '_door', 3, { [pk]: 6 }, 'table'], [w + '_trapdoor', 2, { [pk]: 6 }, 'table'], [w + '_fence', 3, { [pk]: 4, stick: 2 }, 'table'], [w + '_fence_gate', 1, { [pk]: 2, stick: 4 }, 'table']]; }),

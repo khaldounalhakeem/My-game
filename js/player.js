@@ -4,12 +4,13 @@
 class Inventory {
   constructor() { this.slots = new Array(40).fill(null); this.version = 0; } // 0-8 hotbar, 9-35 backpack, 36-39 armor
   changed() { this.version++; }
-  add(id, count, e) {
+  add(id, count, e, n) {
     const max = DEFS[id].stack || 64;
-    if (e) { for (let i = 0; i < 36 && count > 0; i++) if (!this.slots[i]) { this.slots[i] = { id, count: 1, e }; count--; } this.changed(); return count; }
+    if (e) { for (let i = 0; i < 36 && count > 0; i++) if (!this.slots[i]) { this.slots[i] = n ? { id, count: 1, e, n } : { id, count: 1, e }; count--; } this.changed(); return count; }
+    if (n) { for (let i = 0; i < 36 && count > 0; i++) { const s = this.slots[i]; if (s && s.id === id && s.n === n && !s.e && s.count < max) { const k = Math.min(max - s.count, count); s.count += k; count -= k; } } for (let i = 0; i < 36 && count > 0; i++) if (!this.slots[i]) { const k = Math.min(max, count); this.slots[i] = { id, count: k, n }; count -= k; } this.changed(); return count; }
     for (let i = 0; i < 36 && count > 0; i++) {
       const s = this.slots[i];
-      if (s && s.id === id && s.count < max) { const n = Math.min(max - s.count, count); s.count += n; count -= n; }
+      if (s && s.id === id && !s.e && !s.n && s.count < max) { const n = Math.min(max - s.count, count); s.count += n; count -= n; }
     }
     for (let i = 0; i < 36 && count > 0; i++) {
       if (!this.slots[i]) { const n = Math.min(max, count); this.slots[i] = { id, count: n }; count -= n; }
@@ -35,8 +36,8 @@ class Inventory {
     if (s.count <= 0) this.slots[slot] = null;
     this.changed();
   }
-  toJSON() { return this.slots.map(s => (s ? (s.e ? [s.id, s.count, s.e] : [s.id, s.count]) : 0)); }
-  load(arr) { this.slots = arr.map(a => (a && DEFS[a[0]] ? (cleanEnch(a[2]) ? { id: a[0], count: a[1], e: cleanEnch(a[2]) } : { id: a[0], count: a[1] }) : null)); while (this.slots.length < 40) this.slots.push(null); this.changed(); }
+  toJSON() { return this.slots.map(slotToArr); }
+  load(arr) { this.slots = arr.map(a => slotFromArr(a)); while (this.slots.length < 40) this.slots.push(null); this.changed(); }
 }
 
 const BED_DIRS = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
@@ -109,7 +110,7 @@ class Player {
     if (G.keepInventory) { G.ui.showDeath(); return; } // keep inventory: items and XP stay with you
     for (let i = 0; i < 40; i++) {
       const s = this.inv.slots[i];
-      if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 1, this.pos.z, new THREE.Vector3((Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6), s.e ? { e: s.e } : undefined);
+      if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 1, this.pos.z, new THREE.Vector3((Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6), slotExtras(s));
     }
     this.inv.slots.fill(null); this.inv.changed();
     this.xp = 0; this.level = 0;
@@ -698,6 +699,7 @@ class Player {
     if (b && !this.sneaking) {
       if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
       if (b.id === ID.enchanting_table) { G.ui.openEnchant(b.x, b.y, b.z); return; }
+      if (b.id === ID.anvil) { G.ui.openAnvil(b.x, b.y, b.z); return; }
       if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
@@ -826,7 +828,7 @@ class Player {
     if (!s) return;
     const n = all ? s.count : 1;
     const o = this.eyePos(), d = this.lookDir();
-    const drop = G.spawnDrop(s.id, n, o.x + d.x * 0.6, o.y - 0.3, o.z + d.z * 0.6, d.clone().multiplyScalar(6).setY(d.y * 6 + 2), s.e ? { e: s.e } : undefined);
+    const drop = G.spawnDrop(s.id, n, o.x + d.x * 0.6, o.y - 0.3, o.z + d.z * 0.6, d.clone().multiplyScalar(6).setY(d.y * 6 + 2), slotExtras(s));
     drop.pickDelay = 1.5;
     this.inv.takeFrom(this.sel, n);
   }

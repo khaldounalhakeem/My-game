@@ -280,7 +280,7 @@ function updateSky(dt) {
 
 /* ---------- world helpers exposed to entities ---------- */
 G.spawnDrop = (id, count, x, y, z, vel, opts) => {
-  const d = new ItemDrop(id, count, x, y, z, vel, opts && opts.did ? opts.did : Net.newId(), opts && cleanEnch(opts.e));
+  const d = new ItemDrop(id, count, x, y, z, vel, opts && opts.did ? opts.did : Net.newId(), opts && cleanEnch(opts.e), opts && cleanName(opts.n));
   G.drops.push(d);
   if (!(opts && opts.remote)) Net.dropAdded(d); // everyone in the world sees the same items on the ground
   return d;
@@ -916,7 +916,7 @@ G.tickFurnaces = (dt) => {
 G.breakChest = (x, y, z, wasLoot) => {
   let slots = G.chestSlots(x, y, z, false);
   if (!slots && wasLoot) slots = rollLoot(mulberry32(hash3(x, y * 31 + z, G.seed + 77)), G.chestKind(x, y, z)).map(([id, count]) => ({ id, count }));
-  if (slots) for (const s of slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5, undefined, s.e ? { e: s.e } : undefined);
+  if (slots) for (const s of slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5, undefined, slotExtras(s));
   if (G.chests && G.chests[chestKey(x, y, z)]) { delete G.chests[chestKey(x, y, z)]; G.chestChanged(chestKey(x, y, z)); }
 };
 
@@ -1058,8 +1058,8 @@ function spawnTick() {
     if (m.dead || m.remoteCtl) continue;
     const d = Math.min(...players.map(q => Math.hypot(m.pos.x - q.x, m.pos.z - q.z)));
     // tamed and penned mobs never vanish: far away they wait in the save until you come back
-    if ((m.tame || m.penned || m.T.boat || m.leash) && !m.rider && !W.isLoaded(m.pos.x, m.pos.z)) { G.pendingPets.push(serializeMob(m)); m.removeSilently(); continue; }
-    if (m.tame || m.rider || m.penned || m.T.boat || m.leash) continue;
+    if ((m.tame || m.penned || m.T.boat || m.leash || m.customName) && !m.rider && !W.isLoaded(m.pos.x, m.pos.z)) { G.pendingPets.push(serializeMob(m)); m.removeSilently(); continue; }
+    if (m.tame || m.rider || m.penned || m.T.boat || m.leash || m.customName) continue;
     if (d > (m.T.passive ? 160 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
   }
@@ -1259,12 +1259,12 @@ function makeWorld(seed, legacy) {
 /* tamed animals, mobs shut in a pen or on a rope, and boats are kept in the save, one list per dimension:
    [type, x, y, z, sitting, flags (1 tame, 2 penned, 4 baby, 8 boat or rope), time left to grow up, health,
     horse armor, chest contents, rope ('p' = held by you, or the fence [x, y, z]), facing] */
-const keepsForever = m => (m.tame || m.penned || m.T.boat || m.leash) && !m.dead && !m.remoteCtl;
-const slotsJSON = sl => sl.map(s => (s ? (s.e ? [s.id, s.count, s.e] : [s.id, s.count]) : 0));
+const keepsForever = m => (m.tame || m.penned || m.T.boat || m.leash || m.customName) && !m.dead && !m.remoteCtl;
+const slotsJSON = sl => sl.map(slotToArr);
 function serializeMob(m) {
   return [m.type, +m.pos.x.toFixed(2), +m.pos.y.toFixed(2), +m.pos.z.toFixed(2), m.sitting ? 1 : 0,
     (m.tame ? 1 : 0) | (m.penned ? 2 : 0) | (m.baby ? 4 : 0) | (m.T.boat || m.leash ? 8 : 0), Math.round(m.growT || 0), Math.round(m.hp),
-    m.armor || 0, m.chestSlots ? slotsJSON(m.chestSlots) : 0, m.leash === 'player' ? 'p' : m.leash ? [m.leash.x, m.leash.y, m.leash.z] : 0, +(m.yaw || 0).toFixed(2)];
+    m.armor || 0, m.chestSlots ? slotsJSON(m.chestSlots) : 0, m.leash === 'player' ? 'p' : m.leash ? [m.leash.x, m.leash.y, m.leash.z] : 0, +(m.yaw || 0).toFixed(2), m.customName || 0];
 }
 function serializePets() {
   return G.mobs.filter(keepsForever).map(serializeMob).concat(G.guestPens || []);
@@ -1286,10 +1286,11 @@ function restorePets(list) {
       if (m.type === 'wolf') m.hp = 20;
     }
     if (typeof p[8] === 'string' && HORSE_ARMOR[p[8]]) m.armor = p[8];
-    if (Array.isArray(p[9])) { m.chestSlots = new Array(27).fill(null); p[9].slice(0, 27).forEach((a, i) => { if (Array.isArray(a) && DEFS[a[0]]) m.chestSlots[i] = cleanEnch(a[2]) ? { id: a[0], count: 1, e: cleanEnch(a[2]) } : { id: a[0], count: a[1] }; }); }
+    if (Array.isArray(p[9])) { m.chestSlots = new Array(27).fill(null); p[9].slice(0, 27).forEach((a, i) => { m.chestSlots[i] = slotFromArr(a); }); }
     if (p[10] === 'p') m.leash = 'player';
     else if (Array.isArray(p[10]) && p[10].every(Number.isInteger)) m.leash = { x: p[10][0], y: p[10][1], z: p[10][2] };
     if (Number.isFinite(p[11])) { m.yaw = p[11]; m.mesh.rotation.y = p[11]; }
+    if (typeof p[12] === 'string') m.setName(p[12]);
     if (m.dress) m.dress();
   }
 }

@@ -56,16 +56,16 @@ const MC_ORDER = (() => {
   for (const c of colors) o.push('stained_glass_pane_' + c);
   o.push('bed', 'flag');
   o.push('melon', 'pumpkin', 'hay_bale', 'glowstone', 'pumpkin_seeds', 'bamboo', 'sugar_cane');
-  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
+  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
   o.push('redstone', 'lever', 'stone_button', 'oak_button', 'stone_pressure_plate', 'oak_pressure_plate', 'tnt');
   for (const m of mats) for (const t of ['shovel', 'pickaxe', 'axe', 'hoe']) o.push(m + '_' + t);
-  o.push('bucket', 'flint_and_steel', 'lead', 'boat', 'saddle', 'eye_of_ender');
+  o.push('bucket', 'flint_and_steel', 'lead', 'name_tag', 'boat', 'saddle', 'eye_of_ender');
   for (const m of mats) o.push(m + '_sword');
   for (const m of ['leather', 'chainmail', 'iron', 'golden', 'diamond', 'netherite']) for (const t of ['helmet', 'chestplate', 'leggings', 'boots']) o.push(m + '_' + t);
   for (const m of ['leather', 'iron', 'golden', 'diamond']) o.push(m + '_horse_armor');
   o.push('bow', 'arrow');
   o.push('golden_apple', 'melon_slice', 'bread', 'cookie', 'cake');
-  o.push('coal', 'emerald', 'lapis', 'diamond', 'quartz', 'iron_ingot', 'gold_ingot', 'netherite_ingot', 'stick', 'wheat', 'leather', 'paper', 'book', 'blaze_powder');
+  o.push('coal', 'emerald', 'lapis', 'diamond', 'quartz', 'iron_ingot', 'gold_ingot', 'netherite_ingot', 'stick', 'wheat', 'leather', 'paper', 'book', 'enchanted_book', 'blaze_powder');
   const m = {}; o.forEach((k, i) => { if (!(k in m)) m[k] = i; });
   return m;
 })();
@@ -169,7 +169,7 @@ const UI = {
       if (img.getAttribute('src') !== url) img.src = url;
       img.style.visibility = 'visible';
       cnt.textContent = s.count > 1 ? s.count : '';
-      el.dataset.name = DEFS[s.id].name + (s.e ? ' (' + enchText(s.e) + ')' : '');
+      el.dataset.name = (s.n ? '“' + s.n + '” ' + DEFS[s.id].name : DEFS[s.id].name) + (s.e ? ' (' + enchText(s.e) + ')' : '');
       el.classList.toggle('ench', !!s.e);
     } else {
       img.style.visibility = 'hidden'; cnt.textContent = ''; el.dataset.name = ''; el.classList.remove('ench');
@@ -252,15 +252,15 @@ const UI = {
       const left = inv.add(s.id, s.count);
       if (left) s.count = left; else box[k] = null;
     } else if (button === 2) {
-      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = s.e ? { id: s.id, count: half, e: s.e } : { id: s.id, count: half }; s.count -= half; if (!s.count) box[k] = null; }
-      else if (cur && (!s || (s.id === cur.id && s.count < DEFS[s.id].stack))) {
-        if (!s) box[k] = cur.e ? { id: cur.id, count: 1, e: cur.e } : { id: cur.id, count: 1 }; else s.count++;
+      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = copySlot(s, half); s.count -= half; if (!s.count) box[k] = null; }
+      else if (cur && (!s || (sameStack(s, cur) && s.count < DEFS[s.id].stack))) {
+        if (!s) box[k] = copySlot(cur, 1); else s.count++;
         cur.count--; if (!cur.count) this.cursor = null;
       }
     } else {
       if (!cur) { this.cursor = s; box[k] = null; }
       else if (!s) { box[k] = cur; this.cursor = null; }
-      else if (s.id === cur.id && !s.e && !cur.e) { const n = Math.min(DEFS[s.id].stack - s.count, cur.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null; }
+      else if (sameStack(s, cur)) { const n = Math.min(DEFS[s.id].stack - s.count, cur.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null; }
       else { box[k] = cur; this.cursor = s; }
     }
     G.sound.play('click');
@@ -276,7 +276,7 @@ const UI = {
   toChest(i) {
     const box = this.chest.slots, inv = G.player.inv, s = inv.slots[i];
     const max = DEFS[s.id].stack;
-    for (let k = 0; k < 27 && s.count; k++) { const t = box[k]; if (t && t.id === s.id && t.count < max) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; } }
+    for (let k = 0; k < 27 && s.count; k++) { const t = box[k]; if (t && sameStack(t, s) && t.count < max) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; } }
     for (let k = 0; k < 27 && s.count; k++) if (!box[k]) { box[k] = Object.assign({}, s); s.count = 0; }
     if (!s.count) inv.slots[i] = null;
     G.sound.play('click'); inv.changed(); this.chestEdited(); this.renderInventory();
@@ -325,7 +325,7 @@ const UI = {
     if (k < 0) { G.ui.message(DEFS[s.id].name + ' can\'t be smelted or burned.'); return; }
     const t = f.slots[k], max = DEFS[s.id].stack;
     if (!t) { f.slots[k] = Object.assign({}, s); inv.slots[i] = null; }
-    else if (t.id === s.id) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; if (!s.count) inv.slots[i] = null; }
+    else if (sameStack(t, s)) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; if (!s.count) inv.slots[i] = null; }
     else return;
     G.sound.play('click'); inv.changed(); this.renderInventory();
   },
@@ -380,7 +380,7 @@ const UI = {
     const st = this.slotBox(sp.i);
     if (!st || st.box[st.k]) return;
     const back = Math.floor(cur.count / 2);
-    st.box[st.k] = cur.e ? { id: cur.id, count: back, e: cur.e } : { id: cur.id, count: back };
+    st.box[st.k] = copySlot(cur, back);
     cur.count -= back;
     G.sound.play('click');
     G.player.inv.changed();
@@ -407,19 +407,19 @@ const UI = {
     if (shift && s && !cur) {
       const [a, b] = i < 9 ? [9, 36] : [0, 9];
       const max = DEFS[s.id].stack;
-      for (let k = a; k < b && s.count; k++) { const t = inv.slots[k]; if (t && t.id === s.id && t.count < max) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; } }
+      for (let k = a; k < b && s.count; k++) { const t = inv.slots[k]; if (t && sameStack(t, s) && t.count < max) { const n = Math.min(max - t.count, s.count); t.count += n; s.count -= n; } }
       for (let k = a; k < b && s.count; k++) if (!inv.slots[k]) { inv.slots[k] = Object.assign({}, s); s.count = 0; }
       if (!s.count) inv.slots[i] = null;
     } else if (button === 2) {
-      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = s.e ? { id: s.id, count: half, e: s.e } : { id: s.id, count: half }; s.count -= half; if (!s.count) inv.slots[i] = null; }
-      else if (cur && (!s || (s.id === cur.id && s.count < DEFS[s.id].stack))) {
-        if (!s) inv.slots[i] = cur.e ? { id: cur.id, count: 1, e: cur.e } : { id: cur.id, count: 1 }; else s.count++;
+      if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = copySlot(s, half); s.count -= half; if (!s.count) inv.slots[i] = null; }
+      else if (cur && (!s || (sameStack(s, cur) && s.count < DEFS[s.id].stack))) {
+        if (!s) inv.slots[i] = copySlot(cur, 1); else s.count++;
         cur.count--; if (!cur.count) this.cursor = null;
       }
     } else {
       if (!cur) { this.cursor = s; inv.slots[i] = null; }
       else if (!s) { inv.slots[i] = cur; this.cursor = null; }
-      else if (s.id === cur.id && !s.e && !cur.e) { const n = Math.min(DEFS[s.id].stack - s.count, cur.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null; }
+      else if (sameStack(s, cur)) { const n = Math.min(DEFS[s.id].stack - s.count, cur.count); s.count += n; cur.count -= n; if (!cur.count) this.cursor = null; }
       else { inv.slots[i] = cur; this.cursor = s; }
     }
     G.sound.play('click');
@@ -449,8 +449,8 @@ const UI = {
   closeInventory() {
     this.closeSplit();
     if (this.cursor) {
-      const left = G.player.inv.add(this.cursor.id, this.cursor.count, this.cursor.e);
-      if (left) { const P = G.player; G.spawnDrop(this.cursor.id, left, P.pos.x, P.pos.y + 1.2, P.pos.z, undefined, this.cursor.e ? { e: this.cursor.e } : undefined); }
+      const left = G.player.inv.add(this.cursor.id, this.cursor.count, this.cursor.e, this.cursor.n);
+      if (left) { const P = G.player; G.spawnDrop(this.cursor.id, left, P.pos.x, P.pos.y + 1.2, P.pos.z, undefined, slotExtras(this.cursor)); }
       this.cursor = null; this.moveCursor();
     }
     this.tip('');
@@ -783,7 +783,7 @@ const UI = {
     const r = mulberry32((G.enchSeed ^ (slot.id * 2654435761)) >>> 0), ri = n => r() * n | 0;
     const base = 1 + ri(8) + (sh >> 1) + ri(sh + 1);
     const lvls = [Math.max(base / 3 | 0, 1), (base * 2 / 3 | 0) + 1, Math.max(base, sh * 2)];
-    const pool = Object.keys(ENCHANTS).filter(k => ENCHANTS[k].on.some(o => kinds.includes(o)));
+    const pool = Object.keys(ENCHANTS).filter(k => kinds.includes('book') || ENCHANTS[k].on.some(o => kinds.includes(o)));
     return lvls.map((L, i) => {
       const e = {}, pick = () => {
         const left = pool.filter(k => !e[k] && !(k === 'fortune' && e.silk));
@@ -803,9 +803,9 @@ const UI = {
     const items = box.querySelector('.ench-items'), offers = box.querySelector('.ench-offers');
     items.innerHTML = ''; offers.innerHTML = '';
     const can = [];
-    for (let i = 0; i < 40; i++) { const s = inv.slots[i]; if (s && !s.e && canEnchant(DEFS[s.id])) can.push(i); }
+    for (let i = 0; i < 40; i++) { const s = inv.slots[i]; if (s && !s.e && s.id !== ID.enchanted_book && canEnchant(DEFS[s.id])) can.push(i); }
     if (st.pick !== null && !can.includes(st.pick)) st.pick = null;
-    if (!can.length) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'You have nothing to enchant. Bring a sword, a tool, armor or a bow (one that is not enchanted yet).'; items.appendChild(p); return; }
+    if (!can.length) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'You have nothing to enchant. Bring a sword, a tool, armor, a bow or a book (one that is not enchanted yet).'; items.appendChild(p); return; }
     for (const i of can) {
       const s = inv.slots[i], b = document.createElement('button');
       b.type = 'button'; b.className = 'ench-item' + (st.pick === i ? ' sel' : '');
@@ -823,16 +823,126 @@ const UI = {
         if (!creative && P.level < o.L) { this.message('You need level ' + o.L + ' for this. Get more XP by mining ores, smelting and defeating mobs.'); return; }
         if (!creative && lapis < o.cost) { this.message('You need ' + o.cost + ' lapis lazuli.'); return; }
         if (!creative) { inv.remove(ID.lapis, o.cost); P.level = Math.max(0, P.level - o.cost); }
-        slot.e = o.e; inv.changed();
+        let made = slot;
+        if (slot.id === ID.book) { // a book becomes an Enchanted Book (one at a time)
+          made = { id: ID.enchanted_book, count: 1, e: o.e };
+          if (slot.count > 1) { slot.count--; if (inv.add(ID.enchanted_book, 1, o.e)) G.spawnDrop(ID.enchanted_book, 1, P.pos.x, P.pos.y + 1, P.pos.z, undefined, { e: o.e }); }
+          else inv.slots[st.pick] = made;
+        } else slot.e = o.e;
+        inv.changed();
         G.enchSeed = Math.random() * 1e9 | 0; // new offers next time, like Minecraft
         G.sound.play('levelup');
         G.particles.burst(st.x + 0.5, st.y + 1.2, st.z + 0.5, [0xb07aff, 0x7a5aff, 0xe8d8ff], 18, 2, 0.1, -1);
-        this.message(DEFS[slot.id].name + ' is now enchanted with ' + enchText(o.e) + '!', 'purple');
+        this.message((made.id === ID.enchanted_book ? 'You made an Enchanted Book of ' : DEFS[slot.id].name + ' is now enchanted with ') + enchText(o.e) + '!', 'purple');
         st.pick = null;
         this.renderEnchant();
       });
       offers.appendChild(row);
     }
+  },
+
+  /* ---------- the anvil ----------
+     Pick something, type a new name (1 level), and/or pick a second item of the same kind or an Enchanted
+     Book to add its enchantments (more levels). Like Minecraft, two of the same enchantment at the same
+     level make the next level up. */
+  openAnvil(x, y, z) {
+    if (G.state !== 'play') return;
+    let box = $('anvil-pop');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'anvil-pop'; box.className = 'copy-pick';
+      box.innerHTML = '<div class="copy-card trade-card"><h3>Anvil</h3><p class="trade-hint anvil-hint"></p>'
+        + '<b class="anvil-step">1. Pick what to change</b><div class="ench-items anvil-items"></div>'
+        + '<b class="anvil-step">2. Give it a name</b><input class="anvil-name" type="text" maxlength="30" autocomplete="off" placeholder="Type a name">'
+        + '<b class="anvil-step">3. Add enchantments from (if you want)</b><div class="ench-items anvil-adds"></div>'
+        + '<p class="anvil-result"></p><button type="button" class="btn wide anvil-go">Make it</button><button type="button" class="btn trade-close">Close</button></div>';
+      box.addEventListener('pointerdown', e => { if (e.target === box) this.closeTrades(); });
+      box.querySelector('.trade-close').addEventListener('click', () => this.closeTrades());
+      const inp = box.querySelector('.anvil-name');
+      inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') inp.blur(); }); // typing E shouldn't close it
+      inp.addEventListener('input', () => this.anvilPreview());
+      box.querySelector('.anvil-go').addEventListener('click', () => this.anvilMake());
+      document.body.appendChild(box);
+    }
+    this.anvil = { x, y, z, pick: null, add: null };
+    box.querySelector('.anvil-name').value = '';
+    this.renderAnvil();
+    box.hidden = false;
+    G.sound.play('click');
+    G.setState('trade'); G.unlock();
+  },
+  anvilCanAdd(t, s) {
+    if (!t || !s || s === t) return false;
+    return (s.id === t.id && (s.e || t.e || true)) || (s.id === ID.enchanted_book && !!s.e);
+  },
+  renderAnvil() {
+    const box = $('anvil-pop'), st = this.anvil, inv = G.player.inv;
+    if (st.pick !== null && !inv.slots[st.pick]) { st.pick = null; st.add = null; }
+    const t = st.pick !== null ? inv.slots[st.pick] : null;
+    if (st.add !== null && !this.anvilCanAdd(t, inv.slots[st.add])) st.add = null;
+    const mk = (i, s, sel, onPick) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ench-item' + (sel ? ' sel' : '');
+      const img = document.createElement('img'); img.alt = ''; img.src = iconURL(s.id);
+      const sp = document.createElement('span'); sp.textContent = slotName(s) + (s.count > 1 ? ' x' + s.count : '') + (s.e ? ' (' + enchText(s.e) + ')' : '');
+      b.append(img, sp); if (s.e) b.classList.add('glint');
+      b.addEventListener('click', onPick);
+      return b;
+    };
+    const items = box.querySelector('.anvil-items'); items.innerHTML = '';
+    for (let i = 0; i < 40; i++) { const s = inv.slots[i]; if (s) items.appendChild(mk(i, s, i === st.pick, () => { st.pick = i; st.add = null; box.querySelector('.anvil-name').value = inv.slots[i].n || ''; G.sound.play('click'); this.renderAnvil(); })); }
+    const adds = box.querySelector('.anvil-adds'); adds.innerHTML = '';
+    if (t) {
+      const none = document.createElement('button'); none.type = 'button'; none.className = 'ench-item' + (st.add === null ? ' sel' : ''); none.textContent = 'Nothing';
+      none.addEventListener('click', () => { st.add = null; this.renderAnvil(); }); adds.appendChild(none);
+      for (let i = 0; i < 40; i++) { const s = inv.slots[i]; if (i !== st.pick && this.anvilCanAdd(t, s) && s.e) adds.appendChild(mk(i, s, i === st.add, () => { st.add = i; G.sound.play('click'); this.renderAnvil(); })); }
+    }
+    box.querySelector('.anvil-name').disabled = !t;
+    this.anvilPreview();
+  },
+  /* what the anvil would make, and what it costs */
+  anvilPlan() {
+    const st = this.anvil, inv = G.player.inv, P = G.player;
+    const t = st.pick !== null ? inv.slots[st.pick] : null;
+    if (!t) return null;
+    const typed = cleanName($('anvil-pop').querySelector('.anvil-name').value);
+    const n = typed && typed !== DEFS[t.id].name ? typed : undefined;
+    let cost = (n || undefined) !== (t.n || undefined) ? 1 : 0, e = t.e ? Object.assign({}, t.e) : {}, added = false;
+    const s = st.add !== null ? inv.slots[st.add] : null;
+    if (s && s.e && t.id !== ID.book) {
+      const kinds = enchKinds(DEFS[t.id]);
+      for (const k in s.e) {
+        if (!ENCHANTS[k] || !(kinds.includes('book') || ENCHANTS[k].on.some(o => kinds.includes(o)))) continue;
+        const a = e[k] || 0, b = s.e[k], nv = a === b ? Math.min(ENCHANTS[k].max, a + 1) : Math.max(a, b);
+        if (nv !== a) { e[k] = nv; cost += nv * (s.id === ID.enchanted_book ? 1 : 2); added = true; }
+      }
+    }
+    return { t, s, n, e: Object.keys(e).length ? e : undefined, cost, changed: cost > 0, added, can: P.mode === 'creative' || P.level >= cost, tooMuch: cost >= 40 };
+  },
+  anvilPreview() {
+    const box = $('anvil-pop'), P = G.player, plan = this.anvilPlan(), go = box.querySelector('.anvil-go'), res = box.querySelector('.anvil-result');
+    box.querySelector('.anvil-hint').textContent = 'Your level: ' + P.level + '. Naming something costs 1 level; adding enchantments costs more.';
+    if (!plan) { res.textContent = 'Pick something first.'; go.disabled = true; go.textContent = 'Make it'; return; }
+    if (!plan.changed) { res.textContent = 'Type a new name, or pick something to add enchantments from.'; go.disabled = true; go.textContent = 'Make it'; return; }
+    res.textContent = 'You get: ' + (plan.n ? '\u201c' + plan.n + '\u201d (' + DEFS[plan.t.id].name + ')' : DEFS[plan.t.id].name) + (plan.e ? ' with ' + enchText(plan.e) : '');
+    go.disabled = plan.tooMuch;
+    go.textContent = plan.tooMuch ? 'Too expensive!' : 'Make it (costs ' + plan.cost + ' level' + (plan.cost > 1 ? 's' : '') + ')';
+    go.classList.toggle('short', !plan.can);
+  },
+  anvilMake() {
+    const plan = this.anvilPlan(), P = G.player, inv = P.inv, st = this.anvil;
+    if (!plan || !plan.changed || plan.tooMuch) return;
+    if (!plan.can) { this.message('You need level ' + plan.cost + ' for this. Get XP by mining ores, smelting and defeating mobs.'); return; }
+    if (P.mode !== 'creative') P.level -= plan.cost;
+    const t = plan.t;
+    if (plan.n) t.n = plan.n; else delete t.n;
+    if (plan.e) t.e = plan.e; else delete t.e;
+    if (plan.added && t.count > 1 && t.id !== ID.enchanted_book) { /* tools and armor never stack, so this doesn't happen */ }
+    if (plan.s && plan.added) { plan.s.count--; if (plan.s.count <= 0) inv.slots[st.add] = null; }
+    inv.changed();
+    G.sound.play('levelup');
+    G.particles.burst(st.x + 0.5, st.y + 1.1, st.z + 0.5, [0xffffff, 0xdddddd, 0xffd84a], 14, 2, 0.1, -1);
+    this.message('Done: ' + slotName(t) + (t.e ? ' (' + enchText(t.e) + ')' : '') + '!', 'gold');
+    st.add = null;
+    this.renderAnvil();
   },
 
   closeTrades() {
@@ -841,6 +951,9 @@ const UI = {
     const eb = $('ench-pop');
     if (eb) eb.hidden = true;
     this.ench = null;
+    const ab = $('anvil-pop');
+    if (ab) { ab.hidden = true; const inp = ab.querySelector('.anvil-name'); if (inp) inp.blur(); }
+    this.anvil = null;
     this.tradeWith = null;
     if (G.state === 'trade') G.resume();
   },

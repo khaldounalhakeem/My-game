@@ -381,7 +381,7 @@ function nearestPlayer(pos) {
 /* villager jobs (from the work block they stand by) and what each one trades: [what you give, what you get] */
 const VILLAGER_JOBS = {
   farmer: { name: 'Farmer', color: 0xc8a040, block: 'composter', trades: [[[['wheat', 20]], ['emerald', 1]], [[['potato', 26]], ['emerald', 1]], [[['carrot', 22]], ['emerald', 1]], [[['pumpkin', 6]], ['emerald', 1]], [[['emerald', 1]], ['bread', 6]], [[['emerald', 1]], ['cookie', 12]], [[['emerald', 3]], ['golden_apple', 1]]] },
-  librarian: { name: 'Librarian', color: 0xe8e8e8, block: 'lectern', trades: [[[['string', 24]], ['emerald', 1]], [[['emerald', 1]], ['glass', 4]], [[['emerald', 1]], ['lantern', 1]], [[['emerald', 6]], ['bookshelf', 1]], [[['emerald', 4]], ['lead', 2]], [[['emerald', 12]], ['ender_pearl', 1]]] },
+  librarian: { name: 'Librarian', color: 0xe8e8e8, block: 'lectern', trades: [[[['string', 24]], ['emerald', 1]], [[['emerald', 1]], ['glass', 4]], [[['emerald', 1]], ['lantern', 1]], [[['emerald', 6]], ['bookshelf', 1]], [[['emerald', 4]], ['lead', 2]], [[['emerald', 12]], ['ender_pearl', 1]], [[['emerald', 20]], ['name_tag', 1]]] },
   butcher: { name: 'Butcher', color: 0xd84a3a, block: 'smoker', trades: [[[['chicken', 14]], ['emerald', 1]], [[['porkchop', 7]], ['emerald', 1]], [[['beef', 10]], ['emerald', 1]], [[['coal', 15]], ['emerald', 1]], [[['emerald', 1]], ['cooked_porkchop', 5]], [[['emerald', 1]], ['steak', 5]]] },
   armorer: { name: 'Armorer', color: 0x3a3a3a, block: 'blast_furnace', trades: [[[['coal', 15]], ['emerald', 1]], [[['iron_ingot', 4]], ['emerald', 1]], [[['emerald', 5]], ['iron_helmet', 1]], [[['emerald', 9]], ['iron_chestplate', 1]], [[['emerald', 7]], ['iron_leggings', 1]], [[['emerald', 4]], ['iron_boots', 1]], [[['emerald', 18]], ['diamond_chestplate', 1]]] },
   weaponsmith: { name: 'Weaponsmith', color: 0x6a2a2a, block: 'grindstone', trades: [[[['coal', 15]], ['emerald', 1]], [[['iron_ingot', 4]], ['emerald', 1]], [[['emerald', 3]], ['iron_axe', 1]], [[['emerald', 2]], ['iron_sword', 1]], [[['emerald', 13]], ['diamond_sword', 1]], [[['emerald', 16]], ['diamond_axe', 1]]] },
@@ -505,6 +505,16 @@ class Mob {
   interact(P, hd) {
     if (this.dead) return false;
     if (this.T.boat) return this.boatInteract(P);
+    // a name tag (named at an anvil) gives this mob that name for good, and it never goes away
+    if (hd && hd.key === 'name_tag') {
+      const s = P.heldSlot(), n = s && s.n;
+      if (!n) { G.ui.message('Name the name tag at an anvil first, then use it on a mob.'); return true; }
+      if (n === this.customName) return true;
+      if (this.remoteCtl) Net.mobName(this, n); else this.setName(n);
+      if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1);
+      G.ui.message('This ' + this.T.name.toLowerCase() + ' is now called \u201c' + n + '\u201d.', 'gold');
+      return true;
+    }
     if (this.type === 'villager' && !(hd && hd.key === 'lead')) { G.ui.openTrades(this); return true; }
     // a rope: tie up an animal so it follows you, or untie it
     if (this.leash && (!hd || hd.key === 'lead') && !this.remoteCtl) { this.unleash(false); P.inv.add(ID.lead, 1); P.inv.changed(); G.ui.message('You untied the ' + this.T.name.toLowerCase() + '.'); return true; }
@@ -593,6 +603,7 @@ class Mob {
     const hd = P.heldDef();
     // holding food it loves (or a bucket for a cow): a tap feeds it instead of hitting it
     if (hd && lovesFood(this.type, hd.id)) return true;
+    if (hd && hd.key === 'name_tag') return true;
     if (hd && hd.key === 'bucket' && this.type === 'cow') return true;
     if (this.T.horsey || this.T.boat || this.leash || this.type === 'villager') return true;
     if (hd && hd.key === 'lead' && !this.T.hostile) return true;
@@ -723,7 +734,7 @@ class Mob {
     G.sound.play(this.T.boat ? 'break' : 'deathMob', this.pos);
     // whatever it carried falls out
     const drop = (id, n) => { if (id && n > 0) G.spawnDrop(id, n, this.pos.x, this.pos.y + 0.6, this.pos.z); };
-    if (this.chestSlots) { for (const s of this.chestSlots) if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 0.6, this.pos.z, undefined, s.e ? { e: s.e } : undefined); drop(ID.chest, 1); this.chestSlots = null; }
+    if (this.chestSlots) { for (const s of this.chestSlots) if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 0.6, this.pos.z, undefined, slotExtras(s)); drop(ID.chest, 1); this.chestSlots = null; }
     if (this.armor) { drop(ID[this.armor], 1); this.armor = null; }
     if (this.leash) this.unleash(true);
     if (this.T.boat && !byPlayer) drop(ID.boat, 1);
@@ -1030,6 +1041,18 @@ class Mob {
   }
 
   removeSilently() { this.dead = true; this.remove(); }
+  /* a name floating over its head (from a name tag) */
+  setName(n) {
+    n = cleanName(n);
+    if (n === this.customName) return;
+    this.customName = n;
+    if (this.nameSprite) { this.mesh.remove(this.nameSprite); this.nameSprite.material.map.dispose(); this.nameSprite = null; }
+    if (!n) return;
+    const s = nameTag(n);
+    s.position.set(0, this.h + 0.45, 0);
+    s.scale.multiplyScalar(0.8);
+    this.mesh.add(s); this.nameSprite = s;
+  }
   remove() {
     if (this.removed) return;
     this.removed = true; this.dead = true;
@@ -1418,8 +1441,8 @@ function itemGeometry(id) {
 }
 
 class ItemDrop {
-  constructor(id, count, x, y, z, vel, did, e) {
-    this.id = id; this.count = count; this.did = did; this.e = e;
+  constructor(id, count, x, y, z, vel, did, e, n) {
+    this.id = id; this.count = count; this.did = did; this.e = e; this.n = n;
     this.pos = new V3(x, y, z);
     this.vel = vel ? vel.clone() : new V3((Math.random() - 0.5) * 3, 4 + Math.random() * 2, (Math.random() - 0.5) * 3);
     this.w = 0.3; this.h = 0.3; this.age = 0; this.done = false; this.pickDelay = 0.6;
@@ -1451,7 +1474,7 @@ class ItemDrop {
         if (this.owner && Net.ownerHere(this.owner)) {
           if (!this.askedAt || performance.now() - this.askedAt > 2500) { this.askedAt = performance.now(); Net.askForDrop(this); }
         } else {
-          const left = P.inv.add(this.id, this.count, this.e);
+          const left = P.inv.add(this.id, this.count, this.e, this.n);
           if (left < this.count) G.sound.play('pickup');
           this.count = left;
           if (left === 0) { Net.dropPicked(this.did); return this.finish(); }

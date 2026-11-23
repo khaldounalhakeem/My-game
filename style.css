@@ -457,3 +457,11 @@ body.touch:not(.pad) #crosshair { display: none; }
 
 /* Show Coordinates: a small line at the top of the screen */
 #coords { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(68px + env(safe-area-inset-top, 0px)); font-family: var(--font-body); font-size: 18px; color: #fff; background: rgba(0, 0, 0, 0.5); padding: 2px 8px; white-space: nowrap; text-shadow: 1px 1px 0 #000; }
+
+/* the anvil screen */
+.anvil-step { display: block; margin-top: 10px; color: #ffd84a; font-size: 14px; }
+.anvil-items { max-height: 40vh; overflow-y: auto; padding: 2px; }
+.anvil-name { width: 100%; box-sizing: border-box; margin: 6px 0; padding: 8px; font: inherit; font-size: 18px; background: #1a1a1e; color: #fff; border: 2px solid #6a6a7a; }
+.anvil-result { margin: 10px 0 6px; color: #d8f0ff; }
+.anvil-go.short { opacity: .6; }
+.ench-item.glint { box-shadow: inset 0 0 8px 1px rgba(176, 122, 255, .6); }
