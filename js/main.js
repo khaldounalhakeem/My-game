@@ -472,6 +472,90 @@ G.toggleDoor = (x, y, z) => {
   Sound.play('click', new THREE.Vector3(x, y, z));
 };
 
+/* ---------- power: levers, buttons and pressure plates ----------
+   A switch powers the blocks right next to it and right next to the block it sits on (like Minecraft
+   without redstone dust). Powered doors, trapdoors and fence gates open (and close again when the power
+   stops); powered TNT lights. */
+const SUPPORT = { d: [0, -1, 0], n: [0, 0, -1], s: [0, 0, 1], w: [-1, 0, 0], e: [1, 0, 0] };
+const NB6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+G.powered = new Map(); // switches that are on right now: key -> list of the places they power
+function powerTargets(x, y, z, d) {
+  const [sx, sy, sz] = SUPPORT[d] || SUPPORT.d, out = new Map();
+  for (const [bx, by, bz] of [[x, y, z], [x + sx, y + sy, z + sz]]) for (const [a, b, c] of NB6) { const k = (bx + a) + ',' + (by + b) + ',' + (bz + c); out.set(k, [bx + a, by + b, bz + c]); }
+  return [...out.values()];
+}
+const isOpener = def => def && (def.door || def.trapdoor || def.gate);
+const isOpen = def => !!((def.door || def.trapdoor || def.gate).open);
+G.setPower = (x, y, z, d, on) => {
+  const W = G.world, key = G.dim + ':' + x + ',' + y + ',' + z, ts = powerTargets(x, y, z, d);
+  if (on) G.powered.set(key, ts); else G.powered.delete(key);
+  const stillPowered = (px, py, pz) => { for (const [k, list] of G.powered) if (k.startsWith(G.dim + ':') && list.some(t => t[0] === px && t[1] === py && t[2] === pz)) return true; return false; };
+  for (const [px, py, pz] of ts) {
+    const id = W.getBlock(px, py, pz), def = DEFS[id];
+    if (on && id === ID.tnt) { W.setBlock(px, py, pz, 0); G.primeTNT(px, py, pz, 4); continue; }
+    if (!isOpener(def)) continue;
+    if (on && !isOpen(def)) G.toggleDoor(px, py, pz);
+    else if (!on && isOpen(def) && !stillPowered(px, py, pz)) {
+      // a door's other half may still be powered by something else
+      const oy = def.door ? (def.door.half === 'lower' ? py + 1 : py - 1) : null;
+      if (oy === null || !stillPowered(px, oy, pz)) G.toggleDoor(px, py, pz);
+    }
+  }
+};
+/* tap a lever to flip it; tap a button to press it for a moment */
+G.useSwitch = (x, y, z) => {
+  const W = G.world, def = DEFS[W.getBlock(x, y, z)];
+  if (def.lever) {
+    const on = !def.lever.on;
+    W.setBlock(x, y, z, ID['lever_' + def.lever.d + '_' + (on ? 1 : 0)]);
+    Sound.play('click', new THREE.Vector3(x, y, z));
+    G.setPower(x, y, z, def.lever.d, on);
+  } else if (def.button && !def.button.on) {
+    const b = def.button;
+    W.setBlock(x, y, z, ID[b.kind + '_button_' + b.d + '_1']);
+    Sound.play('click', new THREE.Vector3(x, y, z));
+    G.setPower(x, y, z, b.d, true);
+    const dim = G.dim;
+    setTimeout(() => {
+      if (G.dim !== dim) return;
+      const cur = DEFS[G.world.getBlock(x, y, z)];
+      if (cur && cur.button && cur.button.on) { G.world.setBlock(x, y, z, ID[b.kind + '_button_' + b.d + '_0']); Sound.play('click', new THREE.Vector3(x, y, z)); }
+      G.setPower(x, y, z, b.d, false);
+    }, b.kind === 'oak' ? 1500 : 1000);
+  }
+};
+/* a switch was broken while on: its power stops */
+G.switchGone = (x, y, z, def) => {
+  if ((def.lever && def.lever.on) || (def.button && def.button.on)) G.setPower(x, y, z, (def.lever || def.button).d, false);
+  if (def.plate && def.plate.on) { G.setPower(x, y, z, 'd', false); delete G.downPlates[G.dim + ':' + x + ',' + y + ',' + z]; }
+};
+/* pressure plates: pushed down while a player or mob stands on them (wooden ones by dropped items too) */
+G.downPlates = {};
+G.tickPlates = () => {
+  const W = G.world, now = performance.now(), bodies = [];
+  if (!G.player.dead) bodies.push([G.player.pos, false]);
+  for (const m of G.mobs) if (!m.dead && !(m.T && (m.T.fly || m.T.boat))) bodies.push([m.pos, false]);
+  for (const d of G.drops) bodies.push([d.pos, true]);
+  for (const [p, isItem] of bodies) {
+    const x = Math.floor(p.x), y = Math.floor(p.y + 0.02), z = Math.floor(p.z), id = W.getBlock(x, y, z), def = DEFS[id];
+    if (!def || !def.plate || (isItem && def.plate.kind !== 'oak')) continue;
+    const k = G.dim + ':' + x + ',' + y + ',' + z;
+    G.downPlates[k] = now;
+    if (!def.plate.on) {
+      W.setBlock(x, y, z, ID[def.plate.kind + '_plate_1']);
+      Sound.play('click', new THREE.Vector3(x, y, z));
+      G.setPower(x, y, z, 'd', true);
+    }
+  }
+  for (const k in G.downPlates) {
+    if (!k.startsWith(G.dim + ':') || now - G.downPlates[k] < 600) continue;
+    delete G.downPlates[k];
+    const [x, y, z] = k.slice(k.indexOf(':') + 1).split(',').map(Number), def = DEFS[W.getBlock(x, y, z)];
+    if (def && def.plate && def.plate.on) { W.setBlock(x, y, z, ID[def.plate.kind + '_plate_0']); Sound.play('click', new THREE.Vector3(x, y, z)); }
+    G.setPower(x, y, z, 'd', false);
+  }
+};
+
 /* signs: up to 4 short lines of writing, drawn on a little picture in front of the board */
 G.signs = {}; G.signMeshes = {};
 const SIGN_FACE = { n: [0, 0, -1], s: [0, 0, 1], e: [1, 0, 0], w: [-1, 0, 0] };
@@ -1834,6 +1918,8 @@ function frame(now) {
       G.pendingPets = G.pendingPets.filter(p => !G.world.isLoaded(p[1], p[3]));
       restorePets(ready);
     }
+    G.plateT = (G.plateT || 0) - dt;
+    if (G.plateT <= 0) { G.plateT = 0.1; G.tickPlates(); }
     G.spawnT -= dt;
     if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); G.tickSigns(); G.tickFires(); }
     // no dragons outside the End

@@ -402,6 +402,7 @@ class Player {
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
     if (id === ID.furnace) G.breakFurnace(x, y, z);
     if (DEFS[id].sign) G.setSign(x, y, z, null);
+    if (def.lever || def.button || def.plate) G.switchGone(x, y, z, def);
     if (DEFS[id].door) {
       const oy = DEFS[id].door.half === 'lower' ? y + 1 : y - 1, other = W.getBlock(x, oy, z);
       if (other && DEFS[other].door) W.setBlock(x, oy, z, 0);
@@ -518,6 +519,18 @@ class Player {
       if (this.pos.x + this.w / 2 > px + e && this.pos.x - this.w / 2 < px + 1 - e && this.pos.z + this.w / 2 > pz + e && this.pos.z - this.w / 2 < pz + 1 - e && this.pos.y < y0 + 0.5 && this.pos.y + this.h > y0) return true;
       W.setBlock(px, py, pz, ID[k + '_slab_' + half]);
       return done();
+    }
+    if ((hd.placesSwitch || hd.placesPlate) && b) {
+      // levers and buttons go on the floor or on a wall; pressure plates on the floor
+      if (b.ny === -1 || (hd.placesPlate && b.ny !== 1)) { G.ui.message(hd.placesPlate ? 'Put a pressure plate on top of a block.' : 'Put it on the floor or on a wall.'); this.useCd = 0.3; return true; }
+      if (!DEFS[b.id].solid || DEFS[b.id].leaves) return true;
+      const px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz, cur = W.getBlock(px, py, pz);
+      if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return true;
+      const d = b.ny === 1 ? 'd' : b.nz === 1 ? 'n' : b.nz === -1 ? 's' : b.nx === 1 ? 'w' : 'e';
+      W.setBlock(px, py, pz, ID[hd.placesPlate ? hd.placesPlate + '_plate_0' : hd.placesSwitch.replace('lever', 'lever') + '_' + d + '_0']);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
+      return true;
     }
     if (hd.placesLadder && b) {
       if (!b.nx && !b.nz) { G.ui.message('Put a ladder on the side of a block.'); return true; }
@@ -688,6 +701,7 @@ class Player {
       if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
+      if (DEFS[b.id].lever || DEFS[b.id].button) { this.useCd = 0.3; this.swing = 1; G.useSwitch(b.x, b.y, b.z); return; }
       if (DEFS[b.id].door || DEFS[b.id].trapdoor || DEFS[b.id].gate) { this.useCd = 0.3; this.swing = 1; G.toggleDoor(b.x, b.y, b.z); return; }
       if (DEFS[b.id].sign) { this.useCd = 0.3; G.ui.editSign(b.x, b.y, b.z); return; }
       if (b.id === ID.end_portal_frame && hd && hd.key === 'eye_of_ender') {

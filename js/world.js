@@ -3,7 +3,7 @@
 
 const CS = 16, WH = 96, SEA = 32;
 const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14 };
-const GEN_VER = 3; // which newer biomes exist (see genVerAt)
+const GEN_VER = 4; // which newer biomes exist (see genVerAt)
 const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle'];
 
 const FACES = [
@@ -476,7 +476,7 @@ class World {
         for (let k = 1; k <= ch; k++) set(x, h + k, z, ID.cactus);
       }
       rng(); // keeps the rest of the chunk the same as before
-      if (this.pyramidChunk && this.pyramidChunk(cx, cz) && !(this.villageAt && this.villageAt(cx, cz))) this.pyramid(set, get, heights, rng);
+      if (this.pyramidChunk && this.pyramidChunk(cx, cz) && !(this.villageAt && this.villageAt(cx, cz))) this.pyramid(set, get, heights, rng, this.genVerAt(cx * 16, cz * 16) >= 4 && fresh);
     }
     if ((center === BIOME.PLAINS || center === BIOME.FOREST) && rng() < 0.08) plant(3, [ID.pumpkin, ID.melon], ID.grass);
     if (this.buildStructures) this.buildStructures(c, set, get, heights, biomes, rng);
@@ -801,7 +801,7 @@ class World {
     for (let dy = 0; dy <= h; dy++) set(x, y + dy, z, ID.spruce_log);
   }
 
-  pyramid(set, get, heights, rng) {
+  pyramid(set, get, heights, rng, hidden) {
     let base = 999;
     for (let z = 3; z <= 13; z++) for (let x = 3; x <= 13; x++) base = Math.min(base, heights[x + z * 16]);
     if (base <= SEA || base + 8 >= WH) return;
@@ -818,10 +818,26 @@ class World {
     }
     for (let y = base + 1; y <= base + 2; y++) { set(8, y, 2, 0); set(8, y, 3, 0); }
     for (let z = 6; z <= 10; z++) for (let x = 6; x <= 10; x++) set(x, base, z, (x + z) % 2 ? ID.gold_block : ID.wool_orange);
+    if (hidden) return this.pyramidVault(set, base);
     set(8, base, 8, ID.diamond_block);
     set(4, base + 1, 8, ID.chest_loot); set(12, base + 1, 8, ID.chest_loot);
     set(7, base + 1, 7, ID.gold_block); set(9, base + 1, 9, ID.gold_block);
     for (const [x, z] of [[7, 8], [9, 8], [8, 7], [8, 9]]) set(x, base - 2, z, ID.tnt);
+  }
+
+  /* like Minecraft: under the blue block in the middle of the floor, a shaft drops into a hidden room.
+     A chest waits in each wall, and a stone pressure plate sits in the middle with 9 TNT hidden under the
+     floor. Step on the plate and it all blows up. Dig down carefully, or break the plate first! */
+  pyramidVault(set, base) {
+    const fy = Math.max(6, base - 12); // the hidden room's floor
+    for (let z = 5; z <= 11; z++) for (let x = 5; x <= 11; x++) for (let y = fy - 3; y <= fy + 4; y++) set(x, y, z, ID.sandstone);
+    for (let z = 6; z <= 10; z++) for (let x = 6; x <= 10; x++) for (let y = fy + 1; y <= fy + 3; y++) set(x, y, z, 0);
+    for (let z = 6; z <= 10; z++) for (let x = 6; x <= 10; x++) set(x, fy, z, (x === 8 || z === 8) ? ID.terracotta : ID.sandstone);
+    for (let y = fy + 4; y < base; y++) set(8, y, 8, 0); // the shaft down
+    set(8, base, 8, ID.wool_blue); // the blue block over the shaft
+    for (const [x, z] of [[8, 5], [8, 11], [5, 8], [11, 8]]) { set(x, fy + 1, z, ID.chest_loot); set(x, fy + 2, z, 0); }
+    set(8, fy + 1, 8, ID.stone_plate_0);
+    for (let z = 7; z <= 9; z++) for (let x = 7; x <= 9; x++) set(x, fy - 1, z, ID.tnt);
   }
 
   /* ---------- streaming ---------- */

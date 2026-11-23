@@ -643,6 +643,13 @@ makeTile('i_enchanted_book', pPlant(P => { P.rect(3, 2, 10, 12, 0x6a2a8a); P.rec
 makeTile('ench_top', P => { P.fill(0x3a1018, 6); P.rect(0, 0, 16, 1, 0x2a0a10); P.rect(3, 4, 10, 8, 0x7a3a1e); P.rect(4, 5, 4, 6, 0xf0ead8); P.rect(8, 5, 4, 6, 0xe8e0cc); P.rect(8, 5, 1, 6, 0x9a8a6a); P.put(5, 7, 0x6a5aaa); P.put(10, 8, 0x6a5aaa); });
 makeTile('ench_side', P => { P.fill(0x15101f, 5); P.speck(0x3a2860, 0.15, 6); P.rect(0, 0, 16, 4, 0x8a1a2a, 6); P.rect(0, 3, 16, 1, 0xd8b84a); for (const x of [2, 7, 12]) P.rect(x, 1, 2, 2, 0x5ae8e8); });
 makeTile('ench_bottom', P => { P.fill(0x15101f, 5); P.speck(0x3a2860, 0.15, 6); });
+/* levers, buttons and pressure plates */
+makeTile('lever', P => { pCells(0x7d7d7d, 0x4a4a4a, 9, 8)(P); P.rect(6, 0, 4, 16, 0x8a6a3a, 6); P.rect(7, 0, 1, 16, 0x6a4a24); });
+makeTile('i_lever', pPlant(P => { P.rect(3, 11, 10, 4, 0x7d7d7d, 8); P.rect(3, 11, 10, 1, 0x9a9a9a); P.line(8, 11, 11, 3, 0x8a6a3a); P.line(9, 11, 12, 3, 0x6a4a24); P.rect(11, 2, 2, 2, 0x5a3a1a); }));
+makeTile('i_stone_button', pPlant(P => { P.rect(4, 6, 8, 5, 0x8a8a8a, 6); P.rect(4, 6, 8, 1, 0xaaaaaa); P.rect(4, 10, 8, 1, 0x5a5a5a); }));
+makeTile('i_oak_button', pPlant(P => { P.rect(4, 6, 8, 5, 0xa8834f, 6); P.rect(4, 6, 8, 1, 0xc8a36f); P.rect(4, 10, 8, 1, 0x6a5030); }));
+makeTile('i_stone_pressure_plate', pPlant(P => { P.rect(1, 10, 14, 3, 0x8a8a8a, 6); P.rect(1, 10, 14, 1, 0xaaaaaa); P.rect(1, 12, 14, 1, 0x5a5a5a); }));
+makeTile('i_oak_pressure_plate', pPlant(P => { P.rect(1, 10, 14, 3, 0xa8834f, 6); P.rect(1, 10, 14, 1, 0xc8a36f); P.rect(1, 12, 14, 1, 0x6a5030); }));
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -945,6 +952,23 @@ block('bamboo_block', 'Block of Bamboo', { top: 'bamboo_block_top', side: 'bambo
 block('bamboo_planks', 'Bamboo Planks', 'planks_bamboo', { tool: 'axe', hardness: 2 });
 block('sugar_cane', 'Sugar Cane', 'sugar_cane', { solid: false, opaque: false, cutout: true, cross: true, hardness: 0, iconTile: 'i_sugar_cane' });
 block('enchanting_table', 'Enchanting Table', { top: 'ench_top', side: 'ench_side', bottom: 'ench_bottom' }, PICK(1, 5, { height: 0.75, opaque: false, light: true, emit: 7 }));
+/* levers, buttons and pressure plates power what is right next to them, or next to the block they sit on:
+   doors, trapdoors and fence gates open, TNT lights up.  Support side: n s e w (a wall) or d (the floor). */
+const SWITCH_ROT = (b, d) => d === 's' ? [b[0], b[1], 1 - b[5], b[3], b[4], 1 - b[2]] : d === 'w' ? [b[2], b[1], b[0], b[5], b[4], b[3]] : d === 'e' ? [1 - b[5], b[1], b[0], 1 - b[2], b[4], b[3]] : b;
+for (const d of ['d', 'n', 's', 'w', 'e']) for (const on of [0, 1]) {
+  const fl = d === 'd';
+  const base = fl ? [0.25, 0, 0.3125, 0.75, 0.1875, 0.6875] : SWITCH_ROT([0.3125, 0.25, 0, 0.6875, 0.75, 0.1875], d);
+  const handle = fl ? (on ? [0.55, 0.1875, 0.4375, 0.8, 0.55, 0.5625] : [0.2, 0.1875, 0.4375, 0.45, 0.55, 0.5625]) : SWITCH_ROT(on ? [0.4375, 0.55, 0.1875, 0.5625, 0.8, 0.55] : [0.4375, 0.2, 0.1875, 0.5625, 0.45, 0.55], d);
+  block('lever_' + d + '_' + on, 'Lever', 'lever', { hardness: 0.5, solid: false, opaque: false, cutout: true, box: [Math.min(base[0], handle[0]), Math.min(base[1], handle[1]), Math.min(base[2], handle[2]), Math.max(base[3], handle[3]), Math.max(base[4], handle[4]), Math.max(base[5], handle[5])], boxes: [base, handle], drop: 'lever', lever: { d, on: !!on }, iconTile: 'i_lever' });
+}
+for (const [k, n, tile] of [['stone', 'Stone', 'stone'], ['oak', 'Oak', 'planks_oak']]) for (const d of ['d', 'n', 's', 'w', 'e']) for (const on of [0, 1]) {
+  const dep = on ? 0.0625 : 0.125, bx = d === 'd' ? [0.3125, 0, 0.375, 0.6875, dep, 0.625] : SWITCH_ROT([0.3125, 0.375, 0, 0.6875, 0.625, dep], d);
+  block(k + '_button_' + d + '_' + on, n + ' Button', tile, { hardness: 0.5, solid: false, opaque: false, box: bx, boxes: [bx], drop: k + '_button', button: { d, on: !!on, kind: k }, iconTile: 'i_' + k + '_button' });
+}
+for (const [k, n, tile] of [['stone', 'Stone', 'stone'], ['oak', 'Oak', 'planks_oak']]) for (const on of [0, 1]) {
+  const bx = [0.0625, 0, 0.0625, 0.9375, on ? 0.03125 : 0.0625, 0.9375];
+  block(k + '_plate_' + on, n + ' Pressure Plate', tile, { hardness: 0.5, solid: false, opaque: false, box: bx, boxes: [bx], drop: k + '_pressure_plate', plate: { on: !!on, kind: k }, iconTile: 'i_' + k + '_pressure_plate' });
+}
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1072,6 +1096,11 @@ for (const [w, n] of [['mangrove', 'Mangrove'], ['cherry', 'Cherry']]) {
 }
 item('paper', 'Paper', 'paper');
 item('book', 'Book', 'book');
+item('lever', 'Lever', 'lever', { placesSwitch: 'lever' });
+item('stone_button', 'Stone Button', 'stone_button', { placesSwitch: 'stone_button' });
+item('oak_button', 'Oak Button', 'oak_button', { placesSwitch: 'oak_button' });
+item('stone_pressure_plate', 'Stone Pressure Plate', 'stone_pressure_plate', { placesPlate: 'stone' });
+item('oak_pressure_plate', 'Oak Pressure Plate', 'oak_pressure_plate', { placesPlate: 'oak' });
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -1228,6 +1257,7 @@ const RECIPES = [
   ['acacia_door', 3, { acacia_planks: 6 }, 'table'], ['acacia_trapdoor', 2, { acacia_planks: 6 }, 'table'], ['acacia_fence', 3, { acacia_planks: 4, stick: 2 }, 'table'], ['acacia_fence_gate', 1, { acacia_planks: 2, stick: 4 }, 'table'],
   ['paper', 3, { sugar_cane: 3 }, 'table'], ['book', 1, { paper: 3, leather: 1 }], ['bookshelf', 1, { '#planks': 6, book: 3 }, 'table'],
   ['enchanting_table', 1, { book: 1, diamond: 2, obsidian: 4 }, 'table'],
+  ['lever', 1, { stick: 1, cobblestone: 1 }], ['stone_button', 1, { stone: 1 }], ['oak_button', 1, { '#planks': 1 }], ['stone_pressure_plate', 1, { stone: 2 }, 'table'], ['oak_pressure_plate', 1, { '#planks': 2 }, 'table'],
   ['bamboo_block', 1, { bamboo: 9 }], ['bamboo_planks', 2, { bamboo_block: 1 }], ['stick', 1, { bamboo: 2 }],
   ...['mangrove', 'cherry'].flatMap(w => { const pk = w + '_planks'; return [[pk, 4, { [w + '_log']: 1 }], [w + '_stairs', 4, { [pk]: 6 }, 'table'], [w + '_slab', 6, { [pk]: 3 }, 'table'], [w + '_door', 3, { [pk]: 6 }, 'table'], [w + '_trapdoor', 2, { [pk]: 6 }, 'table'], [w + '_fence', 3, { [pk]: 4, stick: 2 }, 'table'], [w + '_fence_gate', 1, { [pk]: 2, stick: 4 }, 'table']]; }),
   ['composter', 1, { '#planks': 4 }, 'table'], ['lectern', 1, { bookshelf: 1, '#planks': 4 }, 'table'],
