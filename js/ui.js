@@ -962,6 +962,12 @@ const UI = {
       this.message(G.noFireSpread ? 'Fire Spreads is off: fire stays where you light it.' : 'Fire Spreads is on: fire spreads along wood, leaves and wool. Careful with wooden houses!', 'gold');
       this.syncPause();
     });
+    try { G.showCoords = localStorage.getItem('blockrealm-coords') === '1'; } catch (e) { G.showCoords = false; }
+    $('btn-coords').addEventListener('click', () => {
+      G.showCoords = !G.showCoords;
+      try { localStorage.setItem('blockrealm-coords', G.showCoords ? '1' : '0'); } catch (e) { /* only for this time */ }
+      this.syncPause();
+    });
     $('btn-keepinv').addEventListener('click', () => {
       G.keepInventory = !G.keepInventory;
       this.message('Keep Inventory is ' + (G.keepInventory ? 'on: you keep your items when you die.' : 'off: your items drop when you die.'), 'gold');
@@ -1017,6 +1023,7 @@ const UI = {
     for (const b of document.querySelectorAll('[data-pdiff]')) b.classList.toggle('on', b.dataset.pdiff === G.difficulty);
     $('btn-keepinv').setAttribute('aria-checked', G.keepInventory ? 'true' : 'false');
     $('btn-firespread').setAttribute('aria-checked', G.noFireSpread ? 'false' : 'true');
+    $('btn-coords').setAttribute('aria-checked', G.showCoords ? 'true' : 'false');
     $('rd').value = G.world.renderDist; $('rd-val').textContent = G.world.renderDist;
     $('sens').value = Input.sens; $('sens-val').textContent = Input.sens.toFixed(1);
     $('btn-time').textContent = G.isNight() ? 'Make it day' : 'Make it night';

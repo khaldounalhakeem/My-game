@@ -14,6 +14,7 @@
 <div id="hud">
   <div id="crosshair"></div>
   <div id="bossbar" hidden><div id="bossname">Ender Dragon</div><div class="bar"><div id="bossfill"></div></div></div>
+  <div id="coords" hidden></div>
   <div id="messages" aria-live="polite"></div>
   <pre id="debug" hidden></pre>
   <div id="online" hidden></div>
@@ -210,6 +211,10 @@
       </button>
       <button id="btn-firespread" class="toggle-row" type="button" role="switch" aria-checked="true">
         <span class="toggle-text"><b>Fire Spreads</b><small>Fire spreads along wood, leaves and wool and burns them away</small></span>
+        <span class="switch"><span class="knob"></span></span>
+      </button>
+      <button id="btn-coords" class="toggle-row" type="button" role="switch" aria-checked="false">
+        <span class="toggle-text"><b>Show Coordinates</b><small>Shows where you are (X, Y height, Z) and which way you face</small></span>
         <span class="switch"><span class="knob"></span></span>
       </button>
       <button id="btn-cam" class="btn wide" type="button">Camera: First person</button>

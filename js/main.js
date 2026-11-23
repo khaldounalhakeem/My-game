@@ -1937,6 +1937,17 @@ function frame(now) {
   }
   G.ui.updateFriendArrow();
   G.ui.updateFlagArrow();
+  // coordinates (Settings > Show Coordinates): where you are, how high, and which way you face
+  {
+    const box = $('coords'), show = !!G.showCoords && (G.state === 'play' || G.state === 'inventory');
+    if (box.hidden === show) box.hidden = !show;
+    if (show) {
+      const dx = -Math.sin(P.yaw), dz = -Math.cos(P.yaw);
+      const face = Math.abs(dz) > Math.abs(dx) ? (dz < 0 ? 'North' : 'South') : (dx > 0 ? 'East' : 'West');
+      const t = 'X ' + Math.floor(P.pos.x) + '   Y ' + Math.floor(P.pos.y) + '   Z ' + Math.floor(P.pos.z) + '   · ' + face;
+      if (box.textContent !== t) box.textContent = t;
+    }
+  }
   Input.lookDX = Input.lookDY = 0;
   G.particles.update(running ? dt : 0);
   G.world.update(P.pos.x, P.pos.z, running ? 6 : 12);

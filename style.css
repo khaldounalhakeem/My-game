@@ -454,3 +454,6 @@ body.touch:not(.pad) #crosshair { display: none; }
 .ench-item.sel { border-color: #b07aff; background: rgba(176, 122, 255, .25); }
 .ench-offer .ench-lv { min-width: 30px; text-align: center; font-weight: bold; color: #7aff7a; }
 .ench-offer .rname { color: #d8c0ff; }
+
+/* Show Coordinates: a small line at the top of the screen */
+#coords { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(68px + env(safe-area-inset-top, 0px)); font-family: var(--font-body); font-size: 18px; color: #fff; background: rgba(0, 0, 0, 0.5); padding: 2px 8px; white-space: nowrap; text-shadow: 1px 1px 0 #000; }
