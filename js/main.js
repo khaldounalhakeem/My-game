@@ -1851,19 +1851,25 @@ function frame(now) {
   }
 
   const active = G.state === 'play';
-  if (active || G.state === 'inventory') G.tickFurnaces(dt); // furnaces keep smelting while a menu like the furnace is open
-  if (active) {
+  // with the inventory, a chest, a villager's trades, the enchanting table or a sign open the world keeps
+  // going like in Minecraft (you still fall, burn and get hit); you just can't walk or mine. Only the pause menu stops it.
+  const running = active || G.state === 'inventory' || G.state === 'trade' || G.state === 'sign';
+  if (running) G.tickFurnaces(dt);
+  if (running) {
     G.time = (G.time + dt / DAY_LENGTH) % 1;
     // look
-    const sens = 0.0024 * Input.sens;
-    P.yaw -= Input.lookDX * sens; P.pitch -= Input.lookDY * sens;
-    P.pitch = clamp(P.pitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
-    G.ui.readMovement();
+    if (active) {
+      const sens = 0.0024 * Input.sens;
+      P.yaw -= Input.lookDX * sens; P.pitch -= Input.lookDY * sens;
+      P.pitch = clamp(P.pitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
+      G.ui.readMovement();
+    }
     const ready = G.world.isLoaded(P.pos.x, P.pos.z) && !G.world.chunks.get(G.world.key(Math.floor(P.pos.x) >> 4, Math.floor(P.pos.z) >> 4)).dirty;
-    if (ready) P.update(dt, P.sleeping ? NO_INPUT : Input);
+    if (ready) P.update(dt, P.sleeping || !active ? NO_INPUT : Input);
     if (P.sleeping) G.sleepTick(dt);
 
     // interaction
+    if (active) {
     const aimPt = Input.tap || Input.aim;
     const tgt = P.dead ? { block: null, mob: null } : P.target(aimPt ? screenRay(aimPt) : null);
     if (Input.tap) {
@@ -1887,6 +1893,7 @@ function frame(now) {
       G.crack.position.set(P.breaking.x + 0.5, P.breaking.y + 0.5, P.breaking.z + 0.5);
       G.crack.geometry = G.crackGeos[Math.min(7, Math.floor(P.breaking.p * 8))];
     } else G.crack.visible = false;
+    } else { P.breaking = null; G.crack.visible = false; }
 
     // entities
     for (const m of G.mobs) m.update(dt);
@@ -1931,8 +1938,8 @@ function frame(now) {
   G.ui.updateFriendArrow();
   G.ui.updateFlagArrow();
   Input.lookDX = Input.lookDY = 0;
-  G.particles.update(active ? dt : 0);
-  G.world.update(P.pos.x, P.pos.z, active ? 6 : 12);
+  G.particles.update(running ? dt : 0);
+  G.world.update(P.pos.x, P.pos.z, running ? 6 : 12);
   Net.tick(dt);
 
   // camera

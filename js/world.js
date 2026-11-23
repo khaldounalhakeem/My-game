@@ -3,7 +3,7 @@
 
 const CS = 16, WH = 96, SEA = 32;
 const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14 };
-const GEN_VER = 4; // which newer biomes exist (see genVerAt)
+const GEN_VER = 5; // which newer biomes exist (see genVerAt)
 const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle'];
 
 const FACES = [
@@ -393,13 +393,21 @@ class World {
     const mountainChunk = biomes[136] === BIOME.MOUNTAIN;
     if (mountainChunk) ORE.push([ID.emerald_ore, 4, 4, 80, 2], [ID.gold_ore, 4, 30, 80, 6], [ID.iron_ore, 8, 30, 90, 9]);
     if (biomes[136] === BIOME.DESERT) ORE.push([ID.gold_ore, 4, 20, 50, 6]);
+    // diamonds were far too easy to find: on new land (nobody built there before) a chunk gets one vein
+    // (sometimes two), like Minecraft, and a diamond touching a cave is usually left as stone
+    const fewDiamonds = this.genVerAt(cx * 16, cz * 16) >= 5;
+    const dr = mulberry32(hash3(cx, cz, this.seed + 4711));
+    const twoVeins = dr() < 0.5;
+    let dVein = 0;
     for (const [ore, count, y0, y1, size] of ORE) {
       for (let v = 0; v < count; v++) {
         let x = rng() * 16, y = y0 + rng() * (y1 - y0), z = rng() * 16;
+        const skip = fewDiamonds && ore === ID.diamond_ore && (dVein++ > (twoVeins ? 1 : 0));
         for (let s = 0; s < size; s++) {
           const xi = x | 0, yi = y | 0, zi = z | 0;
           const here = get(xi, yi, zi);
-          if (here === ID.stone) set(xi, yi, zi, ore);
+          if (skip || (fewDiamonds && ore === ID.diamond_ore && dr() < 0.5 && [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(([a, b, c]) => { const n = get(xi + a, yi + b, zi + c); return n === 0 || n === ID.water || n === ID.lava; }))) { /* no diamond here */ }
+          else if (here === ID.stone) set(xi, yi, zi, ore);
           else if (here === ID.deepslate && DEEP_ORE[ore]) set(xi, yi, zi, DEEP_ORE[ore]);
           x += rng() * 2 - 1; y += rng() * 2 - 1; z += rng() * 2 - 1;
         }
