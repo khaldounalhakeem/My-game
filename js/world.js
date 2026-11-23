@@ -2,8 +2,8 @@
 /* Voxel world: chunk storage, terrain generation, meshing, raycasting and collision. */
 
 const CS = 16, WH = 96, SEA = 32;
-const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11 };
-const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna'];
+const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13 };
+const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove'];
 
 const FACES = [
   { n: [1, 0, 0], c: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], shade: 0.8 },
@@ -99,6 +99,8 @@ class World {
     if (h >= SEA + 26) return BIOME.MOUNTAIN;
     if (temp < -0.12) return moist > 0.0 ? BIOME.TAIGA : BIOME.SNOWY;
     if (temp > 0.1 && moist < 0.04) return BIOME.DESERT;
+    // hot, very wet and low: a mangrove swamp (fresh ground only)
+    if (temp > 0.1 && moist > 0.14 && h <= SEA + 4 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.MANGROVE;
     if (h <= SEA + 1) return BIOME.BEACH;
     // hot and wet: jungle (only on fresh ground, so places you built in keep their forest)
     if (moist > 0.1 && temp > 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.JUNGLE;
@@ -107,6 +109,8 @@ class World {
     // hot and dry-ish: a savanna with flat-topped acacia trees (fresh ground only)
     if (temp > 0.08 && moist <= 0.1 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.SAVANNA;
     if (moist > 0.04) return temp > -0.02 ? BIOME.FOREST : BIOME.BIRCH;
+    // mild, dryish hills: a pink cherry grove (fresh ground only)
+    if (temp > -0.08 && temp <= 0.08 && h >= SEA + 7 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.CHERRY;
     return BIOME.PLAINS;
   }
 
@@ -391,7 +395,7 @@ class World {
 
     // decorations
     const center = biomes[136];
-    const treeCount = { [BIOME.DARK_FOREST]: 6, [BIOME.SAVANNA]: rng() < 0.7 ? 1 + (rng() < 0.4 ? 1 : 0) : 0, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
+    const treeCount = { [BIOME.DARK_FOREST]: 6, [BIOME.MANGROVE]: 5, [BIOME.CHERRY]: 3, [BIOME.SAVANNA]: rng() < 0.7 ? 1 + (rng() < 0.4 ? 1 : 0) : 0, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
     const trees = Math.floor(treeCount * this.style.trees + rng());
     for (let t = 0; t < trees; t++) {
       const x = 2 + (rng() * 12 | 0), z = 2 + (rng() * 12 | 0), h = heights[x + z * 16];
@@ -401,6 +405,8 @@ class World {
       const b = biomes[x + z * 16];
       if (b === BIOME.DARK_FOREST) { if (rng() < 0.8) this.darkOakTree(set, get, x, h + 1, z, rng); else this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4); }
       else if (b === BIOME.SAVANNA) this.acaciaTree(set, get, x, h + 1, z, rng);
+      else if (b === BIOME.MANGROVE) this.mangroveTree(set, get, x, h + 1, z, rng);
+      else if (b === BIOME.CHERRY) this.cherryTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.JUNGLE) { if (rng() < 0.6) this.jungleTree(set, get, x, h + 1, z, rng); else this.jungleBush(set, get, x, h + 1, z, rng); }
       else if (b === BIOME.TAIGA || b === BIOME.SNOWY || (b === BIOME.MOUNTAIN && rng() < 0.7)) this.spruceTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.BIRCH || (b === BIOME.FOREST && rng() < 0.25)) this.oakTree(set, get, x, h + 1, z, rng, ID.birch_log, ID.birch_leaves, 5);
@@ -416,6 +422,17 @@ class World {
     if (center === BIOME.PLAINS) { plant(28, [ID.tall_grass], ID.grass); plant(5, [ID.rose, ID.dandelion], ID.grass); }
     if (center === BIOME.DARK_FOREST) { plant(10, [ID.tall_grass], ID.grass); plant(4, [ID.red_mushroom, ID.brown_mushroom], ID.grass); }
     if (center === BIOME.SAVANNA) plant(40, [ID.tall_grass], ID.grass);
+    if (center === BIOME.CHERRY) { plant(20, [ID.tall_grass], ID.grass); plant(4, [ID.rose, ID.dandelion], ID.grass); }
+    if (center === BIOME.MANGROVE) { // shallow puddles between the trees
+      plant(12, [ID.tall_grass], ID.grass);
+      for (let i = 0; i < 14; i++) {
+        const x = 1 + (rng() * 14 | 0), z = 1 + (rng() * 14 | 0), h = heights[x + z * 16];
+        if (h > SEA + 3 || get(x, h, z) !== ID.grass || get(x, h + 1, z) !== 0) continue;
+        let ok = true;
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = get(x + a, h, z + b); if (n === 0 || (DEFS[n] && !DEFS[n].solid && n !== ID.water)) ok = false; }
+        if (ok) { set(x, h, z, ID.water); set(x, h - 1, z, ID.dirt); }
+      }
+    }
     if (center === BIOME.JUNGLE) { plant(30, [ID.tall_grass], ID.grass); if (rng() < 0.5) plant(3, [ID.melon], ID.grass); }
     if (center === BIOME.FOREST || center === BIOME.BIRCH) { plant(14, [ID.tall_grass], ID.grass); plant(3, [ID.rose, ID.dandelion, ID.red_mushroom, ID.brown_mushroom], ID.grass); }
     if (center === BIOME.TAIGA) { plant(8, [ID.tall_grass], ID.grass); plant(2, [ID.brown_mushroom, ID.red_mushroom], ID.grass); }
@@ -676,6 +693,60 @@ class World {
       const bx = x - ddx, bz = z - ddz, by = y + bend - 1;
       set(bx, by, bz, ID.acacia_log); set(bx - ddx, by + 1, bz - ddz, ID.acacia_log);
       crown(bx - ddx, by + 2, bz - ddz, 2);
+    }
+  }
+
+  /* a mangrove: the trunk stands up on arching roots, with a round crown of leaves on top */
+  mangroveTree(set, get, x, y, z, rng) {
+    const free = (a, b, c) => { const id = get(a, b, c); return id === 0 || id === ID.water || id === ID.tall_grass; };
+    const lift = 2 + (rng() * 2 | 0), h = 5 + (rng() * 3 | 0);
+    for (let dy = 0; dy < lift; dy++) if (free(x, y + dy, z)) set(x, y + dy, z, ID.mangrove_roots);
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+      if (rng() < 0.25) continue;
+      const far = Math.abs(dx) + Math.abs(dz) > 1 ? 1 : 2;
+      for (let s = 1; s <= far; s++) {
+        const ry = y + lift - 1 - s;
+        for (let yy = ry; yy >= y - 1; yy--) { if (!free(x + dx * s, yy, z + dz * s)) break; set(x + dx * s, yy, z + dz * s, ID.mangrove_roots); }
+      }
+      if (free(x + dx, y + lift - 1, z + dz)) set(x + dx, y + lift - 1, z + dz, ID.mangrove_roots);
+    }
+    const top = y + lift + h;
+    for (let dy = -2; dy <= 1; dy++) {
+      const r = dy >= 0 ? 2 : 3;
+      for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+        if (dx * dx + dz * dz > r * r + 1) continue;
+        if (get(x + dx, top + dy, z + dz) === 0) set(x + dx, top + dy, z + dz, ID.mangrove_leaves);
+      }
+    }
+    for (let i = 0; i < 6; i++) { // a few leaves hanging down
+      const dx = (rng() * 7 | 0) - 3, dz = (rng() * 7 | 0) - 3, n = 1 + (rng() * 2 | 0);
+      for (let k = 1; k <= n; k++) if (get(x + dx, top - 2 - k, z + dz) === 0) set(x + dx, top - 2 - k, z + dz, ID.mangrove_leaves);
+    }
+    for (let dy = lift; dy <= lift + h; dy++) set(x, y + dy, z, ID.mangrove_log);
+  }
+
+  /* a cherry tree: a short trunk that splits into branches, each with a puffy pink crown */
+  cherryTree(set, get, x, y, z, rng) {
+    const h = 3 + (rng() * 2 | 0);
+    for (let dy = 0; dy < h; dy++) set(x, y + dy, z, ID.cherry_log);
+    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    const a = rng() * 4 | 0, ends = [[x, y + h + 1, z]];
+    for (const [dx, dz] of [dirs[a], dirs[a ^ 1]]) {
+      let bx = x, by = y + h - 1, bz = z;
+      const len = 2 + (rng() * 2 | 0);
+      for (let s = 0; s < len; s++) { bx += dx; bz += dz; if (s > 0) by++; set(bx, by, bz, ID.cherry_log); }
+      set(bx, by + 1, bz, ID.cherry_log);
+      ends.push([bx, by + 2, bz]);
+    }
+    set(x, y + h, z, ID.cherry_log);
+    for (const [cx, cy, cz] of ends) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const r = dy === 1 ? 2 : 3;
+        for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+          if (dx * dx + dz * dz > r * r - (dy === -1 ? 2 : 0)) continue;
+          if (get(cx + dx, cy + dy, cz + dz) === 0) set(cx + dx, cy + dy, cz + dz, ID.cherry_leaves);
+        }
+      }
     }
   }
 

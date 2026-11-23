@@ -615,6 +615,18 @@ makeTile('leaves_acacia', pLeaves(0x5a8f1e));
 makeTile('planks_acacia', pPlanks(0xa85a32));
 makeTile('acacia_sapling', pSapling(0x5a8f1e, 0x6b6359));
 woodTiles('acacia', 0xa85a32);
+/* mangrove (reddish wood from swamps) and cherry (pink wood from cherry groves) */
+for (const [w, bark, inner, ring, leaf, plank] of [['mangrove', 0x54392d, 0x7a3a32, 0x6a3028, 0x4f8f2a, 0x7a3530], ['cherry', 0x3a2530, 0xe0b0a8, 0xc89890, 0xf2a6c8, 0xe3b4ac]]) {
+  makeTile('log_' + w, pLogSide(bark, shadeC(rgb(bark), 0.72)));
+  makeTile('log_' + w + '_top', pLogTop(bark, inner, ring));
+  makeTile('leaves_' + w, pLeaves(leaf));
+  makeTile('planks_' + w, pPlanks(plank));
+  makeTile(w + '_sapling', pSapling(leaf, bark));
+  woodTiles(w, plank);
+  const c = rgb(plank);
+  makeTile('i_' + w + '_slab', pPlant(P => { P.rect(1, 8, 14, 6, c); P.rect(1, 8, 14, 1, shadeC(c, 1.2)); P.rect(1, 13, 14, 1, shadeC(c, 0.6)); }));
+}
+makeTile('mangrove_roots', P => { for (let i = 0; i < 16; i++) for (let j = 0; j < 16; j++) { const on = (i + j) % 6 < 2 || (i - j + 32) % 7 < 2; if (on) P.put(i, j, P.vary(0x4a3226, 10)); else P.erase(i, j); } });
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -900,6 +912,17 @@ block('acacia_sapling', 'Acacia Sapling', 'acacia_sapling', Object.assign({ sapl
 woodBlocks('acacia', 'Acacia', 'planks_acacia');
 for (const half of ['b', 't']) block('acacia_slab_' + half, 'Acacia Slab', 'planks_acacia', { tool: 'axe', hardness: 2, opaque: false, boxes: [half === 'b' ? [0, 0, 0, 1, 0.5, 1] : [0, 0.5, 0, 1, 1, 1]], drop: 'acacia_slab', slab: 'acacia', slabFull: 'acacia_planks', slabHalf: half });
 rightDoors('acacia_', 'Acacia');
+/* mangrove and cherry (after acacia, same reason) */
+for (const [w, n, sap] of [['mangrove', 'Mangrove', 'Mangrove Propagule'], ['cherry', 'Cherry', 'Cherry Sapling']]) {
+  block(w + '_log', n + ' Log', { top: 'log_' + w + '_top', side: 'log_' + w }, { tool: 'axe', hardness: 2 });
+  block(w + '_leaves', n + ' Leaves', 'leaves_' + w, Object.assign({ drop: (r) => (r() < 0.05 ? [[w + '_sapling', 1]] : r() < 0.07 ? [['stick', 1]] : []) }, LEAVES));
+  block(w + '_planks', n + ' Planks', 'planks_' + w, { tool: 'axe', hardness: 2 });
+  block(w + '_sapling', sap, w + '_sapling', Object.assign({ sapling: w }, CROSS));
+  woodBlocks(w, n, 'planks_' + w);
+  for (const half of ['b', 't']) block(w + '_slab_' + half, n + ' Slab', 'planks_' + w, { tool: 'axe', hardness: 2, opaque: false, boxes: [half === 'b' ? [0, 0, 0, 1, 0.5, 1] : [0, 0.5, 0, 1, 1, 1]], drop: w + '_slab', slab: w, slabFull: w + '_planks', slabHalf: half });
+  rightDoors(w + '_', n);
+}
+block('mangrove_roots', 'Mangrove Roots', 'mangrove_roots', { tool: 'axe', hardness: 0.7, opaque: false, cutout: true });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1018,6 +1041,13 @@ item('acacia_trapdoor', 'Acacia Trapdoor', 'acacia_trapdoor', { placesTrapdoor: 
 item('acacia_fence_gate', 'Acacia Fence Gate', 'acacia_fence_gate', { placesGate: 'acacia' });
 item('acacia_stairs', 'Acacia Stairs', 'acacia_stairs', { placesStair: 'acacia' });
 item('acacia_slab', 'Acacia Slab', 'acacia_slab', { placesSlab: 'acacia' });
+for (const [w, n] of [['mangrove', 'Mangrove'], ['cherry', 'Cherry']]) {
+  item(w + '_door', n + ' Door', w + '_door', { placesDoor: w });
+  item(w + '_trapdoor', n + ' Trapdoor', w + '_trapdoor', { placesTrapdoor: w });
+  item(w + '_fence_gate', n + ' Fence Gate', w + '_fence_gate', { placesGate: w });
+  item(w + '_stairs', n + ' Stairs', w + '_stairs', { placesStair: w });
+  item(w + '_slab', n + ' Slab', w + '_slab', { placesSlab: w });
+}
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -1030,8 +1060,8 @@ function getDrops(def, rng) {
 // [output, count, {input: count}, station]   '#planks' / '#log' match any wood type
 const GROUPS = {
   '#cobble': ['cobblestone', 'cobbled_deepslate', 'blackstone'],
-  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks', 'jungle_planks', 'dark_oak_planks', 'acacia_planks'],
-  '#log': ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'dark_oak_log', 'acacia_log'],
+  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks', 'jungle_planks', 'dark_oak_planks', 'acacia_planks', 'mangrove_planks', 'cherry_planks'],
+  '#log': ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'dark_oak_log', 'acacia_log', 'mangrove_log', 'cherry_log'],
   '#wool': ['wool_white', 'wool_red', 'wool_blue', 'wool_green', 'wool_yellow', 'wool_black', 'wool_orange', 'wool_purple'],
 };
 const RECIPES = [
@@ -1136,6 +1166,7 @@ const RECIPES = [
   ['jungle_slab', 6, { jungle_planks: 3 }, 'table'],
   ['acacia_planks', 4, { acacia_log: 1 }], ['acacia_stairs', 4, { acacia_planks: 6 }, 'table'], ['acacia_slab', 6, { acacia_planks: 3 }, 'table'],
   ['acacia_door', 3, { acacia_planks: 6 }, 'table'], ['acacia_trapdoor', 2, { acacia_planks: 6 }, 'table'], ['acacia_fence', 3, { acacia_planks: 4, stick: 2 }, 'table'], ['acacia_fence_gate', 1, { acacia_planks: 2, stick: 4 }, 'table'],
+  ...['mangrove', 'cherry'].flatMap(w => { const pk = w + '_planks'; return [[pk, 4, { [w + '_log']: 1 }], [w + '_stairs', 4, { [pk]: 6 }, 'table'], [w + '_slab', 6, { [pk]: 3 }, 'table'], [w + '_door', 3, { [pk]: 6 }, 'table'], [w + '_trapdoor', 2, { [pk]: 6 }, 'table'], [w + '_fence', 3, { [pk]: 4, stick: 2 }, 'table'], [w + '_fence_gate', 1, { [pk]: 2, stick: 4 }, 'table']]; }),
   ['composter', 1, { '#planks': 4 }, 'table'], ['lectern', 1, { bookshelf: 1, '#planks': 4 }, 'table'],
   ['smoker', 1, { furnace: 1, '#log': 4 }, 'table'], ['blast_furnace', 1, { furnace: 1, iron_ingot: 5, stone: 3 }, 'table'],
   ['grindstone', 1, { stick: 2, stone: 1, '#planks': 2 }, 'table'], ['fletching_table', 1, { flint: 2, '#planks': 4 }, 'table'],
@@ -1235,7 +1266,7 @@ for (const r of RECIPES) if (r[3] === 'furnace') for (const k in r[2]) for (cons
 const FUEL = {};
 // (how many items each one smelts) x 6 seconds: coal smelts 5 items
 for (const [k, n] of [['lava_bucket', 100], ['coal', 5], ['coal_block', 45], ['blaze_rod', 12], ['stick', 0.5], ['crafting_table', 1.5], ['chest', 1.5], ['bookshelf', 1.5],
-  ['oak_log', 1.5], ['birch_log', 1.5], ['spruce_log', 1.5], ['jungle_log', 1.5], ['dark_oak_log', 1.5], ['acacia_log', 1.5], ['acacia_planks', 1.5], ['dark_oak_planks', 1.5], ['oak_planks', 1.5], ['birch_planks', 1.5], ['spruce_planks', 1.5], ['jungle_planks', 1.5], ['bow', 1.5],
+  ['oak_log', 1.5], ['birch_log', 1.5], ['spruce_log', 1.5], ['jungle_log', 1.5], ['dark_oak_log', 1.5], ['acacia_log', 1.5], ['acacia_planks', 1.5], ['mangrove_log', 1.5], ['mangrove_planks', 1.5], ['cherry_log', 1.5], ['cherry_planks', 1.5], ['dark_oak_planks', 1.5], ['oak_planks', 1.5], ['birch_planks', 1.5], ['spruce_planks', 1.5], ['jungle_planks', 1.5], ['bow', 1.5],
   ['wooden_pickaxe', 1], ['wooden_sword', 1], ['wooden_axe', 1], ['wooden_shovel', 1], ['dead_bush', 0.5], ['boat', 6]]) if (ID[k] !== undefined) FUEL[ID[k]] = n * SMELT_TIME;
 
 /* ---------- what each number means ----------
