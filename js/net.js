@@ -444,7 +444,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v61 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v62 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -797,7 +797,7 @@ const Net = {
         const cx = +m[1], cz = +m[2], mine = w.edits.get(k);
         for (let i = 0; i + 1 < arr.length; i += 2) {
           const idx = arr[i], id = arr[i + 1];
-          if (!Number.isInteger(idx) || idx < 0 || idx >= 16 * 16 * WH || !Number.isInteger(id) || !DEFS[id] || !DEFS[id].isBlock || (DEFS[id].liquid && id !== ID.water)) continue;
+          if (!Number.isInteger(idx) || idx < 0 || idx >= 16 * 16 * WH || !Number.isInteger(id) || !DEFS[id] || !DEFS[id].isBlock) continue;
           const have = mine ? mine.get(idx) : undefined;
           if (have === id || (have !== undefined && !theirsWin)) continue;
           const x = cx * 16 + (idx & 15), z = cz * 16 + ((idx >> 4) & 15), y = idx >> 8;
@@ -1214,7 +1214,7 @@ const Net = {
       for (const e of pr.e) {
         if (!Array.isArray(e) || e.length !== 6 || !e.every(isInt)) continue;
         const [sq, d, x, y, z, id] = e;
-        if (sq <= rp.last || id < 0 || !DEFS[id] || !DEFS[id].isBlock || (DEFS[id].liquid && id !== ID.water)) continue;
+        if (sq <= rp.last || id < 0 || !DEFS[id] || !DEFS[id].isBlock) continue;
         if (G.worlds[DIMS[d]]) G.worlds[DIMS[d]].applyRemote(x, y, z, id);
         if (this.liveTouched) this.liveTouched.add(d + ':' + x + ',' + y + ',' + z);
         if (sq > top) top = sq;
