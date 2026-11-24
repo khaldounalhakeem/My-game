@@ -468,3 +468,21 @@ body.touch:not(.pad) #crosshair { display: none; }
 
 /* freezing in powder snow: frost creeps in from the edges; head inside it: all white */
 #fx-frost { background: radial-gradient(ellipse at center, rgba(235, 245, 255, 0.05) 30%, rgba(225, 240, 255, 0.9)); transition: none; opacity: 0; }
+
+/* the enchanting table: an item slot and a lapis slot, three choices, and your things below */
+.et-card { max-width: 560px; }
+.et-top { display: flex; gap: 12px; align-items: stretch; margin: 6px 0; }
+.et-slots { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+.et-slot { position: relative; width: 52px; height: 52px; padding: 0; background: #1c1c22; border: 3px solid #55556a; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #9a9ab0; font: inherit; }
+.et-slot img { width: 36px; height: 36px; image-rendering: pixelated; }
+.et-slot .count { position: absolute; right: 3px; bottom: 1px; font-size: 13px; color: #fff; text-shadow: 1px 1px 0 #000; }
+.et-slot .et-empty { font-size: 11px; }
+.et-lapis { border-color: #3a55b5; }
+.et-slot.glint { box-shadow: inset 0 0 10px 2px rgba(176, 122, 255, .75); }
+.et-slot.small { width: 42px; height: 42px; border-width: 2px; }
+.et-slot.small img { width: 28px; height: 28px; }
+.et-slot.dim img { opacity: .35; }
+.et-top .ench-offers { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.ench-offer.empty { min-height: 44px; opacity: .35; }
+.et-inv { display: grid; grid-template-columns: repeat(9, 42px); gap: 4px; justify-content: center; margin: 6px 0 10px; }
+@media (max-width: 480px) { .et-inv { grid-template-columns: repeat(9, 1fr); } .et-slot.small { width: auto; } }

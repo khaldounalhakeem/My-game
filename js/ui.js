@@ -768,17 +768,29 @@ const UI = {
     let box = $('ench-pop');
     if (!box) {
       box = document.createElement('div'); box.id = 'ench-pop'; box.className = 'copy-pick';
-      box.innerHTML = '<div class="copy-card trade-card"><h3>Enchanting Table</h3><p class="trade-hint ench-hint"></p><div class="ench-items"></div><div class="trade-list ench-offers"></div><button type="button" class="btn trade-close">Close</button></div>';
+      box.innerHTML = '<div class="copy-card trade-card et-card"><h3>Enchanting Table</h3>'
+        + '<div class="et-top"><div class="et-slots"><button type="button" class="et-slot et-item" title="What to enchant"></button><button type="button" class="et-slot et-lapis" title="Lapis lazuli"></button></div>'
+        + '<div class="trade-list ench-offers"></div></div>'
+        + '<p class="trade-hint ench-hint"></p><b class="anvil-step">Your things: tap one to put it in the table</b><div class="et-inv"></div>'
+        + '<button type="button" class="btn trade-close">Close</button></div>';
       box.addEventListener('pointerdown', e => { if (e.target === box) this.closeTrades(); });
       box.querySelector('.trade-close').addEventListener('click', () => this.closeTrades());
+      box.querySelector('.et-item').addEventListener('click', () => { const st = this.ench; if (st && st.item) { this.enchGiveBack(st.item); st.item = null; G.sound.play('click'); this.renderEnchant(); } });
+      box.querySelector('.et-lapis').addEventListener('click', () => { const st = this.ench; if (st && st.lapis) { this.enchGiveBack(st.lapis); st.lapis = null; G.sound.play('click'); this.renderEnchant(); } });
       document.body.appendChild(box);
     }
-    this.ench = { x, y, z, shelves: Math.min(15, shelves), pick: null };
+    this.ench = { x, y, z, shelves: Math.min(15, shelves), item: null, lapis: null };
     if (G.enchSeed === undefined) G.enchSeed = Math.random() * 1e9 | 0;
     this.renderEnchant();
     box.hidden = false;
     G.sound.play('click');
     G.setState('trade'); G.unlock();
+  },
+  /* something taken out of the table goes back into your inventory (or onto the ground if it's full) */
+  enchGiveBack(s) {
+    const P = G.player, left = P.inv.add(s.id, s.count, s.e, s.n);
+    if (left) G.spawnDrop(s.id, left, P.pos.x, P.pos.y + 1, P.pos.z, undefined, slotExtras(s));
+    P.inv.changed();
   },
   enchOffers(slot) {
     const sh = this.ench.shelves, def = DEFS[slot.id], kinds = enchKinds(def);
@@ -800,46 +812,62 @@ const UI = {
     });
   },
   renderEnchant() {
-    const box = $('ench-pop'), st = this.ench, P = G.player, inv = P.inv, lapis = inv.count(ID.lapis), creative = P.mode === 'creative';
-    box.querySelector('.ench-hint').textContent = 'Your level: ' + P.level + ' · Lapis lazuli: ' + lapis + ' · Bookshelves: ' + st.shelves + ' of 15. ' + (st.pick === null ? 'Pick what you want to enchant.' : 'Pick an enchantment.') + (st.shelves < 15 ? ' Put bookshelves around the table, one block away, for stronger magic.' : '');
-    const items = box.querySelector('.ench-items'), offers = box.querySelector('.ench-offers');
-    items.innerHTML = ''; offers.innerHTML = '';
-    const can = [];
-    for (let i = 0; i < 40; i++) { const s = inv.slots[i]; if (s && !s.e && s.id !== ID.enchanted_book && canEnchant(DEFS[s.id])) can.push(i); }
-    if (st.pick !== null && !can.includes(st.pick)) st.pick = null;
-    if (!can.length) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'You have nothing to enchant. Bring a sword, a tool, armor, a bow or a book (one that is not enchanted yet).'; items.appendChild(p); return; }
-    for (const i of can) {
-      const s = inv.slots[i], b = document.createElement('button');
-      b.type = 'button'; b.className = 'ench-item' + (st.pick === i ? ' sel' : '');
-      b.innerHTML = `<img alt="" src="${iconURL(s.id)}"><span>${DEFS[s.id].name}</span>`;
-      b.addEventListener('click', () => { st.pick = i; G.sound.play('click'); this.renderEnchant(); });
-      items.appendChild(b);
-    }
-    if (st.pick === null) return;
-    const slot = inv.slots[st.pick];
-    for (const o of this.enchOffers(slot)) {
-      const ok = creative || (P.level >= o.L && lapis >= o.cost);
-      const row = document.createElement('button'); row.type = 'button'; row.className = 'recipe ench-offer' + (ok ? ' ok' : '');
-      row.innerHTML = `<span class="ench-lv">${o.L}</span><span class="rname">${enchText(o.e)}<small class="rhow">Needs level ${o.L} · costs ${o.cost} lapis and ${o.cost} level${o.cost > 1 ? 's' : ''}</small></span><span class="ins"><span class="need${lapis >= o.cost ? '' : ' short'}"><img alt="" src="${iconURL(ID.lapis)}">${o.cost}</span></span>`;
+    const box = $('ench-pop'), st = this.ench, P = G.player, inv = P.inv, creative = P.mode === 'creative';
+    const lapis = st.lapis ? st.lapis.count : 0;
+    const fill = (el, s, empty) => {
+      el.innerHTML = '';
+      if (s) { const img = document.createElement('img'); img.alt = ''; img.src = iconURL(s.id); el.appendChild(img); if (s.count > 1) { const c = document.createElement('span'); c.className = 'count'; c.textContent = s.count; el.appendChild(c); } }
+      else { const t = document.createElement('span'); t.className = 'et-empty'; t.textContent = empty; el.appendChild(t); }
+      el.classList.toggle('glint', !!(s && s.e));
+    };
+    fill(box.querySelector('.et-item'), st.item, 'Item');
+    fill(box.querySelector('.et-lapis'), st.lapis, 'Lapis');
+    box.querySelector('.ench-hint').textContent = !st.item ? 'Put in a sword, tool, armor, bow or book, and some lapis lazuli.'
+      : st.item.e ? 'All done! Tap it to take it out.'
+      : !lapis ? 'Now put in lapis lazuli.'
+      : 'Pick an enchantment. Your level: ' + P.level + '. Bookshelves: ' + st.shelves + ' of 15' + (st.shelves < 15 ? ' (more bookshelves around the table, one block away, give better choices).' : '.');
+    // three choices, like Minecraft: the level you need on the left, a hint of the magic, and the lapis it costs
+    const offers = box.querySelector('.ench-offers'); offers.innerHTML = '';
+    const list = st.item && !st.item.e ? this.enchOffers(st.item) : null;
+    for (let i = 0; i < 3; i++) {
+      const o = list && list[i], row = document.createElement('button'); row.type = 'button';
+      const ok = !!o && (creative || (P.level >= o.L && lapis >= o.cost));
+      row.className = 'recipe ench-offer' + (ok ? ' ok' : '') + (o ? '' : ' empty');
+      if (!o) { row.disabled = true; offers.appendChild(row); continue; }
+      const ks = Object.keys(o.e), first = ks[0], hint = ENCHANTS[first].name + (ENCHANTS[first].max > 1 ? ' ' + ROMAN[o.e[first]] : '') + (ks.length > 1 ? ' . . . ?' : '');
+      row.innerHTML = '<span class="ench-lv"></span><span class="rname"></span><span class="ins"><span class="need"><img alt="" src="' + iconURL(ID.lapis) + '">' + o.cost + '</span></span>';
+      row.querySelector('.ench-lv').textContent = o.L; row.querySelector('.rname').textContent = hint;
+      row.title = 'Needs level ' + o.L + '. Costs ' + o.cost + ' lapis and ' + o.cost + ' level' + (o.cost > 1 ? 's' : '') + '.';
       row.addEventListener('click', () => {
-        if (!creative && P.level < o.L) { this.message('You need level ' + o.L + ' for this. Get more XP by mining ores, smelting and defeating mobs.'); return; }
-        if (!creative && lapis < o.cost) { this.message('You need ' + o.cost + ' lapis lazuli.'); return; }
-        if (!creative) { inv.remove(ID.lapis, o.cost); P.level = Math.max(0, P.level - o.cost); }
-        let made = slot;
-        if (slot.id === ID.book) { // a book becomes an Enchanted Book (one at a time)
-          made = { id: ID.enchanted_book, count: 1, e: o.e };
-          if (slot.count > 1) { slot.count--; if (inv.add(ID.enchanted_book, 1, o.e)) G.spawnDrop(ID.enchanted_book, 1, P.pos.x, P.pos.y + 1, P.pos.z, undefined, { e: o.e }); }
-          else inv.slots[st.pick] = made;
-        } else slot.e = o.e;
-        inv.changed();
-        G.enchSeed = Math.random() * 1e9 | 0; // new offers next time, like Minecraft
+        if (!creative && lapis < o.cost) { this.message('You need ' + o.cost + ' lapis lazuli in the table for this one.'); return; }
+        if (!creative && P.level < o.L) { this.message('You need level ' + o.L + ' for this one. Get XP by mining ores, smelting and defeating mobs.'); return; }
+        if (!creative) { st.lapis.count -= o.cost; if (st.lapis.count <= 0) st.lapis = null; P.level = Math.max(0, P.level - o.cost); }
+        st.item = st.item.id === ID.book ? { id: ID.enchanted_book, count: 1, e: o.e } : Object.assign(st.item, { e: o.e });
+        G.enchSeed = Math.random() * 1e9 | 0; // new choices next time, like Minecraft
         G.sound.play('levelup');
         G.particles.burst(st.x + 0.5, st.y + 1.2, st.z + 0.5, [0xb07aff, 0x7a5aff, 0xe8d8ff], 18, 2, 0.1, -1);
-        this.message((made.id === ID.enchanted_book ? 'You made an Enchanted Book of ' : DEFS[slot.id].name + ' is now enchanted with ') + enchText(o.e) + '!', 'purple');
-        st.pick = null;
+        this.message((st.item.id === ID.enchanted_book ? 'You made an Enchanted Book of ' : DEFS[st.item.id].name + ' is now enchanted with ') + enchText(o.e) + '!', 'purple');
         this.renderEnchant();
       });
       offers.appendChild(row);
+    }
+    // your inventory: tap something to put it in the table
+    const grid = box.querySelector('.et-inv'); grid.innerHTML = '';
+    for (let i = 0; i < 36; i++) {
+      const s = inv.slots[i], b = document.createElement('button'); b.type = 'button'; b.className = 'et-slot small';
+      const usable = s && (s.id === ID.lapis || (!s.e && s.id !== ID.enchanted_book && canEnchant(DEFS[s.id])));
+      if (s) { fill(b, s, ''); b.title = slotName(s); if (!usable) b.classList.add('dim'); }
+      b.addEventListener('click', () => {
+        const s2 = inv.slots[i];
+        if (!s2) return;
+        if (s2.id === ID.lapis) { if (st.lapis) st.lapis.count += s2.count; else st.lapis = { id: ID.lapis, count: s2.count }; inv.slots[i] = null; }
+        else if (!s2.e && s2.id !== ID.enchanted_book && canEnchant(DEFS[s2.id])) {
+          if (st.item) this.enchGiveBack(st.item);
+          if (s2.count > 1) { st.item = copySlot(s2, 1); s2.count--; } else { st.item = s2; inv.slots[i] = null; }
+        } else { this.message(s2.e ? 'That is already enchanted. Use an anvil to add more.' : slotName(s2) + ' can\'t be enchanted.'); return; }
+        inv.changed(); G.sound.play('click'); this.renderEnchant();
+      });
+      grid.appendChild(b);
     }
   },
 
@@ -952,6 +980,7 @@ const UI = {
     if (box) box.hidden = true;
     const eb = $('ench-pop');
     if (eb) eb.hidden = true;
+    if (this.ench) { if (this.ench.item) this.enchGiveBack(this.ench.item); if (this.ench.lapis) this.enchGiveBack(this.ench.lapis); }
     this.ench = null;
     const ab = $('anvil-pop');
     if (ab) { ab.hidden = true; const inp = ab.querySelector('.anvil-name'); if (inp) inp.blur(); }

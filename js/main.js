@@ -523,11 +523,12 @@ function weakPowered(x, y, z) {
   for (const [a, c] of H4) if (wireOn(rsD(x + a, y, z + c)) && wireLinks(x + a, y, z + c).length <= 1) return true;
   return false;
 }
-/* is a door, trapdoor, gate or TNT here getting power? */
-function devicePowered(x, y, z) {
+/* is a door, trapdoor, gate or TNT here getting power? (doors skip pressure plates: a plate works them like a button you step on) */
+function devicePowered(x, y, z, forDoor) {
   for (const [a, b, c] of NB6) {
     const nx = x + a, ny = y + b, nz = z + c, d = rsD(nx, ny, nz);
     if (!d) continue;
+    if (forDoor && d.plate) continue;
     if (switchOn(d) || wireOn(d) || d.key === 'redstone_block') return true;
     if (repInto(nx, ny, nz, x, y, z)) return true;
     if (torchOn(d)) { const s = supportOf(nx, ny, nz, d); if (!(s[0] === x && s[1] === y && s[2] === z)) return true; }
@@ -625,16 +626,15 @@ G.tickRedstone = () => {
       continue;
     }
     if (d.door && d.door.half === 'upper') continue; // a door is looked at from its lower half
-    let p = devicePowered(x, y, z);
-    if (d.door && !p) p = devicePowered(x, y + 1, z);
+    let p = devicePowered(x, y, z, !!d.door);
+    if (d.door && !p) p = devicePowered(x, y + 1, z, true);
     // a double door: power on either door opens both (otherwise the two would fight, opening and closing forever)
     if (d.door && !p) {
       const sd = d.door.hinge ? -1 : 1, px = d.door.ax === 'x' ? x + sd : x, pz = d.door.ax === 'z' ? z + sd : z, pd = rsD(px, y, pz);
-      if (pd && pd.door && pd.door.ax === d.door.ax && !!pd.door.hinge !== !!d.door.hinge) p = devicePowered(px, y, pz) || devicePowered(px, y + 1, pz);
+      if (pd && pd.door && pd.door.ax === d.door.ax && !!pd.door.hinge !== !!d.door.hinge) p = devicePowered(px, y, pz, true) || devicePowered(px, y + 1, pz, true);
     }
     const k = G.dim + ':' + x + ',' + y + ',' + z, before = G.devPow.get(k), open = !!(d.door || d.trapdoor || d.gate).open;
     G.devPow.set(k, p);
-    if (d.door && d.door.wood === 'iron') { if (p !== open) G.toggleDoor(x, y, z); continue; } // iron doors only follow power
     if (p && !before && !open) G.toggleDoor(x, y, z);
     else if (!p && before && open) G.toggleDoor(x, y, z);
   }
@@ -684,6 +684,14 @@ G.tickPlates = () => {
     if (!def.plate.on) {
       W.setBlock(x, y, z, ID[def.plate.kind + '_plate_1']);
       Sound.play('click', new THREE.Vector3(x, y, z));
+      // a door next to the plate: step on to open it, step on again to close it (stepping off does nothing)
+      const doneDoors = new Set();
+      for (const [a, b, c] of NB6) for (const dy of [0, -1]) {
+        const dx = x + a, ddy = y + b + dy, dz = z + c, dd = DEFS[W.getBlock(dx, ddy, dz)];
+        if (!dd || !dd.door || dd.door.half !== 'lower' || doneDoors.has(dx + ',' + ddy + ',' + dz)) continue;
+        doneDoors.add(dx + ',' + ddy + ',' + dz);
+        G.toggleDoor(dx, ddy, dz);
+      }
     }
   }
   for (const k in G.downPlates) {
