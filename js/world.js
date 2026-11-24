@@ -599,6 +599,16 @@ class World {
       const x = r2() * 16 | 0, y = 8 + (r2() * 15 | 0), z = r2() * 16 | 0, n = 1 + (r2() * 2 | 0);
       for (let s = 0; s < n; s++) if (get(x + s, y, z) === ID.netherrack) set(x + s, y, z, ID.ancient_debris);
     }
+    // more of it (it was too hard to find): its own random numbers, so nothing else in the Nether moves
+    { const r4 = mulberry32(hash3(cx, cz, this.seed + 6113));
+      const put = (x, y, z) => { if (get(x, y, z) === ID.netherrack) set(x, y, z, ID.ancient_debris); };
+      for (let v = 0; v < 3; v++) {
+        if (r4() < 0.3) continue;
+        const x = 1 + (r4() * 14 | 0), y = 8 + (r4() * 15 | 0), z = 1 + (r4() * 14 | 0);
+        put(x, y, z); if (r4() < 0.5) put(x + (r4() < 0.5 ? 1 : 0), y + (r4() < 0.3 ? 1 : 0), z + (r4() < 0.5 ? 1 : 0));
+      }
+      if (r4() < 0.5) put(r4() * 16 | 0, 23 + (r4() * 70 | 0), r4() * 16 | 0); // now and then higher up too
+    }
     // blobs of blackstone
     for (let v = 0; v < 2; v++) {
       let x = r2() * 16, y = 10 + r2() * 60, z = r2() * 16;

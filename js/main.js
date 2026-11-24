@@ -1750,6 +1750,15 @@ G.toTitle = () => {
 };
 
 G.setState = (s) => {
+  // opening or closing a menu: let go of every touch button and finger, so nothing keeps
+  // walking, jumping or mining by itself afterwards (a hidden button never hears the finger lift)
+  if (s !== G.state && Input.touch) {
+    Input.joy.id = null; Input.joy.x = Input.joy.y = 0;
+    const knob = document.getElementById('knob'); if (knob) knob.style.transform = '';
+    Input.tJump = false; Input.tSneak = false; Input.left = false; Input.aim = null; Input.tap = null;
+    Input.leftPressed = Input.rightPressed = false;
+    if (G.ui && G.ui.dropLook) G.ui.dropLook();
+  }
   G.state = s;
   document.body.dataset.state = s;
 };

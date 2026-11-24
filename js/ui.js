@@ -1237,6 +1237,7 @@ const UI = {
       }
       look = null;
     };
+    this.dropLook = () => { if (look) { clearTimeout(look.hold); look = null; } };
     cv.addEventListener('pointerup', endLook);
     cv.addEventListener('pointercancel', endLook);
 
