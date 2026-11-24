@@ -472,34 +472,135 @@ G.toggleDoor = (x, y, z) => {
   Sound.play('click', new THREE.Vector3(x, y, z));
 };
 
-/* ---------- power: levers, buttons and pressure plates ----------
-   A switch powers the blocks right next to it and right next to the block it sits on (like Minecraft
-   without redstone dust). Powered doors, trapdoors and fence gates open (and close again when the power
-   stops); powered TNT lights. */
+/* ---------- redstone: levers, buttons, pressure plates, redstone dust and redstone torches ----------
+   Like Minecraft (a little simpler). Every 0.1 s the places around anything that changed are looked at again:
+   - A switch that is on powers the blocks right next to it, and the block it is stuck to. That block then
+     powers the things around it. A redstone torch powers the block above it; a Block of Redstone is always on.
+   - Redstone dust carries power from those along the floor, up and down one step, getting weaker by one each
+     block: up to 15 blocks away. Lit dust powers what is next to it and the block under it.
+   - A redstone torch is on unless the block it is stuck to has power (that turns it off: a "NOT" gate).
+   - Powered doors, trapdoors and fence gates open (and close when the power goes); powered TNT lights. */
 const SUPPORT = { d: [0, -1, 0], n: [0, 0, -1], s: [0, 0, 1], w: [-1, 0, 0], e: [1, 0, 0] };
 const NB6 = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-G.powered = new Map(); // switches that are on right now: key -> list of the places they power
-function powerTargets(x, y, z, d) {
-  const [sx, sy, sz] = SUPPORT[d] || SUPPORT.d, out = new Map();
-  for (const [bx, by, bz] of [[x, y, z], [x + sx, y + sy, z + sz]]) for (const [a, b, c] of NB6) { const k = (bx + a) + ',' + (by + b) + ',' + (bz + c); out.set(k, [bx + a, by + b, bz + c]); }
-  return [...out.values()];
+const H4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const rsB = (x, y, z) => G.world.getBlock(x, y, z);
+const rsD = (x, y, z) => DEFS[rsB(x, y, z)];
+const switchOn = d => !!(d && ((d.lever && d.lever.on) || (d.button && d.button.on) || (d.plate && d.plate.on)));
+const supportDir = d => (d.lever ? d.lever.d : d.button ? d.button.d : d.rsTorch ? d.rsTorch.d : 'd');
+const supportOf = (x, y, z, d) => { const v = SUPPORT[supportDir(d)]; return [x + v[0], y + v[1], z + v[2]]; };
+const fullBlock = d => !!(d && d.solid && d.opaque && !d.boxes && !d.box);
+const torchOn = d => !!(d && d.rsTorch && d.rsTorch.on);
+const wireOn = d => !!(d && d.wire && d.wire.on);
+const isDevice = d => !!(d && (d.door || d.trapdoor || d.gate || d.key === 'tnt'));
+/* a block with a switch stuck to it, or a lit redstone torch under it: strong power (it feeds dust too) */
+function strongPowered(x, y, z) {
+  for (const [a, b, c] of NB6) {
+    const nx = x + a, ny = y + b, nz = z + c, d = rsD(nx, ny, nz);
+    if (switchOn(d)) { const s = supportOf(nx, ny, nz, d); if (s[0] === x && s[1] === y && s[2] === z) return true; }
+    if (b === -1 && torchOn(d)) return true; // a redstone torch powers the block above it
+  }
+  return false;
 }
-const isOpener = def => def && (def.door || def.trapdoor || def.gate);
-const isOpen = def => !!((def.door || def.trapdoor || def.gate).open);
-G.setPower = (x, y, z, d, on) => {
-  const W = G.world, key = G.dim + ':' + x + ',' + y + ',' + z, ts = powerTargets(x, y, z, d);
-  if (on) G.powered.set(key, ts); else G.powered.delete(key);
-  const stillPowered = (px, py, pz) => { for (const [k, list] of G.powered) if (k.startsWith(G.dim + ':') && list.some(t => t[0] === px && t[1] === py && t[2] === pz)) return true; return false; };
-  for (const [px, py, pz] of ts) {
-    const id = W.getBlock(px, py, pz), def = DEFS[id];
-    if (on && id === ID.tnt) { W.setBlock(px, py, pz, 0); G.primeTNT(px, py, pz, 4); continue; }
-    if (!isOpener(def)) continue;
-    if (on && !isOpen(def)) G.toggleDoor(px, py, pz);
-    else if (!on && isOpen(def) && !stillPowered(px, py, pz)) {
-      // a door's other half may still be powered by something else
-      const oy = def.door ? (def.door.half === 'lower' ? py + 1 : py - 1) : null;
-      if (oy === null || !stillPowered(px, oy, pz)) G.toggleDoor(px, py, pz);
+/* how many dust neighbours a piece of dust joins up with (a dot or the end of a line points at things) */
+function wireLinks(x, y, z) {
+  const out = [];
+  for (const [a, c] of H4) {
+    if (rsD(x + a, y, z + c) && rsD(x + a, y, z + c).wire) out.push([x + a, y, z + c]);
+    else if (!fullBlock(rsD(x, y + 1, z)) && rsD(x + a, y + 1, z + c) && rsD(x + a, y + 1, z + c).wire) out.push([x + a, y + 1, z + c]);
+    else if (!fullBlock(rsD(x + a, y, z + c)) && rsD(x + a, y - 1, z + c) && rsD(x + a, y - 1, z + c).wire) out.push([x + a, y - 1, z + c]);
+  }
+  return out;
+}
+/* any power at all in this block (strong, or from dust on top of it or pointing into it) */
+function weakPowered(x, y, z) {
+  if (rsB(x, y, z) === ID.redstone_block) return true;
+  if (strongPowered(x, y, z)) return true;
+  if (wireOn(rsD(x, y + 1, z))) return true;
+  for (const [a, c] of H4) if (wireOn(rsD(x + a, y, z + c)) && wireLinks(x + a, y, z + c).length <= 1) return true;
+  return false;
+}
+/* is a door, trapdoor, gate or TNT here getting power? */
+function devicePowered(x, y, z) {
+  for (const [a, b, c] of NB6) {
+    const nx = x + a, ny = y + b, nz = z + c, d = rsD(nx, ny, nz);
+    if (!d) continue;
+    if (switchOn(d) || wireOn(d) || d.key === 'redstone_block') return true;
+    if (torchOn(d)) { const s = supportOf(nx, ny, nz, d); if (!(s[0] === x && s[1] === y && s[2] === z)) return true; }
+    if (fullBlock(d) && weakPowered(nx, ny, nz)) return true;
+  }
+  return false;
+}
+/* where dust gets its power from (15) */
+function wireSource(x, y, z) {
+  for (const [a, b, c] of NB6) {
+    const nx = x + a, ny = y + b, nz = z + c, d = rsD(nx, ny, nz);
+    if (!d) continue;
+    if (switchOn(d) || torchOn(d) || d.key === 'redstone_block') return true;
+    if (fullBlock(d) && strongPowered(nx, ny, nz)) return true;
+  }
+  return false;
+}
+/* work out one whole line of dust: which pieces are lit */
+function updateWireNet(x, y, z, done) {
+  const key = (a, b, c) => a + ',' + b + ',' + c, nodes = new Map(), stack = [[x, y, z]];
+  while (stack.length && nodes.size < 800) {
+    const [a, b, c] = stack.pop(), k = key(a, b, c);
+    if (nodes.has(k) || !(rsD(a, b, c) && rsD(a, b, c).wire)) continue;
+    nodes.set(k, { p: [a, b, c], lvl: 0, links: wireLinks(a, b, c) });
+    done.add(k);
+    for (const n of nodes.get(k).links) stack.push(n);
+  }
+  const queue = [];
+  for (const [k, n] of nodes) if (wireSource(...n.p)) { n.lvl = 15; queue.push(k); }
+  for (let qi = 0; qi < queue.length; qi++) {
+    const n = nodes.get(queue[qi]);
+    if (n.lvl <= 1) continue;
+    for (const p of n.links) { const m = nodes.get(key(...p)); if (m && m.lvl < n.lvl - 1) { m.lvl = n.lvl - 1; queue.push(key(...p)); } }
+  }
+  for (const n of nodes.values()) {
+    const want = ID['redstone_wire_' + (n.lvl > 0 ? 1 : 0)];
+    if (rsB(...n.p) !== want) G.world.setBlock(n.p[0], n.p[1], n.p[2], want);
+  }
+}
+G.rsDirty = new Set();
+G.devPow = new Map();
+G.rsMark = (x, y, z) => { if (G.rsDirty.size < 4000) G.rsDirty.add(x + ',' + y + ',' + z); };
+G.tickRedstone = () => {
+  if (!G.rsDirty.size) return;
+  const list = [...G.rsDirty].slice(0, 300);
+  for (const k of list) G.rsDirty.delete(k);
+  const seen = new Set(), wires = [], things = [];
+  for (const k of list) {
+    const [x, y, z] = k.split(',').map(Number);
+    for (let dy = -2; dy <= 2; dy++) for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) {
+      const px = x + dx, py = y + dy, pz = z + dz, pk = px + ',' + py + ',' + pz;
+      if (seen.has(pk)) continue;
+      seen.add(pk);
+      const d = rsD(px, py, pz);
+      if (!d) continue;
+      if (d.wire) wires.push([px, py, pz]); else if (d.rsTorch || isDevice(d)) things.push([px, py, pz]);
     }
+  }
+  const done = new Set();
+  for (const w of wires) if (!done.has(w.join(','))) updateWireNet(w[0], w[1], w[2], done);
+  const W = G.world;
+  for (const [x, y, z] of things) {
+    const d = rsD(x, y, z);
+    if (!d) continue;
+    if (d.rsTorch) {
+      const s = supportOf(x, y, z, d), want = !weakPowered(s[0], s[1], s[2]);
+      if (want !== d.rsTorch.on) W.setBlock(x, y, z, ID['redstone_torch_' + d.rsTorch.d + '_' + (want ? 1 : 0)]);
+      continue;
+    }
+    if (d.key === 'tnt') { if (devicePowered(x, y, z)) { W.setBlock(x, y, z, 0); G.primeTNT(x, y, z, 4); } continue; }
+    if (d.door && d.door.half === 'upper') continue; // a door is looked at from its lower half
+    let p = devicePowered(x, y, z);
+    if (d.door && !p) p = devicePowered(x, y + 1, z);
+    const k = G.dim + ':' + x + ',' + y + ',' + z, before = G.devPow.get(k), open = !!(d.door || d.trapdoor || d.gate).open;
+    G.devPow.set(k, p);
+    if (d.door && d.door.wood === 'iron') { if (p !== open) G.toggleDoor(x, y, z); continue; } // iron doors only follow power
+    if (p && !before && !open) G.toggleDoor(x, y, z);
+    else if (!p && before && open) G.toggleDoor(x, y, z);
   }
 };
 /* tap a lever to flip it; tap a button to press it for a moment */
@@ -509,25 +610,21 @@ G.useSwitch = (x, y, z) => {
     const on = !def.lever.on;
     W.setBlock(x, y, z, ID['lever_' + def.lever.d + '_' + (on ? 1 : 0)]);
     Sound.play('click', new THREE.Vector3(x, y, z));
-    G.setPower(x, y, z, def.lever.d, on);
   } else if (def.button && !def.button.on) {
     const b = def.button;
     W.setBlock(x, y, z, ID[b.kind + '_button_' + b.d + '_1']);
     Sound.play('click', new THREE.Vector3(x, y, z));
-    G.setPower(x, y, z, b.d, true);
     const dim = G.dim;
     setTimeout(() => {
       if (G.dim !== dim) return;
       const cur = DEFS[G.world.getBlock(x, y, z)];
       if (cur && cur.button && cur.button.on) { G.world.setBlock(x, y, z, ID[b.kind + '_button_' + b.d + '_0']); Sound.play('click', new THREE.Vector3(x, y, z)); }
-      G.setPower(x, y, z, b.d, false);
     }, b.kind === 'oak' ? 1500 : 1000);
   }
 };
 /* a switch was broken while on: its power stops */
 G.switchGone = (x, y, z, def) => {
-  if ((def.lever && def.lever.on) || (def.button && def.button.on)) G.setPower(x, y, z, (def.lever || def.button).d, false);
-  if (def.plate && def.plate.on) { G.setPower(x, y, z, 'd', false); delete G.downPlates[G.dim + ':' + x + ',' + y + ',' + z]; }
+  if (def.plate) delete G.downPlates[G.dim + ':' + x + ',' + y + ',' + z];
 };
 /* pressure plates: pushed down while a player or mob stands on them (wooden ones by dropped items too) */
 G.downPlates = {};
@@ -544,7 +641,6 @@ G.tickPlates = () => {
     if (!def.plate.on) {
       W.setBlock(x, y, z, ID[def.plate.kind + '_plate_1']);
       Sound.play('click', new THREE.Vector3(x, y, z));
-      G.setPower(x, y, z, 'd', true);
     }
   }
   for (const k in G.downPlates) {
@@ -552,7 +648,6 @@ G.tickPlates = () => {
     delete G.downPlates[k];
     const [x, y, z] = k.slice(k.indexOf(':') + 1).split(',').map(Number), def = DEFS[W.getBlock(x, y, z)];
     if (def && def.plate && def.plate.on) { W.setBlock(x, y, z, ID[def.plate.kind + '_plate_0']); Sound.play('click', new THREE.Vector3(x, y, z)); }
-    G.setPower(x, y, z, 'd', false);
   }
 };
 
@@ -1929,6 +2024,7 @@ function frame(now) {
       if (!P.portalCd) { if (G.dim === 'end') G.leaveEnd(); else G.enterEnd(); }
     } else { P.portalT = 0; P.portalCd = false; }
     $('fx-portal').style.opacity = clamp((P.portalT || 0) / 2, 0, 0.85);
+    { const fr = P.headInSnow ? 1 : clamp((P.freezeT || 0) / 7, 0, 0.9); const fe = $('fx-frost'); if (fe.style.opacity !== String(fr)) fe.style.opacity = fr; }
 
     if (G.pendingPets && G.pendingPets.length && G.world.isLoaded(P.pos.x, P.pos.z)) {
       const ready = G.pendingPets.filter(p => G.world.isLoaded(p[1], p[3]));
@@ -1936,7 +2032,7 @@ function frame(now) {
       restorePets(ready);
     }
     G.plateT = (G.plateT || 0) - dt;
-    if (G.plateT <= 0) { G.plateT = 0.1; G.tickPlates(); }
+    if (G.plateT <= 0) { G.plateT = 0.1; G.tickPlates(); G.tickRedstone(); }
     G.spawnT -= dt;
     if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); G.tickSigns(); G.tickFires(); }
     // no dragons outside the End

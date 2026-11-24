@@ -3,7 +3,7 @@
 
 const CS = 16, WH = 96, SEA = 32;
 const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14 };
-const GEN_VER = 5; // which newer biomes exist (see genVerAt)
+const GEN_VER = 6; // which newer biomes exist (see genVerAt)
 const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle'];
 
 const FACES = [
@@ -156,6 +156,7 @@ class World {
       m.set(i, id);
       if (this.dim === 'overworld' && !(this.genVer && this.genVer.has(k))) this.stampGen(cx, cz, GEN_VER);
       if (this.onEdit && !this.applyingRemote) this.onEdit(x, y, z, id);
+      if (!this.applyingRemote && typeof G !== 'undefined' && G.rsMark && this === G.world) G.rsMark(x, y, z); // redstone looks again around here
     }
     this.urgent.add(c);
     const ex = lx === 0 ? -1 : lx === 15 ? 1 : 0, ez = lz === 0 ? -1 : lz === 15 ? 1 : 0;
@@ -451,6 +452,19 @@ class World {
       if (![[1, 0], [-1, 0], [0, 1], [0, -1]].some(([a, b]) => get(x + a, h, z + b) === ID.water)) continue;
       const tall = 1 + (rng() * 3 | 0);
       for (let k = 1; k <= tall; k++) set(x, h + k, z, ID.sugar_cane);
+    }
+    // powder snow: soft white patches on snowy land and mountains that you sink into (new land only)
+    if (fresh && this.genVerAt(cx * 16, cz * 16) >= 6 && (center === BIOME.SNOWY || center === BIOME.MOUNTAIN)) {
+      const pr = mulberry32(hash3(cx, cz, this.seed + 8383));
+      if (pr() < 0.35) {
+        const px = 4 + (pr() * 8 | 0), pz = 4 + (pr() * 8 | 0), r = 1.5 + pr() * 1.5;
+        for (let x = px - 3; x <= px + 3; x++) for (let z = pz - 3; z <= pz + 3; z++) {
+          if ((x - px) * (x - px) + (z - pz) * (z - pz) > r * r) continue;
+          const h = heights[x + z * 16], top = get(x, h, z);
+          if (h <= SEA + 2 || ![ID.snow_grass, ID.snow, ID.grass, ID.stone, ID.dirt].includes(top) || get(x, h + 1, z) !== 0) continue;
+          set(x, h, z, ID.powder_snow); if (pr() < 0.7) set(x, h - 1, z, ID.powder_snow);
+        }
+      }
     }
     if (center === BIOME.BAMBOO) { // thick bamboo everywhere
       plant(20, [ID.tall_grass], ID.grass);

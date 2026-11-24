@@ -465,3 +465,6 @@ body.touch:not(.pad) #crosshair { display: none; }
 .anvil-result { margin: 10px 0 6px; color: #d8f0ff; }
 .anvil-go.short { opacity: .6; }
 .ench-item.glint { box-shadow: inset 0 0 8px 1px rgba(176, 122, 255, .6); }
+
+/* freezing in powder snow: frost creeps in from the edges; head inside it: all white */
+#fx-frost { background: radial-gradient(ellipse at center, rgba(235, 245, 255, 0.05) 30%, rgba(225, 240, 255, 0.9)); transition: none; opacity: 0; }

@@ -57,9 +57,9 @@ const MC_ORDER = (() => {
   o.push('bed', 'flag');
   o.push('melon', 'pumpkin', 'hay_bale', 'glowstone', 'pumpkin_seeds', 'bamboo', 'sugar_cane');
   o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
-  o.push('redstone', 'iron_door', 'lever', 'stone_button', 'oak_button', 'stone_pressure_plate', 'oak_pressure_plate', 'tnt');
+  o.push('redstone', 'redstone_torch', 'redstone_block', 'iron_door', 'lever', 'stone_button', 'oak_button', 'stone_pressure_plate', 'oak_pressure_plate', 'tnt');
   for (const m of mats) for (const t of ['shovel', 'pickaxe', 'axe', 'hoe']) o.push(m + '_' + t);
-  o.push('bucket', 'flint_and_steel', 'lead', 'name_tag', 'boat', 'saddle', 'eye_of_ender');
+  o.push('bucket', 'powder_snow_bucket', 'flint_and_steel', 'lead', 'name_tag', 'boat', 'saddle', 'eye_of_ender');
   for (const m of mats) o.push(m + '_sword');
   for (const m of ['leather', 'chainmail', 'iron', 'golden', 'diamond', 'netherite']) for (const t of ['helmet', 'chestplate', 'leggings', 'boots']) o.push(m + '_' + t);
   for (const m of ['leather', 'iron', 'golden', 'diamond']) o.push(m + '_horse_armor');

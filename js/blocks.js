@@ -659,6 +659,15 @@ makeTile('i_name_tag', pPlant(P => { P.rect(4, 4, 10, 8, 0xd8c8a0); P.rect(4, 4,
 makeTile('iron_door_lower', P => { P.fill(0xc8c8c8, 6); P.rect(0, 0, 16, 1, 0x8a8a8a); P.rect(0, 0, 1, 16, 0x8a8a8a); P.rect(15, 0, 1, 16, 0x8a8a8a); P.rect(0, 15, 16, 1, 0x8a8a8a); P.rect(3, 3, 10, 10, 0xb4b4b4, 4); for (const [x, y] of [[4, 4], [11, 4], [4, 11], [11, 11]]) P.put(x, y, 0x7a7a7a); P.rect(12, 6, 2, 3, 0x6a6a6a); });
 makeTile('iron_door_upper', P => { P.fill(0xc8c8c8, 6); P.rect(0, 0, 16, 1, 0x8a8a8a); P.rect(0, 0, 1, 16, 0x8a8a8a); P.rect(15, 0, 1, 16, 0x8a8a8a); P.rect(3, 3, 4, 4, 0xbfe0f0); P.rect(9, 3, 4, 4, 0xbfe0f0); P.rect(3, 9, 4, 4, 0xbfe0f0); P.rect(9, 9, 4, 4, 0xbfe0f0); });
 makeTile('i_iron_door', pPlant(P => { P.rect(4, 0, 8, 16, 0xc8c8c8); P.rect(5, 2, 2, 3, 0xbfe0f0); P.rect(9, 2, 2, 3, 0xbfe0f0); P.rect(4, 0, 1, 16, 0x8a8a8a); P.rect(11, 0, 1, 16, 0x8a8a8a); P.rect(4, 8, 8, 1, 0x8a8a8a); P.put(10, 10, 0x5a5a5a); }));
+/* redstone dust, redstone torch, powder snow */
+for (const [k, c, hi] of [['off', 0x5a0c0c, 0x7a1a14], ['on', 0xe81e10, 0xff8a6a]]) {
+  makeTile('rs_dust_' + k, P => { P.clear(); P.rect(6, 0, 4, 16, c); P.rect(0, 6, 16, 4, c); P.rect(5, 5, 6, 6, c); P.rect(7, 0, 2, 16, hi); P.rect(0, 7, 16, 2, hi); for (const [x, y] of [[2, 2], [13, 3], [3, 12], [12, 13]]) P.put(x, y, c); });
+  makeTile('rs_torch_' + k, P => { P.clear(); P.rect(7, 9, 2, 7, 0x8a6a3a); P.put(7, 9, 0x6a4a24); P.rect(7, 6, 2, 3, c); P.put(7, 6, hi); P.put(8, 8, hi); });
+  makeTile('rs_torch_top_' + k, P => { P.fill(c, 10); P.disc(7.5, 7.5, 2, hi); });
+}
+makeTile('i_redstone_torch', pPlant(P => { P.rect(7, 6, 2, 9, 0x8a6a3a); P.rect(6, 2, 4, 4, 0xe81e10); P.rect(7, 3, 2, 2, 0xff8a6a); }));
+makeTile('powder_snow', P => { P.fill(0xf6f9fc, 3); P.speck(0xe4ecf4, 0.2, 3); P.speck(0xffffff, 0.15, 2); });
+makeTile('i_powder_snow_bucket', pPlant(P => { P.rect(3, 4, 10, 10, 0x9a9a9a); P.rect(4, 4, 8, 3, 0xf6f9fc); P.rect(3, 4, 10, 1, 0xbdbdbd); P.rect(4, 13, 8, 1, 0x6a6a6a); P.line(3, 4, 8, 1, 0x7a7a7a); P.line(12, 4, 8, 1, 0x7a7a7a); }));
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -984,6 +993,16 @@ block('anvil', 'Anvil', { side: 'anvil', top: 'anvil_top', bottom: 'anvil' }, PI
 for (const ax of ['x', 'z']) for (const op of ['c', 'o']) for (const hg of ['', '_r']) for (const half of ['lower', 'upper']) {
   block('iron_door_' + ax + op + hg + '_' + half, 'Iron Door', 'iron_door_' + half, PICK(1, 5, { opaque: false, solid: op === 'c', box: (hg ? DOOR_BOX_R : DOOR_BOX)[ax + op], drop: half === 'lower' ? 'iron_door' : null, door: hg ? { ax, open: op === 'o', half, wood: 'iron', hinge: 'r' } : { ax, open: op === 'o', half, wood: 'iron' } }));
 }
+/* redstone dust: a wire on the floor that carries power from levers, buttons, plates and redstone torches */
+for (const on of [0, 1]) block('redstone_wire_' + on, 'Redstone Dust', 'rs_dust_' + (on ? 'on' : 'off'), { hardness: 0, solid: false, opaque: false, cutout: true, box: [0, 0, 0, 1, 0.0625, 1], boxes: [[0, 0, 0, 1, 0.0625, 1]], drop: 'redstone', wire: { on: !!on }, iconTile: 'i_redstone' });
+/* redstone torch: always on, unless the block it is stuck to gets power (then it turns off) */
+for (const d of ['d', 'n', 's', 'w', 'e']) for (const on of [0, 1]) {
+  const bx = d === 'd' ? [0.4375, 0, 0.4375, 0.5625, 0.625, 0.5625] : SWITCH_ROT([0.4375, 0.2, 0, 0.5625, 0.8, 0.14], d);
+  const k = on ? 'on' : 'off';
+  block('redstone_torch_' + d + '_' + on, 'Redstone Torch', { side: 'rs_torch_' + k, top: 'rs_torch_top_' + k, bottom: 'rs_torch_top_' + k }, Object.assign({ hardness: 0, solid: false, opaque: false, cutout: true, box: bx, boxes: [bx], drop: 'redstone_torch', rsTorch: { d, on: !!on }, iconTile: 'i_redstone_torch' }, on ? { light: true, emit: 7 } : {}));
+}
+/* powder snow: looks like snow, but you sink into it and slowly freeze. Take it with a bucket. */
+block('powder_snow', 'Powder Snow', 'powder_snow', { tool: 'shovel', hardness: 0.25, solid: false, opaque: false, drop: null, powderSnow: true });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1119,6 +1138,9 @@ item('oak_pressure_plate', 'Oak Pressure Plate', 'oak_pressure_plate', { placesP
 item('name_tag', 'Name Tag', 'name_tag');
 item('enchanted_book', 'Enchanted Book', 'enchanted_book', { stack: 1 });
 item('iron_door', 'Iron Door', 'iron_door', { placesDoor: 'iron' });
+item('redstone_torch', 'Redstone Torch', 'redstone_torch', { placesSwitch: 'redstone_torch' });
+item('powder_snow_bucket', 'Powder Snow Bucket', 'powder_snow_bucket', { stack: 1 });
+DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
 
 function getDrops(def, rng) {
   if (def.drop === null) return [];
@@ -1291,6 +1313,7 @@ const RECIPES = [
   ['acacia_door', 3, { acacia_planks: 6 }, 'table'], ['acacia_trapdoor', 2, { acacia_planks: 6 }, 'table'], ['acacia_fence', 3, { acacia_planks: 4, stick: 2 }, 'table'], ['acacia_fence_gate', 1, { acacia_planks: 2, stick: 4 }, 'table'],
   ['paper', 3, { sugar_cane: 3 }, 'table'], ['book', 1, { paper: 3, leather: 1 }], ['bookshelf', 1, { '#planks': 6, book: 3 }, 'table'],
   ['enchanting_table', 1, { book: 1, diamond: 2, obsidian: 4 }, 'table'],
+  ['redstone_torch', 1, { redstone: 1, stick: 1 }],
   ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
   ['lever', 1, { stick: 1, cobblestone: 1 }], ['stone_button', 1, { stone: 1 }], ['oak_button', 1, { '#planks': 1 }], ['stone_pressure_plate', 1, { stone: 2 }, 'table'], ['oak_pressure_plate', 1, { '#planks': 2 }, 'table'],
   ['bamboo_block', 1, { bamboo: 9 }], ['bamboo_planks', 2, { bamboo_block: 1 }], ['stick', 1, { bamboo: 2 }],

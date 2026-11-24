@@ -84,7 +84,7 @@ class Player {
     if (this.hurtCd > 0 && !force) return;
     if (this.sleeping) G.wake('You were woken up!');
     // armor softens every kind of hurt except falling, drowning, starving and the void (4% per armor point, like Minecraft)
-    const bypass = !from && /fell from|fell out|drown|starv|void|pearl/i.test(cause || '');
+    const bypass = !from && /fell from|fell out|drown|starv|void|pearl|suffocat|froze/i.test(cause || '');
     // armor works like Minecraft: big hits get through more than small ones; damage is kept in halves, so
     // a stronger sword always does more (no rounding two different swords to the same number)
     // Protection on armor and Feather Falling on boots (4% less for each point, at most 80%)
@@ -178,6 +178,10 @@ class Player {
     this.inWater = feet === ID.water || body === ID.water;
     this.inLava = feet === ID.lava || body === ID.lava;
     const swimming = this.inWater || this.inLava;
+    // powder snow: you sink in slowly, move slowly, and land softly
+    const psAt = h => W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + h), Math.floor(this.pos.z)) === ID.powder_snow;
+    this.inSnow = psAt(0.1) || psAt(0.9);
+    this.headInSnow = psAt(this.eye);
 
     // input
     if (input.flyToggle && creative) { this.flying = !this.flying; this.vel.y = 0; }
@@ -189,6 +193,7 @@ class Player {
     this.sprinting = input.sprint && mz > 0.3 && !this.sneaking && (creative || this.hunger > 6);
     let speed = this.flying ? (input.sprint ? 20 : 11) : this.sprinting ? 5.7 : this.sneaking ? 1.4 : 4.3;
     if (swimming && !this.flying) speed *= this.inLava ? 0.4 : 0.55;
+    if (this.inSnow && !this.flying) speed *= 0.45;
     const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
     const wx = (-s * mz + c * mx) * speed, wz = (-c * mz - s * mx) * speed;
     const accel = this.flying ? 8 : this.onGround ? 16 : swimming ? 6 : 3.5;
@@ -212,6 +217,7 @@ class Player {
       this.vel.y -= 28 * dt;
       if (this.vel.y < -55) this.vel.y = -55;
       if (input.jump && this.onGround) { this.vel.y = 8.7; this.hungerDrain(this.sprinting ? 0.05 : 0.0125); }
+      if (this.inSnow) { this.vel.y = Math.max(this.vel.y, -1.2); if (input.jump) this.vel.y = Math.max(this.vel.y, 2.2); this.fallStart = null; }
     }
     const wasGround = this.onGround;
     // sneaking keeps you from walking off edges
@@ -281,6 +287,17 @@ class Player {
 
   survivalTick(dt, swimming) {
     const W = G.world;
+    // sand or gravel fell on your head: you can't breathe (break it or get out!)
+    const headId = W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + this.eye), Math.floor(this.pos.z));
+    if (headId === ID.sand || headId === ID.gravel) {
+      this.suffT = (this.suffT || 0) + dt;
+      if (this.suffT >= 0.5) { this.suffT = 0; this.hurt(1, null, 0, true, headId === ID.sand ? 'You suffocated under sand.' : 'You suffocated under gravel.'); }
+    } else this.suffT = 0;
+    // powder snow: stay in it too long and you start to freeze
+    if (this.inSnow || this.headInSnow) {
+      this.freezeT = Math.min(10, (this.freezeT || 0) + dt);
+      if (this.freezeT >= 7) { this.frostT = (this.frostT || 0) + dt; if (this.frostT >= 2) { this.frostT = 0; this.hurt(1, null, 0, true, 'You froze to death in powder snow.'); } }
+    } else { this.freezeT = Math.max(0, (this.freezeT || 0) - dt * 2); this.frostT = 0; }
     const moving = Math.hypot(this.vel.x, this.vel.z) > 0.5;
     this.hungerDrain(dt * (this.sprinting ? 1 / 25 : moving ? 1 / 100 : 1 / 200)); // walking: a full bar lasts about 40 minutes
     const D = G.diff();
@@ -405,7 +422,8 @@ class Player {
     }
     // plants and cactus above lose their support
     const above = W.getBlock(x, y + 1, z);
-    if (above && (DEFS[above].cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane)) this.breakBlock(x, y + 1, z, above);
+    const ad = above && DEFS[above];
+    if (ad && (ad.cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
     if (id === ID.furnace) G.breakFurnace(x, y, z);
     if (DEFS[id].sign) G.setSign(x, y, z, null);
@@ -527,6 +545,18 @@ class Player {
       W.setBlock(px, py, pz, ID[k + '_slab_' + half]);
       return done();
     }
+    if (hd.placesWire && b) {
+      // redstone dust goes on top of a solid block
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz), under = DEFS[W.getBlock(px, py - 1, pz)];
+      if (cur && !DEFS[cur].replaceable) return true;
+      if (!under || !under.solid || under.leaves) { G.ui.message('Redstone dust goes on top of a solid block.'); this.useCd = 0.3; return true; }
+      W.setBlock(px, py, pz, ID.redstone_wire_0);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.15; this.swing = 1;
+      return true;
+    }
     if ((hd.placesSwitch || hd.placesPlate) && b) {
       // levers and buttons go on the floor or on a wall; pressure plates on the floor
       if (b.ny === -1 || (hd.placesPlate && b.ny !== 1)) { G.ui.message(hd.placesPlate ? 'Put a pressure plate on top of a block.' : 'Put it on the floor or on a wall.'); this.useCd = 0.3; return true; }
@@ -534,7 +564,7 @@ class Player {
       const px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz, cur = W.getBlock(px, py, pz);
       if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return true;
       const d = b.ny === 1 ? 'd' : b.nz === 1 ? 'n' : b.nz === -1 ? 's' : b.nx === 1 ? 'w' : 'e';
-      W.setBlock(px, py, pz, ID[hd.placesPlate ? hd.placesPlate + '_plate_0' : hd.placesSwitch.replace('lever', 'lever') + '_' + d + '_0']);
+      W.setBlock(px, py, pz, ID[hd.placesPlate ? hd.placesPlate + '_plate_0' : hd.placesSwitch + '_' + d + (hd.placesSwitch === 'redstone_torch' ? '_1' : '_0')]);
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
       return true;
@@ -619,10 +649,21 @@ class Player {
     if (k === 'bucket') {
       const o = this.eyePos(), d = this.lookDir();
       const hit = W.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 4.6, true);
-      if (!hit || (hit.id !== ID.water && hit.id !== ID.lava)) return false;
+      if (!hit || (hit.id !== ID.water && hit.id !== ID.lava && hit.id !== ID.powder_snow)) return false;
       W.setBlock(hit.x, hit.y, hit.z, 0);
-      this.swapHeld(hit.id === ID.water ? ID.water_bucket : ID.lava_bucket);
+      this.swapHeld(hit.id === ID.water ? ID.water_bucket : hit.id === ID.lava ? ID.lava_bucket : ID.powder_snow_bucket);
       G.sound.play('pickup'); this.useCd = 0.4; this.swing = 1;
+      return true;
+    }
+    if (k === 'powder_snow_bucket') {
+      if (!b) return false;
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz);
+      if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return false;
+      W.setBlock(px, py, pz, ID.powder_snow);
+      this.swapHeld(ID.bucket);
+      this.useCd = 0.4; this.swing = 1; G.sound.play('place');
       return true;
     }
     if (k === 'water_bucket' || k === 'lava_bucket') {
