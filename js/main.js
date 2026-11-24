@@ -627,6 +627,11 @@ G.tickRedstone = () => {
     if (d.door && d.door.half === 'upper') continue; // a door is looked at from its lower half
     let p = devicePowered(x, y, z);
     if (d.door && !p) p = devicePowered(x, y + 1, z);
+    // a double door: power on either door opens both (otherwise the two would fight, opening and closing forever)
+    if (d.door && !p) {
+      const sd = d.door.hinge ? -1 : 1, px = d.door.ax === 'x' ? x + sd : x, pz = d.door.ax === 'z' ? z + sd : z, pd = rsD(px, y, pz);
+      if (pd && pd.door && pd.door.ax === d.door.ax && !!pd.door.hinge !== !!d.door.hinge) p = devicePowered(px, y, pz) || devicePowered(px, y + 1, pz);
+    }
     const k = G.dim + ':' + x + ',' + y + ',' + z, before = G.devPow.get(k), open = !!(d.door || d.trapdoor || d.gate).open;
     G.devPow.set(k, p);
     if (d.door && d.door.wood === 'iron') { if (p !== open) G.toggleDoor(x, y, z); continue; } // iron doors only follow power
