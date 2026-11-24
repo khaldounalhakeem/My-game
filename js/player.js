@@ -425,7 +425,7 @@ class Player {
     const ad = above && DEFS[above];
     if (ad && (ad.cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.repeater || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
-    if (id === ID.furnace) G.breakFurnace(x, y, z);
+    if (DEFS[id].base === 'furnace') G.breakFurnace(x, y, z);
     if (DEFS[id].sign) G.setSign(x, y, z, null);
     if (def.lever || def.button || def.plate) G.switchGone(x, y, z, def);
     if (DEFS[id].door) {
@@ -757,12 +757,12 @@ class Player {
       }
     }
     if (b && !this.sneaking) {
-      if (b.id === ID.crafting_table) { G.ui.openInventory('table'); return; }
+      if (DEFS[b.id].base === 'crafting_table') { G.ui.openInventory('table'); return; }
       if (b.id === ID.enchanting_table) { G.ui.openEnchant(b.x, b.y, b.z); return; }
       if (b.id === ID.anvil) { G.ui.openAnvil(b.x, b.y, b.z); return; }
       if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
-      if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
+      if (DEFS[b.id].base === 'furnace') { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
       if (DEFS[b.id].lever || DEFS[b.id].button || DEFS[b.id].repeater) { this.useCd = 0.3; this.swing = 1; G.useSwitch(b.x, b.y, b.z); return; }
       if (DEFS[b.id].door && DEFS[b.id].door.wood === 'iron') { this.useCd = 0.4; G.ui.message('An iron door only opens with a button, a lever or a pressure plate.'); return; }
       if (DEFS[b.id].door || DEFS[b.id].trapdoor || DEFS[b.id].gate) { this.useCd = 0.3; this.swing = 1; G.toggleDoor(b.x, b.y, b.z); return; }
@@ -868,10 +868,14 @@ class Player {
       const d = bedHead[0] > px ? 'e' : bedHead[0] < px ? 'w' : bedHead[2] > pz ? 's' : 'n';
       W.setBlock(px, py, pz, ID['bed_foot_' + d]);
       W.setBlock(bedHead[0], bedHead[1], bedHead[2], ID['bed_head_' + d]);
+    } else if (hd.base && hd.facing) {
+      // furnaces, crafting tables, jack o'lanterns...: the front faces you
+      const L = this.lookDir(), f = Math.abs(L.x) > Math.abs(L.z) ? (L.x > 0 ? 'w' : 'e') : (L.z > 0 ? 'n' : 's');
+      W.setBlock(px, py, pz, f === 's' ? ID[hd.base] : ID[hd.base + '_' + f]);
     } else W.setBlock(px, py, pz, hd.id);
     if (hd.id === ID.flag) G.placedFlag(px, py, pz);
     W.settle(px, py, pz);
-    if (hd.id === ID.pumpkin) G.tryBuildGolem(px, py, pz);
+    if (hd.base === 'pumpkin') G.tryBuildGolem(px, py, pz);
     G.sound.play('place', null, hd.id);
     if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
     this.useCd = 0.22; this.swing = 1;

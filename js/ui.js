@@ -333,7 +333,7 @@ const UI = {
   renderFurnace() {
     const f = this.furnace;
     if (!f) return;
-    if (G.world.getBlock(f.x, f.y, f.z) !== ID.furnace) { this.closeInventory(); return; }
+    if (DEFS[G.world.getBlock(f.x, f.y, f.z)].base !== 'furnace') { this.closeInventory(); return; }
     for (let k = 0; k < 3; k++) { this.fillSlot(this.invSlots[200 + k], f.slots[k]); this.invSlots[200 + k].classList.toggle('empty', !f.slots[k]); }
     $('f-flame').style.height = (f.burnMax ? Math.round(100 * f.burn / f.burnMax) : 0) + '%';
     $('f-arrow').style.width = Math.round(100 * f.cook / SMELT_TIME) + '%';
@@ -488,6 +488,8 @@ const UI = {
     const ids = [];
     for (const d of DEFS) {
       if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.bedPart || d.door || d.trapdoor || d.stair || d.slab || d.ladder || d.gate || d.sign || d.key === 'wheat_sprout') continue;
+      // the other versions of a block (switched on, turned, ...) only appear in the world
+      if (d.lever || d.button || d.plate || d.wire || d.rsTorch || d.repeater || (d.lamp && d.lamp.on) || (d.base && d.facing !== 's')) continue;
       if (q ? !d.name.toLowerCase().includes(q) : (this.tab === 'blocks') !== d.isBlock) continue;
       ids.push(d.id);
     }

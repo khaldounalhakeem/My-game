@@ -921,7 +921,7 @@ G.chestKind = (x, y, z) => {
   // a village building: what is in the room says whose chest it is
   if (G.dim === 'overworld' && y > SEA - 3 && W.villageAt && W.villageAt(cx, cz)) {
     const n = {};
-    for (let dy = -1; dy <= 3; dy++) for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { const b = W.getBlock(x + dx, y + dy, z + dz); n[b] = (n[b] || 0) + 1; }
+    for (let dy = -1; dy <= 3; dy++) for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) { let b = W.getBlock(x + dx, y + dy, z + dz); if (DEFS[b] && DEFS[b].base) b = ID[DEFS[b].base]; n[b] = (n[b] || 0) + 1; }
     if (n[ID.lava]) return 'v_blacksmith';
     if (n[ID.hay_bale] >= 2 && n[ID.furnace]) return 'v_butcher';
     if (n[ID.furnace] && (n[ID.crafting_table] || n[ID.iron_block])) return 'v_toolsmith';
@@ -1015,7 +1015,7 @@ G.tickFurnaces = (dt) => {
     const f = G.furnaces[k];
     const [x, y, z] = k.slice(pre.length).split(',').map(Number);
     if (!G.world.isLoaded(x, z)) continue;
-    if (G.world.getBlock(x, y, z) !== ID.furnace) { delete G.furnaces[k]; continue; }
+    if (DEFS[G.world.getBlock(x, y, z)].base !== 'furnace') { delete G.furnaces[k]; continue; }
     const can = furnaceCanSmelt(f);
     if (f.burn <= 0 && can && f.slots[1] && FUEL[f.slots[1].id]) {
       G.furnaceChanged(k);
@@ -1349,13 +1349,13 @@ function structureSpawns() {
 /* ---------- world lifecycle ---------- */
 /* items lying on the ground, kept while you are in the other dimension and saved with the world */
 function serializeDrops() {
-  return G.drops.filter(d => !d.done && d.count > 0).map(d => [d.id, d.count, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), Math.round(d.age), d.did]);
+  return G.drops.filter(d => !d.done && d.count > 0).map(d => [d.id, d.count, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), Math.round(d.age), d.did, d.e || 0, d.n || 0]);
 }
 function restoreDrops(dim) {
   const list = (G.dimDrops && G.dimDrops[dim]) || [];
   for (const e of list) {
     if (!Array.isArray(e) || !DEFS[e[0]] || !(e[1] > 0) || !e.slice(2, 5).every(Number.isFinite)) continue;
-    const d = G.spawnDrop(e[0], e[1], e[2], e[3], e[4], new THREE.Vector3(0, 0, 0), { did: e[6], remote: true });
+    const d = G.spawnDrop(e[0], e[1], e[2], e[3], e[4], new THREE.Vector3(0, 0, 0), { did: e[6], remote: true, e: e[7], n: e[8] });
     d.age = +e[5] || 0; d.pickDelay = 0;
   }
   if (G.dimDrops) G.dimDrops[dim] = [];

@@ -599,12 +599,8 @@ class Mob {
       }
       if (P.riding) return false;
       if (this.tame || P.mode === 'creative') { P.mount(this); return true; }
-      // an untamed horse lets you try to ride it, then often throws you off
-      this.tameProgress = (this.tameProgress || 0) + 0.25 + Math.random() * 0.2;
-      if (this.tameProgress >= 1) { this.makeTame(); P.mount(this); return true; }
-      P.vel.set((Math.random() - 0.5) * 6, 6, (Math.random() - 0.5) * 6);
-      G.particles.burst(this.pos.x, this.pos.y + 1.6, this.pos.z, [0x555555, 0x888888], 8, 1.5, 0.12);
-      G.ui.message('The ' + this.T.name.toLowerCase() + ' threw you off! Keep trying, or feed it apples.');
+      // a wild horse has to be tamed with apples first
+      G.ui.message('This ' + this.T.name.toLowerCase() + ' is wild. Hold apples and tap it to feed it: a few apples and it is yours.');
       return true;
     }
     return false;
@@ -617,6 +613,8 @@ class Mob {
     if (hd && lovesFood(this.type, hd.id)) return true;
     if (hd && hd.key === 'name_tag') return true;
     if (hd && hd.key === 'bucket' && this.type === 'cow') return true;
+    // holding a sword or an axe, a tap on a horse or donkey hits it
+    if (this.T.horsey && hd && /_sword$|_axe$/.test(hd.key) && !P.riding) return false;
     if (this.T.horsey || this.T.boat || this.leash || this.type === 'villager') return true;
     if (hd && hd.key === 'lead' && !this.T.hostile) return true;
     if (this.type === 'wolf') return this.tame || !!(hd && hd.key === 'bone');
@@ -1409,6 +1407,9 @@ class Projectile {
 
 /* ---------- dropped items ---------- */
 const ITEM_GEO = new Map();
+/* blocks that aren't whole cubes (torches, lanterns, fences, panes, anvils...) are held and dropped as their
+   flat inventory picture, like Minecraft, instead of as a big cube */
+const flatIcon = def => !!(def && def.isBlock && def.iconTile && TILES[def.iconTile] !== undefined);
 function itemGeometry(id) {
   if (ITEM_GEO.has(id)) return ITEM_GEO.get(id);
   const def = DEFS[id];
@@ -1434,10 +1435,10 @@ function itemGeometry(id) {
     const h = def.height;
     box(DEFS[ID.bed], -0.5, -h / 2, 0, 1, h, 1);
     box(DEFS[ID.bed_head], -0.5, -h / 2, -1, 1, h, 1);
-  } else if (def.isBlock && !def.cross) {
+  } else if (def.isBlock && !def.cross && !flatIcon(def)) {
     box(def, -0.5, -0.5, -0.5, 1, 1, 1);
   } else {
-    const U = TILE_UV[tileOf(id)];
+    const U = TILE_UV[flatIcon(def) ? TILES[def.iconTile] : tileOf(id)];
     pos.push(-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0);
     uv.push(U[0], U[1], U[2], U[1], U[2], U[3], U[0], U[3]);
     for (let k = 0; k < 4; k++) col.push(1, 1, 1);
@@ -1447,7 +1448,7 @@ function itemGeometry(id) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setIndex(idx);
-  g.userData.flat = !(def.isBlock && !def.cross);
+  g.userData.flat = !(def.isBlock && !def.cross && !flatIcon(def));
   ITEM_GEO.set(id, g);
   return g;
 }
@@ -1470,6 +1471,13 @@ class ItemDrop {
     this.mesh.visible = true;
     this.age += dt;
     const liquid = G.world.liquidAt(this.pos.x, this.pos.y + 0.1, this.pos.z);
+    // dropped in lava or fire: it burns up (netherite never burns, like Minecraft)
+    if ((liquid === ID.lava || G.world.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.1), Math.floor(this.pos.z)) === ID.fire) && !/^netherite_|^ancient_debris$/.test(DEFS[this.id].key)) {
+      G.particles.burst(this.pos.x, this.pos.y + 0.3, this.pos.z, [0xff7a1a, 0xffd04a, 0x555555], 8, 1.4, 0.12, -1);
+      G.sound.play('fuse', this.pos);
+      Net.dropPicked(this.did);
+      return this.finish();
+    }
     if (liquid) { this.vel.y += 20 * dt; this.vel.multiplyScalar(0.9); }
     this.vel.y -= 18 * dt;
     if (this.onGround) { this.vel.x *= 0.85; this.vel.z *= 0.85; }

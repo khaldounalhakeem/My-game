@@ -1028,6 +1028,17 @@ for (const dir of ['n', 's', 'w', 'e']) for (let delay = 1; delay <= 4; delay++)
   const k = on ? 'on' : 'off';
   block('repeater_' + dir + '_' + delay + '_' + on, 'Redstone Repeater', { side: 'rep_side_' + k, top: 'rep_top_' + dir + '_' + k, bottom: 'stone' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0, 0, 0, 1, 0.4375, 1], boxes: bxs, drop: 'repeater', repeater: { dir, delay, on: !!on }, iconTile: 'i_repeater' });
 }
+/* blocks with a front (furnace, crafting table, jack o'lantern, smoker, blast furnace) turned the other three
+   ways, so the front faces you when you place it. The plain block faces south (+z). */
+const TURNABLE = ['furnace', 'crafting_table', 'pumpkin', 'smoker', 'blast_furnace'];
+for (const k of TURNABLE) {
+  const b = DEFS[ID[k]]; b.base = k; b.facing = 's';
+  for (const [dir, fi] of [['n', 5], ['e', 0], ['w', 1]]) {
+    const v = Object.assign({}, b); delete v.id; delete v.key; delete v.faces; delete v.color;
+    const d = block(k + '_' + dir, b.name, 'stone', Object.assign(v, { drop: b.drop !== undefined ? b.drop : k, base: k, facing: dir, iconTile: b.iconTile }));
+    d.faces = b.faces.slice(); d.faces[4] = b.faces[0]; d.faces[fi] = b.faces[4]; d.color = b.color;
+  }
+}
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
