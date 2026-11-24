@@ -488,3 +488,6 @@ body.touch:not(.pad) #crosshair { display: none; }
 @media (max-width: 480px) { .et-inv { grid-template-columns: repeat(9, 1fr); } .et-slot.small { width: auto; } }
 
 .ench-item.dim { opacity: .55; }
+
+/* beacon powers: a line under the coordinates */
+#effects { position: absolute; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(98px + env(safe-area-inset-top, 0px)); font-family: var(--font-body); font-size: 17px; color: #9afff8; background: rgba(0, 0, 0, 0.5); padding: 2px 8px; white-space: nowrap; text-shadow: 1px 1px 0 #000; }

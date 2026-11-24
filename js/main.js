@@ -433,6 +433,63 @@ G.sleepTick = (dt) => {
 };
 
 /* a pumpkin placed on a T of four iron blocks comes alive as an iron golem */
+/* ---------- beacons ----------
+   A beacon on a pyramid (1 to 4 layers) of iron, gold, diamond, emerald or netherite blocks, with only sky
+   (or glass) above it, shines a beam and gives its power to every player nearby, like Minecraft. */
+const BEACON_BASE = new Set(['iron_block', 'gold_block', 'diamond_block', 'emerald_block', 'netherite_block']);
+const BEACON_FX = { speed: ['Speed', 1], haste: ['Haste', 1], resistance: ['Resistance', 2], jump_boost: ['Jump Boost', 2], strength: ['Strength', 3], regeneration: ['Regeneration', 4] };
+G.beaconLevel = (x, y, z) => {
+  const W = G.world;
+  let L = 0;
+  for (let k = 1; k <= 4; k++) {
+    for (let dz = -k; dz <= k; dz++) for (let dx = -k; dx <= k; dx++) { const d = DEFS[W.getBlock(x + dx, y - k, z + dz)]; if (!d || !BEACON_BASE.has(d.key)) return L; }
+    L = k;
+  }
+  return L;
+};
+G.beams = new Map();
+G.tickBeacons = () => {
+  const W = G.world, P = G.player, pcx = Math.floor(P.pos.x) >> 4, pcz = Math.floor(P.pos.z) >> 4, seen = new Set(), now = performance.now();
+  for (let dz = -4; dz <= 4; dz++) for (let dx = -4; dx <= 4; dx++) {
+    const c = W.chunks.get(W.key(pcx + dx, pcz + dz));
+    if (!c) continue;
+    for (const L of W.emitters(c)) {
+      const x = (pcx + dx) * 16 + L[0], y = L[1], z = (pcz + dz) * 16 + L[2], d = DEFS[W.getBlock(x, y, z)];
+      if (!d || !d.beacon) continue;
+      const lvl = G.beaconLevel(x, y, z), on = lvl > 0 && W.skyExposed(x, y, z), key = G.dim + ':' + x + ',' + y + ',' + z;
+      if (!on) continue;
+      seen.add(key);
+      if (!G.beams.has(key)) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.3, 300, 0.3), new THREE.MeshBasicMaterial({ color: 0x9afff8, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+        m.position.set(x + 0.5, y + 1 + 150, z + 0.5);
+        G.scene.add(m); G.beams.set(key, m);
+      }
+      const fx = d.beacon.effect;
+      if (fx && !P.dead && P.pos.distanceTo(new THREE.Vector3(x + 0.5, P.pos.y, z + 0.5)) <= 10 + lvl * 10 && Math.abs(P.pos.y - y) <= 60) {
+        P.effects = P.effects || {};
+        P.effects[fx] = { lvl: lvl >= 4 && fx !== 'regeneration' ? 2 : 1, until: now + 12000 };
+      }
+    }
+  }
+  for (const [k, m] of G.beams) if (!seen.has(k)) { G.scene.remove(m); m.geometry.dispose(); G.beams.delete(k); }
+};
+/* three wither skeleton skulls on top of a T of four soul sand: the Wither appears */
+G.tryBuildWither = (x, y, z) => {
+  const W = G.world, S = ID.soul_sand, K = ID.wither_skull;
+  for (const [ax, az] of [[1, 0], [0, 1]]) for (const o of [-1, 0, 1]) {
+    const cx = x - ax * o, cz = z - az * o; // the middle skull
+    const ok = [-1, 0, 1].every(i => W.getBlock(cx + ax * i, y, cz + az * i) === K && W.getBlock(cx + ax * i, y - 1, cz + az * i) === S) && W.getBlock(cx, y - 2, cz) === S;
+    if (!ok) continue;
+    for (const i of [-1, 0, 1]) { W.setBlock(cx + ax * i, y, cz + az * i, 0); W.setBlock(cx + ax * i, y - 1, cz + az * i, 0); }
+    W.setBlock(cx, y - 2, cz, 0);
+    const m = spawnMob('wither', cx + 0.5, y - 1.5, cz + 0.5);
+    m.shootCd = 3;
+    G.explode(cx + 0.5, y, cz + 0.5, 3, true, false, null, 'The Wither came out with a blast.');
+    G.ui.message('The Wither has awoken! Defeat it to get a Nether Star.', 'purple');
+    return true;
+  }
+  return false;
+};
 G.tryBuildGolem = (x, y, z) => {
   const W = G.world;
   if (W.getBlock(x, y - 1, z) !== ID.iron_block || W.getBlock(x, y - 2, z) !== ID.iron_block) return false;
@@ -1205,7 +1262,7 @@ function spawnTick() {
     const d = Math.min(...players.map(q => Math.hypot(m.pos.x - q.x, m.pos.z - q.z)));
     // tamed and penned mobs never vanish: far away they wait in the save until you come back
     if ((m.tame || m.penned || m.T.boat || m.leash || m.customName) && !m.rider && !W.isLoaded(m.pos.x, m.pos.z)) { G.pendingPets.push(serializeMob(m)); m.removeSilently(); continue; }
-    if (m.tame || m.rider || m.penned || m.T.boat || m.leash || m.customName) continue;
+    if (m.tame || m.rider || m.penned || m.T.boat || m.leash || m.customName || m.T.boss) continue;
     if (d > (m.T.passive ? 160 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
   }
@@ -2085,7 +2142,7 @@ function frame(now) {
     G.plateT = (G.plateT || 0) - dt;
     if (G.plateT <= 0) { G.plateT = 0.1; G.tickPlates(); G.tickRedstone(); }
     G.spawnT -= dt;
-    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); G.tickSigns(); G.tickFires(); }
+    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); G.tickSigns(); G.tickFires(); G.beaconT = (G.beaconT || 0) + 1; if (G.beaconT % 2 === 0) G.tickBeacons(); }
     // no dragons outside the End
     if (G.dim !== 'end') for (const d of G.dragons) if (!d.done && !d.remoteCtl) d.remove();
     if (Date.now() - (G.fixAt || 0) > 3000) { G.fixAt = Date.now(); G.applyFixes(); }
@@ -2094,6 +2151,14 @@ function frame(now) {
   }
   G.ui.updateFriendArrow();
   G.ui.updateFlagArrow();
+  // powers from a beacon
+  {
+    const box = $('effects'), now = performance.now(), list = [];
+    for (const k in (P.effects || {})) { const e = P.effects[k]; if (e.until > now && BEACON_FX[k]) list.push(BEACON_FX[k][0] + (e.lvl > 1 ? ' II' : '')); }
+    const t = list.join('  \u00b7  ');
+    if (box.textContent !== t) box.textContent = t;
+    if (box.hidden === !!t) box.hidden = !t;
+  }
   // coordinates (Settings > Show Coordinates): where you are, how high, and which way you face
   {
     const box = $('coords'), show = !!G.showCoords && (G.state === 'play' || G.state === 'inventory');

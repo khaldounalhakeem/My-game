@@ -686,6 +686,11 @@ makeTile('i_repeater', pPlant(P => { P.rect(1, 9, 14, 4, 0x9a9a9a); P.rect(1, 9,
 makeTile('smithing_top', P => { P.fill(0x3a2a2a, 6); P.rect(0, 0, 16, 2, 0x5a5a62); P.rect(0, 14, 16, 2, 0x5a5a62); P.rect(2, 4, 12, 8, 0x2a1e1e, 4); P.rect(5, 6, 6, 4, 0x6a6a74); });
 makeTile('smithing_side', P => { pPlanks(0x4a3220)(P); P.rect(0, 0, 16, 4, 0x3a2a2a); P.rect(0, 3, 16, 1, 0x6a6a74); P.rect(3, 8, 3, 5, 0x5a5a62); P.rect(10, 8, 3, 5, 0x5a5a62); });
 makeTile('smithing_front', P => { pPlanks(0x4a3220)(P); P.rect(0, 0, 16, 4, 0x3a2a2a); P.rect(0, 3, 16, 1, 0x6a6a74); P.rect(5, 7, 6, 6, 0x2a2a30); P.rect(6, 8, 4, 2, 0x8a8a94); });
+/* wither skull, nether star, beacon */
+makeTile('wither_skull', P => { P.fill(0x2a2a2a, 6); P.rect(3, 5, 3, 3, 0x0a0a0a); P.rect(10, 5, 3, 3, 0x0a0a0a); P.rect(6, 10, 4, 1, 0x0a0a0a); P.rect(5, 12, 6, 2, 0x1a1a1a); });
+makeTile('i_wither_skull', pPlant(P => { P.rect(3, 3, 10, 10, 0x2a2a2a); P.rect(4, 6, 3, 3, 0x0a0a0a); P.rect(9, 6, 3, 3, 0x0a0a0a); P.rect(6, 10, 4, 1, 0x0a0a0a); P.rect(3, 3, 10, 1, 0x3e3e3e); }));
+makeTile('i_nether_star', pPlant(P => { const c = [[7, 1], [8, 1], [6, 4], [9, 4], [1, 6], [14, 6], [3, 7], [12, 7], [5, 10], [10, 10], [3, 13], [12, 13]]; P.rect(5, 4, 6, 8, 0xf4f4e8); P.rect(2, 6, 12, 3, 0xf4f4e8); P.rect(7, 1, 2, 4, 0xf4f4e8); P.rect(3, 11, 3, 3, 0xe8e8d0); P.rect(10, 11, 3, 3, 0xe8e8d0); P.rect(7, 6, 2, 3, 0xffffa0); for (const [x, y] of c) P.put(x, y, 0xffffff); }));
+makeTile('beacon', P => { P.fill(0xc8f0f0, 4); P.rect(0, 0, 16, 1, 0xe8ffff); P.rect(0, 0, 1, 16, 0xe8ffff); P.rect(15, 0, 1, 16, 0x9ad8d8); P.rect(0, 15, 16, 1, 0x9ad8d8); P.rect(4, 4, 8, 8, 0x3ae8e0); P.rect(5, 5, 6, 6, 0x9afff8); P.rect(7, 7, 2, 2, 0xffffff); });
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -1045,6 +1050,11 @@ for (const k of TURNABLE) {
 }
 /* smithing table: turns diamond tools and armor into netherite (keeping their enchantments and names) */
 block('smithing_table', 'Smithing Table', { top: 'smithing_top', side: 'smithing_side', front: 'smithing_front', bottom: 'planks_dark_oak' }, { tool: 'axe', hardness: 2.5, job: 'toolsmith' });
+/* the skull of a wither skeleton: three on a T of soul sand bring out the Wither */
+block('wither_skull', 'Wither Skeleton Skull', 'wither_skull', { hardness: 1, solid: false, opaque: false, box: [0.25, 0, 0.25, 0.75, 0.5, 0.75], boxes: [[0.25, 0, 0.25, 0.75, 0.5, 0.75]], iconTile: 'i_wither_skull' });
+/* beacon: on a pyramid of iron, gold, diamond, emerald or netherite blocks it shines a beam into the sky and
+   gives powers to players nearby. The power it gives is part of the block (so friends see the same) */
+for (const fx of ['', 'speed', 'haste', 'resistance', 'jump_boost', 'strength', 'regeneration']) block(fx ? 'beacon_' + fx : 'beacon', 'Beacon', 'beacon', { hardness: 3, opaque: false, light: true, emit: 15, drop: 'beacon', beacon: { effect: fx || null } });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1183,6 +1193,7 @@ item('iron_door', 'Iron Door', 'iron_door', { placesDoor: 'iron' });
 item('redstone_torch', 'Redstone Torch', 'redstone_torch', { placesSwitch: 'redstone_torch' });
 item('powder_snow_bucket', 'Powder Snow Bucket', 'powder_snow_bucket', { stack: 1 });
 item('repeater', 'Redstone Repeater', 'repeater', { placesRepeater: true });
+item('nether_star', 'Nether Star', 'nether_star');
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
 
 function getDrops(def, rng) {
@@ -1348,7 +1359,7 @@ const RECIPES = [
   ['paper', 3, { sugar_cane: 3 }, 'table'], ['book', 1, { paper: 3, leather: 1 }], ['bookshelf', 1, { '#planks': 6, book: 3 }, 'table'],
   ['enchanting_table', 1, { book: 1, diamond: 2, obsidian: 4 }, 'table'],
   ['redstone_torch', 1, { redstone: 1, stick: 1 }], ['redstone_lamp_0', 1, { redstone: 4, glowstone: 1 }, 'table'], ['repeater', 1, { redstone_torch: 2, redstone: 1, stone: 3 }, 'table'],
-  ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['smithing_table', 1, { iron_ingot: 2, '#planks': 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
+  ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['beacon', 1, { glass: 5, obsidian: 3, nether_star: 1 }, 'table'], ['smithing_table', 1, { iron_ingot: 2, '#planks': 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
   ['lever', 1, { stick: 1, cobblestone: 1 }], ['stone_button', 1, { stone: 1 }], ['oak_button', 1, { '#planks': 1 }], ['stone_pressure_plate', 1, { stone: 2 }, 'table'], ['oak_pressure_plate', 1, { '#planks': 2 }, 'table'],
   ['bamboo_block', 1, { bamboo: 9 }], ['bamboo_planks', 2, { bamboo_block: 1 }], ['stick', 1, { bamboo: 2 }],
   ...['mangrove', 'cherry'].flatMap(w => { const pk = w + '_planks'; return [[pk, 4, { [w + '_log']: 1 }], [w + '_stairs', 4, { [pk]: 6 }, 'table'], [w + '_slab', 6, { [pk]: 3 }, 'table'], [w + '_door', 3, { [pk]: 6 }, 'table'], [w + '_trapdoor', 2, { [pk]: 6 }, 'table'], [w + '_fence', 3, { [pk]: 4, stick: 2 }, 'table'], [w + '_fence_gate', 1, { [pk]: 2, stick: 4 }, 'table']]; }),

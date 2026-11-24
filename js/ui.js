@@ -56,7 +56,7 @@ const MC_ORDER = (() => {
   for (const c of colors) o.push('stained_glass_pane_' + c);
   o.push('bed', 'flag');
   o.push('melon', 'pumpkin', 'hay_bale', 'glowstone', 'pumpkin_seeds', 'bamboo', 'sugar_cane');
-  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'smithing_table', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
+  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'smithing_table', 'beacon', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
   o.push('redstone', 'redstone_torch', 'redstone_block', 'repeater', 'redstone_lamp_0', 'iron_door', 'lever', 'stone_button', 'oak_button', 'stone_pressure_plate', 'oak_pressure_plate', 'tnt');
   for (const m of mats) for (const t of ['shovel', 'pickaxe', 'axe', 'hoe']) o.push(m + '_' + t);
   o.push('bucket', 'powder_snow_bucket', 'flint_and_steel', 'lead', 'name_tag', 'boat', 'saddle', 'eye_of_ender');
@@ -65,7 +65,7 @@ const MC_ORDER = (() => {
   for (const m of ['leather', 'iron', 'golden', 'diamond']) o.push(m + '_horse_armor');
   o.push('bow', 'arrow');
   o.push('golden_apple', 'melon_slice', 'bread', 'cookie', 'cake');
-  o.push('coal', 'emerald', 'lapis', 'diamond', 'quartz', 'iron_ingot', 'gold_ingot', 'netherite_ingot', 'stick', 'wheat', 'leather', 'paper', 'book', 'enchanted_book', 'blaze_powder');
+  o.push('coal', 'emerald', 'lapis', 'diamond', 'quartz', 'iron_ingot', 'gold_ingot', 'netherite_ingot', 'stick', 'wheat', 'leather', 'paper', 'book', 'enchanted_book', 'blaze_powder', 'nether_star');
   const m = {}; o.forEach((k, i) => { if (!(k in m)) m[k] = i; });
   return m;
 })();
@@ -146,8 +146,9 @@ const UI = {
     // boss bar
     let boss = null;
     for (const d of G.dragons) if (!d.done && d.pos.distanceTo(P.pos) < 180) { boss = d; break; }
+    if (!boss) for (const m of G.mobs) if (m.T.boss && !m.dead && m.pos.distanceTo(P.pos) < 120) { boss = { name: m.T.name, hp: m.hp, maxHp: m.T.hp, K: { eye: 0x8a3ac8 } }; break; }
     $('bossbar').hidden = !boss;
-    if (boss) { $('bossname').textContent = boss.name; $('bossfill').style.width = (boss.hp / boss.maxHp * 100) + '%'; $('bossfill').style.background = '#' + boss.K.eye.toString(16).padStart(6, '0'); }
+    if (boss) { $('bossname').textContent = boss.name; $('bossfill').style.width = (Math.max(0, boss.hp) / boss.maxHp * 100) + '%'; $('bossfill').style.background = '#' + boss.K.eye.toString(16).padStart(6, '0'); }
     $('fx-water').classList.toggle('on', P.headInWater);
     $('fx-fire').classList.toggle('on', P.fire > 0 && survival);
   },
@@ -489,7 +490,7 @@ const UI = {
     for (const d of DEFS) {
       if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.bedPart || d.door || d.trapdoor || d.stair || d.slab || d.ladder || d.gate || d.sign || d.key === 'wheat_sprout') continue;
       // the other versions of a block (switched on, turned, ...) only appear in the world
-      if (d.lever || d.button || d.plate || d.wire || d.rsTorch || d.repeater || (d.lamp && d.lamp.on) || (d.base && d.facing !== 's')) continue;
+      if (d.lever || d.button || d.plate || d.wire || d.rsTorch || d.repeater || (d.lamp && d.lamp.on) || (d.base && d.facing !== 's') || (d.beacon && d.beacon.effect)) continue;
       if (q ? !d.name.toLowerCase().includes(q) : (this.tab === 'blocks') !== d.isBlock) continue;
       ids.push(d.id);
     }
@@ -871,6 +872,52 @@ const UI = {
     }
   },
 
+  /* ---------- the beacon: pick the power it gives (paid with an iron, gold or netherite ingot, an emerald or a diamond) ---------- */
+  openBeacon(x, y, z) {
+    if (G.state !== 'play') return;
+    let box = $('beacon-pop');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'beacon-pop'; box.className = 'copy-pick';
+      box.innerHTML = '<div class="copy-card trade-card"><h3>Beacon</h3><p class="trade-hint beacon-hint"></p><div class="trade-list beacon-list"></div><button type="button" class="btn trade-close">Close</button></div>';
+      box.addEventListener('pointerdown', e => { if (e.target === box) this.closeTrades(); });
+      box.querySelector('.trade-close').addEventListener('click', () => this.closeTrades());
+      document.body.appendChild(box);
+    }
+    this.beacon = { x, y, z };
+    this.renderBeacon();
+    box.hidden = false;
+    G.sound.play('click');
+    G.setState('trade'); G.unlock();
+  },
+  renderBeacon() {
+    const box = $('beacon-pop'), b = this.beacon, W = G.world, P = G.player, inv = P.inv;
+    const lvl = G.beaconLevel(b.x, b.y, b.z), sky = W.skyExposed(b.x, b.y, b.z), cur = DEFS[W.getBlock(b.x, b.y, b.z)].beacon;
+    const PAY = ['iron_ingot', 'gold_ingot', 'emerald', 'diamond', 'netherite_ingot'], payWith = PAY.find(k => inv.count(ID[k]) > 0);
+    box.querySelector('.beacon-hint').textContent = (lvl === 0 ? 'The beacon needs a pyramid under it: a 3 by 3 layer of iron, gold, diamond, emerald or netherite blocks (bigger layers below it make it stronger, up to 4 layers).'
+      : 'Pyramid: ' + lvl + ' of 4 layers. It reaches ' + (10 + lvl * 10) + ' blocks.' + (sky ? '' : ' Its beam is blocked: it needs open sky (or glass) above it.'))
+      + ' Pick a power. It costs 1 iron ingot, gold ingot, emerald, diamond or netherite ingot' + (payWith ? ' (you will pay 1 ' + DEFS[ID[payWith]].name + ').' : ' (you have none).');
+    const list = box.querySelector('.beacon-list'); list.innerHTML = '';
+    for (const k in BEACON_FX) {
+      const [name, need] = BEACON_FX[k], ok = lvl >= need && sky && (payWith || P.mode === 'creative'), on = cur && cur.effect === k;
+      const row = document.createElement('button'); row.type = 'button'; row.className = 'recipe ench-offer' + (ok || on ? ' ok' : '');
+      const n = document.createElement('span'); n.className = 'rname'; n.textContent = name + (lvl >= 4 && k !== 'regeneration' ? ' II' : '') + (on ? ' (on now)' : '');
+      const sm = document.createElement('small'); sm.className = 'rhow'; sm.textContent = lvl >= need ? { speed: 'Run faster', haste: 'Mine faster', resistance: 'Take less damage', jump_boost: 'Jump higher, fall softer', strength: 'Hit harder', regeneration: 'Heal over time' }[k] : 'Needs ' + need + ' pyramid layer' + (need > 1 ? 's' : '');
+      n.appendChild(sm); row.appendChild(n);
+      row.addEventListener('click', () => {
+        if (lvl < need) { this.message('This power needs a pyramid with ' + need + ' layers.'); return; }
+        if (!sky) { this.message('The beacon needs open sky above it.'); return; }
+        if (on) return;
+        if (P.mode !== 'creative') { if (!payWith) { this.message('Pay with 1 iron ingot, gold ingot, emerald, diamond or netherite ingot.'); return; } inv.remove(ID[payWith], 1); inv.changed(); }
+        W.setBlock(b.x, b.y, b.z, ID['beacon_' + k]);
+        G.sound.play('levelup');
+        this.message('The beacon now gives ' + name + '!', 'gold');
+        G.tickBeacons();
+        this.renderBeacon();
+      });
+      list.appendChild(row);
+    }
+  },
+
   /* ---------- the smithing table: diamond -> netherite, with one netherite ingot (enchantments and names stay) ---------- */
   openSmithing() {
     if (G.state !== 'play') return;
@@ -1072,6 +1119,8 @@ const UI = {
     if (gb) gb.hidden = true;
     const sb = $('smith-pop');
     if (sb) sb.hidden = true;
+    const bb = $('beacon-pop');
+    if (bb) bb.hidden = true;
     if (this.ench) { if (this.ench.item) this.enchGiveBack(this.ench.item); if (this.ench.lapis) this.enchGiveBack(this.ench.lapis); }
     this.ench = null;
     const ab = $('anvil-pop');

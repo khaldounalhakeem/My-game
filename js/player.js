@@ -71,6 +71,8 @@ class Player {
   }
 
   heldSlot() { return this.inv.slots[this.sel]; }
+  /* a power from a beacon: its level, or 0 */
+  fx(k) { const e = this.effects && this.effects[k]; return e && e.until > performance.now() ? e.lvl : 0; }
   heldDef() { const s = this.heldSlot(); return s ? DEFS[s.id] : null; }
   eyePos() { return new THREE.Vector3(this.pos.x, this.pos.y + (this.sleeping ? 0.3 : this.eye - (this.sneaking ? 0.15 : 0)), this.pos.z); }
   lookDir() {
@@ -87,6 +89,7 @@ class Player {
     const bypass = !from && /fell from|fell out|drown|starv|void|pearl|suffocat|froze/i.test(cause || '');
     // armor works like Minecraft: big hits get through more than small ones; damage is kept in halves, so
     // a stronger sword always does more (no rounding two different swords to the same number)
+    if (this.fx('resistance') && !/void|starv/i.test(cause || '')) amount = Math.max(0.5, Math.round(amount * (1 - 0.2 * this.fx('resistance')) * 2) / 2);
     // Protection on armor and Feather Falling on boots (4% less for each point, at most 80%)
     { let epf = 0; const fall = /fell from/i.test(cause || '');
       if (!/starv|void/i.test(cause || '')) for (let i = 36; i < 40; i++) { const s = this.inv.slots[i]; epf += enchLv(s, 'protection'); if (fall) epf += 3 * enchLv(s, 'feather_falling'); }
@@ -112,7 +115,7 @@ class Player {
 
   die() {
     if (this.riding) this.dismount();
-    this.health = 0; this.dead = true;
+    this.health = 0; this.dead = true; this.effects = {};
     if (G.keepInventory) { G.ui.showDeath(); return; } // keep inventory: items and XP stay with you
     for (let i = 0; i < 40; i++) {
       const s = this.inv.slots[i];
@@ -193,6 +196,7 @@ class Player {
     this.sprinting = input.sprint && mz > 0.3 && !this.sneaking && (creative || this.hunger > 6);
     let speed = this.flying ? (input.sprint ? 20 : 11) : this.sprinting ? 5.7 : this.sneaking ? 1.4 : 4.3;
     if (swimming && !this.flying) speed *= this.inLava ? 0.4 : 0.55;
+    if (!this.flying && this.fx('speed')) speed *= 1 + 0.2 * this.fx('speed');
     if (this.inSnow && !this.flying) speed *= 0.45;
     const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
     const wx = (-s * mz + c * mx) * speed, wz = (-c * mz - s * mx) * speed;
@@ -216,7 +220,7 @@ class Player {
     } else {
       this.vel.y -= 28 * dt;
       if (this.vel.y < -55) this.vel.y = -55;
-      if (input.jump && this.onGround) { this.vel.y = 8.7; this.hungerDrain(this.sprinting ? 0.05 : 0.0125); }
+      if (input.jump && this.onGround) { this.vel.y = 8.7 + 1.7 * this.fx('jump_boost'); this.hungerDrain(this.sprinting ? 0.05 : 0.0125); }
       if (this.inSnow) { this.vel.y = Math.max(this.vel.y, -1.2); if (input.jump) this.vel.y = Math.max(this.vel.y, 2.2); this.fallStart = null; }
     }
     const wasGround = this.onGround;
@@ -234,7 +238,7 @@ class Player {
     else if (!this.onGround) this.fallStart = this.fallStart === null ? this.pos.y : Math.max(this.fallStart, this.pos.y);
     if (this.onGround && !wasGround && this.fallStart !== null) {
       const d = this.fallStart - this.pos.y;
-      if (d >= 4) this.hurt(Math.floor(d - 3), null, 0, true, 'You fell from too high.'); // a short drop doesn't hurt at all
+      if (d >= 4 + this.fx('jump_boost')) this.hurt(Math.floor(d - 3 - this.fx('jump_boost')), null, 0, true, 'You fell from too high.'); // a short drop doesn't hurt at all
       if (d > 1) G.sound.play('land');
       this.fallStart = null;
     }
@@ -306,6 +310,8 @@ class Player {
       this.regenT += dt;
       if (this.regenT > D.regen) { this.regenT = 0; this.health = Math.min(20, this.health + 1); this.hungerDrain(0.25); }
     } else this.regenT = 0;
+    // Regeneration from a beacon heals you even when you're hungry
+    if (this.fx('regeneration') && this.health < 20) { this.fxRegenT = (this.fxRegenT || 0) + dt; if (this.fxRegenT >= 2.5) { this.fxRegenT = 0; this.health = Math.min(20, this.health + 1); } }
     if (this.hunger <= 0) {
       this.starveT += dt;
       if (this.starveT > 4) { this.starveT = 0; if (this.health > G.diff().starve) this.hurt(1, null, 0, true, 'You starved. Eat food when your hunger bar gets low.'); }
@@ -366,7 +372,7 @@ class Player {
     const canHarvest = !def.tool || !def.tier || (tool && tool.type === def.tool && tool.tier >= def.tier);
     const ef = enchLv(this.heldSlot(), 'efficiency');
     const speed = def.tool && tool && tool.type === def.tool ? tool.speed + (ef ? ef * ef + 1 : 0) : 1;
-    return def.hardness * (canHarvest ? 1.5 : 5) / speed;
+    return def.hardness * (canHarvest ? 1.5 : 5) / speed / (1 + 0.2 * this.fx('haste'));
   }
 
   canHarvest(def) {
@@ -379,7 +385,7 @@ class Player {
     if (this.attackCd > 0) return;
     const held = this.heldDef();
     const hs = this.heldSlot(), sharp = enchLv(hs, 'sharpness');
-    let dmg = (held && held.damage ? held.damage : 1) + (sharp ? 0.5 * sharp + 0.5 : 0);
+    let dmg = (held && held.damage ? held.damage : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + 3 * this.fx('strength');
     const crit = !this.onGround && this.vel.y < -1 && !this.flying;
     if (crit) dmg = Math.round(dmg * 1.5);
     this.attackCd = 0.45; this.swing = 1;
@@ -765,6 +771,7 @@ class Player {
       if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (DEFS[b.id].base === 'furnace') { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
+      if (DEFS[b.id].beacon) { this.useCd = 0.4; G.ui.openBeacon(b.x, b.y, b.z); return; }
       if (DEFS[b.id].lever || DEFS[b.id].button || DEFS[b.id].repeater) { this.useCd = 0.3; this.swing = 1; G.useSwitch(b.x, b.y, b.z); return; }
       if (DEFS[b.id].door && DEFS[b.id].door.wood === 'iron') { this.useCd = 0.4; G.ui.message('An iron door only opens with a button, a lever or a pressure plate.'); return; }
       if (DEFS[b.id].door || DEFS[b.id].trapdoor || DEFS[b.id].gate) { this.useCd = 0.3; this.swing = 1; G.toggleDoor(b.x, b.y, b.z); return; }
@@ -878,6 +885,7 @@ class Player {
     if (hd.id === ID.flag) G.placedFlag(px, py, pz);
     W.settle(px, py, pz);
     if (hd.base === 'pumpkin') G.tryBuildGolem(px, py, pz);
+    if (hd.id === ID.wither_skull) G.tryBuildWither(px, py, pz);
     G.sound.play('place', null, hd.id);
     if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
     this.useCd = 0.22; this.swing = 1;

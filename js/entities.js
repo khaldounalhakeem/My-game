@@ -64,6 +64,7 @@ const FACES_DRAW = {
   cow: px => { px(0, 0, '#433626', 8, 8); px(0, 0, '#e8e8e8', 3, 3); px(1, 3, '#fff', 1, 1); px(2, 3, '#111', 1, 1); px(5, 3, '#111', 1, 1); px(6, 3, '#fff', 1, 1); px(2, 5, '#bfa48f', 4, 3); px(2, 6, '#5a4030', 1, 1); px(5, 6, '#5a4030', 1, 1); },
   sheep: px => { px(0, 0, '#d8c4a8', 8, 8); px(1, 3, '#fff', 1, 1); px(2, 3, '#111', 1, 1); px(5, 3, '#111', 1, 1); px(6, 3, '#fff', 1, 1); px(3, 5, '#e3a8a8', 2, 1); },
   panda: px => { px(0, 0, '#f2f2f2', 8, 8); px(0, 0, '#1a1a1a', 2, 1); px(6, 0, '#1a1a1a', 2, 1); px(1, 2, '#1a1a1a', 2, 3); px(5, 2, '#1a1a1a', 2, 3); px(2, 3, '#ffffff', 1, 1); px(5, 3, '#ffffff', 1, 1); px(3, 5, '#1a1a1a', 2, 1); px(3, 6, '#9a9a9a', 2, 1); },
+  wither: px => { px(0, 0, '#1e1e1e', 8, 8); px(1, 2, '#e8e8e8', 2, 2); px(5, 2, '#e8e8e8', 2, 2); px(2, 3, '#101010', 1, 1); px(5, 3, '#101010', 1, 1); px(2, 6, '#3a3a3a', 4, 1); px(2, 5, '#0a0a0a', 4, 1); },
   chicken: px => { px(0, 0, '#f4f4f4', 8, 8); px(1, 2, '#111', 1, 1); px(6, 2, '#111', 1, 1); px(2, 3, '#f0a020', 4, 2); px(3, 5, '#d02020', 2, 2); },
   spider: px => { noisyFill(px, 8, ['#2a2523', '#332c29', '#241f1d'], 4); px(1, 3, '#d01010', 2, 1); px(5, 3, '#d01010', 2, 1); px(2, 2, '#ff3030', 1, 1); px(5, 2, '#ff3030', 1, 1); px(0, 4, '#a01010', 1, 1); px(7, 4, '#a01010', 1, 1); },
   player: px => { px(0, 0, '#c89878', 8, 8); px(0, 0, '#4a2f1a', 8, 2); px(0, 2, '#4a2f1a', 1, 1); px(7, 2, '#4a2f1a', 1, 1); px(1, 4, '#fff', 1, 1); px(2, 4, '#3a5ad0', 1, 1); px(5, 4, '#3a5ad0', 1, 1); px(6, 4, '#fff', 1, 1); px(3, 5, '#a86a50', 2, 1); px(2, 6, '#7a3f2a', 4, 1); },
@@ -211,6 +212,7 @@ const MOB_TYPES = {
   cow: { name: 'Cow', hp: 10, w: 0.9, h: 1.4, speed: 1.4, passive: true, xp: 2, drops: [['beef', 1, 3], ['leather', 0, 2]] },
   sheep: { name: 'Sheep', hp: 8, w: 0.9, h: 1.3, speed: 1.4, passive: true, xp: 2, drops: [['wool_white', 1, 2]] },
   panda: { name: 'Panda', hp: 20, w: 1.2, h: 1.25, speed: 1.1, passive: true, xp: 2, drops: [['bamboo', 0, 2]] },
+  wither: { name: 'Wither', hp: 300, w: 1.0, h: 3.0, speed: 2.6, hostile: true, fly: 7, ranged: 'wither', boss: true, xp: 50, fireproof: true, drops: [['nether_star', 1, 1]] },
   chicken: { name: 'Chicken', hp: 4, w: 0.45, h: 0.7, speed: 1.6, passive: true, xp: 1, drops: [['chicken', 1, 1], ['feather', 0, 2]] },
 };
 
@@ -357,6 +359,15 @@ function buildMobModel(type) {
       const a = i / 10 * Math.PI * 2, r = i % 2 ? 0.45 : 0.3;
       addBox(ring, 0.12, 0.55, 0.12, rodMat, Math.cos(a) * r, i % 2 ? 0.75 : 0.35, Math.sin(a) * r);
     }
+  } else if (type === 'wither') {
+    // three black skulls on a bony shoulder bar, a spine and ribs below
+    const bone = lam(0x2a2a2a), dark = lam(0x1a1a1a);
+    addBox(g, 2.2, 0.3, 0.3, bone, 0, 2.2, 0);
+    addBox(g, 0.25, 1.5, 0.25, bone, 0, 1.4, 0);
+    for (const y of [1.9, 1.6, 1.3]) addBox(g, 1.0, 0.12, 0.6, dark, 0, y, 0.05);
+    const head = new THREE.Mesh(boxGeo(0.7, 0.7, 0.7), headMats('wither', 0x1e1e1e));
+    head.position.set(0, 2.75, 0); g.add(head); P.head = head;
+    for (const x of [-0.95, 0.95]) { const h = new THREE.Mesh(boxGeo(0.5, 0.5, 0.5), headMats('wither', 0x1e1e1e)); h.position.set(x, 2.55, 0); g.add(h); }
   } else if (type === 'ghast') {
     const body = new THREE.Mesh(boxGeo(3.6, 3.6, 3.6), headMats('ghast', 0xf0f0f0));
     body.position.set(0, 2.3, 0); g.add(body); P.head = body;
@@ -758,6 +769,8 @@ class Mob {
         const n = a + Math.floor(Math.random() * (b - a + 1)) + (byPlayer && G.looting ? Math.floor(Math.random() * (G.looting + 1)) : 0); // Looting: a few extra
         if (n > 0) G.spawnDrop(ID[k], n, this.pos.x, this.pos.y + 0.5, this.pos.z);
       }
+      if (this.type === 'wither_skeleton' && byPlayer && Math.random() < 0.1 + 0.05 * (G.looting || 0)) G.spawnDrop(ID.wither_skull, 1, this.pos.x, this.pos.y + 0.5, this.pos.z);
+      if (this.type === 'wither') G.ui.message('You defeated the Wither! Pick up the Nether Star: it makes a beacon.', 'gold');
       if (byPlayer) G.player.addXp(this.T.xp);
     }
   }
@@ -831,8 +844,8 @@ class Mob {
       const l = Math.hypot(toP.x, toP.z) || 1;
       moveX = toP.x / l; moveZ = toP.z / l;
       this.yaw = Math.atan2(moveX, moveZ);
-      if (T.ranged === 'blaze' || T.ranged === 'ghast') {
-        const ghast = T.ranged === 'ghast';
+      if (T.ranged === 'blaze' || T.ranged === 'ghast' || T.ranged === 'wither') {
+        const ghast = T.ranged === 'ghast' || T.ranged === 'wither';
         const near = ghast ? 12 : 5, far = ghast ? 26 : 10;
         if (dist < near) { moveX = -moveX; moveZ = -moveZ; } else if (dist < far) { moveX *= 0.15; moveZ *= 0.15; }
         this.shootCd -= dt;
@@ -840,7 +853,7 @@ class Mob {
           const from = new V3(this.pos.x, this.pos.y + (ghast ? 2.3 : 1.4), this.pos.z);
           const dir = new V3(P.pos.x, P.pos.y + 1.2, P.pos.z).sub(from).normalize();
           if (ghast) {
-            this.shootCd = 3 + Math.random() * 2;
+            this.shootCd = T.ranged === 'wither' ? 1.2 + Math.random() * 0.8 : 3 + Math.random() * 2;
             G.spawnProjectile('fireball', from.addScaledVector(dir, 2.4), dir.multiplyScalar(14), this);
             G.sound.play('fireball', this.pos);
           } else {
