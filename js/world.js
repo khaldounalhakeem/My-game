@@ -1,7 +1,9 @@
 'use strict';
 /* Voxel world: chunk storage, terrain generation, meshing, raycasting and collision. */
 
-const CS = 16, WH = 96, SEA = 32;
+// WH: how high you can build. GEN_H: the height the land was made for (kept at 96, so raising the
+// build limit never changes the land, trees or the Nether's ceiling in worlds made before)
+const CS = 16, WH = 128, GEN_H = 96, SEA = 32;
 const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14 };
 const GEN_VER = 6; // which newer biomes exist (see genVerAt)
 const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle'];
@@ -85,7 +87,7 @@ class World {
     let h = SEA + 4 + cont * 70 * S.amp + hills * 20 * S.hills;
     const m = Math.max(0, mnt - 0.02);
     h += m * m * 600 * S.mnt;
-    return clamp(Math.floor(h), 4, WH - 14);
+    return clamp(Math.floor(h), 4, GEN_H - 14);
   }
 
   climate(x, z) {
@@ -423,7 +425,7 @@ class World {
       const x = 2 + (rng() * 12 | 0), z = 2 + (rng() * 12 | 0), h = heights[x + z * 16];
       const ground = get(x, h, z);
       if (ground !== ID.grass && ground !== ID.snow_grass) continue;
-      if (h + 10 >= WH || get(x, h + 1, z) !== 0) continue;
+      if (h + 10 >= GEN_H || get(x, h + 1, z) !== 0) continue;
       const b = biomes[x + z * 16];
       if (b === BIOME.DARK_FOREST) { if (rng() < 0.8) this.darkOakTree(set, get, x, h + 1, z, rng); else this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4); }
       else if (b === BIOME.SAVANNA) this.acaciaTree(set, get, x, h + 1, z, rng);
@@ -470,7 +472,7 @@ class World {
       plant(20, [ID.tall_grass], ID.grass);
       for (let i = 0; i < 60; i++) {
         const x = rng() * 16 | 0, z = rng() * 16 | 0, h = heights[x + z * 16];
-        if (get(x, h, z) !== ID.grass || get(x, h + 1, z) !== 0 || h + 16 >= WH) continue;
+        if (get(x, h, z) !== ID.grass || get(x, h + 1, z) !== 0 || h + 16 >= GEN_H) continue;
         const tall = 4 + (rng() * 9 | 0);
         for (let k = 1; k <= tall; k++) { if (get(x, h + k, z) !== 0) break; set(x, h + k, z, ID.bamboo); }
       }
@@ -559,7 +561,7 @@ class World {
     const d = c.data;
     const rng = mulberry32(hash3(cx, cz, this.seed));
     const heights = new Int16Array(256), roofs = new Int16Array(256);
-    const set = (x, y, z, id) => { if (x >= 0 && x < 16 && z >= 0 && z < 16 && y > 0 && y < WH - 1) d[x + (z << 4) + (y << 8)] = id; };
+    const set = (x, y, z, id) => { if (x >= 0 && x < 16 && z >= 0 && z < 16 && y > 0 && y < GEN_H - 1) d[x + (z << 4) + (y << 8)] = id; };
     const get = (x, y, z) => (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= 0 && y < WH) ? d[x + (z << 4) + (y << 8)] : -1;
     const LAVA_Y = 31;
     for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -568,10 +570,10 @@ class World {
       const roof = Math.floor(80 + this.noiseB.fbm2(wx / 38, wz / 38, 3) * 16);
       heights[x + z * 16] = floor; roofs[x + z * 16] = roof;
       const soul = this.noiseC.noise2(wx / 18, wz / 18) > 0.22;
-      for (let y = 0; y < WH; y++) {
+      for (let y = 0; y < GEN_H; y++) {
         let id = 0;
-        if (y === 0 || y === WH - 1) id = ID.bedrock;
-        else if ((y <= 3 || y >= WH - 4) && rng() < 0.45) id = ID.bedrock;
+        if (y === 0 || y === GEN_H - 1) id = ID.bedrock;
+        else if ((y <= 3 || y >= GEN_H - 4) && rng() < 0.45) id = ID.bedrock;
         else if (y <= floor) id = (soul && y >= floor - 2 && floor > LAVA_Y) ? ID.soul_sand : ID.netherrack;
         else if (y >= roof) id = ID.netherrack;
         else {
@@ -836,7 +838,7 @@ class World {
   pyramid(set, get, heights, rng, hidden) {
     let base = 999;
     for (let z = 3; z <= 13; z++) for (let x = 3; x <= 13; x++) base = Math.min(base, heights[x + z * 16]);
-    if (base <= SEA || base + 8 >= WH) return;
+    if (base <= SEA || base + 8 >= GEN_H) return;
     for (let z = 2; z <= 14; z++) for (let x = 2; x <= 14; x++) {
       for (let y = base - 3; y <= base; y++) set(x, y, z, ID.sandstone);
       for (let y = base + 1; y < base + 9; y++) if (x > 2 && x < 14 && z > 2 && z < 14) set(x, y, z, 0);
@@ -948,7 +950,10 @@ class World {
       for (const L of this.emitters(n)) lights.push([L[0] + dx * 16 + 0.5, L[1] + 0.5, L[2] + dz * 16 + 0.5, L[3]]);
     }
     const data = c.data;
-    for (let y = 0; y < WH; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+    // only look as high as something is built (most chunks are empty above the land)
+    let top = WH - 1;
+    while (top > 0) { let any = false; const b = top << 8; for (let i = 0; i < 256; i++) if (data[b + i]) { any = true; break; } if (any) break; top--; }
+    for (let y = 0; y <= top; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const id = data[x + (z << 4) + (y << 8)];
       if (!id) continue;
       const def = DEFS[id];

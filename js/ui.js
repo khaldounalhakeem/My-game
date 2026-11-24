@@ -871,6 +871,49 @@ const UI = {
     }
   },
 
+  /* ---------- the grindstone: takes the enchantments off something (you get a little XP back) ---------- */
+  openGrindstone() {
+    if (G.state !== 'play') return;
+    let box = $('grind-pop');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'grind-pop'; box.className = 'copy-pick';
+      box.innerHTML = '<div class="copy-card trade-card"><h3>Grindstone</h3><p class="trade-hint">Tap something enchanted to take its enchantments off. An enchanted book turns back into a book. Its name stays.</p><div class="ench-items grind-items"></div><button type="button" class="btn trade-close">Close</button></div>';
+      box.addEventListener('pointerdown', e => { if (e.target === box) this.closeTrades(); });
+      box.querySelector('.trade-close').addEventListener('click', () => this.closeTrades());
+      document.body.appendChild(box);
+    }
+    this.renderGrindstone();
+    box.hidden = false;
+    G.sound.play('click');
+    G.setState('trade'); G.unlock();
+  },
+  renderGrindstone() {
+    const box = $('grind-pop'), list = box.querySelector('.grind-items'), P = G.player, inv = P.inv;
+    list.innerHTML = '';
+    let any = false;
+    for (let i = 0; i < 40; i++) {
+      const s = inv.slots[i];
+      if (!s || !s.e) continue;
+      any = true;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ench-item glint';
+      const img = document.createElement('img'); img.alt = ''; img.src = iconURL(s.id);
+      const sp = document.createElement('span'); sp.textContent = slotName(s) + ' (' + enchText(s.e) + ')';
+      b.append(img, sp);
+      b.addEventListener('click', () => {
+        const levels = Object.values(s.e).reduce((a, v) => a + v, 0);
+        delete s.e;
+        if (s.id === ID.enchanted_book) s.id = ID.book;
+        inv.changed();
+        P.addXp(Math.max(1, levels * 3));
+        G.sound.play('break');
+        this.message('The enchantments came off your ' + slotName(s) + '.', 'gold');
+        this.renderGrindstone();
+      });
+      list.appendChild(b);
+    }
+    if (!any) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'You have nothing enchanted.'; list.appendChild(p); }
+  },
+
   /* ---------- the anvil ----------
      Pick something, type a new name (1 level), and/or pick a second item of the same kind or an Enchanted
      Book to add its enchantments (more levels). Like Minecraft, two of the same enchantment at the same
@@ -980,6 +1023,8 @@ const UI = {
     if (box) box.hidden = true;
     const eb = $('ench-pop');
     if (eb) eb.hidden = true;
+    const gb = $('grind-pop');
+    if (gb) gb.hidden = true;
     if (this.ench) { if (this.ench.item) this.enchGiveBack(this.ench.item); if (this.ench.lapis) this.enchGiveBack(this.ench.lapis); }
     this.ench = null;
     const ab = $('anvil-pop');
