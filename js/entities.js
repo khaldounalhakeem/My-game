@@ -398,6 +398,7 @@ const VILLAGER_JOBS = {
   armorer: { name: 'Armorer', color: 0x3a3a3a, block: 'blast_furnace', trades: [[[['coal', 15]], ['emerald', 1]], [[['iron_ingot', 4]], ['emerald', 1]], [[['emerald', 5]], ['iron_helmet', 1]], [[['emerald', 9]], ['iron_chestplate', 1]], [[['emerald', 7]], ['iron_leggings', 1]], [[['emerald', 4]], ['iron_boots', 1]], [[['emerald', 18]], ['diamond_chestplate', 1]]] },
   weaponsmith: { name: 'Weaponsmith', color: 0x6a2a2a, block: 'grindstone', trades: [[[['coal', 15]], ['emerald', 1]], [[['iron_ingot', 4]], ['emerald', 1]], [[['emerald', 3]], ['iron_axe', 1]], [[['emerald', 2]], ['iron_sword', 1]], [[['emerald', 13]], ['diamond_sword', 1]], [[['emerald', 16]], ['diamond_axe', 1]]] },
   fletcher: { name: 'Fletcher', color: 0x5a8a3a, block: 'fletching_table', trades: [[[['stick', 32]], ['emerald', 1]], [[['flint', 26]], ['emerald', 1]], [[['string', 14]], ['emerald', 1]], [[['emerald', 1]], ['arrow', 16]], [[['emerald', 2]], ['bow', 1]], [[['emerald', 1]], ['flint', 10]]] },
+  toolsmith: { name: 'Toolsmith', color: 0x2a2a3a, block: 'smithing_table', trades: [[[['coal', 15]], ['emerald', 1]], [[['iron_ingot', 4]], ['emerald', 1]], [[['emerald', 1]], ['stone_axe', 1]], [[['emerald', 1]], ['stone_pickaxe', 1]], [[['emerald', 4]], ['iron_pickaxe', 1]], [[['emerald', 12]], ['diamond_pickaxe', 1]]] },
 };
 const JOB_NAMES = [null, ...Object.keys(VILLAGER_JOBS)];
 

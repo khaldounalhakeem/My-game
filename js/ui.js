@@ -56,7 +56,7 @@ const MC_ORDER = (() => {
   for (const c of colors) o.push('stained_glass_pane_' + c);
   o.push('bed', 'flag');
   o.push('melon', 'pumpkin', 'hay_bale', 'glowstone', 'pumpkin_seeds', 'bamboo', 'sugar_cane');
-  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
+  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'smithing_table', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest');
   o.push('redstone', 'redstone_torch', 'redstone_block', 'repeater', 'redstone_lamp_0', 'iron_door', 'lever', 'stone_button', 'oak_button', 'stone_pressure_plate', 'oak_pressure_plate', 'tnt');
   for (const m of mats) for (const t of ['shovel', 'pickaxe', 'axe', 'hoe']) o.push(m + '_' + t);
   o.push('bucket', 'powder_snow_bucket', 'flint_and_steel', 'lead', 'name_tag', 'boat', 'saddle', 'eye_of_ender');
@@ -714,7 +714,7 @@ const UI = {
   openTrades(v) {
     if (G.state !== 'play') return;
     const job = VILLAGER_JOBS[v.prof];
-    if (!job) { this.message("This villager has no job yet. Put a work block near it: composter (farmer), lectern (librarian), smoker (butcher), blast furnace (armorer), grindstone (weaponsmith) or fletching table (fletcher)."); return; }
+    if (!job) { this.message("This villager has no job yet. Put a work block near it: composter (farmer), lectern (librarian), smoker (butcher), blast furnace (armorer), grindstone (weaponsmith), fletching table (fletcher) or smithing table (toolsmith)."); return; }
     G.sound.play('mob_villager', v.pos);
     let box = $('trade-pop');
     if (!box) {
@@ -871,6 +871,51 @@ const UI = {
     }
   },
 
+  /* ---------- the smithing table: diamond -> netherite, with one netherite ingot (enchantments and names stay) ---------- */
+  openSmithing() {
+    if (G.state !== 'play') return;
+    let box = $('smith-pop');
+    if (!box) {
+      box = document.createElement('div'); box.id = 'smith-pop'; box.className = 'copy-pick';
+      box.innerHTML = '<div class="copy-card trade-card"><h3>Smithing Table</h3><p class="trade-hint smith-hint"></p><div class="ench-items smith-items"></div><button type="button" class="btn trade-close">Close</button></div>';
+      box.addEventListener('pointerdown', e => { if (e.target === box) this.closeTrades(); });
+      box.querySelector('.trade-close').addEventListener('click', () => this.closeTrades());
+      document.body.appendChild(box);
+    }
+    this.renderSmithing();
+    box.hidden = false;
+    G.sound.play('click');
+    G.setState('trade'); G.unlock();
+  },
+  renderSmithing() {
+    const box = $('smith-pop'), list = box.querySelector('.smith-items'), P = G.player, inv = P.inv, ingots = inv.count(ID.netherite_ingot);
+    box.querySelector('.smith-hint').textContent = 'Tap a diamond tool or diamond armor to make it netherite. Each costs 1 netherite ingot (you have ' + ingots + '). Enchantments and names stay.';
+    list.innerHTML = '';
+    let any = false;
+    for (let i = 0; i < 40; i++) {
+      const s = inv.slots[i], k = s && DEFS[s.id].key;
+      if (!k || !/^diamond_(pickaxe|sword|axe|shovel|hoe|helmet|chestplate|leggings|boots)$/.test(k) || ID[k.replace('diamond_', 'netherite_')] === undefined) continue;
+      any = true;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ench-item' + (s.e ? ' glint' : '') + (ingots ? '' : ' dim');
+      const img = document.createElement('img'); img.alt = ''; img.src = iconURL(s.id);
+      const arrow = document.createElement('span'); arrow.textContent = ' \u279c ';
+      const img2 = document.createElement('img'); img2.alt = ''; img2.src = iconURL(ID[k.replace('diamond_', 'netherite_')]);
+      const sp = document.createElement('span'); sp.textContent = slotName(s) + (s.e ? ' (' + enchText(s.e) + ')' : '');
+      b.append(img, arrow, img2, sp);
+      b.addEventListener('click', () => {
+        if (P.mode !== 'creative' && !inv.count(ID.netherite_ingot)) { this.message('You need a netherite ingot. Smelt ancient debris into netherite scrap, then craft 4 scrap and 4 gold ingots into an ingot.'); return; }
+        if (P.mode !== 'creative') inv.remove(ID.netherite_ingot, 1);
+        s.id = ID[k.replace('diamond_', 'netherite_')];
+        inv.changed();
+        G.sound.play('levelup');
+        this.message('Upgraded to ' + slotName(s) + '!', 'gold');
+        this.renderSmithing();
+      });
+      list.appendChild(b);
+    }
+    if (!any) { const p = document.createElement('p'); p.className = 'hint'; p.textContent = 'You have no diamond tools or armor to upgrade.'; list.appendChild(p); }
+  },
+
   /* ---------- the grindstone: takes the enchantments off something (you get a little XP back) ---------- */
   openGrindstone() {
     if (G.state !== 'play') return;
@@ -1025,6 +1070,8 @@ const UI = {
     if (eb) eb.hidden = true;
     const gb = $('grind-pop');
     if (gb) gb.hidden = true;
+    const sb = $('smith-pop');
+    if (sb) sb.hidden = true;
     if (this.ench) { if (this.ench.item) this.enchGiveBack(this.ench.item); if (this.ench.lapis) this.enchGiveBack(this.ench.lapis); }
     this.ench = null;
     const ab = $('anvil-pop');

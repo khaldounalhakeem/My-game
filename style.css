@@ -486,3 +486,5 @@ body.touch:not(.pad) #crosshair { display: none; }
 .ench-offer.empty { min-height: 44px; opacity: .35; }
 .et-inv { display: grid; grid-template-columns: repeat(9, 42px); gap: 4px; justify-content: center; margin: 6px 0 10px; }
 @media (max-width: 480px) { .et-inv { grid-template-columns: repeat(9, 1fr); } .et-slot.small { width: auto; } }
+
+.ench-item.dim { opacity: .55; }

@@ -761,6 +761,7 @@ class Player {
       if (b.id === ID.enchanting_table) { G.ui.openEnchant(b.x, b.y, b.z); return; }
       if (b.id === ID.anvil) { G.ui.openAnvil(b.x, b.y, b.z); return; }
       if (b.id === ID.grindstone) { G.ui.openGrindstone(); return; }
+      if (b.id === ID.smithing_table) { G.ui.openSmithing(); return; }
       if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (DEFS[b.id].base === 'furnace') { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }

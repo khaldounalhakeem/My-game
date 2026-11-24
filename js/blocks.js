@@ -682,6 +682,10 @@ for (const [k, c, hi] of [['off', 0x5a0c0c, 0x7a1a14], ['on', 0xe81e10, 0xff8a6a
 }
 makeTile('i_redstone_lamp', P => { P.fill(0xf0c060, 8); for (let i = 2; i < 14; i += 4) { P.rect(i, 1, 2, 14, 0xfff0b0, 6); P.rect(1, i, 14, 2, 0xfff0b0, 6); } });
 makeTile('i_repeater', pPlant(P => { P.rect(1, 9, 14, 4, 0x9a9a9a); P.rect(1, 9, 14, 1, 0xbdbdbd); P.rect(1, 12, 14, 1, 0x6a6a6a); P.rect(4, 5, 2, 4, 0xe81e10); P.rect(10, 5, 2, 4, 0xe81e10); P.put(4, 5, 0xff8a6a); P.put(10, 5, 0xff8a6a); P.rect(6, 10, 4, 1, 0xa81a10); }));
+/* smithing table */
+makeTile('smithing_top', P => { P.fill(0x3a2a2a, 6); P.rect(0, 0, 16, 2, 0x5a5a62); P.rect(0, 14, 16, 2, 0x5a5a62); P.rect(2, 4, 12, 8, 0x2a1e1e, 4); P.rect(5, 6, 6, 4, 0x6a6a74); });
+makeTile('smithing_side', P => { pPlanks(0x4a3220)(P); P.rect(0, 0, 16, 4, 0x3a2a2a); P.rect(0, 3, 16, 1, 0x6a6a74); P.rect(3, 8, 3, 5, 0x5a5a62); P.rect(10, 8, 3, 5, 0x5a5a62); });
+makeTile('smithing_front', P => { pPlanks(0x4a3220)(P); P.rect(0, 0, 16, 4, 0x3a2a2a); P.rect(0, 3, 16, 1, 0x6a6a74); P.rect(5, 7, 6, 6, 0x2a2a30); P.rect(6, 8, 4, 2, 0x8a8a94); });
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -1039,6 +1043,8 @@ for (const k of TURNABLE) {
     d.faces = b.faces.slice(); d.faces[4] = b.faces[0]; d.faces[fi] = b.faces[4]; d.color = b.color;
   }
 }
+/* smithing table: turns diamond tools and armor into netherite (keeping their enchantments and names) */
+block('smithing_table', 'Smithing Table', { top: 'smithing_top', side: 'smithing_side', front: 'smithing_front', bottom: 'planks_dark_oak' }, { tool: 'axe', hardness: 2.5, job: 'toolsmith' });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1287,15 +1293,6 @@ const RECIPES = [
   ['netherite_scrap', 1, { ancient_debris: 1 }, 'furnace'],
   ['netherite_ingot', 1, { netherite_scrap: 4, gold_ingot: 4 }, 'table'],
   ['netherite_block', 1, { netherite_ingot: 9 }, 'table'], ['netherite_ingot', 9, { netherite_block: 1 }],
-  ['netherite_pickaxe', 1, { diamond_pickaxe: 1, netherite_ingot: 1 }, 'table'],
-  ['netherite_sword', 1, { diamond_sword: 1, netherite_ingot: 1 }, 'table'],
-  ['netherite_axe', 1, { diamond_axe: 1, netherite_ingot: 1 }, 'table'],
-  ['netherite_shovel', 1, { diamond_shovel: 1, netherite_ingot: 1 }, 'table'],
-  ['netherite_hoe', 1, { diamond_hoe: 1, netherite_ingot: 1 }, 'table'],
-  ['netherite_helmet', 1, { diamond_helmet: 1, netherite_ingot: 1 }, 'table'],
-  ['netherite_chestplate', 1, { diamond_chestplate: 1, netherite_ingot: 1 }, 'table'],
-  ['netherite_leggings', 1, { diamond_leggings: 1, netherite_ingot: 1 }, 'table'],
-  ['netherite_boots', 1, { diamond_boots: 1, netherite_ingot: 1 }, 'table'],
   ['jungle_planks', 4, { jungle_log: 1 }], ['dark_oak_planks', 4, { dark_oak_log: 1 }],
   ['dark_oak_stairs', 4, { dark_oak_planks: 6 }, 'table'], ['dark_oak_slab', 6, { dark_oak_planks: 3 }, 'table'], ['cookie', 8, { wheat: 2, cocoa_beans: 1 }],
   ['crimson_planks', 4, { crimson_stem: 1 }], ['warped_planks', 4, { warped_stem: 1 }],
@@ -1351,7 +1348,7 @@ const RECIPES = [
   ['paper', 3, { sugar_cane: 3 }, 'table'], ['book', 1, { paper: 3, leather: 1 }], ['bookshelf', 1, { '#planks': 6, book: 3 }, 'table'],
   ['enchanting_table', 1, { book: 1, diamond: 2, obsidian: 4 }, 'table'],
   ['redstone_torch', 1, { redstone: 1, stick: 1 }], ['redstone_lamp_0', 1, { redstone: 4, glowstone: 1 }, 'table'], ['repeater', 1, { redstone_torch: 2, redstone: 1, stone: 3 }, 'table'],
-  ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
+  ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['smithing_table', 1, { iron_ingot: 2, '#planks': 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
   ['lever', 1, { stick: 1, cobblestone: 1 }], ['stone_button', 1, { stone: 1 }], ['oak_button', 1, { '#planks': 1 }], ['stone_pressure_plate', 1, { stone: 2 }, 'table'], ['oak_pressure_plate', 1, { '#planks': 2 }, 'table'],
   ['bamboo_block', 1, { bamboo: 9 }], ['bamboo_planks', 2, { bamboo_block: 1 }], ['stick', 1, { bamboo: 2 }],
   ...['mangrove', 'cherry'].flatMap(w => { const pk = w + '_planks'; return [[pk, 4, { [w + '_log']: 1 }], [w + '_stairs', 4, { [pk]: 6 }, 'table'], [w + '_slab', 6, { [pk]: 3 }, 'table'], [w + '_door', 3, { [pk]: 6 }, 'table'], [w + '_trapdoor', 2, { [pk]: 6 }, 'table'], [w + '_fence', 3, { [pk]: 4, stick: 2 }, 'table'], [w + '_fence_gate', 1, { [pk]: 2, stick: 4 }, 'table']]; }),
