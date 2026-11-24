@@ -423,7 +423,7 @@ class Player {
     // plants and cactus above lose their support
     const above = W.getBlock(x, y + 1, z);
     const ad = above && DEFS[above];
-    if (ad && (ad.cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
+    if (ad && (ad.cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.repeater || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
     if (id === ID.furnace) G.breakFurnace(x, y, z);
     if (DEFS[id].sign) G.setSign(x, y, z, null);
@@ -544,6 +544,19 @@ class Player {
       if (this.pos.x + this.w / 2 > px + e && this.pos.x - this.w / 2 < px + 1 - e && this.pos.z + this.w / 2 > pz + e && this.pos.z - this.w / 2 < pz + 1 - e && this.pos.y < y0 + 0.5 && this.pos.y + this.h > y0) return true;
       W.setBlock(px, py, pz, ID[k + '_slab_' + half]);
       return done();
+    }
+    if (hd.placesRepeater && b) {
+      // a repeater goes on top of a solid block, pointing the way you face
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz), under = DEFS[W.getBlock(px, py - 1, pz)];
+      if (cur && !DEFS[cur].replaceable) return true;
+      if (!under || !under.solid || under.leaves) { G.ui.message('A repeater goes on top of a solid block.'); this.useCd = 0.3; return true; }
+      const L = this.lookDir(), dir = Math.abs(L.x) > Math.abs(L.z) ? (L.x > 0 ? 'e' : 'w') : (L.z > 0 ? 's' : 'n');
+      W.setBlock(px, py, pz, ID['repeater_' + dir + '_1_0']);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
+      return true;
     }
     if (hd.placesWire && b) {
       // redstone dust goes on top of a solid block
@@ -750,7 +763,7 @@ class Player {
       if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
-      if (DEFS[b.id].lever || DEFS[b.id].button) { this.useCd = 0.3; this.swing = 1; G.useSwitch(b.x, b.y, b.z); return; }
+      if (DEFS[b.id].lever || DEFS[b.id].button || DEFS[b.id].repeater) { this.useCd = 0.3; this.swing = 1; G.useSwitch(b.x, b.y, b.z); return; }
       if (DEFS[b.id].door && DEFS[b.id].door.wood === 'iron') { this.useCd = 0.4; G.ui.message('An iron door only opens with a button, a lever or a pressure plate.'); return; }
       if (DEFS[b.id].door || DEFS[b.id].trapdoor || DEFS[b.id].gate) { this.useCd = 0.3; this.swing = 1; G.toggleDoor(b.x, b.y, b.z); return; }
       if (DEFS[b.id].sign) { this.useCd = 0.3; G.ui.editSign(b.x, b.y, b.z); return; }

@@ -491,13 +491,17 @@ const supportOf = (x, y, z, d) => { const v = SUPPORT[supportDir(d)]; return [x 
 const fullBlock = d => !!(d && d.solid && d.opaque && !d.boxes && !d.box);
 const torchOn = d => !!(d && d.rsTorch && d.rsTorch.on);
 const wireOn = d => !!(d && d.wire && d.wire.on);
-const isDevice = d => !!(d && (d.door || d.trapdoor || d.gate || d.key === 'tnt'));
+const isDevice = d => !!(d && (d.door || d.trapdoor || d.gate || d.key === 'tnt' || d.lamp));
+const REP_DIR = { n: [0, 0, -1], s: [0, 0, 1], w: [-1, 0, 0], e: [1, 0, 0] };
+/* is there a lit repeater at (rx, ry, rz) pointing its front at (x, y, z)? */
+const repInto = (rx, ry, rz, x, y, z) => { const d = rsD(rx, ry, rz); if (!d || !d.repeater || !d.repeater.on) return false; const v = REP_DIR[d.repeater.dir]; return rx + v[0] === x && ry === y && rz + v[2] === z; };
 /* a block with a switch stuck to it, or a lit redstone torch under it: strong power (it feeds dust too) */
 function strongPowered(x, y, z) {
   for (const [a, b, c] of NB6) {
     const nx = x + a, ny = y + b, nz = z + c, d = rsD(nx, ny, nz);
     if (switchOn(d)) { const s = supportOf(nx, ny, nz, d); if (s[0] === x && s[1] === y && s[2] === z) return true; }
     if (b === -1 && torchOn(d)) return true; // a redstone torch powers the block above it
+    if (repInto(nx, ny, nz, x, y, z)) return true; // a repeater pointing into it
   }
   return false;
 }
@@ -525,8 +529,9 @@ function devicePowered(x, y, z) {
     const nx = x + a, ny = y + b, nz = z + c, d = rsD(nx, ny, nz);
     if (!d) continue;
     if (switchOn(d) || wireOn(d) || d.key === 'redstone_block') return true;
+    if (repInto(nx, ny, nz, x, y, z)) return true;
     if (torchOn(d)) { const s = supportOf(nx, ny, nz, d); if (!(s[0] === x && s[1] === y && s[2] === z)) return true; }
-    if (fullBlock(d) && weakPowered(nx, ny, nz)) return true;
+    if (fullBlock(d) && !d.lamp && weakPowered(nx, ny, nz)) return true;
   }
   return false;
 }
@@ -536,6 +541,7 @@ function wireSource(x, y, z) {
     const nx = x + a, ny = y + b, nz = z + c, d = rsD(nx, ny, nz);
     if (!d) continue;
     if (switchOn(d) || torchOn(d) || d.key === 'redstone_block') return true;
+    if (repInto(nx, ny, nz, x, y, z)) return true;
     if (fullBlock(d) && strongPowered(nx, ny, nz)) return true;
   }
   return false;
@@ -565,7 +571,25 @@ function updateWireNet(x, y, z, done) {
 G.rsDirty = new Set();
 G.devPow = new Map();
 G.rsMark = (x, y, z) => { if (G.rsDirty.size < 4000) G.rsDirty.add(x + ',' + y + ',' + z); };
+/* a repeater: what comes in at its back */
+function repeaterInput(x, y, z, d) {
+  const v = REP_DIR[d.repeater.dir], bx = x - v[0], by = y, bz = z - v[2], b = rsD(bx, by, bz);
+  if (!b) return false;
+  if (wireOn(b) || switchOn(b) || torchOn(b) || b.key === 'redstone_block' || repInto(bx, by, bz, x, y, z)) return true;
+  return fullBlock(b) && weakPowered(bx, by, bz);
+}
+G.rsPending = new Map(); // repeaters waiting to switch: key -> [time, wanted]
 G.tickRedstone = () => {
+  if (G.rsPending.size) {
+    const now = performance.now();
+    for (const [k, [at, want]] of G.rsPending) {
+      if (now < at) continue;
+      G.rsPending.delete(k);
+      const [dim, xyz] = k.split(':'); if (dim !== G.dim) continue;
+      const [x, y, z] = xyz.split(',').map(Number), d = rsD(x, y, z);
+      if (d && d.repeater && d.repeater.on !== want) G.world.setBlock(x, y, z, ID['repeater_' + d.repeater.dir + '_' + d.repeater.delay + '_' + (want ? 1 : 0)]);
+    }
+  }
   if (!G.rsDirty.size) return;
   const list = [...G.rsDirty].slice(0, 300);
   for (const k of list) G.rsDirty.delete(k);
@@ -578,7 +602,7 @@ G.tickRedstone = () => {
       seen.add(pk);
       const d = rsD(px, py, pz);
       if (!d) continue;
-      if (d.wire) wires.push([px, py, pz]); else if (d.rsTorch || isDevice(d)) things.push([px, py, pz]);
+      if (d.wire) wires.push([px, py, pz]); else if (d.rsTorch || d.repeater || isDevice(d)) things.push([px, py, pz]);
     }
   }
   const done = new Set();
@@ -593,6 +617,13 @@ G.tickRedstone = () => {
       continue;
     }
     if (d.key === 'tnt') { if (devicePowered(x, y, z)) { W.setBlock(x, y, z, 0); G.primeTNT(x, y, z, 4); } continue; }
+    if (d.lamp) { const p = devicePowered(x, y, z); if (p !== d.lamp.on) W.setBlock(x, y, z, ID['redstone_lamp_' + (p ? 1 : 0)]); continue; }
+    if (d.repeater) {
+      const want = repeaterInput(x, y, z, d), k = G.dim + ':' + x + ',' + y + ',' + z, pend = G.rsPending.get(k);
+      if (want !== d.repeater.on && !(pend && pend[1] === want)) G.rsPending.set(k, [performance.now() + d.repeater.delay * 100 - 20, want]);
+      else if (want === d.repeater.on && pend) G.rsPending.delete(k);
+      continue;
+    }
     if (d.door && d.door.half === 'upper') continue; // a door is looked at from its lower half
     let p = devicePowered(x, y, z);
     if (d.door && !p) p = devicePowered(x, y + 1, z);
@@ -606,6 +637,13 @@ G.tickRedstone = () => {
 /* tap a lever to flip it; tap a button to press it for a moment */
 G.useSwitch = (x, y, z) => {
   const W = G.world, def = DEFS[W.getBlock(x, y, z)];
+  if (def.repeater) {
+    const r = def.repeater, nd = r.delay % 4 + 1;
+    W.setBlock(x, y, z, ID['repeater_' + r.dir + '_' + nd + '_' + (r.on ? 1 : 0)]);
+    Sound.play('click', new THREE.Vector3(x, y, z));
+    G.ui.message('Repeater wait: ' + nd + (nd > 1 ? ' steps' : ' step') + ' (' + (nd / 10) + ' seconds).');
+    return;
+  }
   if (def.lever) {
     const on = !def.lever.on;
     W.setBlock(x, y, z, ID['lever_' + def.lever.d + '_' + (on ? 1 : 0)]);

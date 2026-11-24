@@ -668,6 +668,20 @@ for (const [k, c, hi] of [['off', 0x5a0c0c, 0x7a1a14], ['on', 0xe81e10, 0xff8a6a
 makeTile('i_redstone_torch', pPlant(P => { P.rect(7, 6, 2, 9, 0x8a6a3a); P.rect(6, 2, 4, 4, 0xe81e10); P.rect(7, 3, 2, 2, 0xff8a6a); }));
 makeTile('powder_snow', P => { P.fill(0xf6f9fc, 3); P.speck(0xe4ecf4, 0.2, 3); P.speck(0xffffff, 0.15, 2); });
 makeTile('i_powder_snow_bucket', pPlant(P => { P.rect(3, 4, 10, 10, 0x9a9a9a); P.rect(4, 4, 8, 3, 0xf6f9fc); P.rect(3, 4, 10, 1, 0xbdbdbd); P.rect(4, 13, 8, 1, 0x6a6a6a); P.line(3, 4, 8, 1, 0x7a7a7a); P.line(12, 4, 8, 1, 0x7a7a7a); }));
+/* redstone lamp and repeater */
+makeTile('rs_lamp_off', P => { P.fill(0x5a3a22, 6); for (let i = 2; i < 14; i += 4) { P.rect(i, 1, 2, 14, 0x7a4e2e, 6); P.rect(1, i, 14, 2, 0x7a4e2e, 6); } P.rect(0, 0, 16, 1, 0x3a2414); P.rect(0, 15, 16, 1, 0x3a2414); P.rect(0, 0, 1, 16, 0x3a2414); P.rect(15, 0, 1, 16, 0x3a2414); });
+makeTile('rs_lamp_on', P => { P.fill(0xf0c060, 8); for (let i = 2; i < 14; i += 4) { P.rect(i, 1, 2, 14, 0xfff0b0, 6); P.rect(1, i, 14, 2, 0xfff0b0, 6); } P.rect(0, 0, 16, 1, 0x9a6a30); P.rect(0, 15, 16, 1, 0x9a6a30); P.rect(0, 0, 1, 16, 0x9a6a30); P.rect(15, 0, 1, 16, 0x9a6a30); });
+for (const [k, c, hi] of [['off', 0x5a0c0c, 0x7a1a14], ['on', 0xe81e10, 0xff8a6a]]) {
+  makeTile('rep_side_' + k, P => { P.clear(); P.rect(0, 0, 16, 16, c); P.rect(0, 5, 16, 1, hi); P.rect(0, 10, 16, 1, hi); P.rect(0, 0, 16, 2, 0x8a8a8a); P.rect(0, 14, 16, 2, 0x8a8a8a); });
+  // the top, with an arrow pointing to where the power comes out (one picture for each way it faces)
+  for (const dir of ['n', 's', 'w', 'e']) makeTile('rep_top_' + dir + '_' + k, P => {
+    P.fill(0x9a9a9a, 4); P.rect(0, 0, 16, 1, 0x7a7a7a); P.rect(0, 15, 16, 1, 0x7a7a7a); P.rect(0, 0, 1, 16, 0x7a7a7a); P.rect(15, 0, 1, 16, 0x7a7a7a);
+    const pts = []; for (let i = 0; i < 10; i++) pts.push([7, 3 + i], [8, 3 + i]); for (let i = 0; i < 4; i++) { pts.push([7 - i, 3 + i], [8 + i, 3 + i]); }
+    for (const [x, y] of pts) { const [u, v] = dir === 'n' ? [x, y] : dir === 's' ? [15 - x, 15 - y] : dir === 'w' ? [y, 15 - x] : [15 - y, x]; P.put(u, v, c); }
+  });
+}
+makeTile('i_redstone_lamp', P => { P.fill(0xf0c060, 8); for (let i = 2; i < 14; i += 4) { P.rect(i, 1, 2, 14, 0xfff0b0, 6); P.rect(1, i, 14, 2, 0xfff0b0, 6); } });
+makeTile('i_repeater', pPlant(P => { P.rect(1, 9, 14, 4, 0x9a9a9a); P.rect(1, 9, 14, 1, 0xbdbdbd); P.rect(1, 12, 14, 1, 0x6a6a6a); P.rect(4, 5, 2, 4, 0xe81e10); P.rect(10, 5, 2, 4, 0xe81e10); P.put(4, 5, 0xff8a6a); P.put(10, 5, 0xff8a6a); P.rect(6, 10, 4, 1, 0xa81a10); }));
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -1003,6 +1017,17 @@ for (const d of ['d', 'n', 's', 'w', 'e']) for (const on of [0, 1]) {
 }
 /* powder snow: looks like snow, but you sink into it and slowly freeze. Take it with a bucket. */
 block('powder_snow', 'Powder Snow', 'powder_snow', { tool: 'shovel', hardness: 0.25, solid: false, opaque: false, drop: null, powderSnow: true });
+/* redstone lamp: lights up bright while it has power */
+block('redstone_lamp_0', 'Redstone Lamp', 'rs_lamp_off', { hardness: 0.3, drop: 'redstone_lamp_0', lamp: { on: false } });
+block('redstone_lamp_1', 'Redstone Lamp', 'rs_lamp_on', { hardness: 0.3, drop: 'redstone_lamp_0', lamp: { on: true }, light: true, emit: 15 });
+/* repeater: power goes in at the back and comes out at the front (the way the arrow points), full strength,
+   after a short wait (tap it for 1 to 4 steps of 0.1 seconds) */
+for (const dir of ['n', 's', 'w', 'e']) for (let delay = 1; delay <= 4; delay++) for (const on of [0, 1]) {
+  const back = [[0.5, 0.625], [0.625, 0.75], [0.75, 0.875], [0.8125, 0.9375]][delay - 1];
+  const bxs = [[0, 0, 0, 1, 0.125, 1], [0.4375, 0.125, 0.1875, 0.5625, 0.4375, 0.3125], [0.4375, 0.125, back[0], 0.5625, 0.4375, back[1]]].map(b => SWITCH_ROT(b, dir));
+  const k = on ? 'on' : 'off';
+  block('repeater_' + dir + '_' + delay + '_' + on, 'Redstone Repeater', { side: 'rep_side_' + k, top: 'rep_top_' + dir + '_' + k, bottom: 'stone' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0, 0, 0, 1, 0.4375, 1], boxes: bxs, drop: 'repeater', repeater: { dir, delay, on: !!on }, iconTile: 'i_repeater' });
+}
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1140,6 +1165,7 @@ item('enchanted_book', 'Enchanted Book', 'enchanted_book', { stack: 1 });
 item('iron_door', 'Iron Door', 'iron_door', { placesDoor: 'iron' });
 item('redstone_torch', 'Redstone Torch', 'redstone_torch', { placesSwitch: 'redstone_torch' });
 item('powder_snow_bucket', 'Powder Snow Bucket', 'powder_snow_bucket', { stack: 1 });
+item('repeater', 'Redstone Repeater', 'repeater', { placesRepeater: true });
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
 
 function getDrops(def, rng) {
@@ -1313,7 +1339,7 @@ const RECIPES = [
   ['acacia_door', 3, { acacia_planks: 6 }, 'table'], ['acacia_trapdoor', 2, { acacia_planks: 6 }, 'table'], ['acacia_fence', 3, { acacia_planks: 4, stick: 2 }, 'table'], ['acacia_fence_gate', 1, { acacia_planks: 2, stick: 4 }, 'table'],
   ['paper', 3, { sugar_cane: 3 }, 'table'], ['book', 1, { paper: 3, leather: 1 }], ['bookshelf', 1, { '#planks': 6, book: 3 }, 'table'],
   ['enchanting_table', 1, { book: 1, diamond: 2, obsidian: 4 }, 'table'],
-  ['redstone_torch', 1, { redstone: 1, stick: 1 }],
+  ['redstone_torch', 1, { redstone: 1, stick: 1 }], ['redstone_lamp_0', 1, { redstone: 4, glowstone: 1 }, 'table'], ['repeater', 1, { redstone_torch: 2, redstone: 1, stone: 3 }, 'table'],
   ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
   ['lever', 1, { stick: 1, cobblestone: 1 }], ['stone_button', 1, { stone: 1 }], ['oak_button', 1, { '#planks': 1 }], ['stone_pressure_plate', 1, { stone: 2 }, 'table'], ['oak_pressure_plate', 1, { '#planks': 2 }, 'table'],
   ['bamboo_block', 1, { bamboo: 9 }], ['bamboo_planks', 2, { bamboo_block: 1 }], ['stick', 1, { bamboo: 2 }],
