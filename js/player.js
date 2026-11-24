@@ -18,6 +18,12 @@ class Inventory {
     this.changed();
     return count;
   }
+  /* is there room for this item (an empty slot, or a stack it can join)? */
+  hasRoom(id, e, n) {
+    const max = DEFS[id].stack || 64;
+    for (let i = 0; i < 36; i++) { const s = this.slots[i]; if (!s || (!e && s.id === id && !s.e && (s.n || '') === (n || '') && s.count < max)) return true; }
+    return false;
+  }
   count(id) { let n = 0; for (let i = 0; i < 36; i++) { const s = this.slots[i]; if (s && s.id === id) n += s.count; } return n; }
   armorPoints() { let n = 0; for (let i = 36; i < 40; i++) { const s = this.slots[i]; if (s && DEFS[s.id].armor) n += DEFS[s.id].armor.points; } return n; }
   /* diamond and netherite armor are tougher: they hold up better against big hits */
@@ -704,6 +710,7 @@ class Player {
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (b.id === ID.furnace) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
       if (DEFS[b.id].lever || DEFS[b.id].button) { this.useCd = 0.3; this.swing = 1; G.useSwitch(b.x, b.y, b.z); return; }
+      if (DEFS[b.id].door && DEFS[b.id].door.wood === 'iron') { this.useCd = 0.4; G.ui.message('An iron door only opens with a button, a lever or a pressure plate.'); return; }
       if (DEFS[b.id].door || DEFS[b.id].trapdoor || DEFS[b.id].gate) { this.useCd = 0.3; this.swing = 1; G.toggleDoor(b.x, b.y, b.z); return; }
       if (DEFS[b.id].sign) { this.useCd = 0.3; G.ui.editSign(b.x, b.y, b.z); return; }
       if (b.id === ID.end_portal_frame && hd && hd.key === 'eye_of_ender') {

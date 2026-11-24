@@ -444,7 +444,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v60 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v61 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -489,6 +489,7 @@ const Net = {
       parts.legs[0].rotation.x = sw; parts.legs[1].rotation.x = -sw;
       parts.arms[0].rotation.x = -sw; parts.arms[1].rotation.x = sw - Math.sin((rp.swing || 0) * Math.PI) * 1.4;
       parts.head.rotation.x = -rp.pitch * 0.8;
+      setHeldItem(rp.model, rp.held);
       rp.flashT = (rp.flashT || 0) - dt;
       const red = rp.flashT > 0 ? 0.6 : 0;
       if (rp.red !== red) { rp.red = red; for (const m of rp.mats) m.emissive.setRGB(red, 0, 0); }

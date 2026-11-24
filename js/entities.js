@@ -19,6 +19,18 @@ function addBox(parent, w, h, d, mat, x, y, z) {
   parent.add(m);
   return m;
 }
+/* what a player holds: shown in the right hand of their character (other players see it too) */
+function setHeldItem(model, id) {
+  if (!model || model.heldId === id) return;
+  model.heldId = id;
+  const arm = model.parts.arms[1];
+  if (model.heldMesh) { arm.remove(model.heldMesh); model.heldMesh = null; }
+  if (!id || !DEFS[id]) return;
+  const geo = itemGeometry(id), m = new THREE.Mesh(geo, G.mats.item), flat = geo.userData.flat;
+  if (flat) { m.scale.setScalar(0.8); m.position.set(0.04, -0.66, 0.3); m.rotation.set(-0.5, -Math.PI / 2 + 0.6, 0); }
+  else { m.scale.setScalar(0.3); m.position.set(0, -0.72, 0.1); }
+  arm.add(m); model.heldMesh = m;
+}
 function limb(parent, w, h, d, mat, px, py, pz, oy) {
   const g = new THREE.Group();
   g.position.set(px, py, pz);
@@ -1466,7 +1478,8 @@ class ItemDrop {
     this.mesh.position.set(this.pos.x, this.pos.y + 0.25 + Math.sin(this.age * 3) * 0.06, this.pos.z);
     this.mesh.rotation.y = this.age * 1.6;
     const P = G.player;
-    if (!P.dead && this.age > this.pickDelay) {
+    // with a full inventory, items stay where they are instead of following you around
+    if (!P.dead && this.age > this.pickDelay && P.inv.hasRoom(this.id, this.e, this.n)) {
       const dx = P.pos.x - this.pos.x, dy = (P.pos.y + 0.8) - this.pos.y, dz = P.pos.z - this.pos.z;
       const d = Math.hypot(dx, dy, dz);
       if (d < 1.6) {

@@ -1980,6 +1980,7 @@ function frame(now) {
     const dist = hit && DEFS[hit.id].solid ? Math.max(0.3, hit.dist - 0.3) : 4;
     G.camera.position.set(eye.x + d.x * back * dist, eye.y + d.y * back * dist, eye.z + d.z * back * dist);
     G.camera.lookAt(eye);
+    setHeldItem(G.playerModel, P.heldSlot() ? P.heldSlot().id : 0);
     const pmg = G.playerModel.group, parts = G.playerModel.parts;
     pmg.position.set(P.pos.x, P.pos.y, P.pos.z);
     pmg.rotation.y = P.yaw + Math.PI;
