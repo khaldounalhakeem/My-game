@@ -1302,6 +1302,7 @@ const RECIPES = [
   ['iron_leggings', 1, { iron_ingot: 7 }, 'table'],
   ['iron_boots', 1, { iron_ingot: 4 }, 'table'],
   ['netherite_scrap', 1, { ancient_debris: 1 }, 'furnace'],
+  ['netherite_ingot', 1, { netherite_scrap: 1 }, 'furnace'], // easier than Minecraft: smelt the scrap again for an ingot
   ['netherite_ingot', 1, { netherite_scrap: 4, gold_ingot: 4 }, 'table'],
   ['netherite_block', 1, { netherite_ingot: 9 }, 'table'], ['netherite_ingot', 9, { netherite_block: 1 }],
   ['jungle_planks', 4, { jungle_log: 1 }], ['dark_oak_planks', 4, { dark_oak_log: 1 }],
