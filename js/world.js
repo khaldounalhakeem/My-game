@@ -147,6 +147,7 @@ class World {
     const lx = x & 15, lz = z & 15, i = lx + (lz << 4) + (y << 8);
     const old = c.data[i];
     c.data[i] = id;
+    if (id && c.top !== undefined && y > c.top) c.top = y;
     // a torch or lantern came or went: the light it gives reaches into the chunks around
     if ((DEFS[old] && DEFS[old].emit) || (DEFS[id] && DEFS[id].emit)) {
       c.emit = null;
@@ -285,9 +286,30 @@ class World {
 
   markUrgent(cx, cz) { const c = this.chunks.get(this.key(cx, cz)); if (c && c.meshes.length) this.urgent.add(c); }
 
+  /* the highest y with anything in this chunk (remembered, so looking for the ground doesn't start at the sky) */
+  chunkTop(c) {
+    if (c.top === undefined) {
+      const d = c.data;
+      let top = WH - 1;
+      while (top > 0) { const b = top << 8; let any = false; for (let i = 0; i < 256; i++) if (d[b + i]) { any = true; break; } if (any) break; top--; }
+      c.top = top;
+    }
+    return c.top;
+  }
+
   surfaceY(x, z) {
     x = Math.floor(x); z = Math.floor(z);
     if (!this.isLoaded(x, z)) return Math.max(this.heightAt(x, z), SEA);
+    const c = this.chunks.get(this.key(x >> 4, z >> 4)), lx = x & 15, lz = z & 15, d = c.data;
+    for (let y = this.chunkTop(c); y > 0; y--) {
+      const id = d[lx + (lz << 4) + (y << 8)];
+      if (id && (DEFS[id].solid || DEFS[id].liquid)) return y;
+    }
+    return 0;
+  }
+
+  surfaceYSlow(x, z) {
+    x = Math.floor(x); z = Math.floor(z);
     for (let y = WH - 1; y > 0; y--) {
       const id = this.getBlock(x, y, z);
       if (id && (DEFS[id].solid || DEFS[id].liquid)) return y;
@@ -297,7 +319,8 @@ class World {
 
   skyExposed(x, y, z) {
     x = Math.floor(x); z = Math.floor(z);
-    for (let yy = Math.floor(y) + 1; yy < WH; yy++) {
+    const sc = this.chunks.get(this.key(x >> 4, z >> 4)), stop = sc ? this.chunkTop(sc) + 1 : WH;
+    for (let yy = Math.floor(y) + 1; yy < stop; yy++) {
       const id = this.getBlock(x, yy, z);
       if (id && DEFS[id].opaque) return false;
     }
@@ -951,8 +974,7 @@ class World {
     }
     const data = c.data;
     // only look as high as something is built (most chunks are empty above the land)
-    let top = WH - 1;
-    while (top > 0) { let any = false; const b = top << 8; for (let i = 0; i < 256; i++) if (data[b + i]) { any = true; break; } if (any) break; top--; }
+    const top = this.chunkTop(c);
     for (let y = 0; y <= top; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const id = data[x + (z << 4) + (y << 8)];
       if (!id) continue;

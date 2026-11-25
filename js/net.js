@@ -373,7 +373,7 @@ const Net = {
         mh: this.mobHits, rq: this.askRing, gv: this.giveRing, gm: this.giveMobRing,
         ws: this.wsInfo || null,
         rd: P.riding && P.riding.nid ? [P.riding.nid, P.seat || 0] : null,
-        oc: G.ui.chest && !G.ui.chest.mob ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
+        oc: G.ui.chest && !G.ui.chest.mob && !G.ui.chest.ender ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
         mb: null, dr: null, pk: null, sg: null, fu: null, cs: null,
       });
       // the bigger lists (mobs, items on the ground, signs, furnaces, chests) take turns in the space left: the
@@ -469,7 +469,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v72 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v73 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -983,7 +983,7 @@ const Net = {
       }
     }
     // both opened the same chest at the same moment: the one with the smaller id keeps it
-    if (rp.openChest && G.ui.chest && rp.openChest === G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) && this.uid > rp.peer) {
+    if (rp.openChest && G.ui.chest && !G.ui.chest.ender && rp.openChest === G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) && this.uid > rp.peer) {
       G.ui.closeInventory();
       G.ui.message((rp.name || 'Your friend') + ' opened this chest first.', 'purple');
     }

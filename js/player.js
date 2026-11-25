@@ -770,6 +770,7 @@ class Player {
       if (b.id === ID.smithing_table) { G.ui.openSmithing(); return; }
       if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
+      if (b.id === ID.ender_chest) { this.useCd = 0.5; this.swing = 1; G.openEnderChest(b.x, b.y, b.z); return; }
       if (DEFS[b.id].base === 'furnace') { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
       if (DEFS[b.id].beacon) { this.useCd = 0.4; G.ui.openBeacon(b.x, b.y, b.z); return; }
       if (DEFS[b.id].lever || DEFS[b.id].button || DEFS[b.id].repeater) { this.useCd = 0.3; this.swing = 1; G.useSwitch(b.x, b.y, b.z); return; }

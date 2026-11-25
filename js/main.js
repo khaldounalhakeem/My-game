@@ -1025,6 +1025,12 @@ G.chestChanged = (k) => {
   G.chestVer[k] = (G.chestVer[k] || 0) + 1;
   Net.chestChanged(k);
 };
+/* an ender chest: the same private chest everywhere (for this player, in this world) */
+G.openEnderChest = (x, y, z) => {
+  if (!Array.isArray(G.enderChest) || G.enderChest.length !== 27) G.enderChest = new Array(27).fill(null);
+  G.sound.play('click');
+  G.ui.openInventory('chest', { slots: G.enderChest, ender: true, x, y, z });
+};
 G.openChest = (x, y, z) => {
   const W = G.world, id = W.getBlock(x, y, z), key = chestKey(x, y, z);
   // one player at a time, so nobody can take the same item twice
@@ -1715,7 +1721,7 @@ G.startNew = (mode, name) => {
   G.worldName = (name || '').trim() || 'New World';
   G.adoptName = G.ui.fromMultiplayer && !(Net.friendWorldName && Net.friendWorldName(seedNow));
   makeWorld(txt ? seedFromText(txt) : G.seed);
-  P.inv = new Inventory(); P.reset(); P.mode = mode; P.sel = 0;
+  P.inv = new Inventory(); P.reset(); P.mode = mode; P.sel = 0; G.enderChest = null;
   G.setDifficulty(G.pickedDifficulty(), true);
   const [sx, sz] = findSpawn(G.world);
   loadAround(sx, sz, 2);
@@ -1806,6 +1812,7 @@ G.continueSaved = async (id) => {
   G.netherVisited = !!s.netherVisited;
   if (s.dim === 'nether' || s.dim === 'end') useDim(s.dim); else restoreDrops('overworld');
   G.chests = s.chests || {};
+  G.enderChest = Array.isArray(s.enderChest) ? new Array(27).fill(null).map((_, i) => slotFromArr(s.enderChest[i])) : null;
   G.findFires();
   G.signs = s.signs || {};
   G.crops = s.crops || {};
@@ -1876,7 +1883,7 @@ G.save = (opts) => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, enderChest: G.enderChest ? slotsJSON(G.enderChest) : null, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   let ok = true;
   G.lastSaveText = JSON.stringify(data);
