@@ -207,7 +207,9 @@ function makeMultiRoom(rooms, me) {
         const pr = p.presence || {};
         const id = typeof pr.u === 'string' ? pr.u : p.peer;
         if (id === me) continue;
-        if (!out.has(id) || (pr.p && !(out.get(id).presence || {}).p)) out.set(id, { peer: id, sameTab: false, isMe: false, kind: 'viewer', presence: pr });
+        // the same friend through both connections: keep their newest message
+        const was = out.get(id), wp = was && (was.presence || {});
+        if (!was || (pr.p && !wp.p) || (pr.p && wp.p && (+pr.ts || 0) > (+wp.ts || 0))) out.set(id, { peer: id, sameTab: false, isMe: false, kind: 'viewer', presence: pr });
       }
     });
     return [...out.values(), { peer: me, sameTab: true, isMe: true, kind: 'viewer', presence: {} }];
@@ -362,27 +364,50 @@ const Net = {
       // shared time of day: what time it is here, when we joined, and when someone last changed it
       base.tm = Math.round(G.time * 100000) / 100000; base.tj = this.joinedAt || now; base.te = G.timeEventAt || 0;
       base.tr = this.trail.map(s => [s[0] - now, s[1], s[2], s[3], s[4]]);
+      // what always goes out: where you are and what you just did (block changes, hits...)
       Object.assign(base, {
         m: P.mode === 'creative' ? 1 : 0, d: dimCode(G.dim), p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
         s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
         sl: P.sleeping ? 1 : 0, sb: P.sleeping ? [P.sleeping.x, P.sleeping.y, P.sleeping.z] : null,
-        sg: this.slim ? null : this.signRing,
         ar: [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0)), ex: this.blasts,
-        mb: this.slim ? null : this.ownedMobs(), mh: this.mobHits, dr: this.slim ? null : this.dropRing, pk: this.slim ? null : this.pickRing,
-        rq: this.slim ? null : this.askRing, gv: this.slim ? null : this.giveRing,
-        gm: this.slim ? null : this.giveMobRing,
+        mh: this.mobHits, rq: this.askRing, gv: this.giveRing, gm: this.giveMobRing,
         ws: this.wsInfo || null,
         rd: P.riding && P.riding.nid ? [P.riding.nid, P.seat || 0] : null,
-        fu: this.slim ? null : this.furnRing,
-        cs: this.slim ? null : this.chestRing, oc: G.ui.chest && !G.ui.chest.mob ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
+        oc: G.ui.chest && !G.ui.chest.mob ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
+        mb: null, dr: null, pk: null, sg: null, fu: null, cs: null,
       });
+      // the bigger lists (mobs, items on the ground, signs, furnaces, chests) take turns in the space left: the
+      // claude.ai room refuses anything over 4 KB, and a refused message would hold up everything else
+      const LIMIT = 3600, groups = [['mb', () => this.ownedMobs()], ['dr', () => this.dropRing, 'pk', () => this.pickRing], ['cs', () => this.chestRing], ['fu', () => this.furnRing], ['sg', () => this.signRing]];
+      let size = JSON.stringify(base).length;
+      this.rot = ((this.rot || 0) + 1) % groups.length;
+      for (let i = 0; i < groups.length; i++) {
+        const g = groups[(this.rot + i) % groups.length], add = {};
+        for (let k = 0; k < g.length; k += 2) add[g[k]] = g[k + 1]();
+        const extra = JSON.stringify(add).length;
+        if (size + extra <= LIMIT) { Object.assign(base, add); size += extra; continue; }
+        // too big together: the newest changes that fit go now, the rest next time (not mobs: those go all at once)
+        if (g[0] === 'mb') continue;
+        this.partAt = this.partAt || {};
+        for (let k = 0; k < g.length; k += 2) {
+          const key = g[k], list = add[key];
+          if (!Array.isArray(list) || !list.length) continue;
+          // a different part of the list each time, so every entry gets its turn
+          const start = (this.partAt[key] || 0) % list.length, part = [];
+          for (let j = 0; j < list.length; j++) {
+            const e = list[(start + j) % list.length], len = JSON.stringify(e).length + 1;
+            if (size + len + 8 > LIMIT) break;
+            part.push(e); size += len;
+          }
+          if (part.length) { base[key] = part; size += 8; this.partAt[key] = start + part.length; }
+        }
+      }
     } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null, ws: null, rd: null, fu: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
     }, e => {
       const code = (e && e.code) || 'error';
-      if (code === 'invalid_argument') this.slim = true; // too big for this connection: leave out the shared world
       if (code === 'invalid_argument' && this.ringMax > 4) {
         // too big for the platform: share fewer recent block changes
         this.ringMax = Math.max(4, this.ringMax >> 1);
@@ -444,7 +469,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v71 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v72 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -463,7 +488,7 @@ const Net = {
   tick(dt) {
     if (!this.room || this.status !== 'on' || !this.world) return;
     this.sendT -= dt;
-    if (this.sendT <= 0) { this.sendT = 0.1; this.announce(); }
+    if (this.sendT <= 0) { this.sendT = 0.05; this.announce(); } // twenty times a second
     this.shareTick();
     this.diagT = (this.diagT || 0) - dt;
     if (this.diagT <= 0) { this.diagT = 1; this.render(); }
