@@ -110,7 +110,7 @@ class Player {
     this.health -= amount; this.hurtCd = 0.5;
     G.ui.damagePopup(amount, this.deathCause);
     G.ui.hurtFlash();
-    G.sound.play('hurt');
+    G.sound.play(/lava|fire|burn|flame|magma/i.test(cause || '') ? 'hurtFire' : 'hurt');
     if (from && kb) {
       const dx = this.pos.x - from.x, dz = this.pos.z - from.z, l = Math.hypot(dx, dz) || 1;
       this.vel.x += dx / l * kb; this.vel.z += dz / l * kb; this.vel.y = Math.max(this.vel.y, 5);

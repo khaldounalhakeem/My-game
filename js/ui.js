@@ -656,7 +656,7 @@ const UI = {
     const cur = this.cursor;
     if (!cur) return;
     const n = one ? 1 : cur.count, P = G.player, d = P.lookDir(), o = P.eyePos();
-    const drop = G.spawnDrop(cur.id, n, o.x + d.x * 0.6, o.y - 0.3, o.z + d.z * 0.6, d.clone().multiplyScalar(6).setY(d.y * 6 + 2));
+    const drop = G.spawnDrop(cur.id, n, o.x + d.x * 0.6, o.y - 0.3, o.z + d.z * 0.6, d.clone().multiplyScalar(6).setY(d.y * 6 + 2), slotExtras(cur));
     drop.pickDelay = 1.5;
     cur.count -= n;
     if (cur.count <= 0) this.cursor = null;

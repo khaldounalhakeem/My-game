@@ -101,7 +101,7 @@ const Sound = {
   },
   /* the sound of a block: 'break' when it breaks, 'hit' while you dig at it, 'place' and 'step' */
   blockSound(g, kind, v) {
-    const L = kind === 'break' ? 1 : kind === 'place' ? 0.85 : kind === 'hit' ? 0.5 : 0.42, r = Math.random, br = kind === 'break';
+    const L = kind === 'break' ? 1 : kind === 'place' ? 0.85 : kind === 'hit' ? 0.5 : 0.3, r = Math.random, br = kind === 'break';
     const vv = v * L, n = br ? 4 : kind === 'step' ? 2 : 3, sp = br ? 0.022 : 0.016;
     switch (g) {
       case 'stone': // a dry crack: a few sharp grains and a short knock
@@ -114,7 +114,7 @@ const Sound = {
       case 'gravel': for (let i = 0; i < n * 2; i++) this.grain(i * 0.014 + r() * 0.01, 0.025 + r() * 0.02, (0.8 - i * 0.06) * vv, 900 + r() * 2600, 1.1); break;
       case 'mud': this.grain(0, 0.14, 0.9 * vv, 380 + r() * 100, 1.5, 'lowpass', 0.01); this.grain(0.04, 0.08, 0.4 * vv, 700, 2); break;
       case 'grass': // a soft rustle
-        for (let i = 0; i < n; i++) this.grain(i * 0.03 + r() * 0.015, 0.06 + r() * 0.05, (0.55 - i * 0.08) * vv, 2500 + r() * 3000, 0.8, 'bandpass', 0.012); break;
+        for (let i = 0; i < n; i++) this.grain(i * 0.03 + r() * 0.015, 0.05 + r() * 0.04, (0.55 - i * 0.08) * vv, 1300 + r() * 1500, 0.9, 'bandpass', 0.008); break;
       case 'sand': for (let i = 0; i < n; i++) this.grain(i * 0.035, 0.09 + r() * 0.05, 0.5 * vv, 1800 + r() * 1500, 0.6, 'bandpass', 0.02); break;
       case 'soul': this.grain(0, 0.25, 0.7 * vv, 600, 0.8, 'lowpass', 0.03); this.grain(0.05, 0.2, 0.25 * vv, 1400 + r() * 400, 4, 'bandpass', 0.04); break;
       case 'snow': for (let i = 0; i < n; i++) this.grain(i * 0.03, 0.05, 0.55 * vv, 3000 + r() * 2500, 2, 'bandpass', 0.006); break;
@@ -151,7 +151,8 @@ const Sound = {
       case 'place': this.blockSound(this.group(mat || (G.player && G.player.heldDef && G.player.heldDef()) || null), 'place', v); break;
       case 'step': this.blockSound(this.group(mat), 'step', v); break;
       case 'land': this.grain(0, 0.1, 0.8, 250, 1, 'lowpass', 0.005); break;
-      case 'hurt': this.grain(0, 0.06, 0.8, 300, 1, 'lowpass'); this.voice(0, 0.2, 0.5, 210, 150, [[500, 5, 4], [950, 2.5, 5]], { attack: 0.01, breath: 0.4 }); break; // "oof"
+      case 'hurt': this.grain(0, 0.05, 0.7, 900, 1.2); this.voice(0, 0.12, 0.35, 330, 260, [[750, 5, 5], [1300, 3, 6]], { attack: 0.004 }); break; // a short "oof"
+      case 'hurtFire': this.grain(0, 0.35, 0.6, 5000, 0.8, 'highpass', 0.01); this.grain(0.02, 0.25, 0.35, 2500, 1, 'bandpass', 0.02); this.voice(0, 0.1, 0.25, 340, 280, [[750, 5, 5], [1300, 3, 6]], { attack: 0.004 }); break; // a sizzle
       case 'hurtMob': this.grain(0, 0.07, 1.6 * v, 300, 1, 'lowpass', 0.002); this.grain(0, 0.03, 0.4 * v, 1500, 1.5); break; // the thump of a hit
       case 'deathMob': this.grain(0, 0.3, 0.5 * v, 600, 1, 'lowpass', 0.01); break;
       case 'pickup': this.tone(900 + Math.random() * 500, 0.08, 'sine', 0.3, 1800); break; // the little "pop"
@@ -178,24 +179,24 @@ const Sound = {
       case 'mob_enderman': this.voice(0, 0.6, 0.35 * v, 140, 90, [[400, 4, 3], [1600, 2, 6]], { vib: 0.15, vibRate: 11, ff: 1.8 }); break;
       case 'mob_pig': this.voice(0, 0.13, 0.5 * v, 170, 140, [[700, 4, 4], [1500, 2.5, 5]], { breath: 0.6, attack: 0.01 }); this.voice(0.17, 0.11, 0.45 * v, 175, 140, [[700, 4, 4], [1500, 2.5, 5]], { breath: 0.6, attack: 0.01 }); break; // oink
       case 'mob_cow': this.voice(0, 1.0, 0.5 * v, 125, 105, [[300, 5, 5], [700, 2, 5]], { mid: 135, ff: 1.6, attack: 0.15, vib: 0.02 }); break; // moo
-      case 'mob_sheep': this.voice(0, 0.6, 0.4 * v, 300, 270, [[750, 4, 4], [1250, 3, 5]], { trem: 22, attack: 0.03 }); break; // baa
+      case 'mob_sheep': this.voice(0, 0.6, 0.4 * v, 300, 270, [[750, 4, 4], [1250, 3, 5]], { trem: 8, attack: 0.03 }); break; // baa
       case 'mob_chicken': for (let i = 0; i < 2; i++) this.voice(i * 0.12, 0.07, 0.6 * v, 750, 600, [[1100, 3, 4], [2400, 2, 6]], { attack: 0.005 }); break;
       // every other mob's own voice
-      case 'mob_bee': this.tone(220, 0.9, 'sawtooth', 0.05 * v, 235); this.tone(440, 0.9, 'square', 0.015 * v, 470); break;
+      case 'mob_bee': if (v > 0.6) { this.tone(230, 0.5, 'triangle', 0.025 * v, 240); this.tone(460, 0.5, 'sine', 0.008 * v, 470); } break; // a soft hum, only up close
       case 'mob_wolf': this.voice(0, 0.14, 0.5 * v, 430, 300, [[800, 4, 3], [1700, 2, 5]], { breath: 0.8, attack: 0.008 }); this.voice(0.2, 0.12, 0.45 * v, 420, 300, [[800, 4, 3], [1700, 2, 5]], { breath: 0.8, attack: 0.008 }); break; // woof
       case 'mob_cat': this.voice(0, 0.55, 0.35 * v, 480, 420, [[600, 3, 4], [1800, 3, 6]], { mid: 760, ff: 0.6, attack: 0.05 }); break; // meow
       case 'mob_ocelot': this.tone(800, 0.3, 'triangle', 0.05 * v, 1100); break;
-      case 'mob_horse': case 'mob_donkey': case 'mob_mule': this.voice(0, 0.7, 0.3 * v, 420, 240, [[700, 3, 4], [1500, 2, 5]], { trem: 14, vib: 0.08, vibRate: 14, breath: 0.4 }); break;
+      case 'mob_horse': case 'mob_donkey': case 'mob_mule': this.voice(0, 0.7, 0.3 * v, 420, 240, [[700, 3, 4], [1500, 2, 5]], { trem: 9, vib: 0.05, vibRate: 9, breath: 0.4 }); break;
       case 'mob_panda': this.voice(0, 0.3, 0.35 * v, 260, 220, [[500, 4, 4], [1100, 2, 5]], { breath: 0.4 }); break;
       case 'mob_fox': this.voice(0, 0.15, 0.3 * v, 800, 550, [[1200, 3, 4], [2600, 2, 6]], { breath: 0.4 }); this.voice(0.22, 0.12, 0.25 * v, 820, 600, [[1200, 3, 4], [2600, 2, 6]], { breath: 0.4 }); break;
       case 'mob_rabbit': this.noise(0.08, 0.15 * v, 3000, 'bandpass'); break;
-      case 'mob_goat': this.voice(0, 0.6, 0.35 * v, 380, 330, [[700, 4, 4], [1300, 3, 5]], { trem: 18 }); break;
-      case 'mob_frog': this.tone(150, 0.12, 'square', 0.09 * v, 110); this.tone(180, 0.12, 'square', 0.08 * v, 120, 0.18); break;
+      case 'mob_goat': this.voice(0, 0.6, 0.35 * v, 380, 330, [[700, 4, 4], [1300, 3, 5]], { trem: 7 }); break;
+      case 'mob_frog': this.voice(0, 0.12, 0.4 * v, 140, 110, [[400, 5, 4], [900, 2, 5]], { attack: 0.01 }); this.voice(0.18, 0.12, 0.35 * v, 150, 115, [[400, 5, 4], [900, 2, 5]], { attack: 0.01 }); break; // ribbit
       case 'mob_turtle': this.noise(0.3, 0.1 * v, 400, 'lowpass'); break;
       case 'mob_llama': this.voice(0, 0.4, 0.3 * v, 330, 450, [[600, 4, 4], [1400, 2, 5]], { breath: 0.4 }); break;
       case 'mob_camel': this.voice(0, 0.7, 0.4 * v, 130, 100, [[350, 5, 4], [900, 2, 5]], { breath: 0.7, attack: 0.08, vib: 0.03 }); break;
       case 'mob_polar_bear': this.voice(0, 0.8, 0.5 * v, 100, 80, [[350, 5, 4], [800, 2, 5]], { breath: 0.9, vib: 0.05, attack: 0.08 }); break;
-      case 'mob_mooshroom': this.tone(170, 0.9, 'sawtooth', 0.08 * v, 120); break;
+      case 'mob_mooshroom': this.voice(0, 1.0, 0.5 * v, 125, 105, [[300, 5, 5], [700, 2, 5]], { mid: 135, ff: 1.6, attack: 0.15, vib: 0.02 }); break;
       case 'mob_sniffer': for (let i = 0; i < 3; i++) this.noise(0.12, 0.25 * v, 500, 'bandpass', i * 0.16); break;
       case 'mob_armadillo': this.noise(0.15, 0.15 * v, 1800, 'bandpass'); break;
       case 'mob_parrot': this.tone(1800, 0.08, 'square', 0.04 * v, 2400); this.tone(2000, 0.08, 'square', 0.04 * v, 1500, 0.12); break;
@@ -1915,7 +1916,7 @@ G.openFurnace = (x, y, z) => {
 };
 G.breakFurnace = (x, y, z) => {
   const f = G.furnaceAt(x, y, z, false);
-  if (f) for (const s of f.slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5);
+  if (f) for (const s of f.slots) if (s) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5, undefined, slotExtras(s));
   if (G.furnaces) { delete G.furnaces[chestKey(x, y, z)]; G.furnaceChanged(chestKey(x, y, z), true); }
 };
 /* a furnace changed: tell the others in a shared world (the first player's game runs the furnaces;
