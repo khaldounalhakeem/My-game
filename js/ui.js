@@ -59,12 +59,12 @@ const MC_ORDER = (() => {
   o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'smithing_table', 'beacon', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest', 'ender_chest', 'dog_bed', 'shulker_box', 'shulker_box_white', 'shulker_box_red', 'shulker_box_orange', 'shulker_box_yellow', 'shulker_box_green', 'shulker_box_blue', 'shulker_box_black');
   o.push('redstone', 'redstone_torch', 'redstone_block', 'repeater', 'redstone_lamp_0', 'iron_door', 'lever', 'stone_button', 'oak_button', 'stone_pressure_plate', 'oak_pressure_plate', 'tnt');
   for (const m of mats) for (const t of ['shovel', 'pickaxe', 'axe', 'hoe']) o.push(m + '_' + t);
-  o.push('bucket', 'powder_snow_bucket', 'flint_and_steel', 'lead', 'name_tag', 'boat', 'saddle', 'eye_of_ender');
+  o.push('bucket', 'powder_snow_bucket', 'fishing_rod', 'flint_and_steel', 'lead', 'name_tag', 'boat', 'saddle', 'eye_of_ender');
   for (const m of mats) o.push(m + '_sword');
   for (const m of ['leather', 'chainmail', 'iron', 'golden', 'diamond', 'netherite']) for (const t of ['helmet', 'chestplate', 'leggings', 'boots']) o.push(m + '_' + t);
   for (const m of ['leather', 'iron', 'golden', 'diamond']) o.push(m + '_horse_armor');
   o.push('bow', 'arrow');
-  o.push('golden_apple', 'melon_slice', 'bread', 'cookie', 'cake');
+  o.push('golden_apple', 'melon_slice', 'bread', 'cookie', 'cake', 'cooked_cod', 'cooked_salmon');
   o.push('coal', 'emerald', 'lapis', 'diamond', 'quartz', 'iron_ingot', 'gold_ingot', 'netherite_ingot', 'stick', 'wheat', 'leather', 'paper', 'book', 'enchanted_book', 'blaze_powder', 'nether_star');
   const m = {}; o.forEach((k, i) => { if (!(k in m)) m[k] = i; });
   return m;

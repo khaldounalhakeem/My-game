@@ -833,6 +833,7 @@ class Player {
       if (G.throwEye() && this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       return;
     }
+    if (hd.key === 'fishing_rod') { this.useCd = 0.4; this.swing = 1; G.fishRod(); return; }
     if (hd.key === 'bow') {
       if (this.mode === 'survival') {
         if (!this.inv.count(ID.arrow)) { G.ui.message('You need arrows to shoot the bow.'); this.useCd = 0.5; return; }

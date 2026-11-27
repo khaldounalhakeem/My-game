@@ -708,6 +708,13 @@ makeTile('shulker_side', P => { P.fill(0x8a5a9a, 6); P.speck(0x7a4a8a, 0.2, 4); 
 makeTile('dog_bed_top', P => { P.fill(0xb83a3a, 6); P.rect(0, 0, 16, 2, 0x8a6a3a); P.rect(0, 14, 16, 2, 0x8a6a3a); P.rect(0, 0, 2, 16, 0x8a6a3a); P.rect(14, 0, 2, 16, 0x8a6a3a); P.rect(4, 4, 8, 8, 0xd85a5a, 4); });
 makeTile('dog_bed_side', P => { pPlanks(0x8a6a3a)(P); P.rect(0, 10, 16, 3, 0xb83a3a); });
 makeTile('i_dog_bed', pPlant(P => { P.rect(1, 9, 14, 5, 0x8a6a3a); P.rect(2, 8, 12, 3, 0xb83a3a); P.rect(4, 8, 8, 1, 0xd85a5a); P.rect(1, 13, 14, 1, 0x5a4020); }));
+/* fish and the fishing rod */
+const pFish = (body, belly, fin) => pPlant(P => { P.rect(3, 6, 8, 4, body); P.rect(4, 9, 6, 1, belly); P.rect(11, 5, 2, 2, fin); P.rect(11, 9, 2, 2, fin); P.rect(12, 7, 2, 2, fin); P.put(4, 7, 0x111111); P.rect(6, 5, 3, 1, fin); });
+makeTile('i_cod', pFish(0xb8a07a, 0xe0d0b0, 0x8a7a5a));
+makeTile('i_cooked_cod', pFish(0xd8b88a, 0xf0e0c0, 0xa88a5a));
+makeTile('i_salmon', pFish(0xc84a3a, 0xe8a090, 0x7a3a2a));
+makeTile('i_cooked_salmon', pFish(0xd8803a, 0xf0b890, 0x9a5a2a));
+makeTile('i_fishing_rod', pPlant(P => { P.line(2, 14, 13, 2, 0x8a6a3a); P.line(3, 14, 14, 2, 0x6a4a24); P.line(13, 3, 13, 12, 0xdddddd); P.rect(12, 12, 3, 2, 0xc83a3a); }));
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -1075,9 +1082,9 @@ for (const fx of ['', 'speed', 'haste', 'resistance', 'jump_boost', 'strength', 
 /* ender chest: every one you place opens the same chest, and only you can see what is inside (each player has their own) */
 block('ender_chest', 'Ender Chest', { top: 'ender_chest_top', side: 'ender_chest_side', front: 'ender_chest_front' }, PICK(1, 6, { light: true, emit: 7, drop: (r) => [['obsidian', 8]] }));
 /* shulker box: a chest you can pick up with everything still inside */
-block('shulker_box', 'Shulker Box', { top: 'shulker_top', side: 'shulker_side' }, { hardness: 2, drop: null, shulker: true, stack: 1 });
+block('shulker_box', 'Shulker Box', { top: 'shulker_top', side: 'shulker_side' }, { tool: 'pick', hardness: 2, drop: null, shulker: true, stack: 1 });
 /* shulker boxes in every wool colour (purple is the first one) */
-for (const k of Object.keys(SHULKER_COLORS)) block('shulker_box_' + k, k[0].toUpperCase() + k.slice(1) + ' Shulker Box', { top: 'shulker_top_' + k, side: 'shulker_side_' + k }, { hardness: 2, drop: null, shulker: true, stack: 1 });
+for (const k of Object.keys(SHULKER_COLORS)) block('shulker_box_' + k, k[0].toUpperCase() + k.slice(1) + ' Shulker Box', { top: 'shulker_top_' + k, side: 'shulker_side_' + k }, { tool: 'pick', hardness: 2, drop: null, shulker: true, stack: 1 });
 /* a small bed for your dog: when you sleep, your wolf sleeps on it */
 block('dog_bed', 'Dog Bed', { top: 'dog_bed_top', side: 'dog_bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.3, solid: false, opaque: false, box: [0.0625, 0, 0.0625, 0.9375, 0.25, 0.9375], boxes: [[0.0625, 0, 0.0625, 0.9375, 0.25, 0.9375]], iconTile: 'i_dog_bed' });
 
@@ -1219,6 +1226,11 @@ item('redstone_torch', 'Redstone Torch', 'redstone_torch', { placesSwitch: 'reds
 item('powder_snow_bucket', 'Powder Snow Bucket', 'powder_snow_bucket', { stack: 1 });
 item('repeater', 'Redstone Repeater', 'repeater', { placesRepeater: true });
 item('nether_star', 'Nether Star', 'nether_star');
+item('cod', 'Raw Cod', 'cod', { food: 2 });
+item('cooked_cod', 'Cooked Cod', 'cooked_cod', { food: 5 });
+item('salmon', 'Raw Salmon', 'salmon', { food: 2 });
+item('cooked_salmon', 'Cooked Salmon', 'cooked_salmon', { food: 6 });
+item('fishing_rod', 'Fishing Rod', 'fishing_rod', { stack: 1 });
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
 
 function getDrops(def, rng) {
@@ -1434,6 +1446,7 @@ const RECIPES = [
   ['terracotta', 1, { clay: 1 }, 'furnace'],
   ['cooked_porkchop', 1, { porkchop: 1 }, 'furnace'],
   ['steak', 1, { beef: 1 }, 'furnace'],
+  ['cooked_cod', 1, { cod: 1 }, 'furnace'], ['cooked_salmon', 1, { salmon: 1 }, 'furnace'], ['fishing_rod', 1, { stick: 3, string: 2 }],
   ['cooked_chicken', 1, { chicken: 1 }, 'furnace'],
 ];
 

@@ -1151,6 +1151,64 @@ G.airConnected = (ax, ay, az, bx, by, bz, max = 700) => {
   }
   return false;
 };
+/* ---------- fishing ----------
+   Tap water with a fishing rod to cast. After a while the bobber splashes and dips: tap again quickly to
+   reel in a fish (sometimes junk, now and then a treasure). Tapping too early just reels the line in. */
+G.bobber = null;
+G.removeBobber = () => {
+  const b = G.bobber;
+  if (!b) return;
+  G.scene.remove(b.mesh); G.scene.remove(b.line); b.line.geometry.dispose();
+  G.bobber = null;
+};
+G.fishRod = () => {
+  const P = G.player, W = G.world;
+  if (G.bobber) {
+    const b = G.bobber;
+    G.removeBobber();
+    if (!b.biting) return;
+    const r = Math.random();
+    let k, n = 1, e;
+    if (r < 0.6) k = 'cod';
+    else if (r < 0.85) k = 'salmon';
+    else if (r < 0.95) k = ['stick', 'string', 'leather', 'bone', 'rotten_flesh', 'bowl'][Math.random() * 6 | 0];
+    else { k = ['name_tag', 'saddle', 'enchanted_book', 'bow'][Math.random() * 4 | 0]; if (k === 'enchanted_book') { const ks = Object.keys(ENCHANTS), ek = ks[Math.random() * ks.length | 0]; e = { [ek]: 1 + (Math.random() * ENCHANTS[ek].max | 0) }; } }
+    if (ID[k] === undefined) k = 'cod';
+    const left = P.inv.add(ID[k], n, e);
+    if (left) G.spawnDrop(ID[k], left, P.pos.x, P.pos.y + 1, P.pos.z, undefined, e ? { e } : undefined);
+    P.inv.changed(); P.addXp(1 + (Math.random() * 3 | 0));
+    G.sound.play('pickup');
+    G.ui.message('You caught ' + (k === 'cod' || k === 'salmon' ? 'a ' : '') + DEFS[ID[k]].name + (e ? ' (' + enchText(e) + ')' : '') + '!', 'gold');
+    return;
+  }
+  const o = P.eyePos(), d = P.lookDir();
+  const hit = W.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 24, true);
+  if (!hit || hit.id !== ID.water) { G.ui.message('Throw the line into water.'); return; }
+  let y = hit.y; while (W.getBlock(hit.x, y + 1, hit.z) === ID.water && y < hit.y + 10) y++;
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.18), new THREE.MeshLambertMaterial({ color: 0xd83a3a }));
+  const top = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.08, 0.18), new THREE.MeshLambertMaterial({ color: 0xffffff })); top.position.y = 0.15; mesh.add(top);
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x222222 }));
+  G.scene.add(mesh); G.scene.add(line);
+  const now = performance.now();
+  G.bobber = { mesh, line, x: hit.x + 0.5, y: y + 0.95, z: hit.z + 0.5, biteAt: now + 4000 + Math.random() * 9000, biting: false, t: 0 };
+  G.sound.play('click');
+};
+G.tickBobber = (dt) => {
+  const b = G.bobber;
+  if (!b) return;
+  const P = G.player, held = P.heldDef(), now = performance.now();
+  if (P.dead || !held || held.key !== 'fishing_rod' || Math.hypot(P.pos.x - b.x, P.pos.z - b.z) > 32 || G.world.getBlock(Math.floor(b.x), Math.floor(b.y - 0.95), Math.floor(b.z)) !== ID.water) { G.removeBobber(); return; }
+  b.t += dt;
+  if (!b.biting && now >= b.biteAt) {
+    b.biting = true; b.biteEnd = now + 1400;
+    G.particles.burst(b.x, b.y, b.z, [0xbfe0f0, 0xffffff, 0x6aa0e0], 14, 2, 0.08, -1);
+    G.sound.play('pickup');
+  } else if (b.biting && now > b.biteEnd) { b.biting = false; b.biteAt = now + 3000 + Math.random() * 7000; }
+  b.mesh.position.set(b.x, b.y + (b.biting ? -0.25 : Math.sin(b.t * 2.5) * 0.04), b.z);
+  // the line from your hand to the bobber
+  const o = P.eyePos(), d = P.lookDir(), pts = b.line.geometry.attributes.position;
+  pts.setXYZ(0, o.x + d.x * 0.6 + Math.cos(P.yaw) * 0.25, o.y - 0.2, o.z + d.z * 0.6 - Math.sin(P.yaw) * 0.25); pts.setXYZ(1, b.x, b.y + 0.15, b.z); pts.needsUpdate = true;
+};
 /* the nearest dog bed to where you sleep (or nothing) */
 G.findDogBed = (x, y, z) => {
   const W = G.world;
@@ -1342,6 +1400,7 @@ function spawnTick() {
         if (b === BIOME.BAMBOO && Math.random() < 0.6) { type = 'panda'; n = 1 + (Math.random() * 2 | 0); }
         else if ((b === BIOME.PLAINS || b === BIOME.SAVANNA) && Math.random() < 0.35) { type = Math.random() < 0.3 ? 'donkey' : 'horse'; n = 2 + (Math.random() * 2 | 0); }
         if ((b === BIOME.FOREST || b === BIOME.TAIGA || b === BIOME.BIRCH || b === BIOME.SNOWY) && Math.random() < 0.3) { type = 'wolf'; n = 2 + (Math.random() * 2 | 0); }
+        else if ((b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.SAVANNA) && Math.random() < 0.1) { type = 'cat'; n = 1 + (Math.random() < 0.3 ? 1 : 0); }
         for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y + 1, z + (Math.random() - 0.5) * 2);
       }
     }
@@ -1493,6 +1552,7 @@ function restoreDrops(dim) {
 }
 
 function clearEntities() {
+  if (G.removeBobber) G.removeBobber();
   for (const list of [G.mobs, G.projectiles, G.drops, G.tnts]) { for (const e of list) { if (e.mesh) G.scene.remove(e.mesh); } list.length = 0; }
   for (const d of G.dragons) G.scene.remove(d.mesh);
   G.dragons.length = 0;
@@ -2201,6 +2261,7 @@ function frame(now) {
       G.pendingPets = G.pendingPets.filter(p => !G.world.isLoaded(p[1], p[3]));
       restorePets(ready);
     }
+    G.tickBobber(dt);
     G.plateT = (G.plateT || 0) - dt;
     if (G.plateT <= 0) { G.plateT = 0.1; G.tickPlates(); G.tickRedstone(); }
     G.spawnT -= dt;

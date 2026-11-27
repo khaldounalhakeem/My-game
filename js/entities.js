@@ -65,6 +65,7 @@ const FACES_DRAW = {
   sheep: px => { px(0, 0, '#d8c4a8', 8, 8); px(1, 3, '#fff', 1, 1); px(2, 3, '#111', 1, 1); px(5, 3, '#111', 1, 1); px(6, 3, '#fff', 1, 1); px(3, 5, '#e3a8a8', 2, 1); },
   panda: px => { px(0, 0, '#f2f2f2', 8, 8); px(0, 0, '#1a1a1a', 2, 1); px(6, 0, '#1a1a1a', 2, 1); px(1, 2, '#1a1a1a', 2, 3); px(5, 2, '#1a1a1a', 2, 3); px(2, 3, '#ffffff', 1, 1); px(5, 3, '#ffffff', 1, 1); px(3, 5, '#1a1a1a', 2, 1); px(3, 6, '#9a9a9a', 2, 1); },
   wither: px => { px(0, 0, '#1e1e1e', 8, 8); px(1, 2, '#e8e8e8', 2, 2); px(5, 2, '#e8e8e8', 2, 2); px(2, 3, '#101010', 1, 1); px(5, 3, '#101010', 1, 1); px(2, 6, '#3a3a3a', 4, 1); px(2, 5, '#0a0a0a', 4, 1); },
+  cat: px => { px(0, 0, '#e0902a', 8, 8); px(0, 0, '#c8701a', 8, 2); px(1, 3, '#7ad83a', 2, 1); px(5, 3, '#7ad83a', 2, 1); px(2, 3, '#111', 1, 1); px(5, 3, '#111', 1, 1); px(3, 5, '#f0c8a0', 2, 2); px(3, 5, '#d86a8a', 2, 1); },
   chicken: px => { px(0, 0, '#f4f4f4', 8, 8); px(1, 2, '#111', 1, 1); px(6, 2, '#111', 1, 1); px(2, 3, '#f0a020', 4, 2); px(3, 5, '#d02020', 2, 2); },
   spider: px => { noisyFill(px, 8, ['#2a2523', '#332c29', '#241f1d'], 4); px(1, 3, '#d01010', 2, 1); px(5, 3, '#d01010', 2, 1); px(2, 2, '#ff3030', 1, 1); px(5, 2, '#ff3030', 1, 1); px(0, 4, '#a01010', 1, 1); px(7, 4, '#a01010', 1, 1); },
   player: px => { px(0, 0, '#c89878', 8, 8); px(0, 0, '#4a2f1a', 8, 2); px(0, 2, '#4a2f1a', 1, 1); px(7, 2, '#4a2f1a', 1, 1); px(1, 4, '#fff', 1, 1); px(2, 4, '#3a5ad0', 1, 1); px(5, 4, '#3a5ad0', 1, 1); px(6, 4, '#fff', 1, 1); px(3, 5, '#a86a50', 2, 1); px(2, 6, '#7a3f2a', 4, 1); },
@@ -217,6 +218,7 @@ const MOB_TYPES = {
   sheep: { name: 'Sheep', hp: 8, w: 0.9, h: 1.3, speed: 1.4, passive: true, xp: 2, drops: [['wool_white', 1, 2]] },
   panda: { name: 'Panda', hp: 20, w: 1.2, h: 1.25, speed: 1.1, passive: true, xp: 2, drops: [['bamboo', 0, 2]] },
   wither: { name: 'Wither', hp: 300, w: 1.0, h: 3.0, speed: 2.6, hostile: true, fly: 7, ranged: 'wither', boss: true, xp: 50, fireproof: true, drops: [['nether_star', 1, 1]] },
+  cat: { name: 'Cat', hp: 10, w: 0.5, h: 0.6, speed: 2.6, passive: true, xp: 1, drops: [], tameWith: 'cod' },
   chicken: { name: 'Chicken', hp: 4, w: 0.45, h: 0.7, speed: 1.6, passive: true, xp: 1, drops: [['chicken', 1, 1], ['feather', 0, 2]] },
 };
 
@@ -314,6 +316,17 @@ function buildMobModel(type) {
     addBox(head, 0.1, 0.12, 0.06, dark, -0.12, 0.23, -0.05); addBox(head, 0.1, 0.12, 0.06, dark, 0.12, 0.23, -0.05);
     const tail = addBox(g, 0.12, 0.12, 0.5, fur, 0, 0.72, -0.62); tail.rotation.x = 0.6; P.tail = tail;
     const collar = addBox(g, 0.44, 0.1, 0.44, lam(0xc8202a), 0, 0.84, 0.32); collar.visible = false; P.collar = collar;
+  } else if (type === 'cat') {
+    // a small ginger tabby
+    const fur = lam(0xe0902a), dark = lam(0xc8701a);
+    addBox(g, 0.3, 0.3, 0.7, fur, 0, 0.42, 0);
+    for (const z of [-0.2, 0, 0.2]) addBox(g, 0.32, 0.06, 0.08, dark, 0, 0.58, z);
+    for (const [x, z] of [[-0.09, 0.24], [0.09, 0.24], [-0.09, -0.24], [0.09, -0.24]]) P.legs.push(limb(g, 0.1, 0.28, 0.1, fur, x, 0.28, z));
+    const head = new THREE.Mesh(boxGeo(0.32, 0.28, 0.3), headMats('cat', 0xe0902a));
+    head.position.set(0, 0.6, 0.45); g.add(head); P.head = head;
+    addBox(head, 0.08, 0.1, 0.06, dark, -0.1, 0.18, -0.05); addBox(head, 0.08, 0.1, 0.06, dark, 0.1, 0.18, -0.05);
+    const tail = addBox(g, 0.07, 0.07, 0.55, fur, 0, 0.5, -0.6); tail.rotation.x = 0.9; P.tail = tail;
+    const collar = addBox(g, 0.34, 0.07, 0.34, lam(0x2a6ad8), 0, 0.6, 0.3); collar.visible = false; P.collar = collar;
   } else if (type === 'horse' || type === 'donkey') {
     // a donkey is a smaller, grey horse with long ears
     const dk = type === 'donkey', b = new THREE.Group(); g.add(b);
@@ -553,7 +566,7 @@ class Mob {
       G.ui.message('The ' + this.T.name.toLowerCase() + ' is on a rope and follows you. Tap a fence to tie it there.', 'gold');
       return true;
     }
-    if (this.remoteCtl && (this.type === 'wolf' || this.T.horsey)) {
+    if (this.remoteCtl && (this.type === 'wolf' || this.type === 'cat' || this.T.horsey)) {
       // a wolf or horse another player's game runs: if nobody tamed it yet, ask for it, then tame it here
       if (this.tame) { G.ui.message('This ' + this.T.name.toLowerCase() + ' is already tamed by ' + Net.nameOf(this.remoteCtl) + '.'); return true; }
       Net.claimMob(this, hd ? hd.id : 0);
@@ -567,6 +580,19 @@ class Mob {
       return true;
     }
     const meat = hd && ['porkchop', 'cooked_porkchop', 'beef', 'steak', 'chicken', 'cooked_chicken', 'rotten_flesh'].includes(hd.key);
+    if (this.type === 'cat') {
+      // a cat is tamed with raw fish (it may take a few), heals with fish, and sits or follows when you tap it
+      const fish = hd && (hd.key === 'cod' || hd.key === 'salmon');
+      if (!this.tame && fish) {
+        if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1);
+        if (Math.random() < 0.34 || P.mode === 'creative') this.makeTame();
+        else G.particles.burst(this.pos.x, this.pos.y + 0.8, this.pos.z, [0x555555, 0x888888], 8, 1.5, 0.12);
+        return true;
+      }
+      if (!this.tame) { if (hd) G.ui.message('Cats love fish. Hold raw cod or salmon and tap the cat.'); return !!hd; }
+      if (fish && this.hp < 10) { if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1); this.hp = Math.min(10, this.hp + 4); this.hearts(); return true; }
+      this.sitting = !this.sitting; G.ui.message(this.sitting ? 'Your cat sits and waits.' : 'Your cat follows you again.'); return true;
+    }
     if (this.type === 'wolf') {
       if (!this.tame && hd && hd.key === 'bone') {
         if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1);
@@ -634,6 +660,7 @@ class Mob {
     if (this.T.horsey || this.T.boat || this.leash || this.type === 'villager') return true;
     if (hd && hd.key === 'lead' && !this.T.hostile) return true;
     if (this.type === 'wolf') return (this.tame && !(hd && /_sword$|_axe$/.test(hd.key))) || !!(hd && hd.key === 'bone');
+    if (this.type === 'cat') return (this.tame && !(hd && /_sword$|_axe$/.test(hd.key))) || !!(hd && (hd.key === 'cod' || hd.key === 'salmon'));
     return false;
   }
 
@@ -734,6 +761,7 @@ class Mob {
 
   makeTame() {
     this.tame = true; this.angry = false;
+    if (this.type === 'cat') { if (this.parts.collar) this.parts.collar.visible = true; G.ui.message('You tamed a cat! It follows you, and creepers stay away from it. Tap it to make it sit.', 'gold'); }
     if (this.type === 'wolf') { this.hp = 20; if (this.parts.collar) this.parts.collar.visible = true; G.ui.message('You tamed a wolf! It follows you and fights monsters. Tap it to make it sit.', 'gold'); }
     if (this.T.horsey) { if (this.parts.saddle) this.parts.saddle.visible = true; G.ui.message('You tamed the ' + this.T.name.toLowerCase() + '! Tap it to ride, and press sneak to get off.' + (this.type === 'donkey' ? ' Tap it holding a chest to give it a chest.' : ' Tap it holding horse armor to protect it.'), 'gold'); }
     this.hearts();
@@ -821,7 +849,7 @@ class Mob {
       moveX = dv.x; moveZ = dv.z; speed = 8;
       if (dv.yaw !== undefined) this.yaw = dv.yaw;
       if (dv.jump && this.onGround) this.vel.y = 10;
-    } else if (this.tame && this.type === 'wolf') {
+    } else if (this.tame && (this.type === 'wolf' || this.type === 'cat')) {
       // a tamed wolf follows you, teleports back if left behind, and fights whatever you fight
       const tgt = this.petTarget;
       // gone, too far, or a player who left for another world (the Nether, the End) or the game
@@ -901,6 +929,10 @@ class Mob {
           G.spawnProjectile('arrow', from, dir.normalize().multiplyScalar(24), this);
           G.sound.play('bow', this.pos);
         }
+      } else if (T.explode && G.mobs.some(c => c.type === 'cat' && !c.dead && c.pos.distanceTo(this.pos) < 6)) {
+        // like Minecraft: creepers are scared of cats and run away from them
+        const c = G.mobs.find(c2 => c2.type === 'cat' && !c2.dead && c2.pos.distanceTo(this.pos) < 6), ax = this.pos.x - c.pos.x, az = this.pos.z - c.pos.z, al = Math.hypot(ax, az) || 1;
+        moveX = ax / al; moveZ = az / al; this.yaw = Math.atan2(moveX, moveZ); this.fuse = 0;
       } else if (T.explode) {
         if (dist < 3) { this.fuse += dt; moveX *= 0.2; moveZ *= 0.2; if (this.fuse > 0 && this.fuse - dt <= 0) G.sound.play('fuse', this.pos); }
         else this.fuse = Math.max(0, this.fuse - dt);
@@ -1004,7 +1036,7 @@ class Mob {
     if (this.type === 'ghast') this.parts.legs.forEach((L, i) => { L.rotation.x = Math.sin(performance.now() / 400 + i * 1.7) * 0.35; L.rotation.z = Math.cos(performance.now() / 500 + i) * 0.2; });
     else if (this.type === 'spider') this.parts.legs.forEach((L, i) => { L.rotation.y = L.userData.baseY + Math.sin(this.walk * 1.5 + i) * 0.3 * Math.min(1, hs); });
     else this.parts.legs.forEach((L, i) => { L.rotation.x = (i % 2 === (i < 2 ? 0 : 1) ? sw : -sw); });
-    if (this.type === 'wolf') {
+    if (this.type === 'wolf' || this.type === 'cat') {
       if (this.parts.tail) this.parts.tail.rotation.y = this.tame ? Math.sin(performance.now() / 120) * 0.5 : 0;
       if (this.sitting || this.resting) this.parts.legs.forEach((L, i) => { L.rotation.x = i >= 2 ? -1.2 : 0; });
     }
@@ -1058,7 +1090,7 @@ class Mob {
     }
     const f = this.netFlags || 0;
     this.tame = !!(f & 2); this.sitting = !!(f & 4);
-    if (this.type === 'wolf' && this.sitting) this.parts.legs.forEach((L, i) => { L.rotation.x = i >= 2 ? -1.2 : 0; });
+    if ((this.type === 'wolf' || this.type === 'cat') && this.sitting) this.parts.legs.forEach((L, i) => { L.rotation.x = i >= 2 ? -1.2 : 0; });
     const small = !!(f & 32);
     if (small !== this.baby) { if (small) this.makeBaby(9999); else this.growUp(); }
     if (this.parts.collar) this.parts.collar.visible = this.tame;
