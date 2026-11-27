@@ -321,7 +321,7 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause, opts) => {
       W.setBlock(X, Y, Z, 0);
       if (id === ID.tnt) { G.primeTNT(X, Y, Z, 0.4 + Math.random() * 0.8); continue; }
       if (id === ID.chest || id === ID.chest_loot) { G.breakChest(X, Y, Z, id === ID.chest_loot); continue; } // what was inside spills out
-      if (def.shulker) { G.breakShulker(X, Y, Z); continue; }
+      if (def.shulker) { G.shulkerId = id; G.breakShulker(X, Y, Z); continue; }
       if (Math.random() < 0.12) for (const [did, n] of getDrops(def, Math.random)) G.spawnDrop(did, n, X + 0.5, Y + 0.5, Z + 0.5);
     }
   }
@@ -1137,11 +1137,13 @@ G.openShulker = (x, y, z) => {
   G.ui.openInventory('chest', { slots, x, y, z, shulker: true });
 };
 G.breakShulker = (x, y, z) => {
+  G.shulkerId = G.shulkerId || (DEFS[G.world.getBlock(x, y, z)].shulker ? G.world.getBlock(x, y, z) : null); // same colour back
   const k = chestKey(x, y, z), slots = (G.chests && G.chests[k]) || null;
   const c = slots && slots.some(Boolean) ? slots.map(s => (s && !s.c ? copySlot(s, s.count) : null)) : undefined;
   // a box can't hold another full box: those come out on their own
   if (slots) for (const s of slots) if (s && s.c) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5, undefined, slotExtras(s));
-  G.spawnDrop(ID.shulker_box, 1, x + 0.5, y + 0.5, z + 0.5, undefined, c ? { c } : undefined);
+  G.spawnDrop(G.shulkerId || ID.shulker_box, 1, x + 0.5, y + 0.5, z + 0.5, undefined, c ? { c } : undefined);
+  G.shulkerId = null;
   if (G.chests && G.chests[k]) { delete G.chests[k]; G.chestChanged(k); }
 };
 G.breakChest = (x, y, z, wasLoot) => {

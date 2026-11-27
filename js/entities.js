@@ -824,7 +824,11 @@ class Mob {
       if (this.petTarget && !this.sitting) {
         const t = this.petTarget, dx = t.pos.x - this.pos.x, dz = t.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
         moveX = dx / l; moveZ = dz / l; speed = 4.5; this.yaw = Math.atan2(moveX, moveZ);
-        if (l < 1.6 && this.attackCd <= 0) { this.attackCd = 0.8; t.hurt(4, this.pos, 5, false); }
+        if (l < 1.6 && this.attackCd <= 0) {
+          this.attackCd = 0.8;
+          if (t.remote) { G.lastAttacker = this; t.hurt(4, this.pos, 5, true, 'A wolf bit you.'); } // a player: they take the bite on their own device
+          else t.hurt(4, this.pos, 5, !!t.remoteCtl); // a mob another device runs: send it the bite
+        }
       } else if (!this.sitting && !P.dead) {
         const dx = P.pos.x - this.pos.x, dz = P.pos.z - this.pos.z, l = Math.hypot(dx, dz);
         if (l > 24) { this.pos.set(P.pos.x + (Math.random() - 0.5) * 2, P.pos.y, P.pos.z + (Math.random() - 0.5) * 2); this.vel.set(0, 0, 0); }
@@ -1379,6 +1383,7 @@ class Projectile {
       const t = rayAABB(this.pos, dir, P.pos.x - 0.4, P.pos.y, P.pos.z - 0.4, P.pos.x + 0.4, P.pos.y + 1.8, P.pos.z + 0.4);
       if (t !== null && t < step + 0.2) {
         if (this.kind === 'fireball') { this.pos.addScaledVector(dir, t); return this.explodeHere(); }
+        if (this.owner instanceof Mob) G.lastAttacker = this.owner;
         P.hurt(G.mobDmg(this.kind === 'arrow' ? 3 : this.kind === 'smallfire' ? 4 : 2), this.pos, 4, false, this.kind === 'arrow' ? 'You were shot by an arrow.' : this.kind === 'smallfire' ? 'A Blaze fireball hit you.' : 'You were hit.');
         if (this.kind === 'smallfire' && P.mode === 'survival') P.fire = Math.max(P.fire, 3);
         return this.finish();

@@ -696,6 +696,12 @@ makeTile('ender_chest_top', P => { P.fill(0x16302e, 6); P.speck(0x0e2220, 0.2, 4
 makeTile('ender_chest_side', P => { P.fill(0x16302e, 6); P.speck(0x0e2220, 0.2, 4); for (let i = 0; i < 16; i++) { P.put(i, 0, 0x0a1414); P.put(0, i, 0x0a1414); P.put(i, 15, 0x0a1414); P.put(15, i, 0x0a1414); } for (let x = 1; x < 15; x++) P.put(x, 5, 0x0a1414); });
 makeTile('ender_chest_front', P => { P.fill(0x16302e, 6); P.speck(0x0e2220, 0.2, 4); for (let i = 0; i < 16; i++) { P.put(i, 0, 0x0a1414); P.put(0, i, 0x0a1414); P.put(i, 15, 0x0a1414); P.put(15, i, 0x0a1414); } for (let x = 1; x < 15; x++) P.put(x, 5, 0x0a1414); P.rect(6, 3, 4, 5, 0x2a8a6a); P.rect(7, 4, 2, 3, 0x7affc8); P.put(7, 5, 0x0a3a2a); });
 /* shulker box */
+const SHULKER_COLORS = { white: 0xe8e8e8, red: 0xb83a3a, yellow: 0xe8c83a, blue: 0x3a5ab8, green: 0x4a8a2a, black: 0x2a2a2e, orange: 0xe07a2a };
+for (const [k, c] of Object.entries(SHULKER_COLORS)) {
+  const dk = shadeC(rgb(c), 0.65), lt = shadeC(rgb(c), 1.25);
+  makeTile('shulker_top_' + k, P => { P.fill(c, 6); P.rect(0, 0, 16, 1, dk); P.rect(0, 0, 1, 16, dk); P.rect(15, 0, 1, 16, dk); P.rect(0, 15, 16, 1, dk); P.rect(5, 5, 6, 6, dk); });
+  makeTile('shulker_side_' + k, P => { P.fill(c, 6); P.rect(0, 0, 16, 1, dk); P.rect(0, 15, 16, 1, dk); P.rect(0, 0, 1, 16, dk); P.rect(15, 0, 1, 16, dk); P.rect(0, 9, 16, 2, dk); P.rect(0, 8, 16, 1, lt); });
+}
 makeTile('shulker_top', P => { P.fill(0x8a5a9a, 6); P.speck(0x7a4a8a, 0.2, 4); P.rect(0, 0, 16, 1, 0x5a3a6a); P.rect(0, 0, 1, 16, 0x5a3a6a); P.rect(15, 0, 1, 16, 0x5a3a6a); P.rect(0, 15, 16, 1, 0x5a3a6a); P.rect(5, 5, 6, 6, 0x6a3a7a); });
 makeTile('shulker_side', P => { P.fill(0x8a5a9a, 6); P.speck(0x7a4a8a, 0.2, 4); P.rect(0, 0, 16, 1, 0x5a3a6a); P.rect(0, 15, 16, 1, 0x5a3a6a); P.rect(0, 0, 1, 16, 0x5a3a6a); P.rect(15, 0, 1, 16, 0x5a3a6a); P.rect(0, 9, 16, 2, 0x5a3a6a); P.rect(0, 8, 16, 1, 0xa87ab8); });
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
@@ -1066,6 +1072,8 @@ for (const fx of ['', 'speed', 'haste', 'resistance', 'jump_boost', 'strength', 
 block('ender_chest', 'Ender Chest', { top: 'ender_chest_top', side: 'ender_chest_side', front: 'ender_chest_front' }, PICK(1, 6, { light: true, emit: 7, drop: (r) => [['obsidian', 8]] }));
 /* shulker box: a chest you can pick up with everything still inside */
 block('shulker_box', 'Shulker Box', { top: 'shulker_top', side: 'shulker_side' }, { hardness: 2, drop: null, shulker: true, stack: 1 });
+/* shulker boxes in every wool colour (purple is the first one) */
+for (const k of Object.keys(SHULKER_COLORS)) block('shulker_box_' + k, k[0].toUpperCase() + k.slice(1) + ' Shulker Box', { top: 'shulker_top_' + k, side: 'shulker_side_' + k }, { hardness: 2, drop: null, shulker: true, stack: 1 });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1373,7 +1381,7 @@ const RECIPES = [
   ['paper', 3, { sugar_cane: 3 }, 'table'], ['book', 1, { paper: 3, leather: 1 }], ['bookshelf', 1, { '#planks': 6, book: 3 }, 'table'],
   ['enchanting_table', 1, { book: 1, diamond: 2, obsidian: 4 }, 'table'],
   ['redstone_torch', 1, { redstone: 1, stick: 1 }], ['redstone_lamp_0', 1, { redstone: 4, glowstone: 1 }, 'table'], ['repeater', 1, { redstone_torch: 2, redstone: 1, stone: 3 }, 'table'],
-  ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['shulker_box', 1, { chest: 1, wool_purple: 1 }], ['ender_chest', 1, { obsidian: 8, eye_of_ender: 1 }, 'table'], ['beacon', 1, { glass: 5, obsidian: 3, nether_star: 1 }, 'table'], ['smithing_table', 1, { iron_ingot: 2, '#planks': 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
+  ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['shulker_box', 1, { chest: 1, wool_purple: 1 }], ...Object.keys(SHULKER_COLORS).map(k => ['shulker_box_' + k, 1, { chest: 1, ['wool_' + k]: 1 }]), ['ender_chest', 1, { obsidian: 8, eye_of_ender: 1 }, 'table'], ['beacon', 1, { glass: 5, obsidian: 3, nether_star: 1 }, 'table'], ['smithing_table', 1, { iron_ingot: 2, '#planks': 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
   ['lever', 1, { stick: 1, cobblestone: 1 }], ['stone_button', 1, { stone: 1 }], ['oak_button', 1, { '#planks': 1 }], ['stone_pressure_plate', 1, { stone: 2 }, 'table'], ['oak_pressure_plate', 1, { '#planks': 2 }, 'table'],
   ['bamboo_block', 1, { bamboo: 9 }], ['bamboo_planks', 2, { bamboo_block: 1 }], ['stick', 1, { bamboo: 2 }],
   ...['mangrove', 'cherry'].flatMap(w => { const pk = w + '_planks'; return [[pk, 4, { [w + '_log']: 1 }], [w + '_stairs', 4, { [pk]: 6 }, 'table'], [w + '_slab', 6, { [pk]: 3 }, 'table'], [w + '_door', 3, { [pk]: 6 }, 'table'], [w + '_trapdoor', 2, { [pk]: 6 }, 'table'], [w + '_fence', 3, { [pk]: 4, stick: 2 }, 'table'], [w + '_fence_gate', 1, { [pk]: 2, stick: 4 }, 'table']]; }),

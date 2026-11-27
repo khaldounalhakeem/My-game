@@ -390,7 +390,7 @@ class Player {
     const crit = !this.onGround && this.vel.y < -1 && !this.flying;
     if (crit) dmg = Math.round(dmg * 1.5);
     this.attackCd = 0.45; this.swing = 1;
-    if (target instanceof Mob && !target.tame) for (const m of G.mobs) if (m.tame && m.type === 'wolf' && m !== target) m.petTarget = target;
+    if ((target instanceof Mob && !target.tame) || target.remote) for (const m of G.mobs) if (m.tame && m.type === 'wolf' && m !== target && !m.remoteCtl) m.petTarget = target; // your wolves join your fight (a friend too)
     const kb = (this.sprinting ? 10 : 6) + 6 * enchLv(hs, 'knockback'), fa = enchLv(hs, 'fire_aspect');
     if (target.remote) Net.hit(target.remote, dmg, kb);
     else if (target instanceof Dragon) target.hurt(dmg);
@@ -432,7 +432,7 @@ class Player {
     const ad = above && DEFS[above];
     if (ad && (ad.cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.repeater || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
-    if (def.shulker) G.breakShulker(x, y, z);
+    if (def.shulker) { G.shulkerId = id; G.breakShulker(x, y, z); }
     if (DEFS[id].base === 'furnace') G.breakFurnace(x, y, z);
     if (DEFS[id].sign) G.setSign(x, y, z, null);
     if (def.lever || def.button || def.plate) G.switchGone(x, y, z, def);

@@ -434,10 +434,11 @@ const Net = {
   },
 
   /* punch another player: they read it from our presence and take the damage themselves */
-  hit(rp, dmg, kb, cause) {
+  hit(rp, dmg, kb, cause, byNid) {
     this.hitSeq++;
     const h = [String(rp.peer), this.hitSeq, dmg, kb];
     if (cause) h.push(String(cause).slice(0, 80));
+    if (cause && byNid) h.push(String(byNid).slice(0, 24)); // which of our mobs it was, so their wolves can fight back
     this.hits.push(h);
     if (this.hits.length > 12) this.hits.shift();
     this.sendT = 0;
@@ -469,7 +470,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v74 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v75 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -562,7 +563,7 @@ const Net = {
       if (!rp.inWorld || rp.dim !== G.dim || rp.dead || !rp.model) continue;
       if (!rp.proxy) {
         const r = rp;
-        rp.proxy = { remote: r, w: 0.6, h: 1.8, vel: new THREE.Vector3(), fire: 0, get pos() { return r.model ? r.model.group.position : new THREE.Vector3(); }, get dead() { return !!r.dead; }, get mode() { return r.mode || 'survival'; }, get held() { return r.held || 0; }, hurt: (dmg, from, kb, force, cause) => Net.hit(r, Math.round(dmg), kb || 6, cause || 'You were hit.') };
+        rp.proxy = { remote: r, w: 0.6, h: 1.8, vel: new THREE.Vector3(), fire: 0, get pos() { return r.model ? r.model.group.position : new THREE.Vector3(); }, get dead() { return !!r.dead; }, get mode() { return r.mode || 'survival'; }, get held() { return r.held || 0; }, hurt: (dmg, from, kb, force, cause) => { const by = G.lastAttacker && G.lastAttacker.nid; G.lastAttacker = null; Net.hit(r, Math.round(dmg), kb || 6, cause || 'You were hit.', by); } };
       }
       out.push(rp.proxy);
     }
@@ -1223,6 +1224,8 @@ const Net = {
         if (rp.hitReady && h[1] > (rp.lastHit || 0) && h[0] === me && rp.dim === G.dim && P.mode === 'survival' && !P.dead) {
           const from = { x: rp.target ? rp.target[0] : P.pos.x, z: rp.target ? rp.target[2] : P.pos.z };
           const cause = typeof h[4] === 'string' ? h[4].replace(/[^\w .,'!-]/g, '').slice(0, 80) : name + ' hit you.';
+          // who did it, so our wolves go after them: one of their mobs, or the player themself
+          G.lastAttacker = h[5] !== undefined ? G.mobs.find(m => m.remoteCtl === rp.peer && String(m.nid) === String(h[5])) || null : typeof h[4] === 'string' && !/wolf bit/.test(h[4]) ? null : this.proxies().find(q => q.remote === rp) || null;
           P.hurt(clamp(+h[2] || 1, 1, 20), from, clamp(+h[3] || 6, 0, 16), true, cause);
           if (P.dead) G.ui.message(name + ' knocked you out!', 'purple');
         }
