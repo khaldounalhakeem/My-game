@@ -280,7 +280,7 @@ function updateSky(dt) {
 
 /* ---------- world helpers exposed to entities ---------- */
 G.spawnDrop = (id, count, x, y, z, vel, opts) => {
-  const d = new ItemDrop(id, count, x, y, z, vel, opts && opts.did ? opts.did : Net.newId(), opts && cleanEnch(opts.e), opts && cleanName(opts.n));
+  const d = new ItemDrop(id, count, x, y, z, vel, opts && opts.did ? opts.did : Net.newId(), opts && cleanEnch(opts.e), opts && cleanName(opts.n), opts && Array.isArray(opts.c) ? opts.c.map(s => (s && DEFS[s.id] ? (Array.isArray(s) ? slotFromArr(s, 64, true) : s) : Array.isArray(s) ? slotFromArr(s, 64, true) : null)) : undefined);
   G.drops.push(d);
   if (!(opts && opts.remote)) Net.dropAdded(d); // everyone in the world sees the same items on the ground
   return d;
@@ -320,6 +320,8 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause, opts) => {
       if (def.hardness === Infinity || id === ID.obsidian || def.liquid) continue;
       W.setBlock(X, Y, Z, 0);
       if (id === ID.tnt) { G.primeTNT(X, Y, Z, 0.4 + Math.random() * 0.8); continue; }
+      if (id === ID.chest || id === ID.chest_loot) { G.breakChest(X, Y, Z, id === ID.chest_loot); continue; } // what was inside spills out
+      if (def.shulker) { G.breakShulker(X, Y, Z); continue; }
       if (Math.random() < 0.12) for (const [did, n] of getDrops(def, Math.random)) G.spawnDrop(did, n, X + 0.5, Y + 0.5, Z + 0.5);
     }
   }
@@ -1122,6 +1124,26 @@ G.tickFurnaces = (dt) => {
 };
 
 /* a chest that is broken spills what is inside */
+/* shulker boxes: what's inside goes with the box */
+G.placeShulker = (x, y, z, held) => {
+  const k = chestKey(x, y, z);
+  G.chests = G.chests || {};
+  G.chests[k] = held && held.c ? held.c.map(s => (s ? copySlot(s, s.count) : null)) : new Array(27).fill(null);
+  G.chestChanged(k);
+};
+G.openShulker = (x, y, z) => {
+  const slots = G.chestSlots(x, y, z, true);
+  G.sound.play('click');
+  G.ui.openInventory('chest', { slots, x, y, z, shulker: true });
+};
+G.breakShulker = (x, y, z) => {
+  const k = chestKey(x, y, z), slots = (G.chests && G.chests[k]) || null;
+  const c = slots && slots.some(Boolean) ? slots.map(s => (s && !s.c ? copySlot(s, s.count) : null)) : undefined;
+  // a box can't hold another full box: those come out on their own
+  if (slots) for (const s of slots) if (s && s.c) G.spawnDrop(s.id, s.count, x + 0.5, y + 0.6, z + 0.5, undefined, slotExtras(s));
+  G.spawnDrop(ID.shulker_box, 1, x + 0.5, y + 0.5, z + 0.5, undefined, c ? { c } : undefined);
+  if (G.chests && G.chests[k]) { delete G.chests[k]; G.chestChanged(k); }
+};
 G.breakChest = (x, y, z, wasLoot) => {
   let slots = G.chestSlots(x, y, z, false);
   if (!slots && wasLoot) slots = rollLoot(mulberry32(hash3(x, y * 31 + z, G.seed + 77)), G.chestKind(x, y, z)).map(([id, count]) => ({ id, count }));
@@ -1425,13 +1447,13 @@ function structureSpawns() {
 /* ---------- world lifecycle ---------- */
 /* items lying on the ground, kept while you are in the other dimension and saved with the world */
 function serializeDrops() {
-  return G.drops.filter(d => !d.done && d.count > 0).map(d => [d.id, d.count, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), Math.round(d.age), d.did, d.e || 0, d.n || 0]);
+  return G.drops.filter(d => !d.done && d.count > 0).map(d => [d.id, d.count, +d.pos.x.toFixed(2), +d.pos.y.toFixed(2), +d.pos.z.toFixed(2), Math.round(d.age), d.did, d.e || 0, d.n || 0, d.c ? d.c.map(slotToArr) : 0]);
 }
 function restoreDrops(dim) {
   const list = (G.dimDrops && G.dimDrops[dim]) || [];
   for (const e of list) {
     if (!Array.isArray(e) || !DEFS[e[0]] || !(e[1] > 0) || !e.slice(2, 5).every(Number.isFinite)) continue;
-    const d = G.spawnDrop(e[0], e[1], e[2], e[3], e[4], new THREE.Vector3(0, 0, 0), { did: e[6], remote: true, e: e[7], n: e[8] });
+    const d = G.spawnDrop(e[0], e[1], e[2], e[3], e[4], new THREE.Vector3(0, 0, 0), { did: e[6], remote: true, e: e[7], n: e[8], c: Array.isArray(e[9]) ? e[9] : undefined });
     d.age = +e[5] || 0; d.pickDelay = 0;
   }
   if (G.dimDrops) G.dimDrops[dim] = [];

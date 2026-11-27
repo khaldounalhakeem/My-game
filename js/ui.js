@@ -56,7 +56,7 @@ const MC_ORDER = (() => {
   for (const c of colors) o.push('stained_glass_pane_' + c);
   o.push('bed', 'flag');
   o.push('melon', 'pumpkin', 'hay_bale', 'glowstone', 'pumpkin_seeds', 'bamboo', 'sugar_cane');
-  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'smithing_table', 'beacon', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest', 'ender_chest');
+  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'smithing_table', 'beacon', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest', 'ender_chest', 'shulker_box');
   o.push('redstone', 'redstone_torch', 'redstone_block', 'repeater', 'redstone_lamp_0', 'iron_door', 'lever', 'stone_button', 'oak_button', 'stone_pressure_plate', 'oak_pressure_plate', 'tnt');
   for (const m of mats) for (const t of ['shovel', 'pickaxe', 'axe', 'hoe']) o.push(m + '_' + t);
   o.push('bucket', 'powder_snow_bucket', 'flint_and_steel', 'lead', 'name_tag', 'boat', 'saddle', 'eye_of_ender');
@@ -170,7 +170,7 @@ const UI = {
       if (img.getAttribute('src') !== url) img.src = url;
       img.style.visibility = 'visible';
       cnt.textContent = s.count > 1 ? s.count : '';
-      el.dataset.name = (s.n ? '“' + s.n + '” ' + DEFS[s.id].name : DEFS[s.id].name) + (s.e ? ' (' + enchText(s.e) + ')' : '');
+      el.dataset.name = (s.n ? '“' + s.n + '” ' + DEFS[s.id].name : DEFS[s.id].name) + (s.e ? ' (' + enchText(s.e) + ')' : '') + (s.c ? ' (' + s.c.filter(Boolean).length + ' stacks inside)' : '');
       el.classList.toggle('ench', !!s.e);
     } else {
       img.style.visibility = 'hidden'; cnt.textContent = ''; el.dataset.name = ''; el.classList.remove('ench');
@@ -437,7 +437,7 @@ const UI = {
     this.chest = chest || null;
     this.furnace = furnace || null;
     $('chest-box').hidden = !this.chest;
-    $('chest-box').querySelector('.label').textContent = this.chest && this.chest.mob ? 'Chest on your ' + this.chest.mob.T.name.toLowerCase() : this.chest && this.chest.ender ? 'Ender Chest (only yours)' : 'Chest';
+    $('chest-box').querySelector('.label').textContent = this.chest && this.chest.mob ? 'Chest on your ' + this.chest.mob.T.name.toLowerCase() : this.chest && this.chest.ender ? 'Ender Chest (only yours)' : this.chest && this.chest.shulker ? 'Shulker Box' : 'Chest';
     $('furnace-box').hidden = !this.furnace;
     $('menu-inv').firstElementChild.classList.toggle('with-furnace', !!this.furnace);
     $('menu-inv').firstElementChild.classList.toggle('with-chest', !!this.chest);
@@ -450,7 +450,7 @@ const UI = {
   closeInventory() {
     this.closeSplit();
     if (this.cursor) {
-      const left = G.player.inv.add(this.cursor.id, this.cursor.count, this.cursor.e, this.cursor.n);
+      const left = G.player.inv.add(this.cursor.id, this.cursor.count, this.cursor.e, this.cursor.n, this.cursor.c);
       if (left) { const P = G.player; G.spawnDrop(this.cursor.id, left, P.pos.x, P.pos.y + 1.2, P.pos.z, undefined, slotExtras(this.cursor)); }
       this.cursor = null; this.moveCursor();
     }
@@ -467,7 +467,7 @@ const UI = {
     if (this.furnace) this.renderFurnace();
     if (this.chest) {
       // someone broke the chest while it was open
-      if (this.chest.mob ? this.chest.mob.dead || this.chest.mob.removed || !this.chest.mob.chestSlots : G.world.getBlock(this.chest.x, this.chest.y, this.chest.z) !== (this.chest.ender ? ID.ender_chest : ID.chest)) { this.closeInventory(); return; }
+      if (this.chest.mob ? this.chest.mob.dead || this.chest.mob.removed || !this.chest.mob.chestSlots : G.world.getBlock(this.chest.x, this.chest.y, this.chest.z) !== (this.chest.ender ? ID.ender_chest : this.chest.shulker ? ID.shulker_box : ID.chest)) { this.closeInventory(); return; }
       for (let k = 0; k < 27; k++) this.fillSlot(this.invSlots[100 + k], this.chest.slots[k]);
     }
     if (G.player.mode === 'survival') this.renderRecipes();
@@ -789,7 +789,7 @@ const UI = {
   },
   /* something taken out of the table goes back into your inventory (or onto the ground if it's full) */
   enchGiveBack(s) {
-    const P = G.player, left = P.inv.add(s.id, s.count, s.e, s.n);
+    const P = G.player, left = P.inv.add(s.id, s.count, s.e, s.n, s.c);
     if (left) G.spawnDrop(s.id, left, P.pos.x, P.pos.y + 1, P.pos.z, undefined, slotExtras(s));
     P.inv.changed();
   },

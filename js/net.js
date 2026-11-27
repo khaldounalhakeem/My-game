@@ -469,7 +469,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v73 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v74 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -648,7 +648,7 @@ const Net = {
     this.drSeq++;
     this.seenDrops.add(d.did);
     const dre = [this.drSeq, d.did, d.id, d.count, r2(d.pos.x), r2(d.pos.y), r2(d.pos.z), dimCode(G.dim)];
-    if (d.e || d.n) dre.push(d.e || 0); if (d.n) dre.push(d.n);
+    if (d.e || d.n || d.c) dre.push(d.e || 0); if (d.n || d.c) dre.push(d.n || 0); if (d.c) dre.push(d.c.map(slotToArr));
     this.dropRing.push(dre);
     if (this.dropRing.length > 45) this.dropRing.shift();
     this.sendT = 0;
@@ -926,7 +926,7 @@ const Net = {
       if (this.seenDrops.has(did) || this.pickedDrops.has(did)) continue;
       this.seenDrops.add(did);
       if (DIMS[dim] !== G.dim || !DEFS[id] || !Number.isFinite(x + y + z) || !(count > 0)) continue;
-      const nd = G.spawnDrop(id, Math.min(64, count | 0), x, y, z, new THREE.Vector3(0, 0, 0), { did, remote: true, e: e[8], n: e[9] });
+      const nd = G.spawnDrop(id, Math.min(64, count | 0), x, y, z, new THREE.Vector3(0, 0, 0), { did, remote: true, e: e[8], n: e[9], c: Array.isArray(e[10]) ? e[10] : undefined });
       nd.owner = rp.peer;
     }
     // they asked for an item our game dropped: give it to the first one to ask, if it is still there
@@ -938,7 +938,7 @@ const Net = {
           const d = G.drops.find(o => o.did === e[1] && !o.done && !o.owner);
           if (d) {
             this.giveSeq++;
-            this.giveRing.push(d.e || d.n ? [this.giveSeq, d.did, rp.peer, d.id, d.count, d.e || 0, d.n || 0] : [this.giveSeq, d.did, rp.peer, d.id, d.count]);
+            this.giveRing.push(d.e || d.n || d.c ? [this.giveSeq, d.did, rp.peer, d.id, d.count, d.e || 0, d.n || 0, d.c ? d.c.map(slotToArr) : 0] : [this.giveSeq, d.did, rp.peer, d.id, d.count]);
             if (this.giveRing.length > 20) this.giveRing.shift();
             this.dropPicked(d.did);
             d.finish();
@@ -1009,9 +1009,9 @@ const Net = {
       this.gotDrops.add(e[1]);
       for (const d of G.drops) if (d.did === e[1]) d.finish();
       if (!DEFS[e[3]] || !(e[4] > 0)) continue;
-      const P = G.player, ge = cleanEnch(e[5]), gn = cleanName(e[6]), left = P.inv.add(e[3], ge ? 1 : Math.min(64, e[4] | 0), ge, gn);
+      const P = G.player, ge = cleanEnch(e[5]), gn = cleanName(e[6]), gc = Array.isArray(e[7]) && DEFS[e[3]] && DEFS[e[3]].shulker ? new Array(27).fill(null).map((_, i) => slotFromArr(e[7][i], 64, true)) : undefined, left = P.inv.add(e[3], ge || gc ? 1 : Math.min(64, e[4] | 0), ge, gn, gc);
       G.sound.play('pickup');
-      if (left) G.spawnDrop(e[3], left, P.pos.x, P.pos.y + 1, P.pos.z, new THREE.Vector3(0, 0, 0), ge || gn ? { e: ge, n: gn } : undefined);
+      if (left) G.spawnDrop(e[3], left, P.pos.x, P.pos.y + 1, P.pos.z, new THREE.Vector3(0, 0, 0), ge || gn || gc ? { e: ge, n: gn, c: gc } : undefined);
     }
     if (Array.isArray(pr.pk)) for (const e of pr.pk) {
       if (!Array.isArray(e) || typeof e[1] !== 'string' || this.pickedDrops.has(e[1])) continue;

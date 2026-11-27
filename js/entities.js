@@ -1468,8 +1468,8 @@ function itemGeometry(id) {
 }
 
 class ItemDrop {
-  constructor(id, count, x, y, z, vel, did, e, n) {
-    this.id = id; this.count = count; this.did = did; this.e = e; this.n = n;
+  constructor(id, count, x, y, z, vel, did, e, n, c) {
+    this.id = id; this.count = count; this.did = did; this.e = e; this.n = n; this.c = c;
     this.pos = new V3(x, y, z);
     this.vel = vel ? vel.clone() : new V3((Math.random() - 0.5) * 3, 4 + Math.random() * 2, (Math.random() - 0.5) * 3);
     this.w = 0.3; this.h = 0.3; this.age = 0; this.done = false; this.pickDelay = 0.6;
@@ -1501,7 +1501,7 @@ class ItemDrop {
     this.mesh.rotation.y = this.age * 1.6;
     const P = G.player;
     // with a full inventory, items stay where they are instead of following you around
-    if (!P.dead && this.age > this.pickDelay && P.inv.hasRoom(this.id, this.e, this.n)) {
+    if (!P.dead && this.age > this.pickDelay && P.inv.hasRoom(this.id, this.e || this.c, this.n)) {
       const dx = P.pos.x - this.pos.x, dy = (P.pos.y + 0.8) - this.pos.y, dz = P.pos.z - this.pos.z;
       const d = Math.hypot(dx, dy, dz);
       if (d < 1.6) {
@@ -1509,7 +1509,7 @@ class ItemDrop {
         if (this.owner && Net.ownerHere(this.owner)) {
           if (!this.askedAt || performance.now() - this.askedAt > 2500) { this.askedAt = performance.now(); Net.askForDrop(this); }
         } else {
-          const left = P.inv.add(this.id, this.count, this.e, this.n);
+          const left = P.inv.add(this.id, this.count, this.e, this.n, this.c);
           if (left < this.count) G.sound.play('pickup');
           this.count = left;
           if (left === 0) { Net.dropPicked(this.did); return this.finish(); }

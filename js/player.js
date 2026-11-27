@@ -4,8 +4,9 @@
 class Inventory {
   constructor() { this.slots = new Array(40).fill(null); this.version = 0; } // 0-8 hotbar, 9-35 backpack, 36-39 armor
   changed() { this.version++; }
-  add(id, count, e, n) {
+  add(id, count, e, n, c) {
     const max = DEFS[id].stack || 64;
+    if (c) { for (let i = 0; i < 36 && count > 0; i++) if (!this.slots[i]) { const s = { id, count: 1, c }; if (e) s.e = e; if (n) s.n = n; this.slots[i] = s; count--; } this.changed(); return count; }
     if (e) { for (let i = 0; i < 36 && count > 0; i++) if (!this.slots[i]) { this.slots[i] = n ? { id, count: 1, e, n } : { id, count: 1, e }; count--; } this.changed(); return count; }
     if (n) { for (let i = 0; i < 36 && count > 0; i++) { const s = this.slots[i]; if (s && s.id === id && s.n === n && !s.e && s.count < max) { const k = Math.min(max - s.count, count); s.count += k; count -= k; } } for (let i = 0; i < 36 && count > 0; i++) if (!this.slots[i]) { const k = Math.min(max, count); this.slots[i] = { id, count: k, n }; count -= k; } this.changed(); return count; }
     for (let i = 0; i < 36 && count > 0; i++) {
@@ -431,6 +432,7 @@ class Player {
     const ad = above && DEFS[above];
     if (ad && (ad.cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.repeater || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
+    if (def.shulker) G.breakShulker(x, y, z);
     if (DEFS[id].base === 'furnace') G.breakFurnace(x, y, z);
     if (DEFS[id].sign) G.setSign(x, y, z, null);
     if (def.lever || def.button || def.plate) G.switchGone(x, y, z, def);
@@ -770,6 +772,7 @@ class Player {
       if (b.id === ID.smithing_table) { G.ui.openSmithing(); return; }
       if (b.id === ID.bed || b.id === ID.bed_head || DEFS[b.id].bedPart) { this.useCd = 1; G.sleep(b); return; }
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
+      if (DEFS[b.id].shulker) { this.useCd = 0.5; this.swing = 1; G.openShulker(b.x, b.y, b.z); return; }
       if (b.id === ID.ender_chest) { this.useCd = 0.5; this.swing = 1; G.openEnderChest(b.x, b.y, b.z); return; }
       if (DEFS[b.id].base === 'furnace') { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
       if (DEFS[b.id].beacon) { this.useCd = 0.4; G.ui.openBeacon(b.x, b.y, b.z); return; }
@@ -878,6 +881,10 @@ class Player {
       const d = bedHead[0] > px ? 'e' : bedHead[0] < px ? 'w' : bedHead[2] > pz ? 's' : 'n';
       W.setBlock(px, py, pz, ID['bed_foot_' + d]);
       W.setBlock(bedHead[0], bedHead[1], bedHead[2], ID['bed_head_' + d]);
+    } else if (hd.shulker) {
+      // a shulker box keeps what was inside it
+      W.setBlock(px, py, pz, hd.id);
+      G.placeShulker(px, py, pz, this.heldSlot());
     } else if (hd.base && hd.facing) {
       // furnaces, crafting tables, jack o'lanterns...: the front faces you
       const L = this.lookDir(), f = Math.abs(L.x) > Math.abs(L.z) ? (L.x > 0 ? 'w' : 'e') : (L.z > 0 ? 'n' : 's');
