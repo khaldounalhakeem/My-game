@@ -145,15 +145,19 @@ function buildPlayerModel(skinIdx) {
 }
 
 /* ---------- armor on a player model ---------- */
-const ARMOR_COLORS = { leather: 0x8a4f2a, golden: 0xf5cc2e, iron: 0xdcdcdc, diamond: 0x5decf5 };
+const ARMOR_COLORS = { leather: 0x8a4f2a, golden: 0xf5cc2e, iron: 0xdcdcdc, diamond: 0x5decf5, netherite: 0x4a4446 };
 const armorMats = {};
-function armorMat(id) {
-  const def = DEFS[id], k = def ? def.key.split('_')[0] : 'iron';
-  return armorMats[k] || (armorMats[k] = lam(ARMOR_COLORS[k] || 0xdcdcdc));
+/* enchanted armor shimmers purple (the glow pulses: see GLINT_MATS in the game loop) */
+const GLINT_MATS = [];
+function armorMat(id, shiny) {
+  const def = DEFS[id], k = def ? def.key.split('_')[0] : 'iron', key = k + (shiny ? '_e' : '');
+  if (!armorMats[key]) { armorMats[key] = lam(ARMOR_COLORS[k] || 0xdcdcdc, shiny ? { emissive: 0x7a3ad8 } : undefined); if (shiny) GLINT_MATS.push(armorMats[key]); }
+  return armorMats[key];
 }
-/* ids: [helmet, chestplate, leggings, boots], 0 or an item id each */
-function dressModel(m, ids) {
-  const sig = ids.join(',');
+/* ids: [helmet, chestplate, leggings, boots], 0 or an item id each; ench: which of them are enchanted (bits 1, 2, 4, 8) */
+function dressModel(m, ids, ench) {
+  ench = ench || 0;
+  const sig = ids.join(',') + '|' + ench;
   if (m.armorSig === sig) return;
   m.armorSig = sig;
   for (const o of m.armorParts || []) if (o.parent) o.parent.remove(o);
@@ -163,7 +167,7 @@ function dressModel(m, ids) {
   const ok = (id, slot) => id && DEFS[id] && DEFS[id].armor && DEFS[id].armor.slot === slot;
   const [helmet, chest, legs, boots] = ids;
   if (ok(helmet, 0)) {
-    const M = armorMat(helmet);
+    const M = armorMat(helmet, ench & 1);
     add(P.head, 0.6, 0.18, 0.6, M, 0, 0.22, 0);            // top
     add(P.head, 0.6, 0.42, 0.07, M, 0, 0.02, -0.27);       // back
     add(P.head, 0.07, 0.42, 0.6, M, -0.27, 0.02, 0);       // sides
@@ -171,17 +175,17 @@ function dressModel(m, ids) {
     add(P.head, 0.6, 0.09, 0.07, M, 0, 0.12, 0.27);        // brow above the face
   }
   if (ok(chest, 1)) {
-    const M = armorMat(chest);
+    const M = armorMat(chest, ench & 2);
     add(g, 0.58, 0.64, 0.33, M, 0, 1.17, 0);
     for (const a of P.arms) add(a, 0.31, 0.34, 0.31, M, 0, -0.13, 0);
   }
   if (ok(legs, 2)) {
-    const M = armorMat(legs);
+    const M = armorMat(legs, ench & 4);
     add(g, 0.56, 0.2, 0.31, M, 0, 0.86, 0);
     for (const l of P.legs) add(l, 0.3, 0.5, 0.3, M, 0, -0.25, 0);
   }
   if (ok(boots, 3)) {
-    const M = armorMat(boots);
+    const M = armorMat(boots, ench & 8);
     for (const l of P.legs) add(l, 0.31, 0.22, 0.33, M, 0, -0.65, 0.01);
   }
 }
@@ -629,7 +633,7 @@ class Mob {
     if (this.T.horsey && hd && /_sword$|_axe$/.test(hd.key) && !P.riding) return false;
     if (this.T.horsey || this.T.boat || this.leash || this.type === 'villager') return true;
     if (hd && hd.key === 'lead' && !this.T.hostile) return true;
-    if (this.type === 'wolf') return this.tame || !!(hd && hd.key === 'bone');
+    if (this.type === 'wolf') return (this.tame && !(hd && /_sword$|_axe$/.test(hd.key))) || !!(hd && hd.key === 'bone');
     return false;
   }
 
@@ -829,11 +833,19 @@ class Mob {
           if (t.remote) { G.lastAttacker = this; t.hurt(4, this.pos, 5, true, 'A wolf bit you.'); } // a player: they take the bite on their own device
           else t.hurt(4, this.pos, 5, !!t.remoteCtl); // a mob another device runs: send it the bite
         }
+      } else if (P.sleeping && !P.dead) {
+        // you went to bed: your wolf lies down on its dog bed (if there is one near), or sits beside you
+        if (!this.bedSpot) this.bedSpot = G.findDogBed(P.sleeping.x, P.sleeping.y, P.sleeping.z) || { x: P.sleeping.x + 1.5, y: P.sleeping.y, z: P.sleeping.z + 0.5, none: true };
+        const b = this.bedSpot;
+        this.pos.set(b.none ? b.x : b.x + 0.5, b.none ? G.world.surfaceY(Math.floor(b.x), Math.floor(b.z)) + 1 : b.y + 0.25, b.none ? b.z : b.z + 0.5); this.vel.set(0, 0, 0);
+        this.resting = true;
       } else if (!this.sitting && !P.dead) {
-        const dx = P.pos.x - this.pos.x, dz = P.pos.z - this.pos.z, l = Math.hypot(dx, dz);
-        if (l > 24) { this.pos.set(P.pos.x + (Math.random() - 0.5) * 2, P.pos.y, P.pos.z + (Math.random() - 0.5) * 2); this.vel.set(0, 0, 0); }
-        else if (l > 3) { moveX = dx / l; moveZ = dz / l; speed = l > 8 ? 5 : 3.5; this.yaw = Math.atan2(moveX, moveZ); }
-      }
+        this.resting = false; this.bedSpot = null;
+        const dx = P.pos.x - this.pos.x, dz = P.pos.z - this.pos.z, l = Math.hypot(dx, dz), up = Math.abs(P.pos.y - this.pos.y);
+        // walk and run with you (as fast as a horse when it has to); jump to you only when you're far away, or far above or below
+        if (l > 32 || (up > 8 && l < 12 && P.onGround) || (up > 20)) { this.pos.set(P.pos.x + (Math.random() - 0.5) * 2, P.pos.y, P.pos.z + (Math.random() - 0.5) * 2); this.vel.set(0, 0, 0); }
+        else if (l > 3) { moveX = dx / l; moveZ = dz / l; speed = l > 14 ? 8.5 : l > 7 ? 5.5 : 3.5; this.yaw = Math.atan2(moveX, moveZ); }
+      } else { this.resting = false; this.bedSpot = null; }
     } else if (golemTarget) {
       const dx = golemTarget.pos.x - this.pos.x, dz = golemTarget.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
       moveX = dx / l; moveZ = dz / l;
@@ -986,7 +998,7 @@ class Mob {
     else this.parts.legs.forEach((L, i) => { L.rotation.x = (i % 2 === (i < 2 ? 0 : 1) ? sw : -sw); });
     if (this.type === 'wolf') {
       if (this.parts.tail) this.parts.tail.rotation.y = this.tame ? Math.sin(performance.now() / 120) * 0.5 : 0;
-      if (this.sitting) this.parts.legs.forEach((L, i) => { L.rotation.x = i >= 2 ? -1.2 : 0; });
+      if (this.sitting || this.resting) this.parts.legs.forEach((L, i) => { L.rotation.x = i >= 2 ? -1.2 : 0; });
     }
     if (this.type === 'iron_golem') {
       this.swingT = Math.max(0, (this.swingT || 0) - dt);
@@ -1038,6 +1050,7 @@ class Mob {
     }
     const f = this.netFlags || 0;
     this.tame = !!(f & 2); this.sitting = !!(f & 4);
+    if (this.type === 'wolf' && this.sitting) this.parts.legs.forEach((L, i) => { L.rotation.x = i >= 2 ? -1.2 : 0; });
     const small = !!(f & 32);
     if (small !== this.baby) { if (small) this.makeBaby(9999); else this.growUp(); }
     if (this.parts.collar) this.parts.collar.visible = this.tame;

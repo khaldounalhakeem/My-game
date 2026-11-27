@@ -704,6 +704,10 @@ for (const [k, c] of Object.entries(SHULKER_COLORS)) {
 }
 makeTile('shulker_top', P => { P.fill(0x8a5a9a, 6); P.speck(0x7a4a8a, 0.2, 4); P.rect(0, 0, 16, 1, 0x5a3a6a); P.rect(0, 0, 1, 16, 0x5a3a6a); P.rect(15, 0, 1, 16, 0x5a3a6a); P.rect(0, 15, 16, 1, 0x5a3a6a); P.rect(5, 5, 6, 6, 0x6a3a7a); });
 makeTile('shulker_side', P => { P.fill(0x8a5a9a, 6); P.speck(0x7a4a8a, 0.2, 4); P.rect(0, 0, 16, 1, 0x5a3a6a); P.rect(0, 15, 16, 1, 0x5a3a6a); P.rect(0, 0, 1, 16, 0x5a3a6a); P.rect(15, 0, 1, 16, 0x5a3a6a); P.rect(0, 9, 16, 2, 0x5a3a6a); P.rect(0, 8, 16, 1, 0xa87ab8); });
+/* dog bed */
+makeTile('dog_bed_top', P => { P.fill(0xb83a3a, 6); P.rect(0, 0, 16, 2, 0x8a6a3a); P.rect(0, 14, 16, 2, 0x8a6a3a); P.rect(0, 0, 2, 16, 0x8a6a3a); P.rect(14, 0, 2, 16, 0x8a6a3a); P.rect(4, 4, 8, 8, 0xd85a5a, 4); });
+makeTile('dog_bed_side', P => { pPlanks(0x8a6a3a)(P); P.rect(0, 10, 16, 3, 0xb83a3a); });
+makeTile('i_dog_bed', pPlant(P => { P.rect(1, 9, 14, 5, 0x8a6a3a); P.rect(2, 8, 12, 3, 0xb83a3a); P.rect(4, 8, 8, 1, 0xd85a5a); P.rect(1, 13, 14, 1, 0x5a4020); }));
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -1074,6 +1078,8 @@ block('ender_chest', 'Ender Chest', { top: 'ender_chest_top', side: 'ender_chest
 block('shulker_box', 'Shulker Box', { top: 'shulker_top', side: 'shulker_side' }, { hardness: 2, drop: null, shulker: true, stack: 1 });
 /* shulker boxes in every wool colour (purple is the first one) */
 for (const k of Object.keys(SHULKER_COLORS)) block('shulker_box_' + k, k[0].toUpperCase() + k.slice(1) + ' Shulker Box', { top: 'shulker_top_' + k, side: 'shulker_side_' + k }, { hardness: 2, drop: null, shulker: true, stack: 1 });
+/* a small bed for your dog: when you sleep, your wolf sleeps on it */
+block('dog_bed', 'Dog Bed', { top: 'dog_bed_top', side: 'dog_bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.3, solid: false, opaque: false, box: [0.0625, 0, 0.0625, 0.9375, 0.25, 0.9375], boxes: [[0.0625, 0, 0.0625, 0.9375, 0.25, 0.9375]], iconTile: 'i_dog_bed' });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1381,7 +1387,7 @@ const RECIPES = [
   ['paper', 3, { sugar_cane: 3 }, 'table'], ['book', 1, { paper: 3, leather: 1 }], ['bookshelf', 1, { '#planks': 6, book: 3 }, 'table'],
   ['enchanting_table', 1, { book: 1, diamond: 2, obsidian: 4 }, 'table'],
   ['redstone_torch', 1, { redstone: 1, stick: 1 }], ['redstone_lamp_0', 1, { redstone: 4, glowstone: 1 }, 'table'], ['repeater', 1, { redstone_torch: 2, redstone: 1, stone: 3 }, 'table'],
-  ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['shulker_box', 1, { chest: 1, wool_purple: 1 }], ...Object.keys(SHULKER_COLORS).map(k => ['shulker_box_' + k, 1, { chest: 1, ['wool_' + k]: 1 }]), ['ender_chest', 1, { obsidian: 8, eye_of_ender: 1 }, 'table'], ['beacon', 1, { glass: 5, obsidian: 3, nether_star: 1 }, 'table'], ['smithing_table', 1, { iron_ingot: 2, '#planks': 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
+  ['anvil', 1, { iron_block: 3, iron_ingot: 4 }, 'table'], ['shulker_box', 1, { chest: 1, wool_purple: 1 }], ['dog_bed', 1, { wool_red: 1, '#planks': 2 }], ...Object.keys(SHULKER_COLORS).map(k => ['shulker_box_' + k, 1, { chest: 1, ['wool_' + k]: 1 }]), ['ender_chest', 1, { obsidian: 8, eye_of_ender: 1 }, 'table'], ['beacon', 1, { glass: 5, obsidian: 3, nether_star: 1 }, 'table'], ['smithing_table', 1, { iron_ingot: 2, '#planks': 4 }, 'table'], ['iron_door', 3, { iron_ingot: 6 }, 'table'], ['name_tag', 1, { paper: 1, string: 1 }],
   ['lever', 1, { stick: 1, cobblestone: 1 }], ['stone_button', 1, { stone: 1 }], ['oak_button', 1, { '#planks': 1 }], ['stone_pressure_plate', 1, { stone: 2 }, 'table'], ['oak_pressure_plate', 1, { '#planks': 2 }, 'table'],
   ['bamboo_block', 1, { bamboo: 9 }], ['bamboo_planks', 2, { bamboo_block: 1 }], ['stick', 1, { bamboo: 2 }],
   ...['mangrove', 'cherry'].flatMap(w => { const pk = w + '_planks'; return [[pk, 4, { [w + '_log']: 1 }], [w + '_stairs', 4, { [pk]: 6 }, 'table'], [w + '_slab', 6, { [pk]: 3 }, 'table'], [w + '_door', 3, { [pk]: 6 }, 'table'], [w + '_trapdoor', 2, { [pk]: 6 }, 'table'], [w + '_fence', 3, { [pk]: 4, stick: 2 }, 'table'], [w + '_fence_gate', 1, { [pk]: 2, stick: 4 }, 'table']]; }),

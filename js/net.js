@@ -369,7 +369,7 @@ const Net = {
         m: P.mode === 'creative' ? 1 : 0, d: dimCode(G.dim), p: [r2(P.pos.x), r2(P.pos.y), r2(P.pos.z)], r: [r3(P.yaw), r3(P.pitch)],
         s: r2(P.swing), h: held ? held.id : 0, x: P.dead ? 1 : 0, e: this.ring, a: this.hits,
         sl: P.sleeping ? 1 : 0, sb: P.sleeping ? [P.sleeping.x, P.sleeping.y, P.sleeping.z] : null,
-        ar: [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0)), ex: this.blasts,
+        ar: [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0)), ae: [36, 37, 38, 39].reduce((m, i, k) => m | (P.inv.slots[i] && P.inv.slots[i].e ? 1 << k : 0), 0), ex: this.blasts,
         mh: this.mobHits, rq: this.askRing, gv: this.giveRing, gm: this.giveMobRing,
         ws: this.wsInfo || null,
         rd: P.riding && P.riding.nid ? [P.riding.nid, P.seat || 0] : null,
@@ -470,7 +470,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v75 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v76 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -574,9 +574,12 @@ const Net = {
   ownedMobs() {
     const out = [], P = G.player, players = [P.pos, ...this.proxies().map(p => p.pos)];
     const near = pos => players.some(q => Math.abs(q.x - pos.x) < 96 && Math.abs(q.z - pos.z) < 96);
-    for (const m of G.mobs) {
-      if (m.remoteCtl || m.removed || !near(m.pos) || out.length >= 45) continue;
-      const flags = (m.dead ? 1 : 0) | (m.tame ? 2 : 0) | (m.sitting ? 4 : 0) | (m.fuse > 0 ? 8 : 0) | (m.angry ? 16 : 0) | (m.baby ? 32 : 0)
+    // pets and ridden animals first, then the closest: only 45 fit, and one left out vanishes on the friend's screen
+    const dist = m => Math.min(...players.map(q => Math.abs(q.x - m.pos.x) + Math.abs(q.z - m.pos.z)));
+    const order = G.mobs.filter(m => !m.remoteCtl && !m.removed && near(m.pos)).map(m => [m, (m.tame || m.rider || m.leash || m.customName || m.T.boat ? -1e6 : 0) + dist(m)]).sort((a, b) => a[1] - b[1]).map(a => a[0]);
+    for (const m of order) {
+      if (out.length >= 45) break;
+      const flags = (m.dead ? 1 : 0) | (m.tame ? 2 : 0) | (m.sitting || m.resting ? 4 : 0) | (m.fuse > 0 ? 8 : 0) | (m.angry ? 16 : 0) | (m.baby ? 32 : 0)
         | ((HORSE_ARMOR_KEYS.indexOf(m.armor) + 1) << 6) | (m.chestSlots ? 512 : 0) | (Math.max(0, JOB_NAMES.indexOf(m.prof || null)) << 10);
       out.push(m.customName ? [m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags, m.customName] : [m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags]);
     }
@@ -1201,7 +1204,7 @@ const Net = {
       if (!rp.model) this.makeModel(rp, skin);
       if (first) rp.model.group.position.set(pos[0], pos[1], pos[2]);
     }
-    if (rp.model) dressModel(rp.model, Array.isArray(pr.ar) && pr.ar.length === 4 ? pr.ar.map(v => (isInt(v) ? v : 0)) : [0, 0, 0, 0]);
+    if (rp.model) dressModel(rp.model, Array.isArray(pr.ar) && pr.ar.length === 4 ? pr.ar.map(v => (isInt(v) ? v : 0)) : [0, 0, 0, 0], isInt(pr.ae) ? pr.ae & 15 : 0);
     // explosions on their screen: everyone works out their own damage from where they really are
     if (Array.isArray(pr.ex)) {
       let top = rp.lastEx || 0;

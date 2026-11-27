@@ -56,7 +56,7 @@ const MC_ORDER = (() => {
   for (const c of colors) o.push('stained_glass_pane_' + c);
   o.push('bed', 'flag');
   o.push('melon', 'pumpkin', 'hay_bale', 'glowstone', 'pumpkin_seeds', 'bamboo', 'sugar_cane');
-  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'smithing_table', 'beacon', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest', 'ender_chest', 'shulker_box', 'shulker_box_white', 'shulker_box_red', 'shulker_box_orange', 'shulker_box_yellow', 'shulker_box_green', 'shulker_box_blue', 'shulker_box_black');
+  o.push('torch', 'lantern', 'crafting_table', 'fletching_table', 'grindstone', 'furnace', 'smoker', 'blast_furnace', 'composter', 'enchanting_table', 'anvil', 'smithing_table', 'beacon', 'lectern', 'bookshelf', 'ladder', 'oak_sign', 'chest', 'ender_chest', 'dog_bed', 'shulker_box', 'shulker_box_white', 'shulker_box_red', 'shulker_box_orange', 'shulker_box_yellow', 'shulker_box_green', 'shulker_box_blue', 'shulker_box_black');
   o.push('redstone', 'redstone_torch', 'redstone_block', 'repeater', 'redstone_lamp_0', 'iron_door', 'lever', 'stone_button', 'oak_button', 'stone_pressure_plate', 'oak_pressure_plate', 'tnt');
   for (const m of mats) for (const t of ['shovel', 'pickaxe', 'axe', 'hoe']) o.push(m + '_' + t);
   o.push('bucket', 'powder_snow_bucket', 'flint_and_steel', 'lead', 'name_tag', 'boat', 'saddle', 'eye_of_ender');

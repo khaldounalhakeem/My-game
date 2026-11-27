@@ -1131,6 +1131,17 @@ G.placeShulker = (x, y, z, held) => {
   G.chests[k] = held && held.c ? held.c.map(s => (s ? copySlot(s, s.count) : null)) : new Array(27).fill(null);
   G.chestChanged(k);
 };
+/* the nearest dog bed to where you sleep (or nothing) */
+G.findDogBed = (x, y, z) => {
+  const W = G.world;
+  let best = null, bd = Infinity;
+  for (let dy = -3; dy <= 3; dy++) for (let dz = -12; dz <= 12; dz++) for (let dx = -12; dx <= 12; dx++) {
+    if (W.getBlock(x + dx, y + dy, z + dz) !== ID.dog_bed) continue;
+    const d = dx * dx + dy * dy + dz * dz;
+    if (d < bd) { bd = d; best = { x: x + dx, y: y + dy, z: z + dz }; }
+  }
+  return best;
+};
 G.openShulker = (x, y, z) => {
   const slots = G.chestSlots(x, y, z, true);
   G.sound.play('click');
@@ -2252,7 +2263,8 @@ function frame(now) {
   G.hand.visible = !P.dead && G.camMode === 0;
   // armor you are wearing: on your body in the other camera views, and the chestplate sleeve on your arm
   const worn = [36, 37, 38, 39].map(i => (P.inv.slots[i] ? P.inv.slots[i].id : 0));
-  dressModel(G.playerModel, worn);
+  dressModel(G.playerModel, worn, [36, 37, 38, 39].reduce((m, i, k) => m | (P.inv.slots[i] && P.inv.slots[i].e ? 1 << k : 0), 0));
+  { const k = 0.35 + 0.35 * Math.sin(performance.now() / 300); for (const M of GLINT_MATS) M.emissiveIntensity = k; }
   G.handSleeve.visible = !!worn[1];
   if (worn[1]) G.handSleeve.material.color.setHex(ARMOR_COLORS[DEFS[worn[1]].key.split('_')[0]] || 0xdcdcdc);
   const sw = Math.sin(P.swing * Math.PI);
