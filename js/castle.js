@@ -21,7 +21,7 @@ function castleData() {
   const sign = (x, y, z, dir, lines) => { put(x, y, z, 'wall_sign_' + dir); signs.push([x, y, z, lines]); };
   const post = (x, y, z, dir, lines) => { put(x, y, z, 'sign_' + dir); signs.push([x, y, z, lines]); };
   const chest = (x, y, z, items) => { put(x, y, z, 'chest'); chests.push([x, y, z, items]); };
-  const bed = (x, y, z) => { put(x, y, z, 'bed'); put(x, y, z + 1, 'bed_head'); };
+  const bed = (x, y, z) => { put(x, y, z, 'bed_foot_s'); put(x, y, z + 1, 'bed_head_s'); }; // foot here, pillow one block south
   const lampPost = (x, z) => { put(x, 1, z, 'oak_fence'); put(x, 2, z, 'oak_fence'); put(x, 3, z, 'lantern'); };
 
   /* the ground: a flat grass field, cleared of trees and hills */
@@ -257,16 +257,41 @@ function castleData() {
   for (let z = r.z0; z <= r.z1; z++) for (const y of [8, 9, 10]) put(r.x0, y, z, 'bookshelf');
   put(-12, 8, -23, 'lectern'); box(-15, 8, -21, -9, 8, -21, 'carpet_red'); put(-6, 8, -20, 'lantern'); put(-16, 8, -20, 'lantern');
   chest(-6, 8, -26, [['book', 32], ['paper', 64], ['map', 4], ['compass', 2], ['clock', 1], ['feather', 16]]);
-  r = label(7, 1, 0, ["NABIL'S ROOM", '', 'Keep out,', 'Omar! :)']);
-  bed(17, 8, -7); bed(18, 8, -7); put(16, 8, -7, 'lantern'); put(19, 8, -7, 'lantern');
-  box(10, 8, -6, 17, 8, -1, 'carpet_blue'); put(5, 8, -8, 'jukebox'); put(5, 8, 1, 'crafting_table');
-  chest(19, 8, 1, [['netherite_sword', 1], ['golden_apple', 8], ['ender_pearl', 16], ['diamond', 16], ['steak', 32]]);
-  chest(17, 8, 1, [['name_tag', 4], ['bone', 32], ['lead', 4], ['firework_rocket', 32]]);
-  r = label(7, 1, 1, ["OMAR'S ROOM", '', 'Keep out,', 'Nabil! :)']);
-  bed(17, 8, -16); bed(18, 8, -16); put(16, 8, -16, 'lantern'); put(19, 8, -16, 'lantern');
-  box(10, 8, -15, 17, 8, -11, 'carpet_green'); put(5, 8, -17, 'jukebox'); put(5, 8, -10, 'crafting_table');
-  chest(19, 8, -10, [['netherite_sword', 1], ['golden_apple', 8], ['ender_pearl', 16], ['diamond', 16], ['steak', 32]]);
-  chest(17, 8, -10, [['name_tag', 4], ['bone', 32], ['lead', 4], ['firework_rocket', 32]]);
+  /* a king's bedroom: a royal bed with a canopy and gold headboard, nightstands, a fireplace with armchairs,
+     a chandelier, a desk, a wardrobe and a royal carpet (blue for Nabil, green for Omar) */
+  const kingRoom = (z0, z1, color, chestA, chestB, trim, head, lamp) => {
+    const y = 8, c = Math.floor((z0 + z1) / 2);
+    box(4, y, z0, 19, y, z1, 'carpet_' + color); // the carpet, with a gold border
+    for (let x = 4; x <= 19; x++) { put(x, y, z0, 'carpet_' + trim); put(x, y, z1, 'carpet_' + trim); }
+    for (let z = z0; z <= z1; z++) { put(4, y, z, 'carpet_' + trim); put(19, y, z, 'carpet_' + trim); }
+    // the king-size bed: two beds side by side, pillows against the east wall
+    for (const bz of [c - 1, c]) { put(18, y, bz, 'bed_foot_e'); put(19, y, bz, 'bed_head_e'); }
+    box(20, y + 1, c - 2, 20, y + 3, c + 1, head); // the headboard
+    for (const [px, pz] of [[17, c - 2], [17, c + 1], [19, c - 2], [19, c + 1]]) box(px, y, pz, px, y + 3, pz, 'dark_oak_fence'); // canopy posts
+    box(17, y + 4, c - 2, 19, y + 4, c + 1, 'wool_' + color); // the canopy
+    box(17, y + 4, c - 2, 17, y + 4, c + 1, 'wool_' + trim);
+    put(16, y, c - 1, 'carpet_white'); put(16, y, c, 'carpet_white'); // a little rug at the foot of the bed
+    // nightstands with lanterns
+    for (const nz of [c - 3, c + 2]) { put(19, y, nz, 'barrel'); put(19, y + 1, nz, lamp); }
+    // a fireplace on the north wall, with two armchairs facing it
+    box(9, y, z0, 13, y + 3, z0, 'bricks'); box(10, y, z0, 12, y + 1, z0, 0); put(11, y, z0, 'campfire');
+    put(9, y + 4, z0, 'bricks'); put(13, y + 4, z0, 'bricks'); box(10, y + 4, z0, 12, y + 4, z0, 'x_smooth_stone_slab_b');
+    put(10, y, z0 + 3, 'oak_stairs_s'); put(12, y, z0 + 3, 'oak_stairs_s'); put(11, y, z0 + 3, 'carpet_white');
+    // a chandelier
+    put(11, y + 5, c, 'chain'); put(11, y + 4, c, 'chain'); put(11, y + 3, c, lamp);
+    // a desk with bookshelves, a wardrobe of chests, a jukebox
+    box(5, y, z1, 7, y + 2, z1, 'bookshelf'); put(8, y, z1, 'crafting_table'); put(9, y, z1, 'lectern');
+    chest(13, y, z1, chestA); chest(14, y, z1, chestB); put(15, y, z1, 'jukebox'); put(16, y, z1, 'barrel'); put(16, y + 1, z1, lamp);
+    // a gold statue-stand and lights in the corners
+    put(5, y, z0, head); put(5, y + 1, z0, lamp);
+    put(15, y, z0, lamp);
+  };
+  const KING_A = [['netherite_sword', 1], ['golden_apple', 8], ['ender_pearl', 16], ['diamond', 16], ['steak', 32]];
+  const KING_B = [['name_tag', 4], ['bone', 32], ['lead', 4], ['firework_rocket', 32], ['golden_helmet', 1]];
+  r = label(7, 1, 0, ["NABIL'S ROOM", 'King Nabil', 'Keep out,', 'Omar! :)']);
+  kingRoom(r.z0, r.z1, 'red', KING_A, KING_B, 'yellow', 'gold_block', 'lantern'); // Nabil: red and gold
+  r = label(7, 1, 1, ["OMAR'S ROOM", 'King Omar', 'Keep out,', 'Nabil! :)']);
+  kingRoom(r.z0, r.z1, 'blue', KING_A, KING_B, 'light_blue', 'lapis_block', 'soul_lantern'); // Omar: all blue
   r = label(7, 1, 2, ['STAIRS', 'UP AND DOWN', '', '']);
 
   /* ---------- second floor ---------- */
