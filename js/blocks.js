@@ -18,6 +18,15 @@ function makeTile(name, paint) {
   TILES[name] = i;
   const img = actx.createImageData(TILE, TILE), D = img.data;
   const rng = mulberry32(hashStr(name) + 1337);
+  const P = painterFor(D, rng);
+  paint(P);
+  actx.putImageData(img, (i % ATLAS_N) * TILE, Math.floor(i / ATLAS_N) * TILE);
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let k = 0; k < D.length; k += 4) if (D[k + 3] > 100) { r += D[k]; g += D[k + 1]; b += D[k + 2]; n++; }
+  TILE_AVG[i] = n ? [Math.round(r / n), Math.round(g / n), Math.round(b / n)] : [255, 255, 255];
+  return i;
+}
+function painterFor(D, rng) {
   const P = {
     rng,
     put(x, y, c, a = 255) {
@@ -44,12 +53,21 @@ function makeTile(name, paint) {
     clear() { D.fill(0); },
     erase(x, y) { D[(y * 16 + x) * 4 + 3] = 0; },
   };
-  paint(P);
-  actx.putImageData(img, (i % ATLAS_N) * TILE, Math.floor(i / ATLAS_N) * TILE);
-  let r = 0, g = 0, b = 0, n = 0;
-  for (let k = 0; k < D.length; k += 4) if (D[k + 3] > 100) { r += D[k]; g += D[k + 1]; b += D[k + 2]; n++; }
-  TILE_AVG[i] = n ? [Math.round(r / n), Math.round(g / n), Math.round(b / n)] : [255, 255, 255];
-  return i;
+  return P;
+}
+/* ---------- moving pictures, like Minecraft: water, lava, fire, portals, lanterns... ----------
+   Each one gets a few frames, drawn once here; the game swaps them into the picture sheet as time goes by. */
+const ANIM_TILES = [];
+function animTile(name, n, ms, paint) {
+  const i = TILES[name];
+  if (i === undefined) return;
+  const frames = [];
+  for (let f = 0; f < n; f++) {
+    const img = actx.createImageData(TILE, TILE);
+    paint(painterFor(img.data, mulberry32(hashStr(name) + 1337 + f * 7919)), f, n);
+    frames.push(img);
+  }
+  ANIM_TILES.push({ i, frames, ms, f: 0 });
 }
 
 /* ---------- painters ---------- */
@@ -825,6 +843,82 @@ makeTile('bed_head_top_n', pBedTop('z', 'top')); makeTile('bed_head_top_s', pBed
 makeTile('bed_head_top_w', pBedTop('x', 'left')); makeTile('bed_head_top_e', pBedTop('x', 'right'));
 DEFS[0] = { id: 0, key: 'air', name: 'Air', isBlock: true, solid: false, opaque: false, hardness: 0, faces: [0, 0, 0, 0, 0, 0], color: [255, 255, 255] };
 ID.air = 0;
+
+/* the animations themselves */
+const waveRows = [[2, 3], [5, 9], [8, 1], [11, 6], [14, 11], [0, 12]];
+animTile('water', 16, 140, (P, f) => {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const v = Math.sin((x + f) * 0.8 + Math.sin((y - f) * 0.5) * 1.5) + Math.sin((y + f * 0.5) * 0.7 - x * 0.3);
+    P.put(x, y, v > 1.2 ? [90, 140, 240] : v > 0.2 ? [60, 112, 222] : [47, 98, 212]);
+  }
+  for (const [y0, x0] of waveRows) { const y = (y0 + f) % 16; for (let k = 0; k < 4; k++) P.put((x0 + k + (f >> 1)) % 16, y, [110, 160, 245]); }
+});
+animTile('lava', 16, 180, (P, f) => {
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const v = Math.sin(x * 0.7 + f * 0.39) + Math.sin(y * 0.6 - f * 0.39 * 0.7) + Math.sin((x + y) * 0.45 + f * 0.2);
+    P.put(x, y, v > 1.6 ? [255, 220, 90] : v > 0.6 ? [247, 162, 27] : v > -0.8 ? [214, 90, 22] : [180, 60, 16]);
+  }
+});
+animTile('fire', 8, 70, (P, f) => {
+  P.clear();
+  for (let x = 0; x < 16; x++) {
+    const h = 6 + ((Math.sin(x * 1.7 + f * 0.9) + 1) * 3.5 + P.rng() * 4 | 0);
+    for (let j = 0; j < h; j++) { const t = j / h; P.put(x, 15 - j, t < 0.35 ? 0xffe36a : t < 0.7 ? 0xff9a1a : 0xe0441a); }
+  }
+});
+animTile('portal', 16, 90, (P, f) => {
+  const a = f / 16 * Math.PI * 2;
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const dx = x - 7.5, dy = y - 7.5, ang = Math.atan2(dy, dx), r = Math.hypot(dx, dy);
+    const v = Math.sin(ang * 2 + r * 0.6 - a) + Math.sin(x * 0.9 + y * 0.5 + a) * 0.6;
+    P.put(x, y, v > 0.7 ? [190, 90, 255] : v > -0.3 ? [120, 30, 210] : [70, 10, 150], 210);
+  }
+});
+animTile('magma', 8, 200, (P, f) => {
+  const glow = 0.6 + 0.4 * Math.sin(f / 8 * Math.PI * 2);
+  P.fill(0x5a1a0a, 8);
+  const R = mulberry32(99);
+  for (let i = 0; i < 7; i++) { const x = R() * 14 | 0, y = R() * 14 | 0, l = 2 + (R() * 3 | 0), d = R() * 3 | 0; P.line(x, y, x + l, y + d, [255, Math.round(80 + 90 * glow), Math.round(26 * glow)]); }
+});
+animTile('end_portal', 12, 160, (P, f) => {
+  P.fill(0x070612, 4);
+  const R = mulberry32(5 + f);
+  for (let i = 0; i < 18; i++) P.put(R() * 16 | 0, R() * 16 | 0, [0x9fe8d8, 0x6fd0e8, 0xcfa0f0, 0xffffff][i % 4]);
+});
+animTile('lantern', 6, 160, (P, f) => {
+  const b = [1, 0.85, 0.95, 0.8, 1, 0.9][f];
+  P.clear(); P.rect(5, 7, 6, 9, 0x2e2e34); P.rect(6, 9, 4, 5, [255, Math.round(201 * b), Math.round(74 * b)]); P.rect(7, 10, 2, 3, [255, Math.round(242 * b), Math.round(176 * b)]); P.rect(5, 7, 6, 1, 0x4a4a52); P.rect(5, 15, 6, 1, 0x4a4a52);
+});
+animTile('campfire_side', 8, 90, (P, f) => {
+  P.clear(); P.rect(0, 12, 16, 4, 0x6b4a28); P.rect(0, 12, 16, 1, 0x8a6a3a);
+  for (let x = 3; x < 13; x++) { const h = 3 + ((x * 7 + f * 3) % 6); P.rect(x, 12 - h, 1, h, (x + f) % 2 ? 0xffa020 : 0xffd040); }
+});
+animTile('campfire_top', 6, 110, (P, f) => {
+  P.clear(); P.rect(0, 3, 16, 3, 0x6b4a28); P.rect(0, 10, 16, 3, 0x6b4a28); P.rect(3, 0, 3, 16, 0x5a3e20); P.rect(10, 0, 3, 16, 0x5a3e20);
+  P.disc(8, 8, 2.5 + (f % 3) * 0.4, 0xffa020); P.disc(8, 8, 1.2 + (f % 2) * 0.5, 0xfff060);
+});
+animTile('sculk', 10, 220, (P, f) => {
+  P.fill(0x0a2030, 6); P.speck(0x0e3a4a, 0.25, 6);
+  const R = mulberry32(42), pulse = 0.5 + 0.5 * Math.sin(f / 10 * Math.PI * 2);
+  for (let i = 0; i < 6; i++) P.put(R() * 16, R() * 16, [Math.round(42 * pulse), Math.round(120 + 96 * pulse), Math.round(140 + 92 * pulse)]);
+});
+animTile('sculk_sensor_top', 10, 150, (P, f) => {
+  P.fill(0x0a2a38, 6); const pulse = 0.5 + 0.5 * Math.sin(f / 10 * Math.PI * 2);
+  for (const [k, x] of [3, 7, 11].entries()) P.rect(x, 3 + ((f + k) % 3 === 0 ? 1 : 0), 2, 10, [Math.round(42 * pulse), Math.round(150 + 66 * pulse), Math.round(170 + 62 * pulse)]);
+});
+animTile('creaking_heart', 8, 250, (P, f) => {
+  pLogSide(0x6a625a, 0x524a44)(P); const g = 0.55 + 0.45 * Math.sin(f / 8 * Math.PI * 2);
+  P.rect(4, 4, 8, 8, 0x3a2a1a); P.rect(5, 6, 2, 3, [255, Math.round(138 * g), Math.round(26 * g)]); P.rect(9, 6, 2, 3, [255, Math.round(138 * g), Math.round(26 * g)]);
+});
+animTile('nest_front_full', 8, 300, (P, f) => {
+  P.fill(0xd8b040, 8); for (let y = 3; y < 16; y += 4) P.rect(0, y, 16, 1, 0xa87a20); P.rect(5, 6, 6, 4, 0x3a2410);
+  P.rect(4, 10, 8, 2, 0xf8a820); P.rect(6, 12, 2, 1 + (f >> 1), 0xf8a820); P.rect(10, 12, 1, 1 + ((f + 4) % 8 >> 1), 0xf8a820);
+});
+animTile('hive_front_full', 8, 300, (P, f) => {
+  pPlanks(0xc89a5a)(P); P.rect(0, 0, 16, 2, 0x8a6030); P.rect(0, 14, 16, 2, 0x8a6030); P.rect(5, 7, 6, 3, 0x3a2410);
+  P.rect(4, 10, 8, 2, 0xf8a820); P.rect(6, 12, 2, Math.min(2, 1 + (f >> 2)), 0xf8a820);
+});
+
 let nextBlockId = 1;
 
 function block(key, name, tex, o = {}) {

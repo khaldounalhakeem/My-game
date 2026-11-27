@@ -386,6 +386,130 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause, opts) => {
   }
 };
 
+
+/* ---------- animations, like Minecraft ----------
+   moving pictures (water, lava, fire, portals...), smoke and flames from torches, campfires and furnaces,
+   lava pops, drips under water and lava, portal sparkles, the floating book over an enchanting table,
+   and a glowing front on a furnace while it cooks */
+G.tickAnim = (dt) => {
+  const now = performance.now();
+  // the whole picture sheet goes to the graphics chip each time, so at most 8 times a second (easy on phones)
+  if (now - (G.animAt || 0) < 120) return;
+  G.animAt = now;
+  let changed = false;
+  for (const a of ANIM_TILES) {
+    const f = Math.floor(now / a.ms) % a.frames.length;
+    if (f === a.f) continue;
+    a.f = f; changed = true;
+    actx.putImageData(a.frames[f], (a.i % ATLAS_N) * TILE, Math.floor(a.i / ATLAS_N) * TILE);
+  }
+  if (changed && G.atlasTex) G.atlasTex.needsUpdate = true;
+};
+G.amb = { list: [], scanT: 0, books: new Map(), glows: new Map() };
+const isTorch = d => d && !d.rsTorch && /(^|_)torch/.test(d.key) && d.emit;
+G.tickAmbient = (dt) => {
+  const A = G.amb, P = G.player, W = G.world, PT = G.particles;
+  A.scanT -= dt;
+  if (A.scanT <= 0) {
+    // look around for things that move or smoke (a few times a second)
+    A.scanT = 0.6; A.list = [];
+    const px = Math.floor(P.pos.x), py = Math.floor(P.pos.y), pz = Math.floor(P.pos.z);
+    for (let dy = -6; dy <= 8; dy++) for (let dz = -11; dz <= 11; dz++) for (let dx = -11; dx <= 11; dx++) {
+      const x = px + dx, y = py + dy, z = pz + dz, id = W.getBlock(x, y, z);
+      if (!id) continue;
+      const d = DEFS[id];
+      let kind = null;
+      if (isTorch(d)) kind = 'torch';
+      else if (d.rsTorch && d.rsTorch.on) kind = 'rstorch';
+      else if (id === ID.campfire) kind = 'campfire';
+      else if (id === ID.fire) kind = 'fire';
+      else if (id === ID.nether_portal) kind = 'portal';
+      else if (id === ID.enchanting_table) kind = 'ench';
+      else if (d.base === 'furnace' || d.base === 'smoker' || d.base === 'blast_furnace') kind = 'furnace';
+      else if (id === ID.lava && !W.getBlock(x, y + 1, z)) kind = 'lavatop';
+      else if (d.solid && !W.getBlock(x, y - 1, z)) { const up = W.getBlock(x, y + 1, z); if (up === ID.water || up === ID.lava) kind = up === ID.water ? 'dripw' : 'dripl'; }
+      else if (id === ID.sculk_sensor) kind = 'sculk';
+      if (kind) { A.list.push([kind, x, y, z, d]); if (A.list.length > 300) break; }
+    }
+  }
+  const r = Math.random;
+  const books = new Set(), glows = new Set();
+  for (const [kind, x, y, z, d] of A.list) {
+    switch (kind) {
+      case 'torch': {
+        const by = d.box ? d.box[4] : 0.625, cx = d.box ? (d.box[0] + d.box[3]) / 2 : 0.5, cz = d.box ? (d.box[2] + d.box[5]) / 2 : 0.5;
+        if (r() < dt * 1.2) PT.spawn(x + cx, y + by + 0.08, z + cz, 0x555555, (r() - 0.5) * 0.1, 0.6, (r() - 0.5) * 0.1, 0.05, 0.9, -0.2);
+        if (r() < dt * 0.6) PT.spawn(x + cx, y + by + 0.02, z + cz, 0xffb030, 0, 0.15, 0, 0.05, 0.35, 0);
+        break;
+      }
+      case 'rstorch': if (r() < dt * 1.5) PT.spawn(x + 0.5 + (r() - 0.5) * 0.15, y + 0.7, z + 0.5 + (r() - 0.5) * 0.15, 0xff2a1a, 0, 0.3, 0, 0.05, 0.5, 0); break;
+      case 'campfire': if (r() < dt * 6) PT.spawn(x + 0.3 + r() * 0.4, y + 0.6, z + 0.3 + r() * 0.4, r() < 0.5 ? 0x8a8a8a : 0xb0b0b0, (r() - 0.5) * 0.2, 1.6 + r() * 0.8, (r() - 0.5) * 0.2, 0.12 + r() * 0.08, 3 + r() * 2, -0.1); break;
+      case 'fire': if (r() < dt * 2) PT.spawn(x + r(), y + 0.8, z + r(), 0x4a4a4a, 0, 1.2, 0, 0.14, 1.2, -0.1); break;
+      case 'portal': if (r() < dt * 4) PT.spawn(x + r(), y + r(), z + r(), r() < 0.5 ? 0xb05aff : 0x7a1ad8, (r() - 0.5) * 1.2, (r() - 0.5) * 1.2, (r() - 0.5) * 1.2, 0.06, 1, 0); break;
+      case 'lavatop': if (r() < dt * 0.15) { PT.burst(x + 0.5, y + 1, z + 0.5, [0xff8a1a, 0xffd04a, 0x333333], 4, 1.5, 0.08); if (P.pos.distanceTo(new THREE.Vector3(x, y, z)) < 10 && r() < 0.3) Sound.play('dig', new THREE.Vector3(x, y, z), ID.lava); } break;
+      case 'dripw': case 'dripl': if (r() < dt * 0.25) PT.spawn(x + 0.2 + r() * 0.6, y - 0.05, z + 0.2 + r() * 0.6, kind === 'dripw' ? 0x3a6ad8 : 0xff7a1a, 0, 0, 0, 0.06, 1.2, 9); break;
+      case 'sculk': if (r() < dt * 0.4) PT.spawn(x + 0.5, y + 0.6, z + 0.5, 0x2ad8e8, 0, 0.5, 0, 0.06, 0.8, 0); break;
+      case 'ench': {
+        books.add(x + ',' + y + ',' + z);
+        // letters fly from nearby bookshelves into the table
+        if (r() < dt * 3) for (let k = 0; k < 6; k++) {
+          const ox = (r() * 5 | 0) - 2, oz = (r() * 5 | 0) - 2;
+          if ((Math.abs(ox) === 2 || Math.abs(oz) === 2) && (W.getBlock(x + ox, y, z + oz) === ID.bookshelf || W.getBlock(x + ox, y + 1, z + oz) === ID.bookshelf)) {
+            PT.spawn(x + ox + 0.5, y + 1.6, z + oz + 0.5, r() < 0.5 ? 0xe8e0ff : 0x9a8ad8, -ox * 0.9, -0.6, -oz * 0.9, 0.05, 1.1, 0); break;
+          }
+        }
+        break;
+      }
+      case 'furnace': {
+        const f = G.furnaces && G.furnaces[chestKey(x, y, z)];
+        if (f && f.burn > 0) {
+          glows.add(x + ',' + y + ',' + z);
+          const [fx, fz] = { s: [0, 1], n: [0, -1], e: [1, 0], w: [-1, 0] }[d.facing || 's'];
+          if (r() < dt * 2) PT.spawn(x + 0.5 + fx * 0.55 + (r() - 0.5) * 0.4 * (1 - Math.abs(fx)), y + 0.25, z + 0.5 + fz * 0.55 + (r() - 0.5) * 0.4 * (1 - Math.abs(fz)), r() < 0.5 ? 0xffa020 : 0x555555, 0, 0.4, 0, 0.06, 0.6, 0);
+          if (r() < dt * 0.8) PT.spawn(x + 0.5, y + 1.05, z + 0.5, 0x6a6a6a, 0, 0.8, 0, 0.12, 1.5, -0.1);
+        }
+        break;
+      }
+    }
+  }
+  // the enchanting table's book: floats, turns to look at you, and flips open when you come close
+  for (const k of books) if (!A.books.has(k)) {
+    const g = new THREE.Group();
+    const cover = new THREE.MeshLambertMaterial({ color: 0x7a3a1a }), page = new THREE.MeshBasicMaterial({ color: 0xf0e8d0 });
+    const L = new THREE.Group(), R = new THREE.Group();
+    const lc = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.38), cover); lc.position.x = -0.15; L.add(lc);
+    const lp = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.04, 0.34), page); lp.position.set(-0.14, 0.03, 0); L.add(lp);
+    const rc = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.02, 0.38), cover); rc.position.x = 0.15; R.add(rc);
+    const rp = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.04, 0.34), page); rp.position.set(0.14, 0.03, 0); R.add(rp);
+    g.add(L, R); g.userData = { L, R, open: 0 };
+    const [x, y, z] = k.split(',').map(Number); g.position.set(x + 0.5, y + 1.1, z + 0.5);
+    G.scene.add(g); A.books.set(k, g);
+  }
+  for (const [k, g] of A.books) {
+    if (!books.has(k)) { G.scene.remove(g); A.books.delete(k); continue; }
+    const [x, y, z] = k.split(',').map(Number), t = performance.now() / 1000;
+    const near = Math.hypot(P.pos.x - x - 0.5, P.pos.z - z - 0.5) < 3.5;
+    g.userData.open += ((near ? 1 : 0) - g.userData.open) * Math.min(1, dt * 3);
+    const o = g.userData.open;
+    g.position.y = y + 1.1 + Math.sin(t * 1.6) * 0.06;
+    g.rotation.y = near ? Math.atan2(P.pos.x - x - 0.5, P.pos.z - z - 0.5) + Math.PI / 2 : t * 0.4;
+    g.rotation.z = 0.15;
+    g.userData.L.rotation.z = -(1 - o) * 1.45 + Math.sin(t * 5) * 0.06 * o;
+    g.userData.R.rotation.z = (1 - o) * 1.45 - Math.sin(t * 5 + 1) * 0.06 * o;
+  }
+  // a cooking furnace: its door glows and flickers
+  for (const k of glows) if (!A.glows.has(k)) {
+    const [x, y, z] = k.split(','), d = DEFS[W.getBlock(+x, +y, +z)], [fx, fz] = { s: [0, 1], n: [0, -1], e: [1, 0], w: [-1, 0] }[d.facing || 's'];
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.3), new THREE.MeshBasicMaterial({ color: 0xff9a2a, transparent: true, opacity: 0.85 }));
+    m.position.set(+x + 0.5 + fx * 0.502, +y + 0.3, +z + 0.5 + fz * 0.502); m.rotation.y = Math.atan2(fx, fz);
+    G.scene.add(m); A.glows.set(k, m);
+  }
+  for (const [k, m] of A.glows) {
+    if (!glows.has(k)) { G.scene.remove(m); A.glows.delete(k); continue; }
+    m.material.opacity = 0.65 + Math.random() * 0.3; m.material.color.setHex(Math.random() < 0.5 ? 0xff9a2a : 0xffc04a);
+  }
+};
+
 /* right-click a bed: set your respawn point there and, at night, sleep until morning */
 G.sleep = (b) => {
   const P = G.player;
@@ -2488,6 +2612,8 @@ function frame(now) {
   }
   Input.lookDX = Input.lookDY = 0;
   G.particles.update(running ? dt : 0);
+  G.tickAnim(dt);
+  if (running) G.tickAmbient(dt);
   G.world.update(P.pos.x, P.pos.z, running ? 6 : 12);
   Net.tick(dt);
 
