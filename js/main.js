@@ -1127,7 +1127,7 @@ G.tickFrame = (x, y, z, d, seen) => {
 };
 /* potions: what each one does to you */
 const POTION_FX = { speed: [180, 1], jump_boost: [180, 1], strength: [180, 1], regeneration: [45, 1], fire_resistance: [180, 1], night_vision: [180, 1], invisibility: [180, 1], poison: [45, 1], weakness: [90, 1], slow_falling: [90, 1], water_breathing: [180, 1] };
-const FX_NAMES = { levitation: 'Levitation', speed: 'Speed', jump_boost: 'Jump Boost', strength: 'Strength', regeneration: 'Regeneration', fire_resistance: 'Fire Resistance', night_vision: 'Night Vision', invisibility: 'Invisibility', poison: 'Poison', weakness: 'Weakness', slow_falling: 'Slow Falling', water_breathing: 'Water Breathing', haste: 'Haste', resistance: 'Resistance', absorption: 'Absorption' };
+const FX_NAMES = { mining_fatigue: 'Mining Fatigue', darkness: 'Darkness', levitation: 'Levitation', speed: 'Speed', jump_boost: 'Jump Boost', strength: 'Strength', regeneration: 'Regeneration', fire_resistance: 'Fire Resistance', night_vision: 'Night Vision', invisibility: 'Invisibility', poison: 'Poison', weakness: 'Weakness', slow_falling: 'Slow Falling', water_breathing: 'Water Breathing', haste: 'Haste', resistance: 'Resistance', absorption: 'Absorption' };
 G.applyPotion = (who, k, mult) => {
   mult = mult || 1;
   if (who === G.player) {
@@ -1157,18 +1157,18 @@ G.splashAt = (pos, k) => {
 G.tickHeldHud = (k, dt) => {
   let box = $('held-hud');
   if (!box) { box = document.createElement('div'); box.id = 'held-hud'; box.style.cssText = 'position:fixed;right:12px;top:64px;z-index:5;pointer-events:none;color:#fff;font:bold 14px monospace;text-shadow:1px 1px 0 #000;text-align:center'; document.body.appendChild(box); }
-  const P = G.player, show = G.state === 'play' && (k === 'compass' || k === 'clock' || k === 'map' || (k === 'spyglass' && G.zoom));
+  const P = G.player, show = G.state === 'play' && (k === 'compass' || k === 'recovery_compass' || k === 'clock' || k === 'map' || (k === 'spyglass' && G.zoom));
   if (!show) { if (!box.hidden) box.hidden = true; return; }
   box.hidden = false;
   if (box.dataset.k !== k) { box.dataset.k = k; box.innerHTML = k === 'map' ? '<canvas width="128" height="128" style="width:176px;height:176px;image-rendering:pixelated;border:4px solid #c8a870;background:#e8dcb8"></canvas>' : k === 'spyglass' ? '' : '<div class="hh-dial" style="width:72px;height:72px;border-radius:50%;border:4px solid #8a8a8a;background:#2a2a2a;position:relative;margin:auto"><div class="hh-needle" style="position:absolute;left:34px;top:6px;width:4px;height:30px;background:#e83030;transform-origin:2px 30px"></div></div><div class="hh-text" style="margin-top:4px"></div>'; G.mapAt = 0; }
   if (k === 'spyglass') { box.style.inset = '0'; box.style.background = 'radial-gradient(circle, transparent 38%, #000 40%)'; box.style.right = '0'; box.style.top = '0'; return; }
   box.style.inset = ''; box.style.background = ''; box.style.right = '12px'; box.style.top = '64px';
-  if (k === 'compass') {
-    // points to where you first came into the world
-    const sp = P.spawn, a = Math.atan2(sp.x - P.pos.x, sp.z - P.pos.z), rel = a - (P.yaw + Math.PI);
+  if (k === 'compass' || k === 'recovery_compass') {
+    // a compass points to where you first came into the world; a recovery compass to where you last died
+    const ld = G.lastDeath, sp = k === 'recovery_compass' ? (ld && ld.dim === G.dim ? ld : P.pos) : P.spawn, a = Math.atan2(sp.x - P.pos.x, sp.z - P.pos.z), rel = a - (P.yaw + Math.PI);
     box.querySelector('.hh-needle').style.transform = 'rotate(' + (-rel) + 'rad)';
-    box.querySelector('.hh-text').textContent = G.dim === 'overworld' ? Math.round(Math.hypot(sp.x - P.pos.x, sp.z - P.pos.z)) + ' blocks to spawn' : 'The needle spins here!';
-    if (G.dim !== 'overworld') box.querySelector('.hh-needle').style.transform = 'rotate(' + (performance.now() / 150) + 'rad)';
+    box.querySelector('.hh-text').textContent = k === 'recovery_compass' ? (ld && ld.dim === G.dim ? Math.round(Math.hypot(sp.x - P.pos.x, sp.z - P.pos.z)) + ' blocks to where you died' : 'You haven\'t died here') : G.dim === 'overworld' ? Math.round(Math.hypot(sp.x - P.pos.x, sp.z - P.pos.z)) + ' blocks to spawn' : 'The needle spins here!';
+    if (G.dim !== 'overworld' && k === 'compass') box.querySelector('.hh-needle').style.transform = 'rotate(' + (performance.now() / 150) + 'rad)';
   } else if (k === 'clock') {
     const t = (G.time + 0.25) % 1;
     box.querySelector('.hh-needle').style.transform = 'rotate(' + (t * Math.PI * 2 + Math.PI) + 'rad)';
@@ -1450,6 +1450,13 @@ G.tickCrops = () => {
     if (!G.world.isLoaded(x, z)) continue;
     const here = G.world.getBlock(x, y, z), sap = DEFS[here].sapling, ripe = RIPE()[here];
     // planted bamboo grows one block every minute or so, up to 12 tall; sugar cane up to 3
+    if (here === ID.sniffer_egg) {
+      let t = typeof G.crops[k] === 'number' ? G.crops[k] : 300;
+      if (--t > 0) { G.crops[k] = t; continue; }
+      delete G.crops[k]; G.world.setBlock(x, y, z, 0); G.particles.blockBreak(x, y, z, ID.sniffer_egg);
+      spawnMob('sniffer', x + 0.5, y, z + 0.5).makeBaby(1200); G.ui.message('A baby sniffer hatched!', 'gold');
+      continue;
+    }
     if (here === ID.turtle_egg) {
       let t = typeof G.crops[k] === 'number' ? G.crops[k] : 180;
       if (--t > 0) { G.crops[k] = t; continue; }
@@ -2186,6 +2193,14 @@ function structureSpawns() {
         }
       }
     }
+    // trial spawners: waves of monsters while you're near; beat them all for a trial key
+    if (c.trials) for (const [sx, sy, sz] of c.trials) G.tickTrial(sx, sy, sz);
+    // elder guardians guard the ocean monument, and guardians swim around it
+    if (c.monument && G.diff().mobs > 0 && Math.hypot(P.pos.x - c.monument.x, P.pos.z - c.monument.z) < 48) {
+      const M = c.monument, k = 'mon:' + M.x + ',' + M.z; G.deadShulkers = G.deadShulkers || {};
+      if ((G.deadShulkers[k] || 0) < 3 && Math.random() < 0.1 && !G.mobs.some(m => m.type === 'elder_guardian' && !m.dead && Math.hypot(m.pos.x - M.x, m.pos.z - M.z) < 30)) { const m = spawnMob('elder_guardian', M.x + 0.5, M.y, M.z + 3.5); m.spotKey = k; }
+      if (Math.random() < 0.15 && G.mobs.filter(m => m.type === 'guardian' && !m.dead && Math.hypot(m.pos.x - M.x, m.pos.z - M.z) < 30).length < 5) spawnMob('guardian', M.x + (Math.random() - 0.5) * 30, M.y + 3, M.z + (Math.random() - 0.5) * 30);
+    }
     // a witch lives in the swamp hut
     if (c.witchHut && G.diff().mobs > 0 && Math.random() < 0.2 && Math.hypot(P.pos.x - c.witchHut.x, P.pos.z - c.witchHut.z) < 48 && Math.hypot(P.pos.x - c.witchHut.x, P.pos.z - c.witchHut.z) > 6 && !G.mobs.some(m => m.type === 'witch' && !m.dead && Math.hypot(m.pos.x - c.witchHut.x, m.pos.z - c.witchHut.z) < 12)) spawnMob('witch', c.witchHut.x, c.witchHut.y, c.witchHut.z);
     // a creaking comes out of each creaking heart at night
@@ -2422,6 +2437,48 @@ G.leaveEnd = () => {
   Sound.play('teleport');
   G.ui.message('Back home in the Overworld.', 'gold');
   G.save();
+};
+/* trial spawners: when you come close they send monsters, a few at a time; once all are beaten they give a trial key
+   (and rest for half an hour before they wake again) */
+G.trials = {};
+const TRIAL_MOBS = ['zombie', 'skeleton', 'spider', 'husk', 'stray', 'bogged', 'slime', 'breeze', 'cave_spider', 'zombie'];
+G.tickTrial = (x, y, z) => {
+  const W = G.world, P = G.player, k = chestKey(x, y, z), id = W.getBlock(x, y, z);
+  let T = G.trials[k] || (G.trials[k] = { spawned: 0, killed: 0, doneAt: 0 });
+  if (id === ID.trial_spawner_done) { if (Date.now() - T.doneAt > 30 * 60000) { W.setBlock(x, y, z, ID.trial_spawner); G.trials[k] = { spawned: 0, killed: 0, doneAt: 0 }; } return; }
+  if (id !== ID.trial_spawner || P.mode !== 'survival' || G.diff().mobs === 0) return;
+  const near = Math.hypot(P.pos.x - x, P.pos.y - y, P.pos.z - z) < 14;
+  if (!near) return;
+  const alive = G.mobs.filter(m => m.trialKey === k && !m.dead).length, total = 6;
+  if (T.killed >= total) {
+    W.setBlock(x, y, z, ID.trial_spawner_done); T.doneAt = Date.now();
+    G.spawnDrop(ID.trial_key, 1, x + 0.5, y + 1.2, z + 0.5);
+    for (const [it, n] of [['bread', 2], ['arrow', 8], ['emerald', 2], ['golden_carrot', 2]]) if (Math.random() < 0.5) G.spawnDrop(ID[it], n, x + 0.5, y + 1.2, z + 0.5);
+    G.particles.burst(x + 0.5, y + 1, z + 0.5, [0xffc040, 0xffffff], 20, 2.5, 0.12); Sound.play('levelup');
+    G.ui.message('You beat the trial! Take the Trial Key to a Vault.', 'gold');
+    return;
+  }
+  if (alive < 2 && T.spawned < total && Math.random() < 0.3) {
+    const type = TRIAL_MOBS[Math.random() * TRIAL_MOBS.length | 0];
+    for (let t = 0; t < 8; t++) {
+      const mx = x + (Math.random() * 7 | 0) - 3, mz = z + (Math.random() * 7 | 0) - 3;
+      if (!W.getBlock(mx, y, mz) && !W.getBlock(mx, y + 1, mz) && W.getBlock(mx, y - 1, mz)) {
+        const m = spawnMob(type, mx + 0.5, y, mz + 0.5); m.trialKey = k; T.spawned++;
+        G.particles.burst(mx + 0.5, y + 1, mz + 0.5, [0xff9a2a, 0x555555], 12, 1.5); break;
+      }
+    }
+  }
+  // monsters that ran off or vanished still count, so the trial can always be finished
+  if (T.spawned > T.killed + alive) T.killed = T.spawned - alive;
+};
+LOOT_TABLES.vault = [2, 4, [['emerald', 2, 5, 20], ['diamond', 1, 2, 8], ['golden_apple', 1, 1, 8], ['enchanted_golden_apple', 1, 1, 1], ['heavy_core', 1, 1, 3], ['wind_charge', 4, 12, 15], ['enchanted_book', 1, 1, 10], ['iron_chestplate', 1, 1, 6], ['diamond_axe', 1, 1, 3], ['arrow', 8, 16, 10], ['golden_carrot', 2, 6, 10], ['disc_pigstep', 1, 1, 2], ['disc_far', 1, 1, 2]]];
+G.openVault = (x, y, z) => {
+  const W = G.world;
+  W.setBlock(x, y, z, ID.vault_open);
+  const loot = rollLoot(mulberry32((Math.random() * 1e9) | 0), 'vault');
+  if (Math.random() < 0.15) loot.push([ID.heavy_core, 1]);
+  for (const [it, n] of loot) G.spawnDrop(it, n, x + 0.5, y + 1.2, z + 0.5, new THREE.Vector3((Math.random() - 0.5) * 2, 4, (Math.random() - 0.5) * 2));
+  G.particles.burst(x + 0.5, y + 1, z + 0.5, [0x5ad8f8, 0xffffff], 20, 2.5, 0.12); Sound.play('levelup');
 };
 /* the end gateway: a floating portal beside the main island that leads out to the outer islands (and back) */
 G.placeGateway = () => {
@@ -2675,6 +2732,7 @@ G.continueSaved = async (id) => {
   G.chestVer = s.chestVer || {};
   G.furnaces = s.furnaces || {};
   G.anchor = s.anchor || null;
+  G.trials = s.trials || {}; G.lastDeath = s.lastDeath || null;
   G.dimDrops = s.drops && typeof s.drops === 'object' ? s.drops : {};
   G.pets = Object.assign({}, s.pets || {});
   G.pendingPets = G.pets[G.dim] || [];
@@ -2735,7 +2793,7 @@ G.save = (opts) => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, enderChest: G.enderChest ? slotsJSON(G.enderChest) : null, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, anchor: G.anchor || null, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, enderChest: G.enderChest ? slotsJSON(G.enderChest) : null, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, anchor: G.anchor || null, trials: G.trials || {}, lastDeath: G.lastDeath || null, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   let ok = true;
   G.lastSaveText = JSON.stringify(data);

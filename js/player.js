@@ -134,6 +134,7 @@ class Player {
   /* fire resistance keeps fire and lava from hurting you */
   fireProof(cause) { return this.fx('fire_resistance') && /fire|lava|burn|flame|magma|blaze/i.test(cause || ''); }
   die() {
+    G.lastDeath = { x: this.pos.x, y: this.pos.y, z: this.pos.z, dim: G.dim };
     // holding a Totem of Undying: it saves you instead, like Minecraft
     const held = this.heldSlot();
     if (held && DEFS[held.id].key === 'totem_of_undying') {
@@ -424,7 +425,7 @@ class Player {
     const canHarvest = !def.tool || !def.tier || (tool && tool.type === def.tool && tool.tier >= def.tier);
     const ef = enchLv(this.heldSlot(), 'efficiency');
     const speed = def.tool && tool && tool.type === def.tool ? tool.speed + (ef ? ef * ef + 1 : 0) : 1;
-    return def.hardness * (canHarvest ? 1.5 : 5) / speed / (1 + 0.2 * this.fx('haste'));
+    return def.hardness * (canHarvest ? 1.5 : 5) / speed / (1 + 0.2 * this.fx('haste')) * (this.fx('mining_fatigue') ? 3.5 : 1);
   }
 
   canHarvest(def) {
@@ -440,6 +441,15 @@ class Player {
     let dmg = Math.max(0.5, (held && held.damage ? held.damage : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + 3 * this.fx('strength') - 4 * this.fx('weakness'));
     const crit = !this.onGround && this.vel.y < -1 && !this.flying;
     if (crit) dmg = Math.round(dmg * 1.5);
+    // the mace: the further you fall before you hit, the harder it hits (and you don't get hurt by the fall)
+    if (held && held.mace && this.fallStart !== null && this.fallStart - this.pos.y > 1.5) {
+      const fd = this.fallStart - this.pos.y;
+      dmg += Math.min(fd, 3) * 4 + Math.max(0, Math.min(fd, 8) - 3) * 2 + Math.max(0, fd - 8);
+      this.fallStart = this.pos.y; this.vel.y = 7;
+      G.particles.burst(target.pos.x, target.pos.y + 0.2, target.pos.z, [0x8a8a8a, 0xc8c8c8, 0x5a98c8], 30, 4, 0.14);
+      G.sound.play('explode', target.pos);
+      for (const m of G.mobs) if (m !== target && !m.dead && !m.tame && m.pos.distanceTo(target.pos) < 3.5) { m.vel.y = 7; const dx = m.pos.x - target.pos.x, dz = m.pos.z - target.pos.z, l = Math.hypot(dx, dz) || 1; m.vel.x = dx / l * 6; m.vel.z = dz / l * 6; }
+    }
     this.attackCd = 0.45; this.swing = 1;
     if ((target instanceof Mob && !target.tame) || target.remote) for (const m of G.mobs) if (m.tame && m.type === 'wolf' && m !== target && !m.remoteCtl) m.petTarget = target; // your wolves join your fight (a friend too)
     const kb = (this.sprinting ? 10 : 6) + 6 * enchLv(hs, 'knockback'), fa = enchLv(hs, 'fire_aspect');
@@ -880,6 +890,21 @@ class Player {
       if (b.id === ID.enchanting_table) { G.ui.openEnchant(b.x, b.y, b.z); return; }
       const bd = DEFS[b.id];
       if (bd.station) { G.ui.openInventory(bd.station); return; }
+      if (bd.vault) { if (hd && hd.key === 'trial_key') { if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1); G.openVault(b.x, b.y, b.z); } else G.ui.message('This vault opens with a Trial Key. Beat a Trial Spawner to get one.'); this.useCd = 0.5; this.swing = 1; return; }
+      if (bd.sus && hd && hd.key === 'brush') {
+        // brushing: a few strokes and something old comes out
+        const key = b.x + ',' + b.y + ',' + b.z;
+        if (this.brushAt !== key) { this.brushAt = key; this.brushN = 0; }
+        this.brushN++; this.useCd = 0.35; this.swing = 1;
+        G.particles.blockBreak(b.x, b.y, b.z, b.id);
+        if (this.brushN >= 5) {
+          this.brushAt = null; G.world.setBlock(b.x, b.y, b.z, bd.sus === 'sand' ? ID.sand : ID.gravel);
+          const pool = bd.sus === 'sand' ? ['sherd_archer', 'sherd_prize', 'sherd_skull', 'emerald', 'gold_ingot', 'diamond', 'sniffer_egg', 'sniffer_egg', 'tnt', 'gunpowder'] : ['sherd_heart', 'sherd_friend', 'emerald', 'wheat', 'coal', 'iron_ingot', 'sniffer_egg', 'disc_mall', 'candle'];
+          G.spawnDrop(ID[pool[Math.random() * pool.length | 0]], 1, b.x + 0.5, b.y + 1.1, b.z + 0.5);
+          G.sound.play('pickup');
+        }
+        return;
+      }
       if (bd.container) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (bd.machine === 'note') { this.useCd = 0.25; this.swing = 1; G.playNote(b.x, b.y, b.z, true); return; }
       if (bd.jukebox) {
@@ -960,6 +985,7 @@ class Player {
       if (hd.heal) this.health = Math.min(20, this.health + hd.heal);
       if (hd.key === 'rotten_flesh' && Math.random() < 0.5) this.hungerDrain(2);
       if (hd.chorus) G.chorusTeleport();
+      if (hd.notch) { this.addEffect('regeneration', 2, 20); this.addEffect('resistance', 1, 300); this.addEffect('fire_resistance', 1, 300); this.addEffect('absorption', 2, 120); G.ui.message('You feel super strong!', 'gold'); }
       if (this.mode === 'survival') { this.inv.takeFrom(this.sel, 1); if (hd.leaves) this.inv.add(ID[hd.leaves], 1); }
       G.sound.play('eat');
       this.useCd = 0.5; this.swing = 1;
@@ -1057,6 +1083,7 @@ class Player {
       const L = this.lookDir(), f = Math.abs(L.x) > Math.abs(L.z) ? (L.x > 0 ? 'w' : 'e') : (L.z > 0 ? 'n' : 's');
       W.setBlock(px, py, pz, f === 's' ? ID[hd.base] : ID[hd.base + '_' + f]);
     } else W.setBlock(px, py, pz, hd.id);
+    if (hd.id === ID.sniffer_egg) G.crops[chestKey(px, py, pz)] = 300;
     if (hd.sponge) { let n = 0; for (let a = -5; a <= 5; a++) for (let c = -5; c <= 5; c++) for (let e = -5; e <= 5; e++) { const q = W.getBlock(px + a, py + c, pz + e); if ((q === ID.water || (q && DEFS[q].wlog)) && Math.abs(a) + Math.abs(c) + Math.abs(e) <= 7) { W.setBlock(px + a, py + c, pz + e, 0); n++; } } if (n) { W.setBlock(px, py, pz, ID.wet_sponge); G.particles.burst(px + 0.5, py + 0.5, pz + 0.5, [0x3a6ad8, 0xffffff], 14, 2, 0.1); } }
     if (hd.id === ID.flag) G.placedFlag(px, py, pz);
     W.settle(px, py, pz);

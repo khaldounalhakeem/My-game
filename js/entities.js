@@ -291,7 +291,7 @@ const MORE_MOBS = {
     M: { body: [0.25, 0.2, 0.25], by: 0.1, col: 0x8a8a8a, legs: 0, head: null, x: [[0.3, 0.24, 0.22, 0x9a9a9a, 0, 0.12, 0.2], [0.2, 0.16, 0.2, 0x7a7a7a, 0, 0.08, -0.2], [0.12, 0.12, 0.15, 0x6a6a6a, 0, 0.06, -0.37], [0.06, 0.06, 0.02, 0x111111, -0.08, 0.16, 0.32], [0.06, 0.06, 0.02, 0x111111, 0.08, 0.16, 0.32]] } },
   endermite: { T: { name: 'Endermite', hp: 8, w: 0.4, h: 0.3, speed: 2.6, hostile: true, dmg: 2, xp: 3, drops: [] },
     M: { body: [0.25, 0.2, 0.3], by: 0.1, col: 0x2a1a3a, legs: 0, head: null, x: [[0.2, 0.18, 0.2, 0x3a2a4a, 0, 0.1, 0.22], [0.15, 0.14, 0.18, 0x3a2a4a, 0, 0.08, -0.24], [0.06, 0.06, 0.02, 0xcc44ff, -0.06, 0.14, 0.33], [0.06, 0.06, 0.02, 0xcc44ff, 0.06, 0.14, 0.33]] } },
-  guardian: { T: { name: 'Guardian', hp: 30, w: 0.9, h: 0.9, speed: 2, hostile: true, swim: true, ranged: true, shoot: 'laser', dmg: 5, xp: 10, drops: [['cod', 0, 1]] },
+  guardian: { T: { name: 'Guardian', hp: 30, w: 0.9, h: 0.9, speed: 2, hostile: true, swim: true, ranged: true, shoot: 'laser', dmg: 5, xp: 10, drops: [['cod', 0, 1], ['prismarine_shard', 0, 2], ['prismarine_crystals', 0, 1]] },
     M: { body: [0.85, 0.85, 0.85], by: 0.45, col: 0x5a9a8a, legs: 0, head: null, x: [[0.1, 0.3, 0.1, 0xe8c070, 0, 0.95, 0], [0.1, 0.3, 0.1, 0xe8c070, 0.5, 0.45, 0], [0.1, 0.3, 0.1, 0xe8c070, -0.5, 0.45, 0], [0.3, 0.3, 0.04, 0xf4f0e8, 0, 0.45, 0.43], [0.12, 0.12, 0.02, 0x8a3a1a, 0, 0.45, 0.46], [0.2, 0.2, 0.4, 0x4a8a7a, 0, 0.45, -0.6]] } },
   breeze: { T: { name: 'Breeze', hp: 30, w: 0.6, h: 1.8, speed: 2.4, hostile: true, ranged: true, shoot: 'wind', dmg: 1, hops: true, xp: 10, drops: [['breeze_rod', 1, 2]] },
     M: { body: [0.25, 0.6, 0.25], by: 0.6, col: 0x8ac8e8, legs: 0, head: [0.5, 0.5, 0.5], hy: 1.45, hz: 0, headCol: 0xb8d8f0, x: [[0.6, 0.12, 0.6, 0xc8e8f8, 0, 0.2, 0], [0.4, 0.12, 0.4, 0xc8e8f8, 0, 0.45, 0], [0.08, 0.5, 0.08, 0x5a98c8, -0.35, 1.1, 0.1], [0.08, 0.5, 0.08, 0x5a98c8, 0.35, 1.1, -0.1]], eye: '#3a6a9a' } },
@@ -299,6 +299,8 @@ const MORE_MOBS = {
     M: { body: [1.4, 1.3, 2.2], by: 1.5, col: 0x5a5a52, leg: [0.45, 0.9], legCol: 0x4a4a44, head: [0.9, 0.9, 0.9], hy: 1.55, hz: 1.4, headCol: 0x6a6a62, x: [[0.15, 0.5, 0.15, 0xd8d0b8, -0.5, 2.1, 1.4], [0.15, 0.5, 0.15, 0xd8d0b8, 0.5, 2.1, 1.4], [0.6, 0.3, 0.4, 0x3a3a34, 0, 1.15, 1.75]], eye: '#c8a020' } },
   vex: { T: { name: 'Vex', hp: 14, w: 0.4, h: 0.8, speed: 4, hostile: true, fly: 0.8, dmg: 4, xp: 3, drops: [] },
     M: { body: [0.25, 0.35, 0.18], by: 0.3, col: 0xa8c0d8, legs: 0, head: [0.3, 0.3, 0.3], hy: 0.66, hz: 0, glow: 0x3a4a6a, x: [[0.04, 0.3, 0.3, 0xe8f0ff, -0.17, 0.4, -0.15], [0.04, 0.3, 0.3, 0xe8f0ff, 0.17, 0.4, -0.15], [0.05, 0.4, 0.05, 0xc8c8d8, 0.2, 0.3, 0.15]], eye: '#ff3a3a' } },
+  elder_guardian: { T: { name: 'Elder Guardian', hp: 80, w: 2, h: 2, speed: 1.2, hostile: true, swim: true, ranged: true, shoot: 'laser', dmg: 8, xp: 10, drops: [['wet_sponge', 1, 1], ['prismarine_shard', 1, 3], ['prismarine_crystals', 0, 2]] },
+    M: { body: [1.9, 1.9, 1.9], by: 0.95, col: 0xc8c8b8, legs: 0, head: null, x: [[0.2, 0.6, 0.2, 0xe8c070, 0, 2.0, 0], [0.2, 0.6, 0.2, 0xe8c070, 1.05, 0.95, 0], [0.2, 0.6, 0.2, 0xe8c070, -1.05, 0.95, 0], [0.6, 0.6, 0.04, 0xf4f0e8, 0, 0.95, 0.96], [0.24, 0.24, 0.02, 0x8a3a1a, 0, 0.95, 0.99], [0.4, 0.4, 0.8, 0xa8a898, 0, 0.95, -1.3]] } },
   shulker: { T: { name: 'Shulker', hp: 30, w: 1, h: 1, speed: 0.001, hostile: true, ranged: true, shoot: 'bullet', dmg: 4, xp: 5, fireproof: true, drops: [['shulker_shell', 0, 1]] },
     M: { body: [1, 0.5, 1], by: 0.25, col: 0x8a5a8a, legs: 0, head: [0.5, 0.5, 0.5], hy: 0.55, hz: 0, headCol: 0xd8d0a0, x: [[1.02, 0.4, 1.02, 0xa070a0, 0, 0.8, 0]], eye: '#3a1a3a' } },
   creaking: { T: { name: 'Creaking', hp: 1000, w: 0.9, h: 2.7, speed: 3.2, hostile: true, dmg: 3, xp: 0, drops: [] },
@@ -747,6 +749,10 @@ class Mob {
       case 'creaking':
         if (!G.isNight() || (this.heart && G.world.isLoaded(this.heart[0], this.heart[2]) && !DEFS[G.world.getBlock(...this.heart)].creakingHeart)) { G.particles.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0x5a4a3a, 0x9aa094], 20, 2, 0.15); this.removeSilently(); return 'gone'; } // it crumbles at sunrise, or when its heart is broken
         if (this.frozen) { this.vel.x = this.vel.z = 0; return { x: 0, z: 0 }; }
+        break;
+      case 'elder_guardian':
+        // it makes everyone nearby slow at mining
+        if (dist < 40 && Math.random() < dt * 0.15 && P.mode === 'survival' && P.addEffect) { P.addEffect('mining_fatigue', 1, 60); G.ui.message('An Elder Guardian is near! Mining is slow.', 'purple'); }
         break;
       case 'polar_bear':
         if (!this.baby && !this.angry && canTarget && dist < 6 && G.mobs.some(m => m.type === 'polar_bear' && m.baby && !m.dead && m.pos.distanceTo(P.pos) < 5)) { this.angry = true; G.sound.play('mob_polar_bear', this.pos); }

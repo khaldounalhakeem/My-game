@@ -5,7 +5,7 @@
 // build limit never changes the land, trees or the Nether's ceiling in worlds made before)
 const CS = 16, WH = 320, GEN_H = 96, SEA = 32; // you can build up to y 319, like Minecraft
 const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14, SWAMP: 15, MUSHROOM: 16, BADLANDS: 17, ICE_SPIKES: 18, FLOWER_FOREST: 19, MEADOW: 20, FROZEN_OCEAN: 21, WARM_OCEAN: 22, SUNFLOWER_PLAINS: 23, LUSH_CAVES: 24, DRIPSTONE_CAVES: 25, DEEP_DARK: 26, PALE_GARDEN: 27 };
-const GEN_VER = 9;
+const GEN_VER = 10;
 const BASE_BIOME = { 15: -1, 16: -1, 17: 4, 18: 5, 19: 3, 20: 6, 21: 0, 22: 0, 23: 2 }; // swamp & mushroom: no villages // which newer biomes exist (see genVerAt)
 const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle', 'Swamp', 'Mushroom Fields', 'Badlands', 'Ice Spikes', 'Flower Forest', 'Meadow', 'Frozen Ocean', 'Warm Ocean', 'Sunflower Plains', 'Lush Caves', 'Dripstone Caves', 'Deep Dark', 'Pale Garden'];
 
@@ -561,6 +561,7 @@ class World {
     if ((center === BIOME.PLAINS || center === BIOME.FOREST) && rng() < 0.08) plant(3, [ID.pumpkin, ID.melon], ID.grass);
     if (fresh && this.genVerAt(cx * 16, cz * 16) >= 7) this.newBiomeDecor(cx, cz, center, heights, biomes, set, get);
     if (this.newHearts) { c.hearts = this.newHearts; this.newHearts = null; }
+    if (fresh && this.genVerAt(cx * 16, cz * 16) >= 10) this.bigStructures(cx, cz, c, set, get, heights, biomes);
     if (this.buildStructures) this.buildStructures(c, set, get, heights, biomes, rng);
 
     // apply player edits
@@ -674,6 +675,107 @@ class World {
         }
       }
     }
+  }
+  /* new land only (10): trial chambers underground, ocean monuments, buried suspicious sand */
+  bigStructures(cx, cz, c, set, get, heights, biomes) {
+    const put = (x, y, z, id) => set(x - cx * 16, y, z - cz * 16, id);
+    for (let gx = Math.floor(cx / 24) - 1; gx <= Math.floor(cx / 24) + 1; gx++) for (let gz = Math.floor(cz / 24) - 1; gz <= Math.floor(cz / 24) + 1; gz++) {
+      const t = this.trialAt(gx, gz);
+      if (t && Math.abs(t.x - (cx * 16 + 8)) < 40 && Math.abs(t.z - (cz * 16 + 8)) < 40) this.buildTrial(t, put, c, cx, cz);
+      const m = this.monumentAt(gx, gz);
+      if (m && Math.abs(m.x - (cx * 16 + 8)) < 40 && Math.abs(m.z - (cz * 16 + 8)) < 40) this.buildMonument(m, put, c, cx, cz);
+    }
+    // a little buried archaeology: suspicious sand in deserts and warm seas, suspicious gravel in old ruins
+    const r = mulberry32(hash3(cx, cz, this.seed + 1212)), center = biomes[136];
+    if ((center === BIOME.DESERT || center === BIOME.WARM_OCEAN || center === BIOME.BEACH) && r() < 0.08) {
+      for (let i = 0; i < 5; i++) { const x = 3 + (r() * 10 | 0), z = 3 + (r() * 10 | 0), h = heights[x + z * 16]; if (get(x, h, z) === ID.sand && get(x, h - 1, z) === ID.sand) set(x, h - 1, z, ID.suspicious_sand); }
+    }
+    if ((center === BIOME.TAIGA || center === BIOME.JUNGLE || center === BIOME.BIRCH) && r() < 0.03) {
+      // trail ruins: an old terracotta floor just under the ground
+      const h = heights[8 + 8 * 16];
+      for (let a = 3; a < 13; a++) for (let b = 3; b < 13; b++) { const q = r(); if (q < 0.5) set(a, h - 2, b, [ID.terracotta, ID.terracotta_brown, ID.terracotta_orange, ID.mud_bricks][q * 8 | 0]); else if (q < 0.58) set(a, h - 1, b, ID.suspicious_gravel); }
+    }
+  }
+  trialAt(gx, gz) {
+    this.trialCache = this.trialCache || new Map();
+    const key = 't' + gx + ',' + gz;
+    if (!this.trialCache.has(key)) {
+      const r = mulberry32(hash3(gx, gz, this.seed + 717)), x = (gx * 24 + 3 + (r() * 18 | 0)) * 16 + 8, z = (gz * 24 + 3 + (r() * 18 | 0)) * 16 + 8, h = this.heightAt(x, z);
+      this.trialCache.set(key, r() < 0.7 && h > SEA + 6 && this.genVerAt(x, z) >= 10 && this.fresh7(x, z) ? { x, z, y: 14 + (r() * 6 | 0), top: h } : null);
+    }
+    return this.trialCache.get(key);
+  }
+  monumentAt(gx, gz) {
+    this.monCache = this.monCache || new Map();
+    const key = 'm' + gx + ',' + gz;
+    if (!this.monCache.has(key)) {
+      const r = mulberry32(hash3(gx, gz, this.seed + 818));
+      let m = null;
+      for (let t = 0; t < 12 && !m; t++) {
+        const x = (gx * 24 + 3 + (r() * 18 | 0)) * 16 + 8, z = (gz * 24 + 3 + (r() * 18 | 0)) * 16 + 8;
+        if ([[0, 0], [20, 0], [-20, 0], [0, 20], [0, -20]].every(([a, b]) => this.heightAt(x + a, z + b) < SEA - 10) && this.genVerAt(x, z) >= 10 && this.fresh7(x, z)) m = { x, z, y: Math.min(...[[0, 0], [20, 0], [-20, 0], [0, 20], [0, -20]].map(([a, b]) => this.heightAt(x + a, z + b))) };
+      }
+      this.monCache.set(key, m);
+    }
+    return this.monCache.get(key);
+  }
+  /* a trial chamber: a big tuff and copper hall with rooms around it, trial spawners and vaults, and stairs down from a little hut */
+  buildTrial(t, put, c, cx, cz) {
+    const { x: ox, y: oy, z: oz } = t, TB = ID.tuff_bricks, PT = ID.polished_tuff, CC = ID.cut_copper, WC = ID.oxidized_cut_copper;
+    const mine = (x, z) => Math.floor(x / 16) === cx && Math.floor(z / 16) === cz;
+    const box = (x0, y0, z0, w, d, h, wall, floor) => {
+      for (let a = -w; a <= w; a++) for (let b = -d; b <= d; b++) for (let k = 0; k <= h; k++) {
+        const edge = Math.abs(a) === w || Math.abs(b) === d;
+        put(x0 + a, y0 + k, z0 + b, k === 0 ? ((a + b) % 4 === 0 ? CC : floor) : k === h ? (a % 3 === 0 && b % 3 === 0 ? ID.copper_block : wall) : edge ? (k === 3 && (a === 0 || b === 0) ? WC : wall) : 0);
+      }
+    };
+    box(ox, oy, oz, 10, 10, 8, TB, PT);
+    for (const [dx, dz] of [[18, 0], [-18, 0], [0, 18], [0, -18]]) {
+      box(ox + dx, oy, oz + dz, 5, 5, 6, TB, PT);
+      // a corridor to the hall
+      const sx = Math.sign(dx), sz = Math.sign(dz);
+      for (let s = 10; s <= 13; s++) for (let w = -1; w <= 1; w++) for (let k = 1; k <= 3; k++) put(ox + sx * s + (sz ? w : 0), oy + k, oz + sz * s + (sx ? w : 0), 0);
+      for (let s = 10; s <= 13; s++) for (let w = -2; w <= 2; w++) { put(ox + sx * s + (sz ? w : 0), oy, oz + sz * s + (sx ? w : 0), PT); put(ox + sx * s + (sz ? w : 0), oy + 4, oz + sz * s + (sx ? w : 0), TB); if (Math.abs(w) === 2) for (let k = 1; k <= 3; k++) put(ox + sx * s + (sz ? w : 0), oy + k, oz + sz * s + (sx ? w : 0), TB); }
+      put(ox + dx, oy + 1, oz + dz, ID.trial_spawner);
+      put(ox + dx + 3, oy + 1, oz + dz + 3, ID.vault);
+      if (mine(ox + dx, oz + dz)) (c.trials = c.trials || []).push([ox + dx, oy + 1, oz + dz]);
+      put(ox + dx - 3, oy + 1, oz + dz - 3, ID.chest_loot); put(ox + dx - 3, oy + 1, oz + dz + 3, ID.decorated_pot);
+    }
+    put(ox - 4, oy + 1, oz, ID.trial_spawner); put(ox + 4, oy + 1, oz, ID.trial_spawner); put(ox, oy + 1, oz + 6, ID.vault); put(ox, oy + 1, oz - 6, ID.vault);
+    for (const [a, b] of [[-4, 0], [4, 0]]) if (mine(ox + a, oz + b)) (c.trials = c.trials || []).push([ox + a, oy + 1, oz + b]);
+    for (const [a, b] of [[-8, -8], [8, -8], [-8, 8], [8, 8]]) for (let k = 1; k < 8; k++) put(ox + a, oy + k, oz + b, ID.copper_block);
+    // stairs: a shaft with a ladder from a little tuff hut at the surface down into the hall
+    const hx = ox + 7, hz = oz - 7;
+    for (let y = oy + 1; y <= t.top + 4; y++) for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+      if (y > t.top) { if (y === t.top + 4) put(hx + a, y, hz + b, TB); else put(hx + a, y, hz + b, (Math.abs(a) === 1 || Math.abs(b) === 1) && !(a === 0 && b === -1 && y <= t.top + 2) ? TB : 0); }
+      else if (y > oy + 8) put(hx + a, y, hz + b, (Math.abs(a) === 1 || Math.abs(b) === 1) ? TB : 0);
+      else if (a === 0 && b === 0) put(hx, y, hz, 0);
+    }
+    for (let y = oy + 1; y <= t.top + 1; y++) put(hx, y, hz, ID.ladder_n);
+  }
+  /* an ocean monument: a huge prismarine building full of water, with gold blocks in its heart and sponges in its rooms */
+  buildMonument(m, put, c, cx, cz) {
+    const { x: ox, z: oz } = m, y0 = m.y + 1, top = SEA - 3, PR = ID.prismarine_bricks, DP = ID.dark_prismarine, PM = ID.prismarine, SL = ID.sea_lantern, W = ID.water;
+    for (let a = -20; a <= 20; a++) for (let b = -20; b <= 20; b++) {
+      const ring = Math.max(Math.abs(a), Math.abs(b));
+      for (let y = y0; y <= top; y++) {
+        const k = y - y0, roofH = ring > 14 ? top - 8 : top;
+        if (y > roofH) continue;
+        let id = W;
+        if (k === 0) id = PR;
+        else if (ring === 20 && y < roofH) id = (a + b + k) % 6 === 0 ? SL : PR;
+        else if (y === roofH) id = ring % 5 === 0 ? DP : PR;
+        else if (ring === 14 && (k % 6 < 5) && !(Math.abs(a) < 3 || Math.abs(b) < 3)) id = PM;
+        else if (ring === 6 && k < 7) id = DP;
+        else if (ring < 6 && k === 7) id = DP;
+        else if (Math.abs(a) % 10 === 0 && Math.abs(b) % 10 === 0 && ring > 6) id = PM;
+        put(ox + a, y, oz + b, id);
+      }
+    }
+    for (const [a, b] of [[-1, -1], [0, -1], [-1, 0], [0, 0]]) for (let k = 1; k <= 2; k++) put(ox + a, y0 + k, oz + b, ID.gold_block);
+    for (const [a, b] of [[-17, -17], [17, 17], [-17, 17]]) for (let k = 1; k <= 2; k++) put(ox + a, y0 + k, oz + b, ID.wet_sponge);
+    for (let k = 1; k < 4; k++) { put(ox - 6, y0 + k, oz, W); put(ox + 6, y0 + k, oz, W); for (let w = -1; w <= 1; w++) { put(ox + w, y0 + k, oz - 20, W); put(ox + w, y0 + k, oz + 20, W); put(ox - 20, y0 + k, oz + w, W); put(ox + 20, y0 + k, oz + w, W); } }
+    if (Math.floor(ox / 16) === cx && Math.floor(oz / 16) === cz) c.monument = { x: ox, y: y0 + 2, z: oz };
   }
   /* new land only: copper and other stones underground, amethyst geodes, plants in the sea, berry bushes, vines, cobwebs */
   decor9(cx, cz, center, heights, biomes, set, get) {

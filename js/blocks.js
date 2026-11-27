@@ -1004,6 +1004,27 @@ makeTile('i_shulker_shell', pPlant(P => { P.disc(8, 9, 6, 0x8a5a8a); P.rect(2, 9
 makeTile('i_elytra', pPlant(P => { for (let i = 0; i < 7; i++) { P.line(7 - i, 2 + i, 7 - i, 13 - (i >> 1), 0x8a8ab0); P.line(8 + i, 2 + i, 8 + i, 13 - (i >> 1), 0x8a8ab0); } P.line(7, 2, 7, 13, 0x5a5a80); P.line(8, 2, 8, 13, 0x5a5a80); }));
 makeTile('i_firework_rocket', pPlant(P => { P.rect(6, 4, 4, 9, 0xd83a3a); P.rect(6, 6, 4, 1, 0xf0f0f0); P.rect(6, 10, 4, 1, 0xf0f0f0); P.rect(7, 2, 2, 2, 0x8a8a8a); P.line(8, 13, 8, 15, 0x3a3a3a); }));
 
+/* trial chambers, ocean monuments, ancient cities, archaeology */
+makeTile('trial_spawner', P => { P.fill(0x2a3038, 6); for (let i = 1; i < 16; i += 3) { P.rect(i, 0, 1, 16, 0x5a6470); P.rect(0, i, 16, 1, 0x5a6470); } P.rect(5, 5, 6, 6, 0xff9a2a); P.rect(7, 7, 2, 2, 0xffe060); });
+makeTile('trial_spawner_done', P => { P.fill(0x2a3038, 6); for (let i = 1; i < 16; i += 3) { P.rect(i, 0, 1, 16, 0x4a5058); P.rect(0, i, 16, 1, 0x4a5058); } P.rect(5, 5, 6, 6, 0x3a3a3a); });
+makeTile('vault_side', P => { P.fill(0x3a4048, 6); P.rect(0, 0, 16, 2, 0x5a6470); P.rect(0, 14, 16, 2, 0x5a6470); P.rect(3, 4, 10, 8, 0x1a1e24); P.rect(6, 6, 4, 4, 0x5ad8f8); });
+makeTile('vault_open', P => { P.fill(0x3a4048, 6); P.rect(0, 0, 16, 2, 0x5a6470); P.rect(0, 14, 16, 2, 0x5a6470); P.rect(3, 4, 10, 8, 0x1a1e24); });
+makeTile('heavy_core', P => { P.fill(0x3a3a40, 4); P.rect(2, 2, 12, 12, 0x5a5a62); P.rect(5, 5, 6, 6, 0x2a2a30); });
+makeTile('suspicious_sand', P => { P.fill(0xdccf9e, 8); P.speck(0xc8b98a, 0.2, 5); P.rect(5, 6, 6, 4, 0xb8a878); P.pts([[6, 7], [9, 8]], 0x8a7a5a); });
+makeTile('suspicious_gravel', P => { P.fill(0x8a8480, 12); P.speck(0x6a6460, 0.25, 6); P.rect(5, 6, 6, 4, 0x7a6e60); });
+makeTile('sniffer_egg', P => { P.fill(0x9a3a2a, 8); P.speck(0x3a8a4a, 0.25, 6); });
+makeTile('reinforced_deepslate', P => { P.fill(0x3a3a3e, 6); P.rect(0, 0, 16, 2, 0x5a5048); P.rect(0, 14, 16, 2, 0x5a5048); P.rect(0, 0, 2, 16, 0x5a5048); P.rect(14, 0, 2, 16, 0x5a5048); P.rect(6, 6, 4, 4, 0x1a1a1e); });
+makeTile('shrieker_top', P => { P.fill(0x0a2030, 6); P.rect(2, 2, 12, 12, 0xd8d0b8); P.rect(5, 5, 6, 6, 0x1a3a4a); P.rect(7, 7, 2, 2, 0x2ad8e8); });
+makeTile('shrieker_side', P => { P.fill(0x0a2030, 6); P.rect(0, 0, 16, 5, 0xd8d0b8); P.speck(0x2ad8e8, 0.05, 4); });
+makeTile('i_trial_key', pPlant(P => { P.disc(5, 5, 3, 0xc87a3a); P.disc(5, 5, 1.4, 0x3a3a3a); P.line(7, 7, 13, 13, 0xc87a3a); P.rect(11, 12, 2, 2, 0xc87a3a); P.rect(9, 10, 2, 2, 0xc87a3a); }));
+makeTile('i_mace', pPlant(P => { for (let i = 0; i < 9; i++) { P.put(3 + i, 13 - i, 0x8ac8e8); P.put(4 + i, 13 - i, 0x5a98c8); } P.rect(10, 1, 5, 5, 0x5a5a62); P.rect(11, 2, 3, 3, 0x3a3a40); P.pts([[9, 3], [12, 0], [15, 3], [12, 6]], 0x8a8a92); }));
+makeTile('i_brush', pPlant(P => { P.line(3, 13, 9, 7, 0x8a6438); P.rect(9, 4, 4, 4, 0xc87a4a); P.line(11, 1, 14, 4, 0xe8dcb8); P.line(12, 1, 15, 4, 0xe8dcb8); }));
+makeTile('i_pottery_sherd', pPlant(P => { P.rect(3, 4, 10, 9, 0xa85a3a); P.rect(5, 6, 6, 5, 0x6a3a2a); P.pts([[6, 7], [9, 9], [7, 9]], 0xd88a5a); }));
+makeTile('decorated_pot', P => { P.fill(0xa85a3a, 6); P.rect(0, 0, 16, 2, 0x8a4a2a); P.rect(3, 5, 10, 7, 0x6a3a2a); P.pts([[6, 7], [9, 9], [7, 9], [10, 7]], 0xd88a5a); });
+makeTile('i_echo_shard', pPlant(P => { P.line(5, 13, 11, 3, 0x0e5a6a); P.line(6, 13, 12, 3, 0x2ad8e8); P.line(7, 13, 12, 5, 0x0e3a4a); }));
+makeTile('i_recovery_compass', pPlant(P => { P.disc(8, 8, 6.5, 0x0e3a4a); P.disc(8, 8, 5, 0x1a2a2a); P.line(8, 8, 8, 4, 0x2ad8e8); }));
+makeTile('i_enchanted_golden_apple', pPlant(P => { P.disc(8, 9, 5, 0xf5cc2e); P.disc(6, 7, 1.5, 0xfff0a0); P.line(8, 4, 9, 2, 0x6a4a2a); P.speck(0xd88aff, 0.15, 10); clipToDisc(P, 6); }));
+
 /* the animations themselves */
 const waveRows = [[2, 3], [5, 9], [8, 1], [11, 6], [14, 11], [0, 12]];
 animTile('water', 16, 140, (P, f) => {
@@ -1576,6 +1597,17 @@ for (let c = 0; c <= 4; c++) block('respawn_anchor_' + c, 'Respawn Anchor', { to
 block('chorus_plant', 'Chorus Plant', 'chorus_plant', { hardness: 0.4, opaque: false, boxes: [[0.1875, 0, 0.1875, 0.8125, 1, 0.8125]], drop: (r) => (r() < 0.5 ? [['chorus_fruit', 1]] : []) });
 block('chorus_flower', 'Chorus Flower', 'chorus_flower', { hardness: 0.4, opaque: false, boxes: [[0.125, 0, 0.125, 0.875, 0.875, 0.875]] });
 block('end_gateway', 'End Gateway', 'end_portal', { solid: false, opaque: false, hardness: -1, drop: null, light: true, emit: 15, gateway: true, hide: true });
+block('trial_spawner', 'Trial Spawner', 'trial_spawner', { hardness: 50, tool: 'pick', tier: 3, opaque: false, cutout: true, light: true, emit: 8, trial: true, drop: null });
+block('trial_spawner_done', 'Trial Spawner', 'trial_spawner_done', { hardness: 50, tool: 'pick', tier: 3, opaque: false, cutout: true, trialDone: true, drop: null, hide: true });
+block('vault', 'Vault', { top: 'heavy_core', side: 'vault_side' }, { hardness: 50, tool: 'pick', tier: 3, vault: true, light: true, emit: 6, drop: null });
+block('vault_open', 'Vault', { top: 'heavy_core', side: 'vault_open' }, { hardness: 50, tool: 'pick', tier: 3, drop: null, hide: true });
+block('heavy_core', 'Heavy Core', 'heavy_core', { hardness: 10, tool: 'pick', opaque: false, box: [0.25, 0, 0.25, 0.75, 0.5, 0.75], boxes: [[0.25, 0, 0.25, 0.75, 0.5, 0.75]] });
+block('suspicious_sand', 'Suspicious Sand', 'suspicious_sand', { tool: 'shovel', hardness: 0.25, sus: 'sand', drop: null });
+block('suspicious_gravel', 'Suspicious Gravel', 'suspicious_gravel', { tool: 'shovel', hardness: 0.25, sus: 'gravel', drop: null });
+block('sniffer_egg', 'Sniffer Egg', 'sniffer_egg', { hardness: 0.5, opaque: false, box: [0.1875, 0, 0.1875, 0.8125, 0.75, 0.8125], boxes: [[0.1875, 0, 0.1875, 0.8125, 0.75, 0.8125]] });
+block('reinforced_deepslate', 'Reinforced Deepslate', { top: 'reinforced_deepslate', side: 'reinforced_deepslate' }, { hardness: Infinity, drop: null });
+block('sculk_shrieker', 'Sculk Shrieker', { top: 'shrieker_top', side: 'shrieker_side', bottom: 'sculk' }, { tool: 'hoe', hardness: 3, opaque: false, box: [0, 0, 0, 1, 0.5, 1], boxes: [[0, 0, 0, 1, 0.5, 1]], shrieker: true, drop: null });
+block('decorated_pot', 'Decorated Pot', 'decorated_pot', { hardness: 0.1, opaque: false, box: [0.0625, 0, 0.0625, 0.9375, 1, 0.9375], boxes: [[0.0625, 0, 0.0625, 0.9375, 1, 0.9375]] });
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
   const id = nextItemId++;
@@ -1781,6 +1813,13 @@ item('popped_chorus_fruit', 'Popped Chorus Fruit', 'popped_chorus_fruit');
 item('shulker_shell', 'Shulker Shell', 'shulker_shell');
 item('elytra', 'Elytra', 'elytra', { stack: 1, armor: { slot: 1, points: 0 }, elytra: true });
 item('firework_rocket', 'Firework Rocket', 'firework_rocket', { stack: 64, firework: true });
+item('trial_key', 'Trial Key', 'trial_key');
+item('mace', 'Mace', 'mace', { stack: 1, damage: 6, mace: true });
+item('brush', 'Brush', 'brush', { stack: 1 });
+for (const [k, n] of [['archer', 'Archer'], ['prize', 'Prize'], ['skull', 'Skull'], ['heart', 'Heart'], ['friend', 'Friend']]) item('sherd_' + k, n + ' Pottery Sherd', 'pottery_sherd');
+item('echo_shard', 'Echo Shard', 'echo_shard');
+item('recovery_compass', 'Recovery Compass', 'recovery_compass', { stack: 1 });
+item('enchanted_golden_apple', 'Enchanted Golden Apple', 'enchanted_golden_apple', { food: 4, heal: 20, notch: true });
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
@@ -2033,6 +2072,8 @@ RECIPES.push(
   ...WALLS.filter(([f]) => ID[f]).map(([f]) => [f + '_wall', 6, { [f]: 6 }, 'table']),
 );
 
+/* the trials round's recipes */
+RECIPES.push(['mace', 1, { heavy_core: 1, breeze_rod: 1 }, 'table'], ['brush', 1, { feather: 1, copper_ingot: 1, stick: 1 }], ['decorated_pot', 1, { bricks: 2 }], ['recovery_compass', 1, { echo_shard: 8, compass: 1 }, 'table']);
 /* the End round's recipes */
 RECIPES.push(['popped_chorus_fruit', 1, { chorus_fruit: 1 }, 'furnace'], ['purpur_block', 4, { popped_chorus_fruit: 4 }], ['purpur_pillar', 2, { purpur_block: 2 }], ['end_rod', 4, { blaze_rod: 1, popped_chorus_fruit: 1 }],
   ['shulker_box', 1, { shulker_shell: 2, chest: 1 }, 'table'], ['firework_rocket', 3, { paper: 1, gunpowder: 1 }], ['x_purpur_block_slab', 2, { purpur_block: 1 }, 'stonecutter'], ['x_purpur_block_stairs', 1, { purpur_block: 1 }, 'stonecutter']);
