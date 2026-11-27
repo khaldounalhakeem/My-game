@@ -2826,7 +2826,7 @@ G.continueSaved = async (id) => {
   Sound.init();
   // let the online saves finish starting up first (a few seconds at most), so nothing waiting online is missed
   if (G.cloudInit && !Cloud.ready) { G.ui.message('Getting your online saves...'); await Promise.race([G.cloudInit, new Promise(r => setTimeout(r, 6000))]); }
-  const entry = id ? G.findWorld(id) : G.worldList()[0];
+  const entry = id ? G.findWorld(id) : (G.myLastWorld && G.findWorld(G.myLastWorld)) || G.worldList()[0];
   // your own online copy is used when this device has none or an older one. Someone else's copy is
   // only used if you pick it yourself.
   let here = null;
@@ -3018,6 +3018,14 @@ function recoverWorlds() {
   if (changed) writeWorldList(list);
 }
 function refreshContinue() { G.ui.renderWorldList(); }
+/* once the online saves have come back, the title screen shows the world you played last (not a random new seed),
+   unless you already typed a seed or picked one */
+G.afterCloudList = (mineLast) => {
+  if (mineLast) G.myLastWorld = mineLast.id;
+  if (G.state !== 'title' || G.seedTouched || G.bootRecent) return;
+  const best = (mineLast && G.findWorld(mineLast.id)) || G.worldList()[0];
+  if (best) { G.previewWorld(String(best.seed)); refreshContinue(); }
+};
 
 G.toTitle = () => {
   G.setState('title');
@@ -3347,6 +3355,7 @@ function boot() {
   recoverWorlds();
   G.cloudInit = Cloud.init();
   const recent = G.worldList()[0];
+  G.bootRecent = !!recent;
   refreshContinue();
   G.setState('title');
   G.previewWorld(recent ? String(recent.seed) : null);

@@ -1271,14 +1271,14 @@ const UI = {
     const mpName = () => { const t = $('seed').value.trim(), f = Net.friendWorldName(t ? seedFromText(t) : G.seed); return f ? f.name : $('mp-world-name').value || 'Shared World'; };
     $('btn-mp-s').addEventListener('click', () => { this.fromMultiplayer = true; G.startNew('survival', mpName()); this.fromMultiplayer = false; });
     $('btn-mp-c').addEventListener('click', () => { this.fromMultiplayer = true; G.startNew('creative', mpName()); this.fromMultiplayer = false; });
-    $('seed').addEventListener('input', () => this.seedHints());
+    $('seed').addEventListener('input', () => { G.seedTouched = true; this.seedHints(); });
     $('nick').addEventListener('keydown', e => { if (e.key === 'Enter') e.target.blur(); e.stopPropagation(); });
     this.titlePage('main');
     this.renderNameFace();
     $('btn-survival').addEventListener('click', () => G.startNew('survival'));
     $('btn-creative').addEventListener('click', () => G.startNew('creative'));
     $('btn-continue').addEventListener('click', () => G.continueSaved());
-    $('btn-random').addEventListener('click', () => G.previewWorld(null));
+    $('btn-random').addEventListener('click', () => { G.seedTouched = true; G.previewWorld(null); });
     $('btn-play-seed-s').addEventListener('click', () => G.startNew('survival', $('world-name').value));
     $('btn-play-seed-c').addEventListener('click', () => G.startNew('creative', $('world-name').value));
     $('world-name').addEventListener('keydown', e => e.stopPropagation());

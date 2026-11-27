@@ -82,6 +82,8 @@ const Cloud = {
     if (changed) { local.sort((a, b) => (b.last || 0) - (a.last || 0)); G.writeWorldList(local); }
     this.status = 'Your worlds are saved online too.';
     G.ui.renderWorldList();
+    // this device had forgotten your worlds (iPads do that): go back to the one YOU played last
+    if (G.afterCloudList) G.afterCloudList(idx.filter(b => b.p === me).sort((a, b) => (b.last || 0) - (a.last || 0))[0] || null);
   },
 
   copiesOf(id) {
