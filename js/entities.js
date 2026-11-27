@@ -845,8 +845,14 @@ class Mob {
         this.resting = false; this.bedSpot = null;
         const dx = P.pos.x - this.pos.x, dz = P.pos.z - this.pos.z, l = Math.hypot(dx, dz), up = Math.abs(P.pos.y - this.pos.y);
         // walk and run with you (as fast as a horse when it has to); jump to you only when you're far away, or far above or below
-        if (l > 32 || (up > 8 && l < 12 && P.onGround) || (up > 20)) { this.pos.set(P.pos.x + (Math.random() - 0.5) * 2, P.pos.y, P.pos.z + (Math.random() - 0.5) * 2); this.vel.set(0, 0, 0); }
-        else if (l > 3) { moveX = dx / l; moveZ = dz / l; speed = l > 14 ? 8.5 : l > 7 ? 5.5 : 3.5; this.yaw = Math.atan2(moveX, moveZ); }
+        const wantJump = l > 32 || (up > 8 && l < 12 && P.onGround) || up > 20;
+        // jump to you only along an open way: behind a closed door it waits outside (checked now and then)
+        this.jumpCheckT = (this.jumpCheckT || 0) - dt;
+        if (wantJump && this.jumpCheckT <= 0) {
+          this.jumpCheckT = 2;
+          if (G.airConnected(this.pos.x, this.pos.y, this.pos.z, P.pos.x, P.pos.y, P.pos.z)) { this.pos.set(P.pos.x + (Math.random() - 0.5) * 2, P.pos.y, P.pos.z + (Math.random() - 0.5) * 2); this.vel.set(0, 0, 0); }
+        }
+        if (l > 3 && Math.hypot(P.pos.x - this.pos.x, P.pos.z - this.pos.z) > 3) { moveX = dx / l; moveZ = dz / l; speed = l > 14 ? 8.5 : l > 7 ? 5.5 : 3.5; this.yaw = Math.atan2(moveX, moveZ); }
       } else { this.resting = false; this.bedSpot = null; }
     } else if (golemTarget) {
       const dx = golemTarget.pos.x - this.pos.x, dz = golemTarget.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1;

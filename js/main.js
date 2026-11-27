@@ -1131,6 +1131,26 @@ G.placeShulker = (x, y, z, held) => {
   G.chests[k] = held && held.c ? held.c.map(s => (s ? copySlot(s, s.count) : null)) : new Array(27).fill(null);
   G.chestChanged(k);
 };
+/* is there an open way (air, open doors, no walls or closed doors) from one place to another?
+   A short search that heads straight for the goal; used so a wolf never jumps through a closed door */
+G.airConnected = (ax, ay, az, bx, by, bz, max = 700) => {
+  const W = G.world, k = (x, y, z) => x + ',' + y + ',' + z;
+  const open = (x, y, z) => { const id = W.getBlock(x, y, z); return !id || !DEFS[id].solid; };
+  ax = Math.floor(ax); ay = Math.floor(ay + 0.3); az = Math.floor(az); bx = Math.floor(bx); by = Math.floor(by + 0.3); bz = Math.floor(bz);
+  if (!open(ax, ay, az)) ay++;
+  const seen = new Set([k(ax, ay, az)]), heap = [[Math.abs(ax - bx) + Math.abs(ay - by) + Math.abs(az - bz), ax, ay, az]];
+  for (let n = 0; heap.length && n < max; n++) {
+    let bi = 0; for (let i = 1; i < heap.length; i++) if (heap[i][0] < heap[bi][0]) bi = i;
+    const [, x, y, z] = heap.splice(bi, 1)[0];
+    if (Math.abs(x - bx) + Math.abs(y - by) + Math.abs(z - bz) <= 1) return true;
+    for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+      const nx = x + dx, ny = y + dy, nz = z + dz, nk = k(nx, ny, nz);
+      if (seen.has(nk) || ny < 0 || ny >= WH || !open(nx, ny, nz)) continue;
+      seen.add(nk); heap.push([Math.abs(nx - bx) + Math.abs(ny - by) + Math.abs(nz - bz), nx, ny, nz]);
+    }
+  }
+  return false;
+};
 /* the nearest dog bed to where you sleep (or nothing) */
 G.findDogBed = (x, y, z) => {
   const W = G.world;
