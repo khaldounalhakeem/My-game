@@ -449,7 +449,7 @@ function castleData() {
     // the hole in the floor above, with a railing on the open side
     const top = f + 7;
     box(5, top, lane, 10, top, lane + 1, 0);
-    for (let x = 4; x <= 11; x++) put(x, top + 1, lane === -26 ? lane + 2 : lane - 1, 'oak_fence');
+    for (let x = 5; x <= 11; x++) put(x, top + 1, lane === -26 ? lane + 2 : lane - 1, 'oak_fence'); // leaves the doorway free
     put(4, top + 1, lane, 'oak_fence'); put(4, top + 1, lane + 1, 'oak_fence');
   };
   flight(0, -26); flight(7, -22); flight(14, -26);
@@ -468,6 +468,83 @@ function castleData() {
   for (let x = -28; x <= 28; x += 7) for (const z of [-30, WALL - 3]) if (Math.abs(x) > 4) lampPost(x, z);
   for (const z of [-20, -10, 0]) { lampPost(-21, z); lampPost(21, z); }
 
+
+  /* ---------- the basement under the keep: an archery range, a playing room and an aquarium ---------- */
+  const BF = -7; // the basement floor; rooms from y -6 to -1, the keep's ground floor is the ceiling
+  box(-20, BF, KZ0, 20, -1, KZ1, stone);                       // solid walls all round
+  box(-19, BF, KZ0 + 1, 19, BF, KZ1 - 1, 'polished_andesite'); // the floor
+  box(-19, BF + 1, KZ0 + 1, 19, -1, KZ1 - 1, 0);                // hollow it out
+  for (let z = KZ0 + 1; z < KZ1; z++) for (let y = BF + 1; y <= -1; y++) { put(-3, y, z, stone()); put(3, y, z, stone()); }
+  for (const zw of [-9, -18]) box(4, BF + 1, zw, 19, -1, zw, stone);
+  box(-1, BF + 1, KZ0 + 1, 1, BF + 1, KZ1 - 1, 'carpet_red');
+  for (let z = KZ0 + 2; z < KZ1; z += 5) { put(-2, BF + 1, z, 'lantern'); put(2, BF + 1, z, 'lantern'); }
+  flight(BF, -22); // stairs from the basement up to the ground floor
+  put(18, BF + 1, -26, 'lantern'); put(18, BF + 1, -20, 'lantern');
+  label(BF, 1, 2, ['STAIRS', 'UP', '', '']);
+
+  // ARCHERY RANGE (the whole left side): hit a target with an arrow and the lamp on top flashes
+  label(BF, -1, 0, ['ARCHERY', 'RANGE', 'Bows and arrows', 'inside!']);
+  box(-19, BF, KZ0 + 1, -4, BF, -4, 'moss_block');           // the range is grassy
+  box(-19, BF, -3, -4, BF, KZ1 - 1, 'spruce_planks');        // the shooting platform
+  for (let x = -19; x <= -4; x++) if (x !== -12 && x !== -11) put(x, BF + 1, -3, 'oak_slab_b'); // the shooting line counter
+  for (const x of [-17, -14, -11, -8, -5]) { put(x, BF + 1, KZ0 + 1, 'stone_bricks'); put(x, BF + 2, KZ0 + 1, 'target_0'); put(x, BF + 3, KZ0 + 1, 'redstone_lamp_0'); }
+  for (const x of [-15, -8]) { put(x, BF + 1, -15, 'stone_bricks_wall'); put(x, BF + 2, -15, 'target_0'); put(x, BF + 3, -15, 'redstone_lamp_0'); }
+  for (const x of [-12]) { put(x, BF + 1, -9, 'hay_bale'); put(x, BF + 2, -9, 'target_0'); put(x, BF + 3, -9, 'redstone_lamp_0'); }
+  for (let z = KZ0 + 3; z < KZ1; z += 4) put(-20, BF + 4, z, 'sea_lantern'); // lights in the wall
+  for (let z = KZ0 + 3; z < KZ1; z += 4) put(-3, BF + 4, z, 'sea_lantern');
+  chest(-19, BF + 1, KZ1 - 1, [['bow', 1], ['bow', 1], ['arrow', 64], ['arrow', 64], ['arrow', 64], ['arrow', 64]]);
+  chest(-17, BF + 1, KZ1 - 1, [['bow', 1], ['arrow', 64], ['arrow', 64], ['golden_apple', 2]]);
+  put(-15, BF + 1, KZ1 - 1, 'fletching_table'); put(-13, BF + 1, KZ1 - 1, 'lantern');
+  post(-10, BF + 1, -2, 's', ['Shoot the', 'targets! The', 'lamp flashes', 'when you hit']);
+
+  // PLAYING ROOM: a minecart track around a disco dance floor, a piano of note blocks and a toy chest
+  let pr = label(BF, 1, 0, ['PLAYING', 'ROOM', 'Minecart ride', 'and disco!']);
+  const DISCO = ['concrete_red', 'concrete_yellow', 'concrete_lime', 'concrete_light_blue', 'concrete_magenta', 'concrete_orange'];
+  for (let z = pr.z0 + 1; z <= pr.z1 - 1; z++) for (let x = 6; x <= 17; x++) put(x, BF, z, DISCO[(x + z * 2 + 60) % DISCO.length]);
+  for (const [x, z] of [[8, -5], [15, -5], [8, -2], [15, -2]]) put(x, BF, z, 'froglight'); // the dance floor glows
+  for (let x = 6; x <= 17; x++) { put(x, BF + 1, pr.z0, 'rail_ew'); put(x, BF + 1, pr.z1, 'rail_ew'); }
+  for (let z = pr.z0 + 1; z <= pr.z1 - 1; z++) { put(5, BF + 1, z, 'rail_ns'); put(18, BF + 1, z, 'rail_ns'); }
+  put(5, BF + 1, pr.z0, 'rail_se'); put(18, BF + 1, pr.z0, 'rail_sw'); put(5, BF + 1, pr.z1, 'rail_ne'); put(18, BF + 1, pr.z1, 'rail_nw');
+  for (const x of [9, 10, 11, 12, 13, 14]) put(x, BF + 1, -4, 'note_block'); // a piano
+  put(11, BF + 1, -3, 'oak_stairs_s'); put(12, BF + 1, -3, 'oak_stairs_s');
+  put(19, BF + 1, -4, 'jukebox'); put(19, BF + 2, -4, 'lantern');
+  chest(19, BF + 1, -1, [['minecart', 2], ['snowball', 16], ['snowball', 16], ['firework_rocket', 32], ['cookie', 16], ['name_tag', 2]]);
+  for (const [x, z] of [[4, pr.z0], [19, pr.z0], [19, pr.z1]]) put(x, BF + 3, z, 'lantern');
+  for (let x = 6; x <= 17; x += 3) put(x, -1, -4, 'sea_lantern');
+
+  // AQUARIUM: a big glass fish tank with coral, kelp and sea pickles
+  let aq = label(BF, 1, 1, ['AQUARIUM', '', 'Let the fish', 'out of the buckets!']);
+  box(6, BF, -16, 17, BF + 5, -11, 'glass');
+  box(7, BF, -15, 16, BF, -12, 'sand');
+  box(7, BF + 1, -15, 16, BF + 4, -12, 'water');
+  const SEA = ['seagrass', 'coral_tube', 'coral_brain', 'coral_bubble', 'coral_fire', 'coral_horn', 'coral_fan_tube', 'coral_fan_fire', 'sea_pickle', 'kelp'];
+  for (let z = -15; z <= -12; z++) for (let x = 7; x <= 16; x++) if ((x * 3 + z * 5) % 3 === 0) put(x, BF + 1, z, SEA[(x + z * 7 + 99) % SEA.length]);
+  for (const x of [8, 13]) { put(x, BF + 2, -14, 'kelp'); put(x, BF + 3, -14, 'kelp'); }
+  chest(19, BF + 1, -13, [['bucket_of_tropical_fish', 1], ['bucket_of_tropical_fish', 1], ['bucket_of_cod', 1], ['bucket_of_salmon', 1], ['bucket_of_axolotl', 1], ['cod', 16]]);
+  for (const [x, z] of [[4, -17], [19, -17], [4, -10], [19, -10]]) put(x, BF + 1, z, 'sea_lantern');
+  post(19, BF + 1, -11, 'w', ['Climb on top', 'and drop the', 'fish in!', '']);
+
+  /* ---------- the SECRET ROOM: under the garden, through a hidden hatch among the flowers ---------- */
+  // the hatch: a trapdoor in the ground at x -10, z 12 (looks like part of the flower bed)
+  put(-10, 0, 12, 'trapdoor_xc'); put(-10, 1, 12, 0);
+  for (let y = -1; y >= -7; y--) { put(-10, y, 12, 'ladder_s'); put(-10, y, 13, 'stone_bricks'); put(-9, y, 12, 'stone_bricks'); put(-10, y, 11, 'stone_bricks'); }
+  box(-11, -7, 12, -11, -6, 12, 0); // a little tunnel into the room
+  // the room: mossy and old, full of treasure
+  box(-23, -9, 9, -12, -1, 21, 'mossy_cobblestone');
+  box(-22, -8, 10, -13, -8, 20, 'polished_blackstone_bricks');
+  box(-22, -7, 10, -13, -2, 20, 0);
+  box(-12, -7, 12, -12, -6, 12, 0); // the doorway
+  for (const [x, z] of [[-22, 10], [-13, 10], [-22, 20], [-13, 20]]) box(x, -7, z, x, -2, z, 'chiseled_stone_bricks');
+  box(-19, -7, 13, -16, -7, 17, 'carpet_purple');
+  put(-18, -7, 20, 'gold_block'); put(-17, -7, 20, 'diamond_block'); put(-16, -7, 20, 'emerald_block'); put(-15, -7, 20, 'gold_block');
+  put(-17, -6, 20, 'amethyst_cluster');
+  chest(-20, -7, 20, [['diamond', 64], ['enchanted_golden_apple', 4], ['netherite_ingot', 8], ['totem_of_undying', 2], ['elytra', 1], ['ender_pearl', 16]]);
+  chest(-14, -7, 20, [['emerald', 64], ['gold_block', 16], ['diamond_block', 8], ['golden_apple', 16], ['lapis_block', 16], ['mace', 1]]);
+  put(-22, -7, 15, 'ender_chest'); put(-22, -7, 17, 'enchanting_table');
+  for (const [x, z] of [[-20, 11], [-15, 11], [-20, 18], [-15, 18]]) put(x, -7, z, 'soul_lantern');
+  put(-17, -2, 15, 'chain'); put(-17, -3, 15, 'soul_lantern');
+  sign(-13, -5, 15, 'w', ['SECRET ROOM', '', "Don't tell", 'anyone! ;)']);
+  post(-21, -7, 13, 'e', ['Built for', 'King Nabil', 'and King Omar', '']);
   CASTLE_DATA = { d, S, KEEP, signs, chests };
   return CASTLE_DATA;
 }
