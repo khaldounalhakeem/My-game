@@ -154,10 +154,17 @@ function castleData() {
   for (const cx of [-KX, KX]) for (const cz of [KZ0, KZ1]) {
     for (let z = -2; z <= 2; z++) for (let x = -2; x <= 2; x++) {
       const wall = Math.abs(x) === 2 || Math.abs(z) === 2;
-      for (let y = ROOF - 6; y <= ROOF + 5; y++) { const px = cx + x, pz = cz + z; if (y < ROOF && Math.abs(px) < KX && pz > KZ0 && pz < KZ1) continue; put(px, y, pz, wall ? stone() : y === ROOF ? B('stone_bricks') : 0); }
+      // solid from the ground up to the roof, then a little room with battlements on top
+      for (let y = 0; y <= ROOF + 5; y++) {
+        const px = cx + x, pz = cz + z;
+        if (y < ROOF && Math.abs(px) < KX && pz > KZ0 && pz < KZ1) continue; // inside the keep: leave the rooms alone
+        put(px, y, pz, y < ROOF || wall ? stone() : y === ROOF ? B('stone_bricks') : 0);
+      }
       if (wall && (x + z) % 2 === 0) put(cx + x, ROOF + 6, cz + z, stone());
     }
     put(cx, ROOF + 1, cz, 'lantern');
+    // a doorway from the roof into the little tower
+    const ix = cx - Math.sign(cx) * 2, iz = cz - Math.sign(cz); put(ix, ROOF + 1, iz, 0); put(ix, ROOF + 2, iz, 0);
   }
   // the front door, a sign above it, and steps
   box(-1, 1, KZ1, 1, 3, KZ1, 0);
