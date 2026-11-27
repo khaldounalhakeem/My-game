@@ -1513,10 +1513,15 @@ class World {
     // only look as high as something is built (most chunks are empty above the land)
     const top = this.chunkTop(c);
     for (let y = 0; y <= top; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
-      const id = data[x + (z << 4) + (y << 8)];
+      let id = data[x + (z << 4) + (y << 8)];
       if (!id) continue;
-      const def = DEFS[id];
-      if (def.cross) { this.addCross(O, x, y, z, def); continue; }
+      let def = DEFS[id];
+      if (def.cross) {
+        this.addCross(O, x, y, z, def);
+        if (!def.wlog) continue;
+        // seagrass, kelp, coral and sea pickles stand in water: draw the water around them too, like Minecraft
+        id = ID.water; def = DEFS[id];
+      }
       if (def.wire) {
         // redstone dust draws a line to whatever it joins up with, like Minecraft
         const joins = (dx, dz) => { const n = DEFS[get(x + dx, y, z + dz)]; if (n && (n.wire || n.rsTorch || n.lever || n.button || n.plate || n.key === 'redstone_block' || n.repeater || n.comparator || n.observer || n.target || n.daylight)) return true; const up = DEFS[get(x + dx, y + 1, z + dz)], dn = DEFS[get(x + dx, y - 1, z + dz)]; return !!((up && up.wire && !(DEFS[get(x, y + 1, z)] || {}).opaque) || (dn && dn.wire && !(n && n.opaque))); };
