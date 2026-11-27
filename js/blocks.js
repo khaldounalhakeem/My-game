@@ -715,6 +715,13 @@ makeTile('i_cooked_cod', pFish(0xd8b88a, 0xf0e0c0, 0xa88a5a));
 makeTile('i_salmon', pFish(0xc84a3a, 0xe8a090, 0x7a3a2a));
 makeTile('i_cooked_salmon', pFish(0xd8803a, 0xf0b890, 0x9a5a2a));
 makeTile('i_fishing_rod', pPlant(P => { P.line(2, 14, 13, 2, 0x8a6a3a); P.line(3, 14, 14, 2, 0x6a4a24); P.line(13, 3, 13, 12, 0xdddddd); P.rect(12, 12, 3, 2, 0xc83a3a); }));
+/* drops of the new mobs */
+makeTile('i_ink_sac', pBlob(0x1a1a2a, 4.5, 0x3a3a5a));
+makeTile('i_glow_ink_sac', pBlob(0x2ab8a8, 4.5, 0x8afff0));
+makeTile('i_rabbit', pBlob(0xe0a0a0, 4.5, 0xffffff));
+makeTile('i_cooked_rabbit', pBlob(0xb8703a, 4.5, 0xe0a070));
+makeTile('i_slime_ball', pBlob(0x7ad84a, 4, 0xc8ffa0));
+makeTile('i_phantom_membrane', pPlant(P => { P.rect(3, 4, 10, 8, 0xc8c0a8); P.rect(4, 5, 8, 6, 0xe0d8c0); P.line(3, 4, 12, 11, 0xa8a088); }));
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -1231,6 +1238,12 @@ item('cooked_cod', 'Cooked Cod', 'cooked_cod', { food: 5 });
 item('salmon', 'Raw Salmon', 'salmon', { food: 2 });
 item('cooked_salmon', 'Cooked Salmon', 'cooked_salmon', { food: 6 });
 item('fishing_rod', 'Fishing Rod', 'fishing_rod', { stack: 1 });
+item('ink_sac', 'Ink Sac', 'ink_sac');
+item('glow_ink_sac', 'Glow Ink Sac', 'glow_ink_sac');
+item('rabbit', 'Raw Rabbit', 'rabbit', { food: 3 });
+item('cooked_rabbit', 'Cooked Rabbit', 'cooked_rabbit', { food: 5 });
+item('slime_ball', 'Slimeball', 'slime_ball');
+item('phantom_membrane', 'Phantom Membrane', 'phantom_membrane');
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
 
 function getDrops(def, rng) {
@@ -1446,7 +1459,7 @@ const RECIPES = [
   ['terracotta', 1, { clay: 1 }, 'furnace'],
   ['cooked_porkchop', 1, { porkchop: 1 }, 'furnace'],
   ['steak', 1, { beef: 1 }, 'furnace'],
-  ['cooked_cod', 1, { cod: 1 }, 'furnace'], ['cooked_salmon', 1, { salmon: 1 }, 'furnace'], ['fishing_rod', 1, { stick: 3, string: 2 }],
+  ['cooked_rabbit', 1, { rabbit: 1 }, 'furnace'], ['cooked_cod', 1, { cod: 1 }, 'furnace'], ['cooked_salmon', 1, { salmon: 1 }, 'furnace'], ['fishing_rod', 1, { stick: 3, string: 2 }],
   ['cooked_chicken', 1, { chicken: 1 }, 'furnace'],
 ];
 

@@ -222,25 +222,120 @@ const MOB_TYPES = {
   chicken: { name: 'Chicken', hp: 4, w: 0.45, h: 0.7, speed: 1.6, passive: true, xp: 1, drops: [['chicken', 1, 1], ['feather', 0, 2]] },
 };
 
+/* ---------- more of Minecraft's mobs, made from a short recipe each ----------
+   body [w, h, d] at height by; legs: how many and how long; a head with a face; extra boxes for ears, tails,
+   wings, stripes... Bodies without legs swim or fly. */
+const MORE_MOBS = {
+  // land animals
+  bee: { T: { name: 'Bee', hp: 10, w: 0.6, h: 0.5, speed: 2.6, neutral: true, dmg: 2, fly: 1, xp: 1, drops: [] },
+    M: { body: [0.42, 0.4, 0.6], by: 0.3, col: 0xf0c020, legs: 0, head: [0.3, 0.3, 0.2], hy: 0.32, hz: 0.38, x: [[0.44, 0.1, 0.62, 0x2a2a1a, 0, 0.32, -0.05], [0.44, 0.1, 0.62, 0x2a2a1a, 0, 0.32, 0.12], [0.3, 0.02, 0.25, 0xd8f0ff, -0.18, 0.52, 0], [0.3, 0.02, 0.25, 0xd8f0ff, 0.18, 0.52, 0], [0.05, 0.05, 0.12, 0x2a2a1a, 0, 0.3, -0.36]], eye: '#222' } },
+  fox: { T: { name: 'Fox', hp: 10, w: 0.6, h: 0.7, speed: 3.2, passive: true, xp: 1, drops: [] },
+    M: { body: [0.4, 0.38, 0.7], by: 0.45, col: 0xe07a2a, leg: [0.12, 0.3], legCol: 0x2a1a10, head: [0.42, 0.36, 0.34], hy: 0.62, hz: 0.48, x: [[0.1, 0.14, 0.06, 0xe07a2a, -0.14, 0.86, 0.45], [0.1, 0.14, 0.06, 0xe07a2a, 0.14, 0.86, 0.45], [0.2, 0.12, 0.14, 0xf4f0e8, 0, 0.55, 0.7], [0.22, 0.22, 0.55, 0xe07a2a, 0, 0.5, -0.55], [0.22, 0.22, 0.12, 0xf4f0e8, 0, 0.5, -0.86]], eye: '#222' } },
+  rabbit: { T: { name: 'Rabbit', hp: 3, w: 0.4, h: 0.5, speed: 3.4, passive: true, xp: 1, drops: [['rabbit', 0, 1], ['leather', 0, 1]] },
+    M: { body: [0.3, 0.28, 0.42], by: 0.24, col: 0x9a7a5a, leg: [0.08, 0.12], head: [0.26, 0.24, 0.24], hy: 0.42, hz: 0.24, x: [[0.06, 0.24, 0.04, 0x9a7a5a, -0.07, 0.64, 0.22], [0.06, 0.24, 0.04, 0x9a7a5a, 0.07, 0.64, 0.22], [0.12, 0.12, 0.1, 0xf4f0e8, 0, 0.28, -0.26]], eye: '#222' } },
+  goat: { T: { name: 'Goat', hp: 10, w: 0.9, h: 1.3, speed: 2, passive: true, xp: 1, drops: [] },
+    M: { body: [0.6, 0.6, 0.95], by: 0.85, col: 0xe8e4dc, leg: [0.2, 0.55], head: [0.36, 0.4, 0.5], hy: 1.15, hz: 0.6, x: [[0.06, 0.3, 0.06, 0x8a8070, -0.12, 1.5, 0.55], [0.06, 0.3, 0.06, 0x8a8070, 0.12, 1.5, 0.55], [0.12, 0.2, 0.06, 0xd8d4cc, 0, 0.88, 0.85]], eye: '#c8a020' } },
+  frog: { T: { name: 'Frog', hp: 10, w: 0.5, h: 0.5, speed: 2, passive: true, xp: 1, drops: [] },
+    M: { body: [0.45, 0.25, 0.5], by: 0.18, col: 0xc88a3a, leg: [0.1, 0.1], head: [0.46, 0.18, 0.32], hy: 0.36, hz: 0.12, x: [[0.12, 0.1, 0.12, 0x2a2a1a, -0.15, 0.48, 0.15], [0.12, 0.1, 0.12, 0x2a2a1a, 0.15, 0.48, 0.15]], eye: '#222' } },
+  turtle: { T: { name: 'Turtle', hp: 30, w: 1.2, h: 0.4, speed: 1, passive: true, amphib: true, xp: 1, drops: [] },
+    M: { body: [1.0, 0.3, 1.1], by: 0.25, col: 0x4a7a2a, leg: [0.2, 0.12], legCol: 0x7ab85a, head: [0.3, 0.24, 0.3], hy: 0.22, hz: 0.65, headCol: 0x7ab85a, x: [[0.8, 0.12, 0.9, 0x3a6a1a, 0, 0.44, 0]], eye: '#222' } },
+  llama: { T: { name: 'Llama', hp: 22, w: 0.9, h: 1.87, speed: 1.7, passive: true, xp: 1, drops: [['leather', 0, 2]] },
+    M: { body: [0.62, 0.7, 1.0], by: 1.0, col: 0xe8dcc0, leg: [0.2, 0.75], head: [0.32, 0.36, 0.4], hy: 1.9, hz: 0.55, x: [[0.28, 0.75, 0.28, 0xe8dcc0, 0, 1.5, 0.45], [0.06, 0.16, 0.06, 0xe8dcc0, -0.1, 2.16, 0.5], [0.06, 0.16, 0.06, 0xe8dcc0, 0.1, 2.16, 0.5], [0.66, 0.2, 0.6, 0xc83a3a, 0, 1.32, 0]], eye: '#222' } },
+  camel: { T: { name: 'Camel', hp: 32, w: 1.7, h: 2.4, speed: 1.5, passive: true, xp: 1, drops: [] },
+    M: { body: [0.9, 0.8, 1.6], by: 1.6, col: 0xd8a860, leg: [0.25, 1.2], head: [0.35, 0.4, 0.7], hy: 2.3, hz: 1.1, x: [[0.6, 0.45, 0.7, 0xd8a860, 0, 2.15, -0.1], [0.3, 0.7, 0.3, 0xd8a860, 0, 2.0, 0.85]], eye: '#222' } },
+  polar_bear: { T: { name: 'Polar Bear', hp: 30, w: 1.4, h: 1.4, speed: 2.5, neutral: true, dmg: 6, xp: 1, drops: [['cod', 0, 2]] },
+    M: { body: [0.9, 0.85, 1.5], by: 0.95, col: 0xf4f4f0, leg: [0.32, 0.6], head: [0.6, 0.55, 0.5], hy: 1.15, hz: 0.95, x: [[0.14, 0.12, 0.08, 0xf4f4f0, -0.22, 1.48, 0.85], [0.14, 0.12, 0.08, 0xf4f4f0, 0.22, 1.48, 0.85], [0.28, 0.2, 0.18, 0x2a2a2a, 0, 1.06, 1.24]], eye: '#222' } },
+  mooshroom: { T: { name: 'Mooshroom', hp: 10, w: 0.9, h: 1.4, speed: 1.4, passive: true, xp: 2, drops: [['beef', 1, 3], ['leather', 0, 2]] },
+    M: { body: [0.72, 0.65, 1.1], by: 0.95, col: 0xb82a22, leg: [0.22, 0.62], legCol: 0xe8e0d8, head: [0.5, 0.5, 0.4], hy: 1.2, hz: 0.72, x: [[0.18, 0.18, 0.18, 0xd83a3a, -0.15, 1.38, 0.1], [0.18, 0.18, 0.18, 0xd83a3a, 0.2, 1.38, -0.3], [0.08, 0.15, 0.08, 0xd8d0c0, -0.28, 1.45, 0.72], [0.08, 0.15, 0.08, 0xd8d0c0, 0.28, 1.45, 0.72]], eye: '#111' } },
+  sniffer: { T: { name: 'Sniffer', hp: 14, w: 1.9, h: 1.75, speed: 1, passive: true, xp: 1, drops: [] },
+    M: { body: [1.5, 1.2, 2.0], by: 1.0, col: 0x9a3a2a, leg: [0.35, 0.45], legCol: 0x5a2a1a, head: [0.9, 0.8, 0.7], hy: 1.1, hz: 1.25, headCol: 0x8a3a2a, x: [[1.52, 0.3, 2.02, 0x3a8a4a, 0, 1.52, 0], [0.4, 0.3, 0.3, 0xc8a030, 0, 0.8, 1.65]], eye: '#222' } },
+  armadillo: { T: { name: 'Armadillo', hp: 12, w: 0.7, h: 0.65, speed: 1.4, passive: true, xp: 1, drops: [] },
+    M: { body: [0.5, 0.42, 0.7], by: 0.4, col: 0xc88a7a, leg: [0.12, 0.2], legCol: 0xd8a898, head: [0.26, 0.26, 0.3], hy: 0.4, hz: 0.45, x: [[0.56, 0.3, 0.74, 0xa86a5a, 0, 0.55, 0], [0.08, 0.14, 0.04, 0xd8a898, -0.08, 0.6, 0.38], [0.08, 0.14, 0.04, 0xd8a898, 0.08, 0.6, 0.38]], eye: '#222' } },
+  parrot: { T: { name: 'Parrot', hp: 6, w: 0.5, h: 0.9, speed: 2, passive: true, fly: 1.5, xp: 1, drops: [['feather', 1, 2]] },
+    M: { body: [0.3, 0.5, 0.3], by: 0.45, col: 0xd82a2a, legs: 0, head: [0.26, 0.26, 0.26], hy: 0.85, hz: 0.05, x: [[0.06, 0.3, 0.2, 0x2a6ad8, -0.18, 0.5, 0], [0.06, 0.3, 0.2, 0x2a6ad8, 0.18, 0.5, 0], [0.1, 0.1, 0.12, 0xf0c020, 0, 0.82, 0.22], [0.2, 0.3, 0.08, 0xf0c020, 0, 0.2, -0.15]], eye: '#222' } },
+  ocelot: { T: { name: 'Ocelot', hp: 10, w: 0.6, h: 0.7, speed: 3.5, passive: true, xp: 1, drops: [] },
+    M: { body: [0.3, 0.3, 0.7], by: 0.42, col: 0xe8c060, leg: [0.1, 0.28], head: [0.32, 0.28, 0.3], hy: 0.6, hz: 0.45, x: [[0.07, 0.07, 0.55, 0xe8c060, 0, 0.5, -0.6], [0.32, 0.05, 0.1, 0x6a4a2a, 0, 0.58, 0.1], [0.32, 0.05, 0.1, 0x6a4a2a, 0, 0.58, -0.15]], eye: '#3ad83a' } },
+  // in the water
+  squid: { T: { name: 'Squid', hp: 10, w: 0.8, h: 0.8, speed: 1.5, passive: true, swim: true, fish: true, xp: 1, drops: [['ink_sac', 1, 3]] },
+    M: { body: [0.6, 0.75, 0.6], by: 0.6, col: 0x2a3a6a, legs: 0, head: null, x: [[0.08, 0.6, 0.08, 0x3a4a7a, -0.2, 0.0, -0.2], [0.08, 0.6, 0.08, 0x3a4a7a, 0.2, 0.0, -0.2], [0.08, 0.6, 0.08, 0x3a4a7a, -0.2, 0.0, 0.2], [0.08, 0.6, 0.08, 0x3a4a7a, 0.2, 0.0, 0.2], [0.1, 0.1, 0.02, 0xffffff, -0.15, 0.6, 0.31], [0.1, 0.1, 0.02, 0xffffff, 0.15, 0.6, 0.31]] } },
+  glow_squid: { T: { name: 'Glow Squid', hp: 10, w: 0.8, h: 0.8, speed: 1.5, passive: true, swim: true, fish: true, glow: true, xp: 1, drops: [['glow_ink_sac', 1, 3]] },
+    M: { body: [0.6, 0.75, 0.6], by: 0.6, col: 0x2ab8a8, legs: 0, head: null, glow: 0x1a6a60, x: [[0.08, 0.6, 0.08, 0x3ad8c8, -0.2, 0.0, -0.2], [0.08, 0.6, 0.08, 0x3ad8c8, 0.2, 0.0, -0.2], [0.08, 0.6, 0.08, 0x3ad8c8, -0.2, 0.0, 0.2], [0.08, 0.6, 0.08, 0x3ad8c8, 0.2, 0.0, 0.2], [0.1, 0.1, 0.02, 0xffffff, -0.15, 0.6, 0.31], [0.1, 0.1, 0.02, 0xffffff, 0.15, 0.6, 0.31]] } },
+  dolphin: { T: { name: 'Dolphin', hp: 10, w: 0.9, h: 0.6, speed: 4, passive: true, swim: true, xp: 1, drops: [['cod', 0, 1]] },
+    M: { body: [0.5, 0.45, 1.3], by: 0.3, col: 0x6a8aa8, legs: 0, head: [0.4, 0.35, 0.35], hy: 0.28, hz: 0.75, x: [[0.18, 0.12, 0.3, 0x5a7a98, 0, 0.3, 1.05], [0.06, 0.35, 0.3, 0x5a7a98, 0, 0.62, 0], [0.6, 0.06, 0.25, 0x5a7a98, 0, 0.3, -0.8]], eye: '#222' } },
+  axolotl: { T: { name: 'Axolotl', hp: 14, w: 0.75, h: 0.42, speed: 2, passive: true, swim: true, amphib: true, xp: 1, drops: [] },
+    M: { body: [0.35, 0.22, 0.7], by: 0.22, col: 0xf0a0c0, leg: [0.08, 0.12], head: [0.4, 0.26, 0.3], hy: 0.28, hz: 0.48, x: [[0.06, 0.18, 0.04, 0xd84a7a, -0.24, 0.38, 0.45], [0.06, 0.18, 0.04, 0xd84a7a, 0.24, 0.38, 0.45], [0.06, 0.18, 0.5, 0xf0a0c0, 0, 0.26, -0.55]], eye: '#222' } },
+  cod: { T: { name: 'Cod', hp: 3, w: 0.5, h: 0.3, speed: 2, passive: true, swim: true, fish: true, xp: 1, drops: [['cod', 1, 1]] },
+    M: { body: [0.18, 0.24, 0.55], by: 0.15, col: 0xb8a07a, legs: 0, head: null, x: [[0.06, 0.2, 0.15, 0x8a7a5a, 0, 0.15, -0.34], [0.04, 0.08, 0.15, 0x8a7a5a, 0, 0.3, 0], [0.05, 0.05, 0.02, 0x111111, -0.07, 0.2, 0.2], [0.05, 0.05, 0.02, 0x111111, 0.07, 0.2, 0.2]] } },
+  salmon: { T: { name: 'Salmon', hp: 3, w: 0.5, h: 0.3, speed: 2.4, passive: true, swim: true, fish: true, xp: 1, drops: [['salmon', 1, 1]] },
+    M: { body: [0.2, 0.26, 0.7], by: 0.15, col: 0xa83a2a, legs: 0, head: null, x: [[0.06, 0.22, 0.18, 0x6a2a1a, 0, 0.15, -0.42], [0.04, 0.1, 0.2, 0x6a2a1a, 0, 0.32, 0], [0.05, 0.05, 0.02, 0x111111, -0.08, 0.2, 0.3], [0.05, 0.05, 0.02, 0x111111, 0.08, 0.2, 0.3]] } },
+  tropical_fish: { T: { name: 'Tropical Fish', hp: 3, w: 0.5, h: 0.4, speed: 2, passive: true, swim: true, fish: true, xp: 1, drops: [] },
+    M: { body: [0.12, 0.3, 0.35], by: 0.2, col: 0xf07a2a, legs: 0, head: null, x: [[0.13, 0.3, 0.08, 0xffffff, 0, 0.2, 0.05], [0.05, 0.2, 0.12, 0x2a6ad8, 0, 0.2, -0.22], [0.05, 0.05, 0.02, 0x111111, -0.06, 0.24, 0.16], [0.05, 0.05, 0.02, 0x111111, 0.06, 0.24, 0.16]] } },
+  // monsters
+  slime: { T: { name: 'Slime', hp: 16, w: 1.0, h: 1.0, speed: 2, hostile: true, dmg: 2, xp: 4, drops: [['slime_ball', 0, 2]] },
+    M: { body: [1.0, 1.0, 1.0], by: 0.5, col: 0x7ad84a, trans: true, legs: 0, head: null, x: [[0.6, 0.6, 0.6, 0x4a9a2a, 0, 0.5, 0], [0.15, 0.15, 0.02, 0x1a3a10, -0.2, 0.65, 0.5], [0.15, 0.15, 0.02, 0x1a3a10, 0.2, 0.65, 0.5], [0.25, 0.08, 0.02, 0x1a3a10, 0, 0.35, 0.5]] } },
+  magma_cube: { T: { name: 'Magma Cube', hp: 16, w: 1.0, h: 1.0, speed: 2, hostile: true, dmg: 4, xp: 4, fireproof: true, drops: [['blaze_powder', 0, 1]] },
+    M: { body: [1.0, 1.0, 1.0], by: 0.5, col: 0x3a1a10, legs: 0, head: null, glow: 0x401000, x: [[1.02, 0.12, 1.02, 0xe85a1a, 0, 0.3, 0], [1.02, 0.12, 1.02, 0xe85a1a, 0, 0.7, 0], [0.18, 0.12, 0.02, 0xffc030, -0.22, 0.6, 0.51], [0.18, 0.12, 0.02, 0xffc030, 0.22, 0.6, 0.51]] } },
+  phantom: { T: { name: 'Phantom', hp: 20, w: 0.9, h: 0.5, speed: 4, hostile: true, nightOnly: true, burns: true, fly: 1, dmg: 3, xp: 5, drops: [['phantom_membrane', 0, 1]] },
+    M: { body: [0.5, 0.25, 0.9], by: 0.25, col: 0x2a3a6a, legs: 0, head: [0.4, 0.22, 0.4], hy: 0.25, hz: 0.6, x: [[0.9, 0.04, 0.5, 0x3a4a7a, -0.68, 0.32, 0], [0.9, 0.04, 0.5, 0x3a4a7a, 0.68, 0.32, 0], [0.25, 0.04, 0.4, 0x3a4a7a, 0, 0.25, -0.6]], eye: '#7aff3a' } },
+  hoglin: { T: { name: 'Hoglin', hp: 40, w: 1.4, h: 1.4, speed: 2.4, hostile: true, dmg: 6, xp: 5, drops: [['porkchop', 2, 4], ['leather', 0, 1]] },
+    M: { body: [0.9, 0.85, 1.5], by: 1.0, col: 0xc87a5a, leg: [0.3, 0.6], legCol: 0x8a5a3a, head: [0.7, 0.6, 0.7], hy: 1.0, hz: 1.0, x: [[0.1, 0.35, 0.1, 0xf4f0e0, -0.3, 0.9, 1.4], [0.1, 0.35, 0.1, 0xf4f0e0, 0.3, 0.9, 1.4], [0.12, 0.6, 1.2, 0xe8c070, 0, 1.6, 0]], eye: '#222' } },
+};
+/* people-shaped ones reuse the zombie / skeleton bodies */
+const MORE_PEOPLE = {
+  husk: { T: { name: 'Husk', hp: 20, w: 0.6, h: 1.95, speed: 2.3, hostile: true, dmg: 3, xp: 5, drops: [['rotten_flesh', 0, 2]] }, skin: 0xb8a070, shirt: 0x7a6a4a, pants: 0x5a4a3a, like: 'zombie' },
+  stray: { T: { name: 'Stray', hp: 20, w: 0.6, h: 1.95, speed: 2.4, hostile: true, ranged: true, dmg: 3, burns: true, xp: 5, drops: [['bone', 0, 2], ['arrow', 0, 2]] }, skin: 0x9ab0b0, shirt: 0x6a8a8a, pants: 0x5a6a6a, like: 'skeleton' },
+  drowned: { T: { name: 'Drowned', hp: 20, w: 0.6, h: 1.95, speed: 2.3, hostile: true, dmg: 3, burns: true, amphib: true, xp: 5, drops: [['rotten_flesh', 0, 2]] }, skin: 0x5a9a8a, shirt: 0x3a7a8a, pants: 0x4a5a7a, like: 'zombie' },
+  witch: { T: { name: 'Witch', hp: 26, w: 0.6, h: 1.95, speed: 2, hostile: true, ranged: true, dmg: 3, xp: 5, drops: [['redstone', 0, 2], ['glowstone', 0, 1], ['stick', 0, 2], ['sugar_cane', 0, 1]] }, skin: 0xc8a07a, shirt: 0x3a1a4a, pants: 0x2a1a3a, like: 'witch' },
+  piglin: { T: { name: 'Piglin', hp: 16, w: 0.6, h: 1.95, speed: 2.6, neutral: true, dmg: 5, xp: 5, fireproof: true, drops: [['gold_ingot', 0, 1]] }, skin: 0xe8a89a, shirt: 0x7a5a32, pants: 0x5a3a20, like: 'piglin' },
+};
+for (const [k, v] of Object.entries(MORE_MOBS)) {
+  MOB_TYPES[k] = v.T;
+  if (v.M.head) { const c = '#' + (v.M.headCol || v.M.col).toString(16).padStart(6, '0'), e = v.M.eye || '#222'; FACES_DRAW[k] = px => { px(0, 0, c, 8, 8); px(1, 3, e, 2, 2); px(5, 3, e, 2, 2); }; }
+}
+for (const [k, v] of Object.entries(MORE_PEOPLE)) {
+  MOB_TYPES[k] = v.T;
+  const c = '#' + v.skin.toString(16).padStart(6, '0');
+  FACES_DRAW[k] = px => { px(0, 0, c, 8, 8); px(1, 3, '#1a1a1a', 2, 1); px(5, 3, '#1a1a1a', 2, 1); px(3, 5, '#00000044', 2, 1); };
+}
+Object.assign(BREED_FOOD, { rabbit: ['carrot'], goat: ['wheat'], llama: ['hay_bale'], mooshroom: ['wheat'], frog: ['slime_ball'], fox: ['wheat_seeds'], sniffer: ['wheat_seeds'], armadillo: ['wheat_seeds'], camel: ['wheat'], turtle: ['wheat_seeds'], axolotl: ['cod'], ocelot: ['cod'], bee: ['rose', 'dandelion'] });
+function buildMoreModel(type, g, P) {
+  const M = MORE_MOBS[type].M, mat = c => lam(c, M.glow ? { emissive: M.glow } : M.trans ? { transparent: true, opacity: 0.75 } : undefined);
+  const [bw, bh, bd] = M.body;
+  addBox(g, bw, bh, bd, mat(M.col), 0, M.by, 0);
+  const legs = M.legs === 0 ? 0 : 4;
+  if (legs && M.leg) {
+    const [lw, ll] = M.leg, lx = bw / 2 - lw / 2 - 0.02, lz = bd / 2 - lw / 2 - 0.04, lm = mat(M.legCol || M.col);
+    for (const [x, z] of [[-lx, lz], [lx, lz], [-lx, -lz], [lx, -lz]]) P.legs.push(limb(g, lw, ll, lw, lm, x, ll, z));
+  }
+  if (M.head) {
+    const head = new THREE.Mesh(boxGeo(...M.head), headMats(type, M.headCol || M.col));
+    head.position.set(0, M.hy, M.hz); g.add(head); P.head = head;
+  }
+  for (const [w, h, d, c, x, y, z] of M.x || []) addBox(g, w, h, d, mat(c), x, y, z);
+}
 function buildMobModel(type) {
   const g = new THREE.Group();
   const P = { legs: [], arms: [], head: null, wings: [] };
-  if (type === 'zombie' || type === 'skeleton' || type === 'enderman' || type === 'player' || type === 'zombified_piglin' || type === 'wither_skeleton' || type === 'villager' || type === 'pillager') {
-    const thin = type === 'skeleton' || type === 'enderman' || type === 'wither_skeleton', tall = type === 'enderman';
-    const skin = { zombie: 0x5c8a3e, skeleton: 0xc9c9c9, enderman: 0x161616, player: 0xc89878, zombified_piglin: 0xe39a8f, wither_skeleton: 0x2a2a2a, villager: 0xc8a07a, pillager: 0x9a9a9a }[type];
-    const shirt = { zombie: 0x2f8fa3, skeleton: 0xbdbdbd, enderman: 0x1a1a1a, player: 0x2fb5c8, zombified_piglin: 0x7a5a32, wither_skeleton: 0x262626, villager: 0x6b4a2e, pillager: 0x3a3a4a }[type];
-    const pants = { zombie: 0x3b3f8f, skeleton: 0xa6a6a6, enderman: 0x161616, player: 0x3b3f9f, zombified_piglin: 0x5a3a20, wither_skeleton: 0x202020, villager: 0x5e3f24, pillager: 0x2a2a34 }[type];
+  if (MORE_MOBS[type]) buildMoreModel(type, g, P);
+  else if (type === 'zombie' || type === 'skeleton' || type === 'enderman' || type === 'player' || type === 'zombified_piglin' || type === 'wither_skeleton' || type === 'villager' || type === 'pillager' || MORE_PEOPLE[type]) {
+    const MP = MORE_PEOPLE[type], like = MP ? MP.like : type;
+    const thin = like === 'skeleton' || type === 'enderman' || type === 'wither_skeleton', tall = type === 'enderman';
+    const skin = MP ? MP.skin : { zombie: 0x5c8a3e, skeleton: 0xc9c9c9, enderman: 0x161616, player: 0xc89878, zombified_piglin: 0xe39a8f, wither_skeleton: 0x2a2a2a, villager: 0xc8a07a, pillager: 0x9a9a9a }[type];
+    const shirt = MP ? MP.shirt : { zombie: 0x2f8fa3, skeleton: 0xbdbdbd, enderman: 0x1a1a1a, player: 0x2fb5c8, zombified_piglin: 0x7a5a32, wither_skeleton: 0x262626, villager: 0x6b4a2e, pillager: 0x3a3a4a }[type];
+    const pants = MP ? MP.pants : { zombie: 0x3b3f8f, skeleton: 0xa6a6a6, enderman: 0x161616, player: 0x3b3f9f, zombified_piglin: 0x5a3a20, wither_skeleton: 0x202020, villager: 0x5e3f24, pillager: 0x2a2a34 }[type];
     const mSkin = lam(skin), mShirt = lam(shirt), mPants = lam(pants);
     const lw = thin ? 0.13 : 0.25, legL = tall ? 1.5 : 0.75, bodyH = 0.75, hip = legL;
     P.legs.push(limb(g, lw, legL, lw, mPants, -0.125, hip, 0), limb(g, lw, legL, lw, mPants, 0.125, hip, 0));
     addBox(g, 0.5, bodyH, thin ? 0.2 : 0.25, mShirt, 0, hip + bodyH / 2, 0);
     const shoulder = hip + bodyH - 0.1, armL = tall ? 1.5 : 0.72;
-    const armMat = type === 'zombie' || type === 'player' ? mSkin : mShirt;
+    const armMat = like === 'zombie' || type === 'player' ? mSkin : mShirt;
     P.arms.push(limb(g, lw, armL, lw, armMat, -0.25 - lw / 2, shoulder, 0), limb(g, lw, armL, lw, armMat, 0.25 + lw / 2, shoulder, 0));
     if (type === 'player') for (const a of P.arms) addBox(a, lw + 0.02, 0.3, lw + 0.02, mShirt, 0, -0.12, 0);
     const head = new THREE.Mesh(boxGeo(0.5, 0.5, 0.5), headMats(type, skin));
     head.position.set(0, hip + bodyH + 0.25, 0); g.add(head); P.head = head;
-    if (type === 'zombie') for (const a of P.arms) a.rotation.x = -Math.PI / 2;
+    if (like === 'zombie') for (const a of P.arms) a.rotation.x = -Math.PI / 2;
+    if (like === 'witch') { addBox(head, 0.6, 0.08, 0.6, lam(0x2a1a3a), 0, 0.29, 0); addBox(head, 0.36, 0.3, 0.36, lam(0x2a1a3a), 0, 0.46, 0); addBox(head, 0.18, 0.25, 0.18, lam(0x2a1a3a), 0, 0.68, -0.05); addBox(head, 0.12, 0.18, 0.1, lam(0xa8805a), 0, -0.05, 0.3); }
+    if (like === 'piglin') { addBox(head, 0.26, 0.16, 0.1, lam(0xd8889a), 0, -0.08, 0.3); P.arms[1].rotation.x = -0.6; const blade = addBox(P.arms[1], 0.08, 0.8, 0.08, lam(0xf5cc2e), 0, -0.9, 0.1); blade.rotation.x = Math.PI / 2 - 0.3; }
     if (type === 'villager') {
       addBox(head, 0.12, 0.22, 0.12, lam(0xb88a64), 0, -0.08, 0.3);
       addBox(g, 0.54, 0.5, 0.29, mShirt, 0, hip + 0.1, 0);
@@ -255,7 +350,7 @@ function buildMobModel(type) {
       blade.rotation.x = Math.PI / 2 - 0.3;
       if (type === 'wither_skeleton') g.scale.setScalar(1.2);
     }
-    if (type === 'skeleton') { P.arms[1].rotation.x = -Math.PI / 2; const bow = addBox(P.arms[1], 0.05, 0.7, 0.05, lam(0x7a5a32), 0, -0.7, 0.12); bow.rotation.x = Math.PI / 2; }
+    if (like === 'skeleton') { P.arms[1].rotation.x = -Math.PI / 2; const bow = addBox(P.arms[1], 0.05, 0.7, 0.05, lam(0x7a5a32), 0, -0.7, 0.12); bow.rotation.x = Math.PI / 2; }
   } else if (type === 'creeper') {
     const tex = faceTex('creeper_body', 8, px => noisyFill(px, 8, ['#4caf50', '#3f9a44', '#5cc060', '#6fc86a', '#2f7a32'], 9));
     const body = lam(0xffffff, { map: tex });
@@ -991,7 +1086,31 @@ class Mob {
       }
     }
 
-    const accel = this.onGround ? 10 : 2;
+    // swimmers (fish, squid, dolphins, axolotls): stay in the water and swim up and down
+    const swimming = T.swim && inLiquid === ID.water;
+    if (swimming) {
+      // never swim out onto land: turn around at the shore
+      if (!T.amphib && (moveX || moveZ) && !W.liquidAt(this.pos.x + moveX * 0.9, this.pos.y + 0.3, this.pos.z + moveZ * 0.9)) {
+        moveX = -moveX; moveZ = -moveZ; if (this.wanderDir != null) this.wanderDir += Math.PI; this.yaw = Math.atan2(moveX, moveZ);
+      }
+      this.swimT = (this.swimT || 0) - dt;
+      if (this.swimT <= 0 || this.swimY === undefined) {
+        this.swimT = 2 + Math.random() * 4;
+        let top = Math.floor(this.pos.y), bot = top;
+        while (top < WH - 1 && W.liquidAt(this.pos.x, top + 1.2, this.pos.z) === ID.water && top - this.pos.y < 12) top++;
+        while (bot > 1 && W.liquidAt(this.pos.x, bot - 0.8, this.pos.z) === ID.water && this.pos.y - bot < 12) bot--;
+        this.swimY = bot + 0.2 + Math.random() * Math.max(0, top - bot - 0.2);
+      }
+      if (this.wanderDir == null && this.fleeT <= 0 && !hostileNow) this.wanderDir = Math.random() * Math.PI * 2; // fish keep swimming
+    }
+    if (T.swim && !T.amphib && !swimming && !inLiquid) {
+      // a fish on land flops about and slowly runs out of air
+      this.dryT = (this.dryT || 0) + dt;
+      if (this.onGround && Math.random() < dt * 2) { this.vel.y = 4; this.vel.x = (Math.random() - 0.5) * 3; this.vel.z = (Math.random() - 0.5) * 3; }
+      if (this.dryT > 3) { this.dryT = 2; this.hurt(1, null); }
+      moveX = moveZ = 0;
+    } else this.dryT = 0;
+    const accel = this.onGround || swimming ? 10 : 2;
     this.vel.x += (moveX * speed - this.vel.x) * Math.min(1, accel * dt);
     this.vel.z += (moveZ * speed - this.vel.z) * Math.min(1, accel * dt);
     if (T.fly) {
@@ -999,6 +1118,8 @@ class Mob {
       const engaged = hostileNow && canTarget;
       const wantY = (engaged ? P.pos.y + T.fly : this.homeY) + Math.sin(performance.now() / 700 + this.pos.x) * 0.6;
       this.vel.y += (clamp((wantY - this.pos.y) * 1.2, -3, 3) - this.vel.y) * Math.min(1, dt * 3);
+    } else if (swimming) {
+      this.vel.y += (clamp((this.swimY - this.pos.y) * 1.5, -2, 2) - this.vel.y) * Math.min(1, dt * 3);
     } else {
       if (inLiquid) { this.vel.y += (inLiquid === ID.lava ? 6 : 14) * dt; this.vel.y *= 0.9; if (this.vel.y > 2.5) this.vel.y = 2.5; }
       this.vel.y -= 25 * dt;
@@ -1007,7 +1128,7 @@ class Mob {
     const wantMove = moveX !== 0 || moveZ !== 0;
     W.mobMode = !this.rider; // a horse you ride can still jump fences
     W.moveBody(this, dt); W.mobMode = false;
-    if (!T.fly && this.hitH && wantMove && (this.onGround || inLiquid)) this.vel.y = 7.6;
+    if (!T.fly && !swimming && this.hitH && wantMove && (this.onGround || inLiquid)) this.vel.y = 7.6;
     if (this.parts.ring) this.parts.ring.rotation.y += dt * 3;
     if (inLiquid === ID.lava && !T.fireproof && Math.random() < dt * 2) this.hurt(4, null);
     if (W.touching(this, ID.cactus, 0.05) && Math.random() < dt * 2) this.hurt(1, null);

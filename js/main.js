@@ -1389,20 +1389,44 @@ function spawnTick() {
   if (G.dim === 'end') { endSpawn(hostile); return; }
   structureSpawns();
   // farm animals, horses and wolves: plenty of them around (monsters are counted separately)
-  if (passive < 22 && Math.random() < 0.5) {
+  if (passive < 30 && Math.random() < 0.5) {
     const a = Math.random() * Math.PI * 2, r = 22 + Math.random() * 34;
     const x = Math.floor(P.pos.x + Math.cos(a) * r) + 0.5, z = Math.floor(P.pos.z + Math.sin(a) * r) + 0.5;
     if (W.isLoaded(x, z)) {
-      const y = W.surfaceY(x, z);
-      if (W.getBlock(Math.floor(x), y, Math.floor(z)) === ID.grass) {
-        const b = W.biomeAt(x, z, W.heightAt(x, z));
-        let type = pick(PASSIVE_POOL), n = 1 + (Math.random() * 3 | 0);
-        if (b === BIOME.BAMBOO && Math.random() < 0.6) { type = 'panda'; n = 1 + (Math.random() * 2 | 0); }
-        else if ((b === BIOME.PLAINS || b === BIOME.SAVANNA) && Math.random() < 0.35) { type = Math.random() < 0.3 ? 'donkey' : 'horse'; n = 2 + (Math.random() * 2 | 0); }
+      const y = W.surfaceY(x, z), ground = W.getBlock(Math.floor(x), y, Math.floor(z));
+      const b = W.biomeAt(x, z, W.heightAt(x, z)), R = Math.random();
+      let type = null, n = 1 + (Math.random() * 3 | 0);
+      if (ground === ID.water) {
+        // the sea: squid, fish and dolphins (glow squid come out in the dark)
+        const deep = W.getBlock(Math.floor(x), y - 3, Math.floor(z)) === ID.water;
+        if (deep) {
+          type = R < 0.25 ? 'squid' : R < 0.5 ? 'cod' : R < 0.65 ? 'salmon' : R < 0.75 ? 'dolphin' : R < 0.9 ? 'tropical_fish' : G.isNight() ? 'glow_squid' : 'squid';
+          if (type === 'dolphin') n = 2;
+          if (b === BIOME.MANGROVE && R < 0.3) type = 'axolotl';
+          for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y - 1.5, z + (Math.random() - 0.5) * 2);
+        }
+        type = null;
+      } else if (ground === ID.grass) {
+        type = pick(PASSIVE_POOL);
+        if (b === BIOME.BAMBOO && R < 0.6) { type = 'panda'; n = 1 + (Math.random() * 2 | 0); }
+        else if ((b === BIOME.PLAINS || b === BIOME.SAVANNA) && R < 0.35) { type = Math.random() < 0.3 ? 'donkey' : 'horse'; n = 2 + (Math.random() * 2 | 0); }
         if ((b === BIOME.FOREST || b === BIOME.TAIGA || b === BIOME.BIRCH || b === BIOME.SNOWY) && Math.random() < 0.3) { type = 'wolf'; n = 2 + (Math.random() * 2 | 0); }
         else if ((b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.SAVANNA) && Math.random() < 0.1) { type = 'cat'; n = 1 + (Math.random() < 0.3 ? 1 : 0); }
-        for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y + 1, z + (Math.random() - 0.5) * 2);
       }
+      // each biome's own animals, like Minecraft
+      if (ground && ground !== ID.water && Math.random() < 0.45) {
+        const B = BIOME, r2 = Math.random();
+        const extra = {
+          [B.PLAINS]: r2 < 0.5 ? 'rabbit' : 'bee', [B.FOREST]: r2 < 0.5 ? 'bee' : 'fox', [B.BIRCH]: r2 < 0.6 ? 'bee' : 'fox',
+          [B.TAIGA]: r2 < 0.6 ? 'fox' : 'rabbit', [B.SNOWY]: r2 < 0.4 ? 'polar_bear' : r2 < 0.7 ? 'fox' : 'rabbit',
+          [B.MOUNTAIN]: r2 < 0.6 ? 'goat' : 'llama', [B.DESERT]: r2 < 0.6 ? 'rabbit' : 'camel',
+          [B.JUNGLE]: r2 < 0.5 ? 'parrot' : r2 < 0.85 ? 'ocelot' : 'sniffer', [B.BAMBOO]: r2 < 0.6 ? 'parrot' : 'ocelot',
+          [B.SAVANNA]: r2 < 0.45 ? 'armadillo' : r2 < 0.75 ? 'llama' : 'camel', [B.MANGROVE]: 'frog',
+          [B.DARK_FOREST]: r2 < 0.35 ? 'mooshroom' : 'fox', [B.CHERRY]: r2 < 0.5 ? 'bee' : 'rabbit', [B.BEACH]: 'turtle',
+        }[b];
+        if (extra) { type = extra; n = { bee: 2 + (Math.random() * 2 | 0), polar_bear: 1, sniffer: 1, camel: 1, turtle: 2, goat: 2, llama: 3 }[extra] || 1 + (Math.random() * 2 | 0); }
+      }
+      if (type && ground !== ID.water) for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y + 1, z + (Math.random() - 0.5) * 2);
     }
   }
   const night = G.isNight();
@@ -1423,15 +1447,28 @@ function spawnTick() {
       if (y <= top && W.skyExposed(x, y, z)) continue;
       if (G.lightNear(x, y, z)) continue; // torches, lanterns and glowstone keep monsters away
       let type = pick(HOSTILE_POOL);
+      const hb = W.biomeAt(x, z, W.heightAt(x, z)), outside = y > top;
+      if (type === 'zombie' && hb === BIOME.DESERT && outside) type = 'husk';
+      if (type === 'skeleton' && (hb === BIOME.SNOWY || hb === BIOME.TAIGA) && outside) type = 'stray';
+      if (Math.random() < 0.06) type = 'witch';
+      if (outside && Math.random() < (hb === BIOME.MANGROVE ? 0.35 : 0.06)) type = 'slime';
       if (type === 'enderman' && (W.getBlock(x, y + 2, z))) type = 'zombie';
       if (type === 'spider' && (W.getBlock(x + 1, y, z) || W.getBlock(x - 1, y, z))) type = 'skeleton';
       spawnMob(type, x + 0.5, y, z + 0.5);
       break;
     }
+    // drowned climb out of the sea at night, and phantoms swoop down from the sky
+    const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 20;
+    const x = Math.floor(P.pos.x + Math.cos(a) * r), z = Math.floor(P.pos.z + Math.sin(a) * r);
+    if (W.isLoaded(x, z)) {
+      const top = W.surfaceY(x, z);
+      if (W.getBlock(x, top, z) === ID.water && Math.random() < 0.25) spawnMob('drowned', x + 0.5, top - 1, z + 0.5);
+      else if (night && P.pos.y > 50 && Math.random() < 0.08 && !G.mobs.some(m => m.type === 'phantom' && !m.dead)) spawnMob('phantom', x + 0.5, Math.max(top, P.pos.y) + 18, z + 0.5);
+    }
   }
 }
 
-const NETHER_POOL = [['zombified_piglin', 40], ['wither_skeleton', 14], ['blaze', 16], ['ghast', 7]];
+const NETHER_POOL = [['zombified_piglin', 34], ['piglin', 16], ['hoglin', 10], ['magma_cube', 10], ['wither_skeleton', 14], ['blaze', 16], ['ghast', 7]];
 /* the End: endermen wander the island, and the dragon guards it until it is beaten */
 function endSpawn(hostile) {
   const P = G.player, W = G.world;

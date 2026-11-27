@@ -64,7 +64,7 @@ const MC_ORDER = (() => {
   for (const m of ['leather', 'chainmail', 'iron', 'golden', 'diamond', 'netherite']) for (const t of ['helmet', 'chestplate', 'leggings', 'boots']) o.push(m + '_' + t);
   for (const m of ['leather', 'iron', 'golden', 'diamond']) o.push(m + '_horse_armor');
   o.push('bow', 'arrow');
-  o.push('golden_apple', 'melon_slice', 'bread', 'cookie', 'cake', 'cooked_cod', 'cooked_salmon');
+  o.push('golden_apple', 'melon_slice', 'bread', 'cookie', 'cake', 'cooked_rabbit', 'cooked_cod', 'cooked_salmon');
   o.push('coal', 'emerald', 'lapis', 'diamond', 'quartz', 'iron_ingot', 'gold_ingot', 'netherite_ingot', 'stick', 'wheat', 'leather', 'paper', 'book', 'enchanted_book', 'blaze_powder', 'nether_star');
   const m = {}; o.forEach((k, i) => { if (!(k in m)) m[k] = i; });
   return m;
