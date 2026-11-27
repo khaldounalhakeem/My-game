@@ -791,7 +791,7 @@ const supportOf = (x, y, z, d) => { const v = SUPPORT[supportDir(d)]; return [x 
 const fullBlock = d => !!(d && d.solid && d.opaque && !d.boxes && !d.box);
 const torchOn = d => !!(d && d.rsTorch && d.rsTorch.on);
 const wireOn = d => !!(d && d.wire && d.wire.on);
-const isDevice = d => !!(d && (d.door || d.trapdoor || d.gate || d.key === 'tnt' || d.lamp || d.machine));
+const isDevice = d => !!(d && (d.door || d.trapdoor || d.gate || d.key === 'tnt' || d.lamp || d.machine || (d.rail && d.rail.kind === 'powered')));
 const REP_DIR = { n: [0, 0, -1], s: [0, 0, 1], w: [-1, 0, 0], e: [1, 0, 0] };
 /* is there a lit repeater at (rx, ry, rz) pointing its front at (x, y, z)? */
 const repInto = (rx, ry, rz, x, y, z) => { const d = rsD(rx, ry, rz); const r = d && (d.repeater || d.comparator); if (!r || !r.on) return false; const v = REP_DIR[r.dir]; return rx + v[0] === x && ry === y && rz + v[2] === z; };
@@ -924,6 +924,7 @@ G.tickRedstone = () => {
       if (want !== d.comparator.on) W.setBlock(x, y, z, ID['comparator_' + d.comparator.dir + '_' + (want ? 1 : 0)]);
       continue;
     }
+    if (d.rail) { const p = devicePowered(x, y, z) || weakPowered(x, y - 1, z); if (p !== d.rail.on) W.setBlock(x, y, z, ID['prail_' + d.rail.shape + '_' + (p ? 1 : 0)]); continue; }
     if (d.machine) {
       const p = devicePowered(x, y, z), k = G.dim + ':' + x + ',' + y + ',' + z, before = !!G.devPow.get(k);
       G.devPow.set(k, p);
@@ -954,7 +955,7 @@ G.tickRedstone = () => {
 };
 
 /* ================= machines: pistons, dispensers, droppers, hoppers, observers, note blocks, jukeboxes ================= */
-const srcOn = d => !!(d && ((d.observer && d.observer.on) || (d.daylight && d.daylight.on) || (d.target && d.target.on)));
+const srcOn = d => !!(d && ((d.observer && d.observer.on) || (d.daylight && d.daylight.on) || (d.target && d.target.on) || (d.rail && d.rail.kind === 'detector' && d.rail.on)));
 const NOT_PUSHABLE = d => !d || d.container || d.jukebox || d.noPush || d.hopper || d.base === 'furnace' || d.base === 'smoker' || d.base === 'blast_furnace' || d.key === 'chest' || d.key === 'chest_loot' || d.key === 'ender_chest' || d.shulker || d.key === 'bedrock' || d.key === 'obsidian' || d.key === 'crying_obsidian' || d.key === 'spawner' || d.beacon || d.key === 'enchanting_table' || d.key === 'end_portal_frame' || d.key === 'end_portal_frame_eye' || d.portal || d.bedPart || d.key === 'bed' || d.key === 'bed_head' || d.door || d.sign || d.frame || (d.piston && d.piston.ext) || d.respawn;
 const breaksWhenPushed = d => d.liquid || d.replaceable || (d.cross && !d.solid) || d.key === 'torch' || d.wire || d.rsTorch || d.lever || d.button || d.plate || d.ladder || d.candle;
 /* things inside other things: a stack goes into a list of slots (returns what didn't fit) */
@@ -2507,6 +2508,37 @@ G.openVault = (x, y, z) => {
   if (Math.random() < 0.15) loot.push([ID.heavy_core, 1]);
   for (const [it, n] of loot) G.spawnDrop(it, n, x + 0.5, y + 1.2, z + 0.5, new THREE.Vector3((Math.random() - 0.5) * 2, 4, (Math.random() - 0.5) * 2));
   G.particles.burst(x + 0.5, y + 1, z + 0.5, [0x5ad8f8, 0xffffff], 20, 2.5, 0.12); Sound.play('levelup');
+};
+/* rails join up with the rails beside them: straight, round a corner, or up a slope */
+const RDV = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
+const RAIL_ENDS = { ns: ['n', 's'], ew: ['e', 'w'], ne: ['n', 'e'], nw: ['n', 'w'], se: ['s', 'e'], sw: ['s', 'w'], an: ['n', 's'], as: ['s', 'n'], ae: ['e', 'w'], aw: ['w', 'e'] };
+const railD = (x, y, z) => { const d = DEFS[G.world.getBlock(x, y, z)]; return d && d.rail ? d : null; };
+const railId = (kind, sh, on) => (kind === 'rail' ? ID['rail_' + sh] : kind === 'powered' ? ID['prail_' + sh + '_' + (on ? 1 : 0)] : ID['drail_' + sh + '_' + (on ? 1 : 0)]);
+function railShapeFor(x, y, z, kind, look) {
+  const ups = [], links = [];
+  for (const k of ['n', 's', 'e', 'w']) { const [a, b] = RDV[k]; if (railD(x + a, y + 1, z + b)) ups.push(k); else if (railD(x + a, y, z + b) || railD(x + a, y - 1, z + b)) links.push(k); }
+  if (ups.length && kind !== 'detector') return 'a' + ups[0];
+  const ax = k => (k === 'n' || k === 's' ? 'ns' : 'ew');
+  if (links.length >= 2 && kind === 'rail') {
+    for (const [p, q] of [['n', 's'], ['e', 'w']]) if (links.includes(p) && links.includes(q)) return p + q;
+    const v = links.find(k => k === 'n' || k === 's'), h = links.find(k => k === 'e' || k === 'w');
+    if (v && h) return v + h;
+  }
+  if (links.length) return ax(links[0]);
+  return look && Math.abs(look.x) > Math.abs(look.z) ? 'ew' : 'ns';
+}
+G.placeRail = (x, y, z, kind, look) => {
+  const W = G.world;
+  W.setBlock(x, y, z, railId(kind, railShapeFor(x, y, z, kind, look), false));
+  // rails beside it that were only joined at one end turn to join this one
+  for (const k of ['n', 's', 'e', 'w']) for (const dy of [0, -1, 1]) {
+    const [a, b] = RDV[k], nx = x + a, ny = y + dy, nz = z + b, d = railD(nx, ny, nz);
+    if (!d) continue;
+    const joined = RAIL_ENDS[d.rail.shape].filter(e => { const [p, q] = RDV[e]; return railD(nx + p, ny, nz + q) || railD(nx + p, ny - 1, nz + q) || (d.rail.shape === 'a' + e && railD(nx + p, ny + 1, nz + q)); }).length;
+    if (joined >= 2) continue;
+    const sh = railShapeFor(nx, ny, nz, d.rail.kind);
+    if (sh !== d.rail.shape) W.setBlock(nx, ny, nz, railId(d.rail.kind, sh, d.rail.on));
+  }
 };
 /* the end gateway: a floating portal beside the main island that leads out to the outer islands (and back) */
 G.placeGateway = () => {

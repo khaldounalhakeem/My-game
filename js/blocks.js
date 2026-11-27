@@ -1025,6 +1025,33 @@ makeTile('i_echo_shard', pPlant(P => { P.line(5, 13, 11, 3, 0x0e5a6a); P.line(6,
 makeTile('i_recovery_compass', pPlant(P => { P.disc(8, 8, 6.5, 0x0e3a4a); P.disc(8, 8, 5, 0x1a2a2a); P.line(8, 8, 8, 4, 0x2ad8e8); }));
 makeTile('i_enchanted_golden_apple', pPlant(P => { P.disc(8, 9, 5, 0xf5cc2e); P.disc(6, 7, 1.5, 0xfff0a0); P.line(8, 4, 9, 2, 0x6a4a2a); P.speck(0xd88aff, 0.15, 10); clipToDisc(P, 6); }));
 
+/* rails and minecarts */
+function pRail(shape, tie, steel, glow) {
+  return P => {
+    P.clear();
+    const ns = shape === 'ns', ew = shape === 'ew';
+    if (ns || ew) {
+      for (let i = 1; i < 16; i += 3) { if (ns) P.rect(2, i, 12, 2, tie); else P.rect(i, 2, 2, 12, tie); }
+      if (ns) { P.rect(3, 0, 2, 16, steel); P.rect(11, 0, 2, 16, steel); } else { P.rect(0, 3, 16, 2, steel); P.rect(0, 11, 16, 2, steel); }
+      if (glow) { if (ns) { P.rect(3, 0, 1, 16, glow); P.rect(12, 0, 1, 16, glow); } else { P.rect(0, 3, 16, 1, glow); P.rect(0, 12, 16, 1, glow); } }
+      return;
+    }
+    // a curve joining two sides: ne, nw, se, sw
+    const cx = shape.includes('e') ? 16 : 0, cy = shape.includes('n') ? 0 : 16;
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const d = Math.hypot(x + 0.5 - cx, y + 0.5 - cy);
+      if ((d > 2.5 && d < 4.5) || (d > 10.5 && d < 12.5)) P.put(x, y, steel); else if (d > 4.5 && d < 10.5 && ((Math.atan2(y - cy, x - cx) * 6) | 0) % 2 === 0) P.put(x, y, tie);
+    }
+  };
+}
+for (const sh of ['ns', 'ew', 'ne', 'nw', 'se', 'sw']) makeTile('rail_' + sh, pRail(sh, 0x7a5a32, 0x9a9a9a));
+for (const sh of ['ns', 'ew']) { makeTile('prail_' + sh + '_0', pRail(sh, 0x7a5a32, 0xd8b030, 0x5a0c0c)); makeTile('prail_' + sh + '_1', pRail(sh, 0x7a5a32, 0xf5cc2e, 0xff3a1a)); makeTile('drail_' + sh, pRail(sh, 0x6a6a6a, 0x9a9a9a, 0x8a2a2a)); }
+makeTile('i_rail', pRail('ns', 0x7a5a32, 0x9a9a9a));
+makeTile('i_powered_rail', pRail('ns', 0x7a5a32, 0xd8b030, 0xff3a1a));
+makeTile('i_detector_rail', pRail('ns', 0x6a6a6a, 0x9a9a9a, 0x8a2a2a));
+makeTile('i_minecart', pPlant(P => { P.rect(2, 6, 12, 6, 0x6a6a70); P.rect(3, 7, 10, 3, 0x3a3a40); P.disc(5, 13, 1.6, 0x2a2a2a); P.disc(11, 13, 1.6, 0x2a2a2a); }));
+makeTile('i_chest_minecart', pPlant(P => { P.rect(2, 7, 12, 5, 0x6a6a70); P.rect(4, 3, 8, 5, 0x9a6a32); P.rect(7, 5, 2, 2, 0x3a3a3a); P.disc(5, 13, 1.6, 0x2a2a2a); P.disc(11, 13, 1.6, 0x2a2a2a); }));
+
 /* the animations themselves */
 const waveRows = [[2, 3], [5, 9], [8, 1], [11, 6], [14, 11], [0, 12]];
 animTile('water', 16, 140, (P, f) => {
@@ -1608,6 +1635,17 @@ block('sniffer_egg', 'Sniffer Egg', 'sniffer_egg', { hardness: 0.5, opaque: fals
 block('reinforced_deepslate', 'Reinforced Deepslate', { top: 'reinforced_deepslate', side: 'reinforced_deepslate' }, { hardness: Infinity, drop: null });
 block('sculk_shrieker', 'Sculk Shrieker', { top: 'shrieker_top', side: 'shrieker_side', bottom: 'sculk' }, { tool: 'hoe', hardness: 3, opaque: false, box: [0, 0, 0, 1, 0.5, 1], boxes: [[0, 0, 0, 1, 0.5, 1]], shrieker: true, drop: null });
 block('decorated_pot', 'Decorated Pot', 'decorated_pot', { hardness: 0.1, opaque: false, box: [0.0625, 0, 0.0625, 0.9375, 1, 0.9375], boxes: [[0.0625, 0, 0.0625, 0.9375, 1, 0.9375]] });
+/* rails: the shape joins up with the rails next to it; 'a' + a side = going up that way */
+const RAIL_BOX = [[0, 0, 0, 1, 0.0625, 1]], RAIL_UP = { an: [[0, 0, 0.5, 1, 0.0625, 1], [0, 0.5, 0, 1, 0.5625, 0.5]], as: [[0, 0, 0, 1, 0.0625, 0.5], [0, 0.5, 0.5, 1, 0.5625, 1]], ae: [[0, 0, 0, 0.5, 0.0625, 1], [0.5, 0.5, 0, 1, 0.5625, 1]], aw: [[0.5, 0, 0, 1, 0.0625, 1], [0, 0.5, 0, 0.5, 0.5625, 1]] };
+for (const sh of ['ns', 'ew', 'ne', 'nw', 'se', 'sw', 'an', 'as', 'ae', 'aw']) {
+  const tile = sh[0] === 'a' ? (sh === 'an' || sh === 'as' ? 'rail_ns' : 'rail_ew') : 'rail_' + sh;
+  block('rail_' + sh, 'Rail', tile, { hardness: 0.7, solid: false, opaque: false, cutout: true, boxes: RAIL_UP[sh] || RAIL_BOX, rail: { shape: sh, kind: 'rail' }, drop: 'rail', iconTile: 'i_rail', hide: true });
+}
+for (const sh of ['ns', 'ew', 'an', 'as', 'ae', 'aw']) for (const on of [0, 1]) {
+  const ax = sh === 'ns' || sh === 'an' || sh === 'as' ? 'ns' : 'ew';
+  block('prail_' + sh + '_' + on, 'Powered Rail', 'prail_' + ax + '_' + on, { hardness: 0.7, solid: false, opaque: false, cutout: true, boxes: RAIL_UP[sh] || RAIL_BOX, rail: { shape: sh, kind: 'powered', on: !!on }, drop: 'powered_rail', iconTile: 'i_powered_rail', hide: true, light: !!on, emit: on ? 3 : undefined });
+}
+for (const sh of ['ns', 'ew']) for (const on of [0, 1]) block('drail_' + sh + '_' + on, 'Detector Rail', 'drail_' + sh, { hardness: 0.7, solid: false, opaque: false, cutout: true, boxes: RAIL_BOX, rail: { shape: sh, kind: 'detector', on: !!on }, drop: 'detector_rail', iconTile: 'i_detector_rail', hide: true });
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
   const id = nextItemId++;
@@ -1820,6 +1858,11 @@ for (const [k, n] of [['archer', 'Archer'], ['prize', 'Prize'], ['skull', 'Skull
 item('echo_shard', 'Echo Shard', 'echo_shard');
 item('recovery_compass', 'Recovery Compass', 'recovery_compass', { stack: 1 });
 item('enchanted_golden_apple', 'Enchanted Golden Apple', 'enchanted_golden_apple', { food: 4, heal: 20, notch: true });
+item('rail', 'Rail', 'rail', { placesRail: 'rail' });
+item('powered_rail', 'Powered Rail', 'powered_rail', { placesRail: 'powered' });
+item('detector_rail', 'Detector Rail', 'detector_rail', { placesRail: 'detector' });
+item('minecart', 'Minecart', 'minecart', { stack: 1, cart: 'minecart' });
+item('chest_minecart', 'Minecart with Chest', 'chest_minecart', { stack: 1, cart: 'chest_minecart' });
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
@@ -2072,6 +2115,8 @@ RECIPES.push(
   ...WALLS.filter(([f]) => ID[f]).map(([f]) => [f + '_wall', 6, { [f]: 6 }, 'table']),
 );
 
+/* rails */
+RECIPES.push(['rail', 16, { iron_ingot: 6, stick: 1 }, 'table'], ['powered_rail', 6, { gold_ingot: 6, stick: 1, redstone: 1 }, 'table'], ['detector_rail', 6, { iron_ingot: 6, stone_pressure_plate: 1, redstone: 1 }, 'table'], ['minecart', 1, { iron_ingot: 5 }, 'table'], ['chest_minecart', 1, { minecart: 1, chest: 1 }]);
 /* the trials round's recipes */
 RECIPES.push(['mace', 1, { heavy_core: 1, breeze_rod: 1 }, 'table'], ['brush', 1, { feather: 1, copper_ingot: 1, stick: 1 }], ['decorated_pot', 1, { bricks: 2 }], ['recovery_compass', 1, { echo_shard: 8, compass: 1 }, 'table']);
 /* the End round's recipes */

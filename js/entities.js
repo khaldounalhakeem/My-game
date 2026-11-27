@@ -211,6 +211,8 @@ const MOB_TYPES = {
   horse: { name: 'Horse', hp: 22, w: 1.3, h: 1.6, speed: 2.2, passive: true, rideable: true, horsey: true, xp: 1, drops: [['leather', 0, 2]] },
   donkey: { name: 'Donkey', hp: 20, w: 1.1, h: 1.4, speed: 1.9, passive: true, rideable: true, horsey: true, xp: 1, drops: [['leather', 0, 2]] },
   boat: { name: 'Boat', hp: 4, w: 1.3, h: 0.55, speed: 0, boat: true, xp: 0, drops: [['boat', 1, 1]] },
+  minecart: { name: 'Minecart', hp: 4, w: 0.98, h: 0.7, speed: 0, boat: true, cart: true, xp: 0, drops: [['minecart', 1, 1]] },
+  chest_minecart: { name: 'Minecart with Chest', hp: 4, w: 0.98, h: 0.9, speed: 0, boat: true, cart: true, chestCart: true, xp: 0, drops: [['minecart', 1, 1], ['chest', 1, 1]] },
   pillager: { name: 'Pillager', hp: 24, w: 0.6, h: 1.95, speed: 2.6, hostile: true, ranged: true, dmg: 4, xp: 5, drops: [['arrow', 0, 2], ['emerald', 0, 1]] },
   villager: { name: 'Villager', hp: 20, w: 0.6, h: 1.95, speed: 1.2, passive: true, xp: 0, drops: [] },
   pig: { name: 'Pig', hp: 10, w: 0.9, h: 0.9, speed: 1.5, passive: true, xp: 2, drops: [['porkchop', 1, 3]] },
@@ -495,6 +497,14 @@ function buildMobModel(type) {
     for (const a of P.armorParts) a.visible = false;
     P.chests = [addBox(b, 0.16, 0.42, 0.5, lam(0x9a6a32), -0.43, 1.2, -0.3), addBox(b, 0.16, 0.42, 0.5, lam(0x9a6a32), 0.43, 1.2, -0.3)];
     for (const c of P.chests) c.visible = false;
+  } else if (type === 'minecart' || type === 'chest_minecart') {
+    const iron = lam(0x7a7a80), dark = lam(0x3a3a40);
+    addBox(g, 0.98, 0.1, 0.98, dark, 0, 0.18, 0);
+    addBox(g, 0.08, 0.55, 0.98, iron, -0.45, 0.45, 0); addBox(g, 0.08, 0.55, 0.98, iron, 0.45, 0.45, 0);
+    addBox(g, 0.98, 0.55, 0.08, iron, 0, 0.45, 0.45); addBox(g, 0.98, 0.55, 0.08, iron, 0, 0.45, -0.45);
+    for (const [x, z] of [[-0.4, 0.3], [0.4, 0.3], [-0.4, -0.3], [0.4, -0.3]]) addBox(g, 0.06, 0.22, 0.22, dark, x, 0.1, z);
+    if (type === 'chest_minecart') { addBox(g, 0.8, 0.7, 0.8, lam(0x9a6a32), 0, 0.6, 0); addBox(g, 0.16, 0.16, 0.04, lam(0x3a3a3a), 0, 0.75, 0.41); }
+    const head = new THREE.Group(); g.add(head); P.head = head;
   } else if (type === 'boat') {
     const wood = lam(0x9a6a32), dark = lam(0x6e4a22);
     addBox(g, 1.3, 0.12, 1.9, dark, 0, 0.06, 0);
@@ -1089,11 +1099,96 @@ class Mob {
   /* ---------- boats: two seats, the front one steers ---------- */
   boatInteract(P) {
     if (P.riding) return false;
+    if (this.T.chestCart) { if (!this.chestSlots) this.chestSlots = new Array(27).fill(null); G.ui.openInventory('chest', { slots: this.chestSlots, mob: this }); return true; }
+    if (this.T.cart) { if (this.remoteCtl) { Net.claimMob(this, 0); return true; } if (this.rider) { G.ui.message('Someone is already in this minecart.'); return true; } P.mount(this, 0); return true; }
     const taken = Net.boatSeats(this);
     if (this.remoteCtl && !taken[0]) { Net.claimMob(this, 0); return true; } // ask for it, then get in the front seat
     for (const seat of [0, 1]) if (!taken[seat]) { P.mount(this, seat); return true; }
     G.ui.message('This boat is full: it fits two.');
     return true;
+  }
+  /* a minecart rolls along rails: round the bends, up and down slopes; powered rails push it, unpowered ones stop it */
+  cartTick(dt) {
+    const W = G.world;
+    if (this.dead) { G.particles.burst(this.pos.x, this.pos.y + 0.3, this.pos.z, [0x7a7a80, 0x3a3a40], 14, 2); this.remove(); return; }
+    this.hurtT -= dt;
+    const railAt = (x, y, z) => { const d = DEFS[W.getBlock(x, y, z)]; return d && d.rail ? d : null; };
+    let rx = Math.floor(this.pos.x), rz = Math.floor(this.pos.z), ry = Math.floor(this.pos.y + 0.2);
+    let rd = railAt(rx, ry, rz);
+    if (!rd && railAt(rx, ry - 1, rz)) { ry--; rd = railAt(rx, ry, rz); }
+    this.leaveDetector(rx, ry, rz);
+    if (!rd) {
+      // off the rails: it just slides and falls
+      this.vel.y = Math.max(this.vel.y - 25 * dt, -30); this.vel.x *= Math.pow(0.1, dt); this.vel.z *= Math.pow(0.1, dt);
+      W.moveBody(this, dt); this.cartS = 0;
+      if (this.pos.y < -20) { this.remove(); return; }
+      this.mesh.position.copy(this.pos); return;
+    }
+    const DV = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] }, sh = rd.rail.shape;
+    const ENDS = { ns: ['n', 's'], ew: ['e', 'w'], ne: ['n', 'e'], nw: ['n', 'w'], se: ['s', 'e'], sw: ['s', 'w'], an: ['n', 's'], as: ['s', 'n'], ae: ['e', 'w'], aw: ['w', 'e'] }[sh];
+    let h = this.cartH || DV[ENDS[0]], s = this.cartS || 0;
+    // the way it is heading has to be along this rail
+    const along = e => DV[e][0] === h[0] && DV[e][1] === h[1], back = e => DV[e][0] === -h[0] && DV[e][1] === -h[1];
+    if (!ENDS.some(e => along(e) || back(e))) h = DV[ENDS[0]];
+    if (rd.rail.kind === 'detector' && !rd.rail.on) { W.setBlock(rx, ry, rz, ID['drail_' + sh + '_1']); this.detector = [rx, ry, rz]; }
+    // pushes and brakes
+    if (rd.rail.kind === 'powered') {
+      if (rd.rail.on) { if (s < 0.3) { s = 0.3; const free = ENDS.find(e => !railAt(rx + DV[e][0], ry, rz + DV[e][1]) && !railAt(rx + DV[e][0], ry - 1, rz + DV[e][1]) && !railAt(rx + DV[e][0], ry + 1, rz + DV[e][1])); if (free) h = [-DV[free][0], -DV[free][1]]; } s = Math.min(s + 30 * dt, 16); }
+      else s *= Math.pow(0.001, dt);
+    }
+    if (sh[0] === 'a') { const up = DV[sh[1]]; s += (up[0] === h[0] && up[1] === h[1] ? -10 : 10) * dt; }
+    if (this.drive && (this.drive.x || this.drive.z)) s += (this.drive.x * h[0] + this.drive.z * h[1]) * 6 * dt;
+    // walking into a minecart pushes it
+    const P = G.player;
+    if (!this.rider && !P.riding && Math.abs(P.pos.x - this.pos.x) < 0.8 && Math.abs(P.pos.z - this.pos.z) < 0.8 && Math.abs(P.pos.y - this.pos.y) < 1) s += Math.max(0, P.vel.x * h[0] + P.vel.z * h[1]) * 3 * dt;
+    s *= Math.pow(0.85, dt);
+    if (s < 0) { s = -s; h = [-h[0], -h[1]]; }
+    if (s < 0.02) s = 0;
+    // move along the track a little at a time
+    let dist = Math.min(s * dt, 1.5);
+    for (let guard = 0; dist > 1e-4 && guard < 12; guard++) {
+      rx = Math.floor(this.pos.x); rz = Math.floor(this.pos.z);
+      let cur = railAt(rx, ry, rz); if (!cur) break;
+      const ends = { ns: ['n', 's'], ew: ['e', 'w'], ne: ['n', 'e'], nw: ['n', 'w'], se: ['s', 'e'], sw: ['s', 'w'], an: ['n', 's'], as: ['s', 'n'], ae: ['e', 'w'], aw: ['w', 'e'] }[cur.rail.shape];
+      const exit = ends.find(e => DV[e][0] === h[0] && DV[e][1] === h[1]) || ends.find(e => !(DV[e][0] === -h[0] && DV[e][1] === -h[1])) || ends[0];
+      const ex = DV[exit], cxm = rx + 0.5, czm = rz + 0.5;
+      // first to the middle of the rail, then out of the side it leaves by
+      const toMid = (this.pos.x - cxm) * -h[0] + (this.pos.z - czm) * -h[1];
+      if (!(ex[0] === h[0] && ex[1] === h[1]) && toMid > 1e-3) {
+        const st = Math.min(dist, toMid); this.pos.x += h[0] * st; this.pos.z += h[1] * st; dist -= st;
+        if (st >= toMid - 1e-6) { this.pos.x = cxm; this.pos.z = czm; h = ex; }
+        continue;
+      }
+      h = ex;
+      if (h[0]) this.pos.z = czm; else this.pos.x = cxm;
+      const toEdge = h[0] ? (h[0] > 0 ? rx + 1 - this.pos.x : this.pos.x - rx) : (h[1] > 0 ? rz + 1 - this.pos.z : this.pos.z - rz);
+      if (dist < toEdge) { this.pos.x += h[0] * dist; this.pos.z += h[1] * dist; dist = 0; break; }
+      // into the next block: is there more rail (level, one up, or one down)?
+      const nx = rx + h[0], nz = rz + h[1], upHere = cur.rail.shape[0] === 'a' && DV[cur.rail.shape[1]][0] === h[0] && DV[cur.rail.shape[1]][1] === h[1];
+      let ny = upHere ? ry + 1 : ry;
+      if (!railAt(nx, ny, nz)) { if (railAt(nx, ny - 1, nz)) ny--; else if (railAt(nx, ny + 1, nz)) ny++; else { this.pos.x += h[0] * (toEdge - 0.02); this.pos.z += h[1] * (toEdge - 0.02); s = 0; dist = 0; break; } }
+      this.pos.x += h[0] * (toEdge + 0.001); this.pos.z += h[1] * (toEdge + 0.001); dist -= toEdge; ry = ny;
+    }
+    // height: on a slope it climbs as it goes
+    const cr = railAt(Math.floor(this.pos.x), ry, Math.floor(this.pos.z));
+    let y = ry + 0.0625;
+    if (cr && cr.rail.shape[0] === 'a') { const up = DV[cr.rail.shape[1]], fx = this.pos.x - Math.floor(this.pos.x), fz = this.pos.z - Math.floor(this.pos.z); y = ry + (up[0] ? (up[0] > 0 ? fx : 1 - fx) : (up[1] > 0 ? fz : 1 - fz)) + 0.0625; }
+    this.pos.y = y; this.vel.set(h[0] * s, 0, h[1] * s);
+    this.cartH = h; this.cartS = s;
+    this.yaw = Math.atan2(h[0], h[1]);
+    if (s > 4 && Math.random() < dt * 3) G.sound.play('dig', this.pos, ID.iron_block);
+    let d = this.yaw - this.mesh.rotation.y;
+    while (d > Math.PI) d -= Math.PI * 2; while (d < -Math.PI) d += Math.PI * 2;
+    this.mesh.rotation.y += d * Math.min(1, dt * 10);
+    this.mesh.position.copy(this.pos);
+    for (const m of this.mats) if (m.emissive) m.emissive.setRGB(this.hurtT > 0 ? 0.5 : 0, 0, 0);
+  }
+  leaveDetector(rx, ry, rz) {
+    const dt = this.detector;
+    if (!dt || (dt[0] === rx && dt[1] === ry && dt[2] === rz)) return;
+    const W = G.world, d = DEFS[W.getBlock(dt[0], dt[1], dt[2])];
+    if (d && d.rail && d.rail.kind === 'detector' && d.rail.on && !G.mobs.some(m => m !== this && m.T.cart && Math.floor(m.pos.x) === dt[0] && Math.floor(m.pos.z) === dt[2])) W.setBlock(dt[0], dt[1], dt[2], ID['drail_' + d.rail.shape + '_0']);
+    this.detector = null;
   }
   boatTick(dt) {
     const W = G.world;
@@ -1171,7 +1266,7 @@ class Mob {
     if (this.chestSlots) { for (const s of this.chestSlots) if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 0.6, this.pos.z, undefined, slotExtras(s)); drop(ID.chest, 1); this.chestSlots = null; }
     if (this.armor) { drop(ID[this.armor], 1); this.armor = null; }
     if (this.leash) this.unleash(true);
-    if (this.T.boat && !byPlayer) drop(ID.boat, 1);
+    if (this.T.boat && !byPlayer) drop(this.T.cart ? ID.minecart : ID.boat, 1);
     // killed while burning (by you, or by the fire itself): the meat comes out cooked
     const cooked = this.onFire > 0 || Date.now() - (this.burnedAt || 0) < 2500;
     if (byPlayer || (cooked && !this.T.hostile)) {
@@ -1192,7 +1287,7 @@ class Mob {
   update(dt) {
     if (this.remoteCtl) return this.puppetUpdate(dt);
     if (!G.world.isLoaded(this.pos.x, this.pos.z)) return; // the ground here isn't loaded: wait
-    if (this.T.boat) return this.boatTick(dt);
+    if (this.T.boat) return this.T.cart ? this.cartTick(dt) : this.boatTick(dt);
     if (this.type === 'villager') this.jobTick(dt);
     const W = G.world, P = this.tame ? G.player : nearestPlayer(this.pos);
     if (this.dead) {

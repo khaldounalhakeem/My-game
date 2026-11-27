@@ -190,8 +190,8 @@ class Player {
       if (h.T.boat) {
         // in a boat: the front seat steers, the back seat just comes along
         if (this.seat === 0 && !h.remoteCtl) h.drive = { x: wx, z: wz };
-        const off = this.seat === 1 ? -0.55 : 0.25, by = h.mesh.rotation.y;
-        this.pos.set(h.pos.x + Math.sin(by) * off, h.pos.y + 0.05, h.pos.z + Math.cos(by) * off);
+        const off = h.T.cart ? 0 : this.seat === 1 ? -0.55 : 0.25, by = h.mesh.rotation.y;
+        this.pos.set(h.pos.x + Math.sin(by) * off, h.pos.y + (h.T.cart ? 0.25 : 0.05), h.pos.z + Math.cos(by) * off);
       } else {
         h.drive = { x: wx, z: wz, jump: input.jump, yaw: Math.atan2(-s, -c) };
         this.pos.set(h.pos.x, h.pos.y + (h.T.seat !== undefined ? h.T.seat : h.type === 'donkey' ? 0.75 : 0.95), h.pos.z);
@@ -491,7 +491,7 @@ class Player {
     // plants and cactus above lose their support
     const above = W.getBlock(x, y + 1, z);
     const ad = above && DEFS[above];
-    if (ad && (ad.cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.repeater || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
+    if (ad && (ad.cross || ad.rail || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.repeater || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
     if (DEFS[id].hive) G.angerBees(x, y, z, this);
     { const bd = DEFS[id];
@@ -640,6 +640,24 @@ class Player {
       W.setBlock(px, py, pz, id);
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       G.sound.play('place', null, id); this.useCd = 0.2; this.swing = 1;
+      return true;
+    }
+    if (hd.placesRail && b) {
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz), under = DEFS[W.getBlock(px, py - 1, pz)];
+      if (cur && !DEFS[cur].replaceable) return true;
+      if (!under || !under.solid || under.rail) { G.ui.message('Rails go on top of a solid block.'); this.useCd = 0.3; return true; }
+      G.placeRail(px, py, pz, hd.placesRail, this.lookDir());
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place', null, ID.iron_block); this.useCd = 0.2; this.swing = 1;
+      return true;
+    }
+    if (hd.cart && b && DEFS[b.id].rail) {
+      const m = spawnMob(hd.cart, b.x + 0.5, b.y + 0.1, b.z + 0.5);
+      const L = this.lookDir(); m.cartH = Math.abs(L.x) > Math.abs(L.z) ? [Math.sign(L.x), 0] : [0, Math.sign(L.z) || 1];
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place', null, ID.iron_block); this.useCd = 0.3; this.swing = 1;
       return true;
     }
     if (hd.placesRepeater && b) {
