@@ -228,6 +228,9 @@ class Player {
     this.sprinting = input.sprint && mz > 0.3 && !this.sneaking && (creative || this.hunger > 6);
     let speed = this.flying ? (input.sprint ? 20 : 11) : this.sprinting ? 5.7 : this.sneaking ? 1.4 : 4.3;
     if (swimming && !this.flying) speed *= this.inLava ? 0.4 : 0.55;
+    // flowing water carries you along
+    const push = !this.flying && G.fluidPush && G.fluidPush(this.pos.x, this.pos.y + 0.2, this.pos.z);
+    if (push) { const k = push[2] === 'water' ? 7 : 2; this.vel.x += push[0] * k * dt; this.vel.z += push[1] * k * dt; }
     // swimming next to a dolphin makes you fast (Dolphin's Grace)
     if (swimming && !this.inLava && G.mobs.some(m => m.type === 'dolphin' && !m.dead && m.pos.distanceTo(this.pos) < 7)) speed *= 2.2;
     if (!this.flying && this.fx('speed')) speed *= 1 + 0.2 * this.fx('speed');

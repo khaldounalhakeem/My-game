@@ -1646,6 +1646,9 @@ for (const sh of ['ns', 'ew', 'an', 'as', 'ae', 'aw']) for (const on of [0, 1]) 
   block('prail_' + sh + '_' + on, 'Powered Rail', 'prail_' + ax + '_' + on, { hardness: 0.7, solid: false, opaque: false, cutout: true, boxes: RAIL_UP[sh] || RAIL_BOX, rail: { shape: sh, kind: 'powered', on: !!on }, drop: 'powered_rail', iconTile: 'i_powered_rail', hide: true, light: !!on, emit: on ? 3 : undefined });
 }
 for (const sh of ['ns', 'ew']) for (const on of [0, 1]) block('drail_' + sh + '_' + on, 'Detector Rail', 'drail_' + sh, { hardness: 0.7, solid: false, opaque: false, cutout: true, boxes: RAIL_BOX, rail: { shape: sh, kind: 'detector', on: !!on }, drop: 'detector_rail', iconTile: 'i_detector_rail', hide: true });
+/* flowing water and lava: level 1 is next to the source, 7 the furthest; 'fall' pours straight down */
+for (const F of ['water', 'lava']) for (const lv of [1, 2, 3, 4, 5, 6, 7, 8]) block(F + '_' + (lv === 8 ? 'fall' : lv), F === 'water' ? 'Water' : 'Lava', F, F === 'water' ? { solid: false, opaque: false, translucent: true, liquid: true, hardness: Infinity, fluid: F, level: lv, drop: null, hide: true } : { solid: false, opaque: false, liquid: true, hardness: Infinity, light: true, fluid: F, level: lv, drop: null, hide: true });
+Object.assign(DEFS[ID.water], { fluid: 'water', level: 0 }); Object.assign(DEFS[ID.lava], { fluid: 'lava', level: 0 });
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
   const id = nextItemId++;

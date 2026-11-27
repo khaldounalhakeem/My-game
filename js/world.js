@@ -1497,16 +1497,22 @@ class World {
       if (def.box) { this.addBox(O, x, y, z, def); continue; }
       if (def.boxes || def.fence || def.pane) { for (const bx of this.shapeBoxes(def, (a, b, c) => get(a, b, c), x, y, z, true)) this.addBox(def.translucent ? T : O, x, y, z, { box: bx, faces: def.faces }); continue; }
       const out = def.translucent ? T : O;
-      const above = def.liquid ? get(x, y + 1, z) : 0;
-      const topH = def.height ? def.height : def.liquid && above !== id && !(id === ID.water && above && DEFS[above].wlog) ? 0.875 : 1;
+      // water and lava: full under more of the same, lower the further they have flowed
+      const sameFluid = (n) => n && DEFS[n] && ((DEFS[n].fluid && DEFS[n].fluid === def.fluid) || (def.fluid === 'water' && DEFS[n].wlog));
+      const fluidH = (n, nx, ny, nz) => { const nd2 = DEFS[n]; if (sameFluid(get(nx, ny + 1, nz))) return 1; return nd2.level && nd2.level < 8 ? Math.max(0.12, 0.875 - nd2.level * 0.1) : 0.875; };
+      const topH = def.height ? def.height : def.liquid ? fluidH(id, x, y, z) : 1;
       for (let f = 0; f < 6; f++) {
         const F = FACES[f];
         const nid = get(x + F.n[0], y + F.n[1], z + F.n[2]);
         if (nid) {
           const nd = DEFS[nid];
           if (nd.opaque) continue;
-          if (nid === id && !def.leaves) continue;
-          if (def.liquid && id === ID.water && nd.wlog) continue; // water next to kelp or seagrass: still one body of water
+          if (nid === id && !def.leaves && !def.liquid) continue;
+          if (def.liquid && sameFluid(nid)) {
+            // the same water (or lava): only show the side where this one stands higher than its neighbour
+            if (f === 2 || f === 3 || nd.wlog) continue;
+            if (fluidH(nid, x + F.n[0], y + F.n[1], z + F.n[2]) >= topH - 0.01) continue;
+          }
           if (def.liquid && nd.solid && !nd.cutout && f !== 2) continue;
         }
         const uv = TILE_UV[def.faces[f]];
@@ -1723,7 +1729,9 @@ class World {
 
   liquidAt(x, y, z) {
     const id = this.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
-    return id && DEFS[id].liquid ? id : id && DEFS[id].wlog ? ID.water : 0; // kelp, seagrass and coral sit in water
+    if (!id) return 0;
+    const d = DEFS[id];
+    return d.fluid ? (d.fluid === 'water' ? ID.water : ID.lava) : d.liquid ? id : d.wlog ? ID.water : 0; // flowing water counts as water; kelp, seagrass and coral sit in water
   }
 
   moveBody(b, dt) {

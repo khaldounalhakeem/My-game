@@ -871,7 +871,7 @@ function updateWireNet(x, y, z, done) {
 }
 G.rsDirty = new Set();
 G.devPow = new Map();
-G.rsMark = (x, y, z) => { if (G.rsDirty.size < 4000) G.rsDirty.add(x + ',' + y + ',' + z); G.observerSaw(x, y, z); };
+G.rsMark = (x, y, z) => { if (G.rsDirty.size < 4000) G.rsDirty.add(x + ',' + y + ',' + z); G.observerSaw(x, y, z); G.fluidMark(x, y, z); };
 /* a repeater: what comes in at its back */
 function repeaterInput(x, y, z, d) {
   const v = REP_DIR[(d.repeater || d.comparator).dir], bx = x - v[0], by = y, bz = z - v[2], b = rsD(bx, by, bz);
@@ -2540,6 +2540,107 @@ G.placeRail = (x, y, z, kind, look) => {
     if (sh !== d.rail.shape) W.setBlock(nx, ny, nz, railId(d.rail.kind, sh, d.rail.on));
   }
 };
+/* ---------- water and lava flow, like Minecraft ----------
+   A source (what a bucket puts down) spreads out: water up to 7 blocks, lava 3 (7 in the Nether, and lava is slower).
+   Flowing water pours down any drop. Take the source away and the flow dries up. Water between two sources becomes
+   a new source (an endless water supply); lava never does. Where water meets lava: obsidian, cobblestone or stone. */
+G.fluidQ = new Set(); G.fluidLines = { water: [], lava: [] }; // first in, first out: each kind waits the same time
+const NB4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+const fluidOf = id => { const d = id && DEFS[id]; return d ? (d.fluid || (d.wlog ? 'water' : null)) : null; };
+const isSource = id => { const d = DEFS[id]; return !!(d && ((d.fluid && d.level === 0) || d.wlog)); };
+// how far from a source: a source or a falling column counts as 0
+const strengthOf = id => { const d = DEFS[id]; return !d || !(d.fluid || d.wlog) ? 99 : d.wlog || d.level === 0 || d.level === 8 ? 0 : d.level; };
+const fluidDelay = F => (F === 'water' ? 250 : G.dim === 'nether' ? 500 : 1500);
+const fluidStep = F => (F === 'lava' && G.dim !== 'nether' ? 2 : 1);
+// what flowing water or lava washes away (and whether you get it back)
+const washable = d => !!(d && !d.liquid && !d.solid && (d.cross || d.replaceable || d.wire || d.rsTorch || d.key === 'torch' || d.key === 'soul_torch' || d.plate || d.lever || d.button || d.rail) && !d.wlog);
+G.fluidMark = (x, y, z) => {
+  if (G.fluidQ.size > 20000) return;
+  const W = G.world, now = performance.now();
+  for (const [a, b, c] of [[0, 0, 0], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+    const id = W.getBlock(x + a, y + b, z + c), F = fluidOf(id);
+    if (!F || DEFS[id].wlog) continue;
+    const k = (x + a) + ',' + (y + b) + ',' + (z + c);
+    if (G.fluidQ.has(k)) continue;
+    G.fluidQ.add(k); G.fluidLines[F].push([now + fluidDelay(F), k]);
+  }
+};
+function flowInto(W, x, y, z, F, newId, fromAbove) {
+  const here = W.getBlock(x, y, z), hd = DEFS[here];
+  const other = fluidOf(here);
+  if (other && other !== F) {
+    // water and lava meet
+    if (F === 'water') W.setBlock(x, y, z, isSource(here) ? ID.obsidian : ID.cobblestone);
+    else W.setBlock(x, y, z, fromAbove ? ID.stone : ID.cobblestone);
+    G.particles.burst(x + 0.5, y + 1, z + 0.5, [0xdddddd, 0x888888], 8, 1.5, 0.12, -1); Sound.play('fuse', new THREE.Vector3(x, y, z));
+    return;
+  }
+  if (here && washable(hd)) { if (F === 'water' && hd.drop !== null) G.spawnDrop(ID[hd.drop] || here, 1, x + 0.5, y + 0.3, z + 0.5); }
+  W.setBlock(x, y, z, newId);
+}
+G.tickFluids = () => {
+  if (!G.fluidQ.size) return;
+  const W = G.world, now = performance.now(), due = [];
+  for (const F of ['water', 'lava']) {
+    const L = G.fluidLines[F];
+    let i = 0;
+    while (i < L.length && L[i][0] <= now && due.length < 1500) { due.push(L[i][1]); i++; }
+    if (i) L.splice(0, i);
+  }
+  for (const k of due) G.fluidQ.delete(k);
+  for (const k of due) {
+    const [x, y, z] = k.split(',').map(Number);
+    if (!W.isLoaded(x, z) || y < 1 || y >= WH) continue;
+    const id = W.getBlock(x, y, z), d = DEFS[id], F = fluidOf(id);
+    if (!F || d.wlog) continue;
+    const step = fluidStep(F), FLOW = lv => ID[F + '_' + lv], FALL = ID[F + '_fall'];
+    // lava touching water hardens
+    if (F === 'lava') {
+      for (const [a, b, c] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]]) if (fluidOf(W.getBlock(x + a, y + b, z + c)) === 'water') { W.setBlock(x, y, z, d.level === 0 ? ID.obsidian : ID.cobblestone); Sound.play('fuse', new THREE.Vector3(x, y, z)); G.particles.burst(x + 0.5, y + 1, z + 0.5, [0xdddddd, 0x888888], 8, 1.5, 0.12, -1); continue; }
+      if (!fluidOf(W.getBlock(x, y, z))) continue;
+    }
+    // a flowing block checks it is still fed; if not it shrinks or dries up
+    let lv = d.level;
+    if (lv !== 0) {
+      let want = 99;
+      if (fluidOf(W.getBlock(x, y + 1, z)) === F) want = 8;
+      // only water closer to the source can feed it (so a puddle with no source dries up quickly instead of feeding itself)
+      else for (const [a, c] of NB4) { const nid = W.getBlock(x + a, y, z + c); if (fluidOf(nid) === F) { const st = strengthOf(nid); if (DEFS[nid].level === 8 && fluidOf(W.getBlock(x + a, y - 1, z + c)) === F) continue; if (st < (lv === 8 ? 99 : lv)) want = Math.min(want, st + step); } }
+      // water between two sources (on something solid, or more water) becomes a new source
+      if (F === 'water' && want !== 8) {
+        let src = 0; for (const [a, c] of NB4) if (isSource(W.getBlock(x + a, y, z + c)) && fluidOf(W.getBlock(x + a, y, z + c)) === 'water') src++;
+        const below = DEFS[W.getBlock(x, y - 1, z)];
+        if (src >= 2 && below && (below.solid || isSource(W.getBlock(x, y - 1, z)))) want = 0;
+      }
+      if (want > 7 && want !== 8) { W.setBlock(x, y, z, 0); continue; }
+      if (want !== lv) { W.setBlock(x, y, z, want === 0 ? ID[F] : want === 8 ? FALL : FLOW(want)); lv = want; }
+    }
+    // pour down first
+    const below = W.getBlock(x, y - 1, z), bd = DEFS[below];
+    const canFall = y > 1 && (!below || washable(bd) || (fluidOf(below) === F && !isSource(below) && bd.level !== 8) || (fluidOf(below) && fluidOf(below) !== F));
+    if (canFall) flowInto(W, x, y - 1, z, F, FALL, true);
+    // then out to the sides (a source always does; flowing water only when it can't fall)
+    const blockedBelow = !canFall && !(fluidOf(below) === F);
+    if (lv === 0 || blockedBelow) {
+      const s0 = lv === 8 ? 0 : lv, next = s0 + step;
+      if (next <= 7) for (const [a, c] of NB4) {
+        const nx = x + a, nz = z + c, nid = W.getBlock(nx, y, nz), nd = DEFS[nid];
+        if (!nid || washable(nd)) flowInto(W, nx, y, nz, F, FLOW(next), false);
+        else if (fluidOf(nid) === F && nd.level && nd.level !== 8 && nd.level > next) W.setBlock(nx, y, nz, FLOW(next));
+        else if (fluidOf(nid) && fluidOf(nid) !== F) flowInto(W, nx, y, nz, F, FLOW(next), false);
+      }
+    }
+  }
+};
+/* the way flowing water pushes you: from higher water toward lower */
+G.fluidPush = (x, y, z) => {
+  const W = G.world, id = W.getBlock(Math.floor(x), Math.floor(y), Math.floor(z)), d = DEFS[id];
+  if (!d || !d.fluid || d.level === 0) return null;
+  const me = strengthOf(id); let fx = 0, fz = 0;
+  for (const [a, c] of NB4) { const nid = W.getBlock(Math.floor(x) + a, Math.floor(y), Math.floor(z) + c); if (fluidOf(nid) === d.fluid) { const st = strengthOf(nid); fx += a * (st - me); fz += c * (st - me); } else if (!nid) { fx += a * 2; fz += c * 2; } }
+  const l = Math.hypot(fx, fz);
+  return l ? [fx / l, fz / l, d.fluid] : null;
+};
 /* the end gateway: a floating portal beside the main island that leads out to the outer islands (and back) */
 G.placeGateway = () => {
   const W = G.worlds.end, gx = 90, gz = 0, gy = 70;
@@ -3154,6 +3255,7 @@ function frame(now) {
   Input.lookDX = Input.lookDY = 0;
   G.particles.update(running ? dt : 0);
   G.tickAnim(dt);
+  if (running) G.tickFluids();
   G.tickLids(dt);
   if (running) G.tickAmbient(dt);
   G.world.update(P.pos.x, P.pos.z, running ? 6 : 12);
