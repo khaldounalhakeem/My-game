@@ -33,7 +33,42 @@ const Sound = {
     o.type = type; o.frequency.setValueAtTime(f, t);
     if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
     g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(v, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.05);
+    // buzzy waves are rounded off so they don't sound like an old computer beep
+    if (type === 'square' || type === 'sawtooth') { const lp = c.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = Math.min(9000, f * 3); lp.Q.value = 0.7; o.connect(lp); lp.connect(g); } else o.connect(g);
+    g.connect(this.master); o.start(t); o.stop(t + dur + 0.05);
+  },
+  /* a tiny burst of filtered noise: block sounds are built from these, like the crunch of a real footstep */
+  grain(delay, dur, v, f, q = 1, type = 'bandpass', attack = 0.002) {
+    const c = this.ctx, t = c.currentTime + delay;
+    const s = c.createBufferSource(); s.buffer = this.noiseBuf;
+    const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.value = f * this.pitch; fl.Q.value = q;
+    const g = c.createGain();
+    // a narrow filter lets less noise through: make up for it so every grain is about as loud
+    v *= type === 'bandpass' ? Math.min(8, 2.2 * Math.sqrt(q) * Math.sqrt(2000 / f)) : 1.5;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + attack); g.gain.exponentialRampToValueAtTime(0.0001, t + attack + dur);
+    s.connect(fl); fl.connect(g); g.connect(this.master);
+    s.start(t, Math.random() * 0.8); s.stop(t + attack + dur + 0.05);
+  },
+  /* an animal voice: a buzzing throat shaped by the mouth (vowel filters), with the pitch sliding like a real call */
+  voice(delay, dur, v, f0, f1, formants, o2 = {}) {
+    const c = this.ctx, t = c.currentTime + delay, p = this.pitch;
+    const o = c.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(f0 * p, t);
+    if (o2.mid) o.frequency.exponentialRampToValueAtTime(o2.mid * p, t + dur * 0.4);
+    o.frequency.exponentialRampToValueAtTime(Math.max(20, f1 * p), t + dur);
+    const stop = t + dur + 0.1;
+    if (o2.vib) { const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = o2.vibRate || 5.5; lg.gain.value = f0 * p * o2.vib; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(stop); }
+    let src = o;
+    if (o2.trem) { const tg = c.createGain(), l = c.createOscillator(), lg = c.createGain(); tg.gain.value = 0.55; l.frequency.value = o2.trem; lg.gain.value = 0.45; l.connect(lg); lg.connect(tg.gain); l.start(t); l.stop(stop); o.connect(tg); src = tg; }
+    const g = c.createGain(), a = o2.attack || 0.03;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(v, t + a); g.gain.setValueAtTime(v, t + Math.max(a, dur * 0.55)); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    for (const [ff, fv, fq] of formants) {
+      const b = c.createBiquadFilter(); b.type = 'bandpass'; b.frequency.setValueAtTime(ff, t); if (o2.ff) b.frequency.linearRampToValueAtTime(ff * o2.ff, t + dur); b.Q.value = fq || 4;
+      const bg = c.createGain(); bg.gain.value = fv; src.connect(b); b.connect(bg); bg.connect(g);
+    }
+    // a little breath in the voice
+    if (o2.breath) { const n = c.createBufferSource(); n.buffer = this.noiseBuf; const nf = c.createBiquadFilter(); nf.type = 'bandpass'; nf.frequency.value = formants[0][0] * 1.5; nf.Q.value = 1; const ng = c.createGain(); ng.gain.value = o2.breath; n.connect(nf); nf.connect(ng); ng.connect(g); n.start(t, Math.random() * 0.5); n.stop(stop); }
+    g.connect(this.master); o.start(t); o.stop(stop);
   },
   noise(dur, v, freq, type = 'lowpass', delay = 0, f2) {
     const c = this.ctx, t = c.currentTime + delay;
@@ -66,24 +101,33 @@ const Sound = {
   },
   /* the sound of a block: 'break' when it breaks, 'hit' while you dig at it, 'place' and 'step' */
   blockSound(g, kind, v) {
-    const L = kind === 'break' ? 1 : kind === 'place' ? 0.8 : kind === 'hit' ? 0.4 : 0.22, r = Math.random;
-    const vv = v * L;
+    const L = kind === 'break' ? 1 : kind === 'place' ? 0.85 : kind === 'hit' ? 0.5 : 0.42, r = Math.random, br = kind === 'break';
+    const vv = v * L, n = br ? 4 : kind === 'step' ? 2 : 3, sp = br ? 0.022 : 0.016;
     switch (g) {
-      case 'stone': this.noise(kind === 'break' ? 0.14 : 0.06, 0.55 * vv, 1600 + r() * 400, 'bandpass'); this.tone(140, 0.05, 'triangle', 0.08 * vv, 90); break;
-      case 'wood': this.tone(220 + r() * 40, kind === 'break' ? 0.12 : 0.07, 'triangle', 0.18 * vv, 140); this.noise(0.08, 0.3 * vv, 800, 'bandpass'); break;
-      case 'gravel': for (let i = 0; i < (kind === 'break' ? 4 : 2); i++) this.noise(0.05, 0.4 * vv, 1400 + r() * 1400, 'bandpass', i * 0.03); break;
-      case 'mud': this.noise(0.12, 0.45 * vv, 400, 'lowpass'); this.tone(110, 0.08, 'sine', 0.08 * vv, 70); break;
-      case 'grass': this.noise(kind === 'break' ? 0.16 : 0.09, 0.35 * vv, 2600, 'lowpass', 0, 900); if (kind !== 'step') this.noise(0.07, 0.2 * vv, 3200, 'highpass', 0.04); break;
-      case 'sand': this.noise(kind === 'break' ? 0.22 : 0.12, 0.35 * vv, 1800, 'lowpass', 0, 600); break;
-      case 'soul': this.noise(0.2, 0.35 * vv, 700, 'lowpass', 0, 200); this.tone(180, 0.15, 'sine', 0.05 * vv, 120); break;
-      case 'glass': if (kind === 'break') { for (let i = 0; i < 6; i++) this.tone(2200 + r() * 3000, 0.12 + r() * 0.1, 'triangle', 0.07 * v, 1500, i * 0.025); this.noise(0.25, 0.4 * v, 4000, 'highpass'); } else this.tone(2600, 0.05, 'triangle', 0.1 * vv); break;
-      case 'wool': this.noise(0.1, 0.4 * vv, 500, 'lowpass'); break;
-      case 'snow': for (let i = 0; i < 2; i++) this.noise(0.08, 0.3 * vv, 2000 + r() * 800, 'lowpass', i * 0.05); break;
-      case 'metal': this.tone(700 + r() * 200, kind === 'break' ? 0.35 : 0.15, 'square', 0.05 * vv, 600); this.tone(1400, 0.2, 'sine', 0.06 * vv, 1300); this.noise(0.05, 0.3 * vv, 3000, 'bandpass'); break;
-      case 'amethyst': this.tone(1500 + r() * 900, 0.4, 'sine', 0.1 * vv); this.tone(2400 + r() * 900, 0.3, 'sine', 0.06 * vv, null, 0.04); break;
-      case 'nether': this.noise(0.1, 0.5 * vv, 900, 'bandpass'); this.tone(100, 0.06, 'triangle', 0.08 * vv, 70); break;
-      case 'slime': this.noise(0.15, 0.4 * vv, 500, 'lowpass', 0, 150); this.tone(200, 0.12, 'sine', 0.1 * vv, 120); break;
-      case 'sculk': this.noise(0.15, 0.35 * vv, 600, 'lowpass'); this.tone(300, 0.1, 'sine', 0.05 * vv, 500); break;
+      case 'stone': // a dry crack: a few sharp grains and a short knock
+        for (let i = 0; i < n; i++) this.grain(i * sp * (0.7 + r() * 0.6), 0.03 + r() * 0.03, (0.9 - i * 0.15) * vv, 1200 + r() * 1800, 1.4);
+        this.grain(0, 0.05, 0.5 * vv, 350 + r() * 120, 2); break;
+      case 'nether': for (let i = 0; i < n; i++) this.grain(i * sp, 0.035, 0.8 * vv, 700 + r() * 900, 1.2); this.grain(0, 0.06, 0.5 * vv, 260, 2); break;
+      case 'wood': // a hollow knock
+        this.grain(0, br ? 0.12 : 0.07, 1.1 * vv, 420 + r() * 220, 7); this.grain(0.004, 0.05, 0.5 * vv, 1100 + r() * 500, 3);
+        if (br) this.grain(0.05, 0.08, 0.6 * vv, 300 + r() * 150, 6); break;
+      case 'gravel': for (let i = 0; i < n * 2; i++) this.grain(i * 0.014 + r() * 0.01, 0.025 + r() * 0.02, (0.8 - i * 0.06) * vv, 900 + r() * 2600, 1.1); break;
+      case 'mud': this.grain(0, 0.14, 0.9 * vv, 380 + r() * 100, 1.5, 'lowpass', 0.01); this.grain(0.04, 0.08, 0.4 * vv, 700, 2); break;
+      case 'grass': // a soft rustle
+        for (let i = 0; i < n; i++) this.grain(i * 0.03 + r() * 0.015, 0.06 + r() * 0.05, (0.55 - i * 0.08) * vv, 2500 + r() * 3000, 0.8, 'bandpass', 0.012); break;
+      case 'sand': for (let i = 0; i < n; i++) this.grain(i * 0.035, 0.09 + r() * 0.05, 0.5 * vv, 1800 + r() * 1500, 0.6, 'bandpass', 0.02); break;
+      case 'soul': this.grain(0, 0.25, 0.7 * vv, 600, 0.8, 'lowpass', 0.03); this.grain(0.05, 0.2, 0.25 * vv, 1400 + r() * 400, 4, 'bandpass', 0.04); break;
+      case 'snow': for (let i = 0; i < n; i++) this.grain(i * 0.03, 0.05, 0.55 * vv, 3000 + r() * 2500, 2, 'bandpass', 0.006); break;
+      case 'wool': this.grain(0, 0.12, 0.8 * vv, 450 + r() * 150, 0.7, 'lowpass', 0.015); break;
+      case 'glass':
+        if (br) { this.grain(0, 0.25, 1.1 * v, 5000, 0.7, 'highpass'); for (let i = 0; i < 8; i++) this.grain(0.01 + r() * 0.12, 0.08 + r() * 0.12, 0.3 * v, 2500 + r() * 6000, 25); }
+        else { this.grain(0, 0.04, 0.7 * vv, 1700 + r() * 600, 3); this.grain(0.005, 0.06, 0.35 * vv, 4200 + r() * 1500, 12); } break;
+      case 'metal': // a clank that rings a little
+        for (const f of [620, 1530, 2470, 3900]) this.grain(0, (br ? 0.3 : 0.14) * (0.6 + r() * 0.6), 0.35 * vv, f * (0.9 + r() * 0.2), 30);
+        this.grain(0, 0.03, 0.7 * vv, 2500, 1.5); break;
+      case 'amethyst': for (let i = 0; i < 3; i++) this.grain(i * 0.04, 0.35, 0.35 * vv, 1800 + r() * 2500, 60); break;
+      case 'slime': this.grain(0, 0.16, 0.9 * vv, 350, 3, 'bandpass', 0.02); this.voice(0, 0.12, 0.12 * vv, 220, 140, [[400, 3, 3]]); break;
+      case 'sculk': this.grain(0, 0.15, 0.7 * vv, 500, 2, 'bandpass', 0.02); this.grain(0.06, 0.1, 0.3 * vv, 1200, 6); break;
     }
   },
   /* a mob that gets hit makes its own noise, higher and sharper, like a cry of pain; dying, lower and longer */
@@ -106,51 +150,51 @@ const Sound = {
       case 'dig': this.blockSound(this.group(mat), 'hit', v); break;
       case 'place': this.blockSound(this.group(mat || (G.player && G.player.heldDef && G.player.heldDef()) || null), 'place', v); break;
       case 'step': this.blockSound(this.group(mat), 'step', v); break;
-      case 'land': this.noise(0.1, 0.25, 300); break;
-      case 'hurt': this.tone(240, 0.2, 'square', 0.12, 130); break;
-      case 'hurtMob': this.noise(0.08, 0.45 * v, 420, 'lowpass'); this.tone(120, 0.07, 'sine', 0.12 * v, 70); break; // the thump of a hit
-      case 'deathMob': this.tone(260, 0.4, 'sawtooth', 0.08 * v, 70); break;
-      case 'pickup': this.tone(1100, 0.06, 'triangle', 0.08, 1700); break;
-      case 'click': this.tone(900, 0.03, 'square', 0.04); break;
+      case 'land': this.grain(0, 0.1, 0.8, 250, 1, 'lowpass', 0.005); break;
+      case 'hurt': this.grain(0, 0.06, 0.8, 300, 1, 'lowpass'); this.voice(0, 0.2, 0.5, 210, 150, [[500, 5, 4], [950, 2.5, 5]], { attack: 0.01, breath: 0.4 }); break; // "oof"
+      case 'hurtMob': this.grain(0, 0.07, 1.6 * v, 300, 1, 'lowpass', 0.002); this.grain(0, 0.03, 0.4 * v, 1500, 1.5); break; // the thump of a hit
+      case 'deathMob': this.grain(0, 0.3, 0.5 * v, 600, 1, 'lowpass', 0.01); break;
+      case 'pickup': this.tone(900 + Math.random() * 500, 0.08, 'sine', 0.3, 1800); break; // the little "pop"
+      case 'click': this.grain(0, 0.02, 0.5, 2500, 3); this.tone(1200, 0.03, 'sine', 0.05); break;
       case 'craft': this.noise(0.08, 0.3, 900); this.tone(700, 0.08, 'triangle', 0.06, 1000, 0.05); break;
       case 'smelt': this.noise(0.4, 0.25, 600, 'bandpass'); break;
-      case 'eat': for (let i = 0; i < 3; i++) this.noise(0.07, 0.3, 1200, 'bandpass', i * 0.12); break;
+      case 'eat': for (let i = 0; i < 3; i++) for (let k = 0; k < 3; k++) this.grain(i * 0.16 + k * 0.02, 0.04, 0.5, 900 + Math.random() * 1800, 1.5); break;
       case 'bow': this.noise(0.15, 0.3 * v, 2000, 'bandpass', 0, 600); break;
       case 'fuse': this.noise(0.9, 0.18 * v, 4000, 'highpass'); break;
       case 'explode': this.noise(1.3, 0.9 * v, 900, 'lowpass', 0, 60); this.tone(70, 0.6, 'sine', 0.4 * v, 30); break;
       case 'teleport': this.tone(200, 0.35, 'sine', 0.12 * v, 1200); break;
-      case 'levelup': [523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.15, 'triangle', 0.07, null, i * 0.08)); break;
+      case 'levelup': [784, 988, 1175, 1568].forEach((f, i) => { this.tone(f, 0.5, 'sine', 0.2, null, i * 0.07); this.tone(f * 2, 0.3, 'sine', 0.06, null, i * 0.07); }); break;
       case 'fireball': this.noise(0.6, 0.4 * v, 300, 'lowpass', 0, 1500); break;
       case 'dragonRoar': this.tone(90, 1.6, 'sawtooth', 0.25 * v, 40); this.noise(1.4, 0.3 * v, 400, 'bandpass', 0, 150); break;
       case 'dragonHurt': this.tone(160, 0.5, 'sawtooth', 0.2 * v, 70); break;
       case 'dragonDeath': this.tone(120, 3.5, 'sawtooth', 0.3, 30); this.noise(3.5, 0.3, 800, 'lowpass', 0, 50); break;
-      case 'mob_zombie': this.tone(115, 0.7, 'sawtooth', 0.09 * v, 80); break;
-      case 'mob_skeleton': for (let i = 0; i < 4; i++) this.noise(0.04, 0.2 * v, 2500, 'bandpass', i * 0.07); break;
+      case 'mob_zombie': this.voice(0, 0.9, 0.45 * v, 95, 70, [[320, 5, 4], [800, 2.5, 5]], { vib: 0.04, breath: 0.5, attack: 0.12 }); break;
+      case 'mob_skeleton': for (let i = 0; i < 5; i++) this.grain(i * 0.06 + Math.random() * 0.02, 0.03, 0.6 * v, 1000 + Math.random() * 900, 6); break;
       case 'mob_creeper': break;
       case 'golem': this.noise(0.25, 0.5 * v, 300, 'lowpass'); this.tone(90, 0.3, 'square', 0.15 * v, 50); break;
-      case 'mob_iron_golem': this.tone(70, 0.4, 'triangle', 0.1 * v, 60); break;
-      case 'mob_villager': this.tone(260, 0.12, 'square', 0.05 * v, 200); this.tone(220, 0.15, 'square', 0.05 * v, 300, 0.14); break;
-      case 'mob_spider': this.noise(0.4, 0.12 * v, 3000, 'highpass'); break;
-      case 'mob_enderman': this.tone(330, 0.5, 'sine', 0.08 * v, 180); this.tone(240, 0.5, 'sine', 0.06 * v, 420, 0.2); break;
-      case 'mob_pig': this.tone(330, 0.12, 'square', 0.06 * v, 220); this.tone(300, 0.12, 'square', 0.06 * v, 200, 0.16); break;
-      case 'mob_cow': this.tone(170, 0.9, 'sawtooth', 0.08 * v, 120); break;
-      case 'mob_sheep': this.tone(420, 0.5, 'square', 0.05 * v, 380); break;
-      case 'mob_chicken': this.tone(1000, 0.06, 'triangle', 0.06 * v, 1300); this.tone(1100, 0.06, 'triangle', 0.06 * v, 1400, 0.1); break;
+      case 'mob_iron_golem': this.grain(0, 0.25, 0.8 * v, 160, 2, 'lowpass', 0.02); this.voice(0, 0.4, 0.2 * v, 60, 50, [[250, 4, 3]]); break;
+      case 'mob_villager': this.voice(0, 0.18, 0.55 * v, 190, 160, [[280, 6, 5], [1100, 1, 6]], { attack: 0.02 }); this.voice(0.2, 0.24, 0.55 * v, 170, 220, [[280, 6, 5], [1100, 1, 6]], { attack: 0.02 }); break; // hmm-hrm
+      case 'mob_spider': this.grain(0, 0.35, 0.4 * v, 3500, 0.8, 'highpass', 0.05); for (let i = 0; i < 4; i++) this.grain(0.05 + i * 0.06, 0.02, 0.4 * v, 2200, 5); break;
+      case 'mob_enderman': this.voice(0, 0.6, 0.35 * v, 140, 90, [[400, 4, 3], [1600, 2, 6]], { vib: 0.15, vibRate: 11, ff: 1.8 }); break;
+      case 'mob_pig': this.voice(0, 0.13, 0.5 * v, 170, 140, [[700, 4, 4], [1500, 2.5, 5]], { breath: 0.6, attack: 0.01 }); this.voice(0.17, 0.11, 0.45 * v, 175, 140, [[700, 4, 4], [1500, 2.5, 5]], { breath: 0.6, attack: 0.01 }); break; // oink
+      case 'mob_cow': this.voice(0, 1.0, 0.5 * v, 125, 105, [[300, 5, 5], [700, 2, 5]], { mid: 135, ff: 1.6, attack: 0.15, vib: 0.02 }); break; // moo
+      case 'mob_sheep': this.voice(0, 0.6, 0.4 * v, 300, 270, [[750, 4, 4], [1250, 3, 5]], { trem: 22, attack: 0.03 }); break; // baa
+      case 'mob_chicken': for (let i = 0; i < 2; i++) this.voice(i * 0.12, 0.07, 0.6 * v, 750, 600, [[1100, 3, 4], [2400, 2, 6]], { attack: 0.005 }); break;
       // every other mob's own voice
       case 'mob_bee': this.tone(220, 0.9, 'sawtooth', 0.05 * v, 235); this.tone(440, 0.9, 'square', 0.015 * v, 470); break;
-      case 'mob_wolf': this.tone(600, 0.12, 'square', 0.06 * v, 400); this.tone(560, 0.14, 'square', 0.06 * v, 380, 0.2); break;
-      case 'mob_cat': this.tone(700, 0.45, 'triangle', 0.07 * v, 1000); break;
+      case 'mob_wolf': this.voice(0, 0.14, 0.5 * v, 430, 300, [[800, 4, 3], [1700, 2, 5]], { breath: 0.8, attack: 0.008 }); this.voice(0.2, 0.12, 0.45 * v, 420, 300, [[800, 4, 3], [1700, 2, 5]], { breath: 0.8, attack: 0.008 }); break; // woof
+      case 'mob_cat': this.voice(0, 0.55, 0.35 * v, 480, 420, [[600, 3, 4], [1800, 3, 6]], { mid: 760, ff: 0.6, attack: 0.05 }); break; // meow
       case 'mob_ocelot': this.tone(800, 0.3, 'triangle', 0.05 * v, 1100); break;
-      case 'mob_horse': case 'mob_donkey': for (let i = 0; i < 5; i++) this.tone(500 - i * 50, 0.08, 'sawtooth', 0.06 * v, 650 - i * 60, i * 0.07); break;
-      case 'mob_panda': this.tone(300, 0.3, 'triangle', 0.06 * v, 260); break;
-      case 'mob_fox': this.tone(900, 0.15, 'sawtooth', 0.05 * v, 600); this.tone(950, 0.12, 'sawtooth', 0.04 * v, 700, 0.2); break;
+      case 'mob_horse': case 'mob_donkey': case 'mob_mule': this.voice(0, 0.7, 0.3 * v, 420, 240, [[700, 3, 4], [1500, 2, 5]], { trem: 14, vib: 0.08, vibRate: 14, breath: 0.4 }); break;
+      case 'mob_panda': this.voice(0, 0.3, 0.35 * v, 260, 220, [[500, 4, 4], [1100, 2, 5]], { breath: 0.4 }); break;
+      case 'mob_fox': this.voice(0, 0.15, 0.3 * v, 800, 550, [[1200, 3, 4], [2600, 2, 6]], { breath: 0.4 }); this.voice(0.22, 0.12, 0.25 * v, 820, 600, [[1200, 3, 4], [2600, 2, 6]], { breath: 0.4 }); break;
       case 'mob_rabbit': this.noise(0.08, 0.15 * v, 3000, 'bandpass'); break;
-      case 'mob_goat': this.tone(480, 0.6, 'sawtooth', 0.06 * v, 430); break;
+      case 'mob_goat': this.voice(0, 0.6, 0.35 * v, 380, 330, [[700, 4, 4], [1300, 3, 5]], { trem: 18 }); break;
       case 'mob_frog': this.tone(150, 0.12, 'square', 0.09 * v, 110); this.tone(180, 0.12, 'square', 0.08 * v, 120, 0.18); break;
       case 'mob_turtle': this.noise(0.3, 0.1 * v, 400, 'lowpass'); break;
-      case 'mob_llama': this.tone(380, 0.35, 'sawtooth', 0.05 * v, 520); break;
-      case 'mob_camel': this.tone(160, 0.6, 'sawtooth', 0.07 * v, 120); this.noise(0.4, 0.1 * v, 600, 'lowpass', 0.1); break;
-      case 'mob_polar_bear': this.tone(110, 0.7, 'sawtooth', 0.1 * v, 80); this.noise(0.6, 0.15 * v, 300, 'lowpass'); break;
+      case 'mob_llama': this.voice(0, 0.4, 0.3 * v, 330, 450, [[600, 4, 4], [1400, 2, 5]], { breath: 0.4 }); break;
+      case 'mob_camel': this.voice(0, 0.7, 0.4 * v, 130, 100, [[350, 5, 4], [900, 2, 5]], { breath: 0.7, attack: 0.08, vib: 0.03 }); break;
+      case 'mob_polar_bear': this.voice(0, 0.8, 0.5 * v, 100, 80, [[350, 5, 4], [800, 2, 5]], { breath: 0.9, vib: 0.05, attack: 0.08 }); break;
       case 'mob_mooshroom': this.tone(170, 0.9, 'sawtooth', 0.08 * v, 120); break;
       case 'mob_sniffer': for (let i = 0; i < 3; i++) this.noise(0.12, 0.25 * v, 500, 'bandpass', i * 0.16); break;
       case 'mob_armadillo': this.noise(0.15, 0.15 * v, 1800, 'bandpass'); break;
@@ -161,16 +205,16 @@ const Sound = {
       case 'mob_cod': case 'mob_salmon': case 'mob_tropical_fish': for (let i = 0; i < 3; i++) this.tone(600 + i * 200, 0.05, 'sine', 0.03 * v, 1200, i * 0.08); break;
       case 'mob_slime': case 'mob_magma_cube': this.noise(0.2, 0.3 * v, 500, 'lowpass', 0, 150); this.tone(140, 0.15, 'sine', 0.08 * v, 90); break;
       case 'mob_phantom': this.tone(1600, 0.8, 'sawtooth', 0.05 * v, 700); this.tone(1700, 0.8, 'square', 0.02 * v, 750); break;
-      case 'mob_hoglin': this.tone(120, 0.4, 'sawtooth', 0.1 * v, 90); this.noise(0.3, 0.15 * v, 400, 'lowpass'); break;
-      case 'mob_piglin': case 'mob_zombified_piglin': this.tone(260, 0.15, 'sawtooth', 0.07 * v, 180); this.tone(240, 0.2, 'sawtooth', 0.06 * v, 150, 0.18); break;
+      case 'mob_hoglin': this.voice(0, 0.4, 0.5 * v, 110, 85, [[400, 5, 4], [900, 2, 5]], { breath: 0.9, attack: 0.02 }); break;
+      case 'mob_piglin': case 'mob_zombified_piglin': case 'mob_piglin_brute': this.voice(0, 0.15, 0.45 * v, 200, 150, [[600, 4, 4], [1300, 2, 5]], { breath: 0.7, attack: 0.01 }); this.voice(0.18, 0.22, 0.4 * v, 190, 130, [[600, 4, 4], [1300, 2, 5]], { breath: 0.7, attack: 0.01 }); break;
       case 'mob_warden': this.tone(55, 0.18, 'sine', 0.3 * v, 45); this.tone(55, 0.18, 'sine', 0.25 * v, 45, 0.3); break;
       case 'wardenRoar': this.tone(70, 1.5, 'sawtooth', 0.3 * v, 40); this.noise(1.5, 0.35 * v, 300, 'lowpass', 0, 80); break;
-      case 'mob_husk': case 'mob_drowned': this.tone(100, 0.8, 'sawtooth', 0.09 * v, 70); if (name === 'mob_drowned') this.noise(0.5, 0.1 * v, 500, 'lowpass'); break;
+      case 'mob_husk': case 'mob_drowned': this.voice(0, 0.9, 0.45 * v, 85, 65, [[300, 5, 4], [700, 2.5, 5]], { vib: 0.04, breath: 0.6, attack: 0.12 }); break;
       case 'mob_stray': case 'mob_wither_skeleton': for (let i = 0; i < 4; i++) this.noise(0.04, 0.2 * v, name === 'mob_stray' ? 2000 : 1500, 'bandpass', i * 0.08); break;
-      case 'mob_witch': for (let i = 0; i < 4; i++) this.tone(700 - i * 30, 0.07, 'square', 0.04 * v, 900, i * 0.09); break;
-      case 'mob_pillager': this.tone(200, 0.3, 'square', 0.05 * v, 150); break;
+      case 'mob_witch': for (let i = 0; i < 3; i++) this.voice(i * 0.11, 0.09, 0.3 * v, 520 - i * 30, 640, [[900, 3, 4], [2200, 2, 6]], { attack: 0.01 }); break; // a cackle
+      case 'mob_pillager': this.voice(0, 0.3, 0.35 * v, 170, 130, [[350, 5, 5], [1000, 1.5, 6]], { attack: 0.02 }); break;
       case 'mob_blaze': this.noise(0.8, 0.2 * v, 900, 'bandpass', 0, 300); break;
-      case 'mob_ghast': this.tone(600, 1.2, 'sine', 0.1 * v, 350); this.tone(640, 1.2, 'triangle', 0.05 * v, 380); break;
+      case 'mob_ghast': this.voice(0, 1.2, 0.3 * v, 520, 330, [[900, 3, 4], [2200, 2, 6]], { vib: 0.05, vibRate: 7, attack: 0.2 }); break;
       case 'mob_wither': this.tone(90, 1.0, 'sawtooth', 0.15 * v, 60); break;
       case 'llamaSpit': this.noise(0.15, 0.4 * v, 2000, 'bandpass', 0, 600); break;
       case 'honey': this.noise(0.25, 0.25 * v, 800, 'lowpass'); break;
@@ -1296,6 +1340,31 @@ G.setRule = (k, v) => {
 };
 G.resetRules();
 G.RULE_LIST = GAME_RULES;
+/* settings picked on the main menu's Options page: used in the next world you open */
+G.menuSet = (() => { try { return JSON.parse(localStorage.getItem('blockrealm-menuset') || '{}') || {}; } catch (e) { return {}; } })();
+G.saveMenuSet = () => { try { localStorage.setItem('blockrealm-menuset', JSON.stringify(G.menuSet)); } catch (e) { /* only for this time */ } };
+G.menuRule = k => (G.menuSet.rules && G.menuSet.rules[k] !== undefined ? G.menuSet.rules[k] : (GAME_RULES.find(r => r[0] === k) || [])[1]);
+G.applyMenuSet = () => {
+  const M = G.menuSet, r = M.rules || {};
+  if (!M.difficulty && !Object.keys(r).length) return;
+  for (const k in r) G.setRule(k, r[k]);
+  if (M.difficulty && !G.hardcore) G.setDifficulty(M.difficulty, true);
+  G.menuSet = {}; G.saveMenuSet();
+  G.ui.message('The settings you picked on the main menu are on in this world.', 'gold');
+};
+/* Nabil's enchanted netherite pickaxe and sword, taken by an allay: given back once */
+G.giveBackAllayLoot = () => {
+  try {
+    if (String(Net.nick || '').trim().toLowerCase() !== 'nabil' || localStorage.getItem('blockrealm-gift-allay') === '1') return;
+    const P = G.player;
+    // a full inventory: they land at your feet instead
+    for (const [k, e] of [['netherite_pickaxe', { efficiency: 5, fortune: 3 }], ['netherite_sword', { sharpness: 5, fire_aspect: 2, looting: 3, knockback: 2 }]]) if (P.inv.add(ID[k], 1, e) > 0) G.spawnDrop(ID[k], 1, P.pos.x, P.pos.y + 0.5, P.pos.z, undefined, { e });
+    P.inv.changed();
+    localStorage.setItem('blockrealm-gift-allay', '1');
+    G.ui.message('Here are your enchanted netherite pickaxe and sword back, Nabil!', 'gold');
+    G.save();
+  } catch (e) { /* storage unavailable */ }
+};
 /* a starter chest next to where you first come into the world */
 G.bonusChest = (sx, sy, sz) => {
   const W = G.world, x = Math.floor(sx) + 2, z = Math.floor(sz) - 2, y = W.surfaceY(x, z) + 1;
@@ -2230,11 +2299,11 @@ function spawnTick() {
         type = pick(PASSIVE_POOL);
         if (b === BIOME.BAMBOO && R < 0.6) { type = 'panda'; n = 1 + (Math.random() * 2 | 0); }
         else if ((b === BIOME.PLAINS || b === BIOME.SAVANNA) && R < 0.35) { type = Math.random() < 0.3 ? 'donkey' : 'horse'; n = 2 + (Math.random() * 2 | 0); }
-        if ((b === BIOME.FOREST || b === BIOME.TAIGA || b === BIOME.BIRCH || b === BIOME.SNOWY) && Math.random() < 0.3) { type = 'wolf'; n = 2 + (Math.random() * 2 | 0); }
+        if ([BIOME.FOREST, BIOME.TAIGA, BIOME.BIRCH, BIOME.SNOWY, BIOME.SAVANNA, BIOME.BADLANDS, BIOME.FLOWER_FOREST, BIOME.DARK_FOREST].includes(b) && Math.random() < 0.45) { type = 'wolf'; n = 2 + (Math.random() * 3 | 0); }
         else if ((b === BIOME.PLAINS || b === BIOME.FOREST || b === BIOME.SAVANNA) && Math.random() < 0.1) { type = 'cat'; n = 1 + (Math.random() < 0.3 ? 1 : 0); }
       }
       // each biome's own animals, like Minecraft
-      if (ground && ground !== ID.water && Math.random() < 0.45) {
+      if (ground && ground !== ID.water && type !== 'wolf' && Math.random() < 0.45) {
         const B = BIOME, r2 = Math.random();
         const extra = {
           [B.PLAINS]: r2 < 0.5 ? 'rabbit' : 'bee', [B.FOREST]: r2 < 0.5 ? 'bee' : 'fox', [B.BIRCH]: r2 < 0.6 ? 'bee' : 'fox',
@@ -3316,8 +3385,10 @@ G.setState = (s) => {
     Input.leftPressed = Input.rightPressed = false;
     if (G.ui && G.ui.dropLook) G.ui.dropLook();
   }
+  const was = G.state;
   G.state = s;
   document.body.dataset.state = s;
+  if (s === 'play' && was !== 'paused' && G.world && G.player && G.applyMenuSet) { G.applyMenuSet(); setTimeout(() => G.state === 'play' && G.giveBackAllayLoot(), 3000); }
 };
 G.lock = () => {
   if (Input.touch || Input.fallback || Pad.active) return;

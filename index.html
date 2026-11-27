@@ -159,7 +159,7 @@
 
     <div class="title-page" data-page="options" hidden>
       <h2 class="page-title">Options</h2>
-      <div class="opt-slot"></div>
+      <div class="settings-slot"></div>
       <button class="btn mc back" type="button" data-go="main">Done</button>
     </div>
     <div class="title-page" data-page="about" hidden>
@@ -226,6 +226,8 @@
     </div>
     <div id="pause-settings" hidden>
       <h2>Settings</h2>
+      <div id="settings-body">
+      <p id="settings-note" class="page-hint" hidden>Difficulty, Keep Inventory, Fire Spreads and Game Rules you pick here are used in the next world you open.</p>
       <span class="diff-label">Difficulty</span>
       <div class="diff-btns">
         <button type="button" class="btn diff" data-pdiff="peaceful">Peaceful</button>
@@ -252,6 +254,7 @@
       <button id="btn-cam" class="btn wide" type="button">Camera: First person</button>
       <label class="slider" for="rd">View distance <span id="rd-val">5</span><input id="rd" type="range" min="2" max="9" step="1" value="5"></label>
       <label class="slider" for="sens">Look speed <span id="sens-val">1.0</span><input id="sens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>
+      </div>
       <button id="btn-settings-back" class="btn wide" type="button">Done</button>
     </div>
   </div>

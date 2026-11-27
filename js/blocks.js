@@ -990,6 +990,7 @@ makeTile('i_hopper', pPlant(P => { P.rect(1, 2, 14, 5, 0x4a4a50); P.rect(4, 7, 8
 makeTile('i_item_frame', P => { P.clear(); P.rect(1, 1, 14, 14, 0x8a5a2a); P.rect(3, 3, 10, 10, 0xc8a878); });
 makeTile('i_candle', P => { P.clear(); P.rect(6, 6, 4, 10, 0xe8e0c8); P.rect(7, 3, 2, 3, 0x3a3a3a); });
 makeTile('i_brewing_stand', pPlant(P => { P.rect(7, 2, 2, 12, 0xd8c070); P.rect(2, 13, 12, 3, 0x6a6a6a); P.rect(2, 8, 2, 4, 0xc84a8a); P.rect(12, 8, 2, 4, 0x4a8ac8); }));
+makeTile('i_saddle', pPlant(P => { P.rect(3, 5, 10, 5, 0x7a4a24); P.rect(4, 4, 8, 2, 0x9a6232); P.rect(2, 9, 12, 2, 0x5a3418); P.rect(4, 11, 1, 3, 0x3a2410); P.rect(11, 11, 1, 3, 0x3a2410); P.rect(3, 13, 3, 2, 0xb0b0b0); P.rect(10, 13, 3, 2, 0xb0b0b0); }));
 makeTile('i_comparator', pPlant(P => { P.rect(1, 9, 14, 6, 0xa8a8a8); P.rect(3, 6, 2, 3, 0xe81e10); P.rect(11, 6, 2, 3, 0xe81e10); P.rect(7, 7, 2, 2, 0xe81e10); }));
 makeTile('i_scaffolding', pPlant(P => { P.rect(2, 2, 12, 2, 0xd8b870); P.rect(2, 2, 2, 12, 0xd8b870); P.rect(12, 2, 2, 12, 0xd8b870); P.line(4, 13, 12, 4, 0xc8a860); }));
 for (const [k, c] of [['nether_wart', 0x9a1a2a], ['sugar', 0xf4f4f4], ['spider_eye', 0x8a1a2a], ['fermented_spider_eye', 0x6a3a4a], ['magma_cream', 0xe8902a], ['rabbit_foot', 0xc8a070]]) makeTile('i_' + k, pBlob(c, 4, shadeC(rgb(c), 1.3)));
@@ -1912,6 +1913,7 @@ item('detector_rail', 'Detector Rail', 'detector_rail', { placesRail: 'detector'
 item('minecart', 'Minecart', 'minecart', { stack: 1, cart: 'minecart' });
 item('chest_minecart', 'Minecart with Chest', 'chest_minecart', { stack: 1, cart: 'chest_minecart' });
 for (const [k] of EGG_MOBS) item('egg_' + k, k.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') + ' Spawn Egg', 'egg_' + k, { stack: 64, egg: k });
+item('saddle', 'Saddle', 'saddle', { stack: 1 });
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
@@ -2178,6 +2180,7 @@ RECIPES.push(
   ['brewing_stand', 1, { blaze_rod: 1, cobblestone: 3 }, 'table'], ['jukebox', 1, { '#planks': 8, diamond: 1 }, 'table'], ['note_block', 1, { '#planks': 8, redstone: 1 }, 'table'],
   ['hopper', 1, { iron_ingot: 5, chest: 1 }, 'table'], ['dispenser_s', 1, { cobblestone: 7, bow: 1, redstone: 1 }, 'table'], ['dropper_s', 1, { cobblestone: 7, redstone: 1 }, 'table'],
   ['piston_n', 1, { '#planks': 3, cobblestone: 4, iron_ingot: 1, redstone: 1 }, 'table'], ['sticky_piston_n', 1, { piston_n: 1, slime_ball: 1 }], ['observer_n_0', 1, { cobblestone: 6, redstone: 2, quartz: 1 }, 'table'],
+  ['saddle', 1, { leather: 3, iron_ingot: 1 }, 'table'],
   ['daylight_detector_0', 1, { glass: 3, quartz: 3, '#planks': 3 }, 'table'], ['target_0', 1, { redstone: 4, hay_bale: 1 }, 'table'], ['comparator', 1, { redstone_torch: 3, quartz: 1, stone: 3 }, 'table'],
   ['scaffolding', 6, { bamboo: 6, string: 1 }, 'table'], ['item_frame', 1, { stick: 8, leather: 1 }, 'table'], ['candle', 1, { string: 1, honeycomb: 1 }], ['respawn_anchor_0', 1, { crying_obsidian: 6, glowstone: 3 }, 'table'],
   ['compass', 1, { iron_ingot: 4, redstone: 1 }, 'table'], ['clock', 1, { gold_ingot: 4, redstone: 1 }, 'table'], ['map', 1, { paper: 8, compass: 1 }, 'table'], ['spyglass', 1, { copper_ingot: 2, amethyst_shard: 1 }, 'table'],

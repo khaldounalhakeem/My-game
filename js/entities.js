@@ -920,8 +920,10 @@ class Mob {
     if (this.type === 'zombie_villager' && hd && hd.key === 'golden_apple' && !this.remoteCtl && !(this.cureT > 0)) { if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1); this.cureT = 5; G.ui.message('The zombie villager is shaking... it is being cured!'); return true; }
     // an allay: give it an item to collect, tap it again with an empty hand to take it back
     if (this.type === 'allay' && !this.remoteCtl) {
-      if (!this.holding && hd) { this.holding = hd.id; if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1); G.ui.message('The allay will find more ' + hd.name.toLowerCase() + ' and bring it to you.', 'gold'); return true; }
-      if (this.holding && !hd) { P.inv.add(this.holding, 1 + (this.carry || 0)); P.inv.changed(); this.holding = null; this.carry = 0; return true; }
+      // it keeps the very item you gave it (enchantments and name too)
+      if (!this.holding && hd) { const hs = P.heldSlot(); this.holding = hd.id; this.holdEx = slotExtras(hs) || null; if (P.mode === 'survival') P.inv.takeFrom(P.sel, 1); G.ui.message('The allay will find more ' + hd.name.toLowerCase() + ' and bring it to you. Tap it with an empty hand to get it back.', 'gold'); return true; }
+      if (this.holding && !hd) { const X = this.holdEx || {}; P.inv.add(this.holding, 1, X.e, X.n, X.c); if (this.carry) P.inv.add(this.holding, this.carry); P.inv.changed(); this.holding = null; this.holdEx = null; this.carry = 0; G.ui.message('The allay gave it back.'); return true; }
+      if (this.holding && hd) { G.ui.message('The allay is holding something. Tap it with an empty hand to get it back.'); return true; }
       return false;
     }
     // foxes trust you after glow berries, parrots after seeds: then they follow you like a pet
@@ -1019,8 +1021,16 @@ class Mob {
         if (this.tameProgress >= 1 && !this.tame) this.makeTame(); else this.hearts();
         return true;
       }
+      // camels and striders: put a saddle on and ride, like Minecraft
+      if (!this.tame && hd && hd.key === 'saddle' && (this.type === 'camel' || this.type === 'strider' || this.type === 'horse' || this.type === 'donkey' || this.type === 'mule')) {
+        if (this.type !== 'camel' && this.type !== 'strider' && (this.tameProgress || 0) < 0.99) { G.ui.message('Tame the ' + this.T.name.toLowerCase() + ' with apples first, then it is yours to ride.'); return true; }
+        if (P.mode === 'survival') { P.inv.takeFrom(P.sel, 1); P.inv.changed(); }
+        this.makeTame(); G.sound.play('craft', this.pos);
+        return true;
+      }
       if (P.riding) return false;
       if (this.tame || P.mode === 'creative') { P.mount(this); return true; }
+      if (this.type === 'camel' || this.type === 'strider') { G.ui.message('Put a saddle on the ' + this.T.name.toLowerCase() + ' to ride it: hold a saddle (crafted from 3 leather and 1 iron ingot) and tap it.'); return true; }
       // a wild horse has to be tamed with apples first
       G.ui.message('This ' + this.T.name.toLowerCase() + ' is wild. Hold apples and tap it to feed it: a few apples and it is yours.');
       return true;
@@ -1265,6 +1275,8 @@ class Mob {
     const drop = (id, n) => { if (id && n > 0) G.spawnDrop(id, n, this.pos.x, this.pos.y + 0.6, this.pos.z); };
     if (this.chestSlots) { for (const s of this.chestSlots) if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 0.6, this.pos.z, undefined, slotExtras(s)); drop(ID.chest, 1); this.chestSlots = null; }
     if (this.armor) { drop(ID[this.armor], 1); this.armor = null; }
+    // an allay drops the item you gave it, and what it collected
+    if (this.type === 'allay' && this.holding) { G.spawnDrop(this.holding, 1, this.pos.x, this.pos.y + 0.6, this.pos.z, undefined, this.holdEx || undefined); drop(this.holding, this.carry || 0); this.holding = null; this.holdEx = null; this.carry = 0; }
     if (this.leash) this.unleash(true);
     if (this.T.boat && !byPlayer) drop(this.T.cart ? ID.minecart : ID.boat, 1);
     // killed while burning (by you, or by the fire itself): the meat comes out cooked

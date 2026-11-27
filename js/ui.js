@@ -797,7 +797,7 @@ const UI = {
     if (name === 'single') this.renderWorldList();
     if (name === 'create' || name === 'multi') this.seedHints();
     if (name === 'create') this.newWorldDefaults();
-    if (name === 'options') this.renderOptions(document.querySelector('.title-page[data-page="options"] .opt-slot'));
+    if (name === 'options') { document.querySelector('.title-page[data-page="options"] .settings-slot').appendChild($('settings-body')); this.syncSettings(); }
     if (G.sound && G.state === 'title') G.sound.play('click');
   },
 
@@ -1310,6 +1310,7 @@ const UI = {
     for (const b of document.querySelectorAll('[data-diff]')) b.classList.toggle('on', b.dataset.diff === d);
     $('diff-hint').textContent = {
       peaceful: 'No monsters, you never stay hungry, and you heal fast.',
+      easy: 'Fewer monsters and they hit softer.',
       normal: 'The usual game.',
       hard: 'More monsters that hit harder, and you get hungry faster.',
       extreme: 'Twice the monsters, they hit twice as hard, and starving can kill you.',
@@ -1354,19 +1355,25 @@ const UI = {
     }));
     $('btn-settings').addEventListener('click', () => this.pausePage('settings'));
     $('btn-settings-back').addEventListener('click', () => this.pausePage('main'));
-    for (const b of document.querySelectorAll('[data-pdiff]')) b.addEventListener('click', () => { G.setDifficulty(b.dataset.pdiff); try { localStorage.setItem('blockrealm-diff', b.dataset.pdiff); } catch (e) { /* storage unavailable */ } this.syncPause(); });
+    const T = () => G.state === 'title';
+    const menuRule = (k, v) => { G.menuSet.rules = G.menuSet.rules || {}; G.menuSet.rules[k] = v; G.saveMenuSet(); this.syncSettings(); };
+    for (const b of document.querySelectorAll('[data-pdiff]')) b.addEventListener('click', () => { if (T()) { G.menuSet.difficulty = b.dataset.pdiff; G.saveMenuSet(); try { localStorage.setItem('blockrealm-diff', b.dataset.pdiff); } catch (e) { /* storage unavailable */ } this.syncSettings(); return; } G.setDifficulty(b.dataset.pdiff); try { localStorage.setItem('blockrealm-diff', b.dataset.pdiff); } catch (e) { /* storage unavailable */ } this.syncPause(); });
     $('btn-firespread').addEventListener('click', () => {
+      if (T()) { menuRule('doFireTick', !G.menuRule('doFireTick')); return; }
       G.noFireSpread = !G.noFireSpread;
       this.message(G.noFireSpread ? 'Fire Spreads is off: fire stays where you light it.' : 'Fire Spreads is on: fire spreads along wood, leaves and wool. Careful with wooden houses!', 'gold');
       this.syncPause();
     });
-    try { G.showCoords = localStorage.getItem('blockrealm-coords') === '1'; } catch (e) { G.showCoords = false; }
+    // coordinates are on unless you turned them off
+    try { G.showCoords = localStorage.getItem('blockrealm-coords') !== '0'; } catch (e) { G.showCoords = true; }
     $('btn-coords').addEventListener('click', () => {
       G.showCoords = !G.showCoords;
       try { localStorage.setItem('blockrealm-coords', G.showCoords ? '1' : '0'); } catch (e) { /* only for this time */ }
+      if (T()) { this.syncSettings(); return; }
       this.syncPause();
     });
     $('btn-keepinv').addEventListener('click', () => {
+      if (T()) { menuRule('keepInventory', !G.menuRule('keepInventory')); return; }
       G.keepInventory = !G.keepInventory;
       this.message('Keep Inventory is ' + (G.keepInventory ? 'on: you keep your items when you die.' : 'off: your items drop when you die.'), 'gold');
       this.syncPause();
@@ -1402,7 +1409,7 @@ const UI = {
     $('cmd-go').addEventListener('click', () => { const v = $('cmd-input').value; $('cmd-input').value = ''; this.closeCommand(); if (v.trim()) G.runCommand(v); });
     $('cmd-x').addEventListener('click', () => this.closeCommand());
     $('cmd-input').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('cmd-go').click(); else if (e.key === 'Escape') this.closeCommand(); });
-    $('btn-rules').addEventListener('click', () => { const b = $('pause-rules'); b.hidden = !b.hidden; if (!b.hidden) this.renderRules(b, G.rules, (k, v) => { G.setRule(k, v); this.syncPause(); }); });
+    $('btn-rules').addEventListener('click', () => { const b = $('pause-rules'); b.hidden = !b.hidden; if (!b.hidden && T()) { const all = {}; for (const [k] of GAME_RULES) all[k] = G.menuRule(k); this.renderRules(b, all, (k, v) => { all[k] = v; menuRule(k, v); }); return; } if (!b.hidden) this.renderRules(b, G.rules, (k, v) => { G.setRule(k, v); this.syncPause(); }); });
     for (const t of document.querySelectorAll('.cw-tab')) t.addEventListener('click', () => this.cwTab(t.dataset.ctab));
     $('cw-mode').addEventListener('click', () => { const N = G.newWorld, order = ['survival', 'hardcore', 'creative', 'adventure']; N.mode = order[(order.indexOf(N.mode) + 1) % order.length]; if (!N.cheatsTouched) N.cheats = N.mode === 'creative'; if (N.mode === 'hardcore') N.cheats = false; this.renderCreate(); });
     $('cw-cheats').addEventListener('click', () => { const N = G.newWorld; if (N.mode === 'hardcore') return; N.cheats = !N.cheats; N.cheatsTouched = true; this.renderCreate(); });
@@ -1412,7 +1419,7 @@ const UI = {
     $('cw-biome').addEventListener('click', () => { const N = G.newWorld; let b = N.biome; do { b = (b + 1) % BIOME_NAMES.length; } while (b === BIOME.LUSH_CAVES || b === BIOME.DRIPSTONE_CAVES || b === BIOME.DEEP_DARK); N.biome = b; this.renderCreate(); });
     $('btn-dragon').addEventListener('click', () => { if (G.summonDragon()) G.resume(); });
     $('btn-time').addEventListener('click', () => { G.time = G.isNight() ? 0.02 : 0.52; G.timeEventAt = Date.now(); this.message(G.isNight() ? 'Night falls.' : 'The sun rises.'); });
-    $('btn-cam').addEventListener('click', () => { G.camMode = (G.camMode + 1) % 3; this.syncPause(); });
+    $('btn-cam').addEventListener('click', () => { G.camMode = (G.camMode + 1) % 3; if (T()) this.syncSettings(); else this.syncPause(); });
     $('btn-save').addEventListener('click', () => { G.save(); this.message('World saved in this browser.'); });
     $('btn-quit').addEventListener('click', () => { G.save({ now: true }); G.toTitle(); });
     $('rd').addEventListener('input', () => { for (const w of Object.values(G.worlds)) { w.renderDist = +$('rd').value; w.queue = []; } $('rd-val').textContent = $('rd').value; G.applyFog(); });
@@ -1425,17 +1432,34 @@ const UI = {
   },
 
   pausePage(name) {
+    if (name === 'settings') $('pause-settings').insertBefore($('settings-body'), $('btn-settings-back'));
     $('pause-main').hidden = name !== 'main';
     $('pause-settings').hidden = name !== 'settings';
     this.syncPause();
   },
 
+  /* the same settings, shown on the main menu's Options page */
+  syncSettings() {
+    if (G.state !== 'title') { this.syncPause(); return; }
+    $('settings-note').hidden = false;
+    const d = G.menuSet.difficulty || G.pickedDifficulty();
+    for (const b of document.querySelectorAll('[data-pdiff]')) { b.disabled = false; b.classList.toggle('on', b.dataset.pdiff === d); }
+    $('btn-keepinv').setAttribute('aria-checked', G.menuRule('keepInventory') ? 'true' : 'false');
+    $('btn-firespread').setAttribute('aria-checked', G.menuRule('doFireTick') ? 'true' : 'false');
+    $('btn-coords').setAttribute('aria-checked', G.showCoords ? 'true' : 'false');
+    $('btn-cam').textContent = 'Camera: ' + ['First person', 'Behind', 'Front'][G.camMode || 0];
+    if (G.world) { $('rd').value = G.world.renderDist; $('rd-val').textContent = G.world.renderDist; }
+    $('sens').value = Input.sens; $('sens-val').textContent = Input.sens.toFixed(1);
+    this.renderOptions(document.querySelector('#settings-body .opt-slot'));
+  },
+
   syncPause() {
+    $('settings-note').hidden = true;
     const P = G.player;
     $('btn-mode').textContent = 'Game mode: ' + (P.adventure ? 'Adventure' : P.mode[0].toUpperCase() + P.mode.slice(1)) + (G.hardcore ? ' (Hardcore)' : '');
     $('btn-commands').hidden = !G.cheats;
     for (const b of document.querySelectorAll('[data-pdiff]')) b.disabled = !!G.hardcore;
-    this.renderOptions(document.querySelector('#pause-settings .opt-slot'));
+    this.renderOptions(document.querySelector('#settings-body .opt-slot'));
     for (const b of document.querySelectorAll('[data-pdiff]')) b.classList.toggle('on', b.dataset.pdiff === G.difficulty);
     $('btn-keepinv').setAttribute('aria-checked', G.keepInventory ? 'true' : 'false');
     $('btn-firespread').setAttribute('aria-checked', G.noFireSpread ? 'false' : 'true');
