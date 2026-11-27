@@ -351,7 +351,7 @@ const Net = {
   /* send who we are and where; in a world this is refreshed ten times a second by tick() */
   announce() {
     if (!this.room || this.status !== 'on') return;
-    const base = { v: 2, iv: ID_HASH, u: this.uid, n: this.nick, c: this.color, w: this.world, sk: G.skin || 0, wn: this.world && G.worldName ? String(G.worldName).slice(0, 32) : null };
+    const base = { v: 2, iv: ID_HASH, u: this.uid, n: this.nick, c: this.color, w: this.world, sk: G.skin || 0, wn: this.world && G.worldName ? String(G.worldName).slice(0, 32) : null, wo: this.world && G.worldOpts && (G.worldOpts.type !== 'default' || G.worldOpts.structures === false) ? [G.worldOpts.type, G.worldOpts.biome || 0, G.worldOpts.structures === false ? 0 : 1] : undefined };
     if (this.world && G.player) {
       const P = G.player, held = P.heldSlot(), now = Date.now();
       this.trail = this.trail || [];
@@ -470,7 +470,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v92 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return 'v93 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -669,7 +669,7 @@ const Net = {
 
   /* the name a friend already gave the world with this seed, if one of them is playing it */
   friendWorldName(seed) {
-    for (const rp of this.peers.values()) if (rp.world === 'w' + seed && rp.worldName) return { name: rp.worldName, by: rp.name || 'Your friend' };
+    for (const rp of this.peers.values()) if (rp.world === 'w' + seed && rp.worldName) return { name: rp.worldName, by: rp.name || 'Your friend', opts: rp.worldOpts || null };
     return null;
   },
 
@@ -1147,6 +1147,7 @@ const Net = {
     rp.name = name;
     rp.world = typeof pr.w === 'string' ? pr.w.slice(0, 24) : null;
     rp.worldName = typeof pr.wn === 'string' ? pr.wn.replace(/[^\w .,'!?&()-]/g, '').slice(0, 32) : null;
+    rp.worldOpts = Array.isArray(pr.wo) && ['default', 'flat', 'large', 'amplified', 'single'].includes(pr.wo[0]) ? { type: pr.wo[0], biome: Math.max(0, Math.min(40, pr.wo[1] | 0)), structures: pr.wo[2] !== 0 } : null;
     // joined a new world through multiplayer: whoever was here first already named it
     if (G.adoptName && rp.worldName && this.world && rp.world === this.world && Number.isFinite(pr.tj) && pr.tj < (this.joinedAt || Date.now()) && rp.worldName !== G.worldName) {
       G.adoptName = false;

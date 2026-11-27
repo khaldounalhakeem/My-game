@@ -1269,7 +1269,7 @@ class Mob {
     if (this.T.boat && !byPlayer) drop(this.T.cart ? ID.minecart : ID.boat, 1);
     // killed while burning (by you, or by the fire itself): the meat comes out cooked
     const cooked = this.onFire > 0 || Date.now() - (this.burnedAt || 0) < 2500;
-    if (byPlayer || (cooked && !this.T.hostile)) {
+    if ((byPlayer || (cooked && !this.T.hostile)) && G.rule('doMobLoot')) {
       const COOK = { porkchop: 'cooked_porkchop', beef: 'steak', chicken: 'cooked_chicken' };
       if (!this.baby) for (const [k0, a, b] of this.T.drops) {
         const k = cooked && COOK[k0] ? COOK[k0] : k0;
@@ -1429,7 +1429,7 @@ class Mob {
       } else if (T.explode) {
         if (dist < 3) { this.fuse += dt; moveX *= 0.2; moveZ *= 0.2; if (this.fuse > 0 && this.fuse - dt <= 0) G.sound.play('fuse', this.pos); }
         else this.fuse = Math.max(0, this.fuse - dt);
-        if (this.fuse > 1.5) { this.removeSilently(); G.explode(this.pos.x, this.pos.y + 0.8, this.pos.z, 3, true, false, null, 'A Creeper blew up next to you.'); return; }
+        if (this.fuse > 1.5) { this.removeSilently(); G.explode(this.pos.x, this.pos.y + 0.8, this.pos.z, 3, G.rule('mobGriefing'), false, null, 'A Creeper blew up next to you.'); return; }
       } else if (dist < 1.4 + this.w / 2 && Math.abs(toP.y) < 1.6 && this.attackCd <= 0) {
         this.attackCd = 1;
         G.lastAttacker = this;
@@ -2228,6 +2228,7 @@ class Particles {
   }
   spawn(x, y, z, color, vx, vy, vz, size, life, grav) {
     if (this.list.length > 500) return;
+    const pl = G.opt && G.opt.particles; if ((pl === 'less' && Math.random() < 0.5) || (pl === 'min' && Math.random() < 0.85)) return;
     const m = new THREE.Mesh(this.geo, this.mat(color));
     m.position.set(x, y, z);
     m.scale.setScalar(size);

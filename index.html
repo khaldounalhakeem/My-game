@@ -74,6 +74,7 @@
       <button class="btn mc" type="button" data-go="single">Singleplayer</button>
       <button class="btn mc" type="button" data-go="multi">Multiplayer</button>
       <button class="btn mc" type="button" data-go="skins">Skins</button>
+      <button class="btn mc" type="button" data-go="options">Options...</button>
       <div class="mc-row">
         <button class="btn mc" type="button" data-go="howto">How to Play</button>
         <button class="btn mc" type="button" data-go="about">About</button>
@@ -92,15 +93,32 @@
 
     <div class="title-page" data-page="create" hidden>
       <h2 class="page-title">Create New World</h2>
-      <div class="seed-row"><label for="world-name">World name</label><input id="world-name" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="New World"></div>
-      <div class="seed-slot"></div>
-      <p id="create-hint" class="page-hint"></p>
-      <div class="diff-slot"></div>
-      <div class="mc-row">
-        <button id="btn-play-seed-s" class="btn mc" type="button">Create in Survival</button>
-        <button id="btn-play-seed-c" class="btn mc" type="button">Create in Creative</button>
+      <div class="cw-tabs"><button type="button" class="cw-tab on" data-ctab="game">Game</button><button type="button" class="cw-tab" data-ctab="world">World</button><button type="button" class="cw-tab" data-ctab="more">More</button></div>
+      <div class="cw-page" data-ctab-page="game">
+        <div class="seed-row"><label for="world-name">World name</label><input id="world-name" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="New World"></div>
+        <button id="cw-mode" class="btn mc wide" type="button">Game Mode: Survival</button>
+        <p id="cw-mode-hint" class="page-hint"></p>
+        <div class="diff-slot"></div>
+        <button id="cw-cheats" class="toggle-row" type="button" role="switch" aria-checked="false"><span class="toggle-text"><b>Allow Cheats</b><small>Lets you type commands like /gamemode and /time set day, and change game mode in the pause menu</small></span><span class="switch"><span class="knob"></span></span></button>
       </div>
-      <button class="btn mc back" type="button" data-go="single">Back</button>
+      <div class="cw-page" data-ctab-page="world" hidden>
+        <button id="cw-type" class="btn mc wide" type="button">World Type: Default</button>
+        <p id="cw-type-hint" class="page-hint"></p>
+        <button id="cw-biome" class="btn mc wide" type="button" hidden>Biome: Plains</button>
+        <div class="seed-slot"></div>
+        <p id="create-hint" class="page-hint"></p>
+        <button id="cw-structures" class="toggle-row" type="button" role="switch" aria-checked="false"><span class="toggle-text"><b>Generate Structures</b><small>Villages, temples, shipwrecks, trial chambers, mansions, end cities and more</small></span><span class="switch"><span class="knob"></span></span></button>
+        <button id="cw-bonus" class="toggle-row" type="button" role="switch" aria-checked="false"><span class="toggle-text"><b>Bonus Chest</b><small>A chest next to you at the start with wood, tools and food</small></span><span class="switch"><span class="knob"></span></span></button>
+      </div>
+      <div class="cw-page" data-ctab-page="more" hidden>
+        <p class="page-hint">Game Rules: how this world works. You can change them later in Settings.</p>
+        <div id="cw-rules" class="rules-list"></div>
+      </div>
+      <div class="mc-row">
+        <button id="btn-play-seed-s" class="btn mc gold" type="button">Create New World</button>
+        <button class="btn mc back" type="button" data-go="single">Cancel</button>
+      </div>
+      <button id="btn-play-seed-c" class="btn mc" type="button" hidden>Create in Creative</button>
     </div>
 
     <div class="title-page" data-page="multi" hidden>
@@ -139,6 +157,11 @@
       <button class="btn mc back" type="button" data-go="main">Back</button>
     </div>
 
+    <div class="title-page" data-page="options" hidden>
+      <h2 class="page-title">Options</h2>
+      <div class="opt-slot"></div>
+      <button class="btn mc back" type="button" data-go="main">Done</button>
+    </div>
     <div class="title-page" data-page="about" hidden>
       <h2 class="page-title">About</h2>
       <p class="page-hint">BlockRealm is a fan-made block building game. Find blaze rods in Nether fortresses and ender pearls from endermen, craft Eyes of Ender, follow them to a stronghold, and open the portal to the End to fight the Ender Dragon.</p>
@@ -149,6 +172,7 @@
       <span class="diff-label">Difficulty</span>
       <div class="diff-btns">
         <button type="button" class="btn diff" data-diff="peaceful">Peaceful</button>
+        <button type="button" class="btn diff" data-diff="easy">Easy</button>
         <button type="button" class="btn diff" data-diff="normal">Normal</button>
         <button type="button" class="btn diff" data-diff="hard">Hard</button>
         <button type="button" class="btn diff" data-diff="extreme">Extreme</button>
@@ -163,6 +187,7 @@
   </div>
 </section>
 
+<div id="cmd-box" class="cmd-box" hidden><input id="cmd-input" type="text" autocomplete="off" spellcheck="false" placeholder="/help to see the commands" aria-label="Command"><button id="cmd-go" class="btn small" type="button">Go</button><button id="cmd-x" class="btn small" type="button">Close</button></div>
 <section id="menu-sign" class="screen dim" hidden>
   <div class="panel menu sign-panel">
     <h2>Write on the sign</h2>
@@ -183,6 +208,7 @@
       <button id="btn-resume" class="btn wide" type="button">Back to game</button>
       <button id="btn-settings" class="btn wide" type="button">Settings</button>
       <button id="btn-mode" class="btn wide" type="button">Game mode</button>
+      <button id="btn-commands" class="btn wide" type="button" hidden>Commands ( / )</button>
       <button id="btn-dragon" class="btn wide gold" type="button">Summon a dragon</button>
       <button id="btn-time" class="btn wide" type="button">Make it night</button>
       <p id="players" class="players"></p>
@@ -203,6 +229,7 @@
       <span class="diff-label">Difficulty</span>
       <div class="diff-btns">
         <button type="button" class="btn diff" data-pdiff="peaceful">Peaceful</button>
+        <button type="button" class="btn diff" data-pdiff="easy">Easy</button>
         <button type="button" class="btn diff" data-pdiff="normal">Normal</button>
         <button type="button" class="btn diff" data-pdiff="hard">Hard</button>
         <button type="button" class="btn diff" data-pdiff="extreme">Extreme</button>
@@ -219,6 +246,9 @@
         <span class="toggle-text"><b>Show Coordinates</b><small>Shows where you are (X, Y height, Z) and which way you face</small></span>
         <span class="switch"><span class="knob"></span></span>
       </button>
+      <button id="btn-rules" class="btn wide" type="button">Game Rules...</button>
+      <div id="pause-rules" class="rules-list" hidden></div>
+      <div class="opt-slot"></div>
       <button id="btn-cam" class="btn wide" type="button">Camera: First person</button>
       <label class="slider" for="rd">View distance <span id="rd-val">5</span><input id="rd" type="range" min="2" max="9" step="1" value="5"></label>
       <label class="slider" for="sens">Look speed <span id="sens-val">1.0</span><input id="sens" type="range" min="0.3" max="2.5" step="0.1" value="1"></label>

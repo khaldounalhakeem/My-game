@@ -79,7 +79,11 @@ class World {
   key(cx, cz) { return cx + ',' + cz; }
 
   /* ---------- terrain shape ---------- */
+  /* the world type chosen when the world was made (Create New World > World) */
+  get wtype() { return (this.opts && this.opts.type) || 'default'; }
+  get genH() { return this.wtype === 'amplified' ? 230 : GEN_H; }
   heightAt(x, z) {
+    if (this.wtype === 'flat' && this.dim === 'overworld') return 3;
     const n = this.noise, S = this.style;
     x += S.ox; z += S.oz;
     const cont = n.fbm2(x / S.cont, z / S.cont, 4);
@@ -88,13 +92,16 @@ class World {
     let h = SEA + 4 + cont * 70 * S.amp + hills * 20 * S.hills;
     const m = Math.max(0, mnt - 0.02);
     h += m * m * 600 * S.mnt;
+    // amplified: everything twice as tall and wild
+    if (this.wtype === 'amplified') { h = SEA + 4 + (h - SEA - 4) * 2.4 + Math.max(0, this.noiseC.fbm2(x / 90 + 7, z / 90 - 7, 3)) * 90; return clamp(Math.floor(h), 4, this.genH - 14); }
     return clamp(Math.floor(h), 4, GEN_H - 14);
   }
 
   climate(x, z) {
     const S = this.style;
     x += S.ox; z += S.oz;
-    return [this.noiseB.fbm2(x / 420 + 500, z / 420, 2) + S.temp, this.noiseC.fbm2(x / 380, z / 380 + 700, 2) + S.moist];
+    const k = this.wtype === 'large' ? 4 : 1; // large biomes: every biome four times as big
+    return [this.noiseB.fbm2(x / (420 * k) + 500, z / (420 * k), 2) + S.temp, this.noiseC.fbm2(x / (380 * k), z / (380 * k) + 700, 2) + S.moist];
   }
 
   /* villages, temples, igloos and shipwrecks treat the newest biomes like the ones they grew from,
@@ -103,6 +110,8 @@ class World {
   /* the newest biomes (swamp, mushroom fields, badlands...) only grow on land nobody had built on before them */
   fresh7(x, z) { return !this.noNew && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4))) && this.genVerAt(x, z) >= 7; }
   biomeAt(x, z, h) {
+    if (this.wtype === 'flat') return BIOME.PLAINS;
+    if (this.wtype === 'single') return this.opts.biome || 0;
     const [temp, moist] = this.climate(x, z);
     const S = this.style, sx = x + S.ox, sz = z + S.oz;
     if (h < SEA) {
@@ -349,6 +358,7 @@ class World {
   generate(cx, cz) {
     if (this.dim === 'nether') return this.generateNether(cx, cz);
     if (this.dim === 'end') return this.generateEnd(cx, cz);
+    if (this.wtype === 'flat') return this.generateFlat(cx, cz);
     const c = new Chunk(cx, cz);
     const d = c.data;
     const rng = mulberry32(hash3(cx, cz, this.seed));
@@ -474,7 +484,7 @@ class World {
       const x = 2 + (rng() * 12 | 0), z = 2 + (rng() * 12 | 0), h = heights[x + z * 16];
       const ground = get(x, h, z);
       if (ground !== ID.grass && ground !== ID.snow_grass) continue;
-      if (h + 10 >= GEN_H || get(x, h + 1, z) !== 0) continue;
+      if (h + 10 >= this.genH || get(x, h + 1, z) !== 0) continue;
       const b = biomes[x + z * 16];
       if (b === BIOME.PALE_GARDEN) { this.darkOakTree(set, get, x, h + 1, z, rng, ID.pale_oak_log, ID.pale_oak_leaves); if (br() < 0.2) { set(x, h + 3, z, ID.creaking_heart); (this.newHearts || (this.newHearts = [])).push([cx * 16 + x, h + 3, cz * 16 + z]); } }
       else if (b === BIOME.DARK_FOREST) { if (rng() < 0.8) this.darkOakTree(set, get, x, h + 1, z, rng); else this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4); }
@@ -528,7 +538,7 @@ class World {
       plant(20, [ID.tall_grass], ID.grass);
       for (let i = 0; i < 60; i++) {
         const x = rng() * 16 | 0, z = rng() * 16 | 0, h = heights[x + z * 16];
-        if (get(x, h, z) !== ID.grass || get(x, h + 1, z) !== 0 || h + 16 >= GEN_H) continue;
+        if (get(x, h, z) !== ID.grass || get(x, h + 1, z) !== 0 || h + 16 >= this.genH) continue;
         const tall = 4 + (rng() * 9 | 0);
         for (let k = 1; k <= tall; k++) { if (get(x, h + k, z) !== 0) break; set(x, h + k, z, ID.bamboo); }
       }
@@ -556,13 +566,13 @@ class World {
         for (let k = 1; k <= ch; k++) set(x, h + k, z, ID.cactus);
       }
       rng(); // keeps the rest of the chunk the same as before
-      if (this.pyramidChunk && this.pyramidChunk(cx, cz) && !(this.villageAt && this.villageAt(cx, cz))) this.pyramid(set, get, heights, rng, this.genVerAt(cx * 16, cz * 16) >= 4 && fresh);
+      if (this.pyramidChunk && !(this.opts && this.opts.structures === false) && this.pyramidChunk(cx, cz) && !(this.villageAt && this.villageAt(cx, cz))) this.pyramid(set, get, heights, rng, this.genVerAt(cx * 16, cz * 16) >= 4 && fresh);
     }
     if ((center === BIOME.PLAINS || center === BIOME.FOREST) && rng() < 0.08) plant(3, [ID.pumpkin, ID.melon], ID.grass);
     if (fresh && this.genVerAt(cx * 16, cz * 16) >= 7) this.newBiomeDecor(cx, cz, center, heights, biomes, set, get);
     if (this.newHearts) { c.hearts = this.newHearts; this.newHearts = null; }
-    if (fresh && this.genVerAt(cx * 16, cz * 16) >= 10) this.bigStructures(cx, cz, c, set, get, heights, biomes);
-    if (this.buildStructures) this.buildStructures(c, set, get, heights, biomes, rng);
+    if (fresh && this.genVerAt(cx * 16, cz * 16) >= 10 && !(this.opts && this.opts.structures === false)) this.bigStructures(cx, cz, c, set, get, heights, biomes);
+    if (this.buildStructures && !(this.opts && this.opts.structures === false)) this.buildStructures(c, set, get, heights, biomes, rng);
 
     // apply player edits
     const m = this.edits.get(this.key(cx, cz));
@@ -603,7 +613,7 @@ class World {
       const n = r() < 0.6 ? 1 : 0;
       for (let t = 0; t < n; t++) {
         const x = 4 + (r() * 8 | 0), z = 4 + (r() * 8 | 0), h = H(x, z);
-        if (get(x, h, z) !== ID.mycelium || h + 9 >= GEN_H) continue;
+        if (get(x, h, z) !== ID.mycelium || h + 9 >= this.genH) continue;
         const tall = 4 + (r() * 3 | 0), red = r() < 0.5;
         for (let k = 1; k <= tall; k++) set(x, h + k, z, ID.mushroom_stem);
         if (red) { // a dome of red caps
@@ -629,7 +639,7 @@ class World {
     }
     if (center === B.ICE_SPIKES && r() < 0.7) {
       const x = 3 + (r() * 10 | 0), z = 3 + (r() * 10 | 0), h = H(x, z), tall = r() < 0.15 ? 18 + (r() * 10 | 0) : 6 + (r() * 8 | 0), wide = tall > 15 ? 2 : 1;
-      if (h + tall < GEN_H - 2) for (let k = 1; k <= tall; k++) {
+      if (h + tall < this.genH - 2) for (let k = 1; k <= tall; k++) {
         const w = Math.max(0, Math.round(wide * (1 - k / tall)));
         for (let a = -w; a <= w; a++) for (let b = -w; b <= w; b++) if (Math.abs(a) + Math.abs(b) <= w + 0.5) set(x + a, h + k, z + b, ID.packed_ice);
       }
@@ -973,6 +983,17 @@ class World {
     if (this.dim !== 'overworld' || !this.fresh7(x, z) || y > this.heightAt(Math.floor(x), Math.floor(z)) - 8) return -1;
     if (y <= 16 && this.deepDark(Math.floor(x), Math.floor(z))) return BIOME.DEEP_DARK;
     return this.caveKind((Math.floor(x) >> 4) * 16 + 8, (Math.floor(z) >> 4) * 16 + 8);
+  }
+
+  /* a superflat world: bedrock, two layers of dirt and grass on top, flat forever */
+  generateFlat(cx, cz) {
+    const c = new Chunk(cx, cz), d = c.data, heights = new Int16Array(256).fill(3);
+    for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) for (let y = 0; y <= 3; y++) d[x + (z << 4) + (y << 8)] = y === 0 ? ID.bedrock : y === 3 ? ID.grass : ID.dirt;
+    const m = this.edits.get(this.key(cx, cz));
+    if (m) for (const [i, id] of m) d[i] = id;
+    c.heights = heights;
+    this.chunks.set(this.key(cx, cz), c);
+    return c;
   }
 
   /* the End: one big island of end stone floating over the void, ringed by obsidian pillars */

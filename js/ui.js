@@ -682,6 +682,102 @@ const UI = {
   },
 
   /* ---------- main menu pages ---------- */
+
+  /* ---------- Create New World: Game / World / More, like Minecraft ---------- */
+  newWorldDefaults() {
+    G.newWorld = { mode: 'survival', cheats: false, cheatsTouched: false, type: 'default', biome: BIOME.PLAINS, structures: true, bonus: false, rules: {} };
+    for (const [k, def] of G.RULE_LIST) G.newWorld.rules[k] = def;
+    this.cwTab('game'); this.renderCreate();
+  },
+  cwTab(t) {
+    for (const b of document.querySelectorAll('.cw-tab')) b.classList.toggle('on', b.dataset.ctab === t);
+    for (const p of document.querySelectorAll('.cw-page')) p.hidden = p.dataset.ctabPage !== t;
+    // the seed box lives on the World tab, the difficulty buttons on the Game tab
+    const slot = document.querySelector('.cw-page[data-ctab-page="world"] .seed-slot'); if (slot) { slot.appendChild($('seed-row')); $('seed-row').hidden = false; }
+    const ds = document.querySelector('.cw-page[data-ctab-page="game"] .diff-slot'); if (ds) { ds.appendChild($('diff-row')); $('diff-row').hidden = false; this.renderDiff(); }
+  },
+  renderCreate() {
+    const N = G.newWorld; if (!N) return;
+    const MODES = { survival: ['Survival', 'Find things, build, craft tools, get hungry and stay alive.'], hardcore: ['Hardcore', 'Like Survival, but stuck on Hard and you only get ONE life. If you die you can only watch.'], creative: ['Creative', 'Every block there is, you can fly and you never get hurt.'], adventure: ['Adventure', 'Play maps other people built: you can use things, but not break or place blocks.'] };
+    $('cw-mode').textContent = 'Game Mode: ' + MODES[N.mode][0]; $('cw-mode-hint').textContent = MODES[N.mode][1];
+    const set = (id, on) => $(id).setAttribute('aria-checked', on ? 'true' : 'false');
+    set('cw-cheats', N.cheats); $('cw-cheats').disabled = N.mode === 'hardcore';
+    set('cw-structures', N.structures); set('cw-bonus', N.bonus);
+    const TYPES = { default: ['Default', 'A normal world with hills, mountains, oceans and every biome.'], flat: ['Superflat', 'Completely flat grass, great for building. No caves, no hills.'], large: ['Large Biomes', 'Like Default, but every biome is four times bigger.'], amplified: ['Amplified', 'Giant mountains reaching way up into the sky.'], single: ['Single Biome', 'The whole world is one biome that you pick.'] };
+    $('cw-type').textContent = 'World Type: ' + TYPES[N.type][0]; $('cw-type-hint').textContent = TYPES[N.type][1];
+    $('cw-biome').hidden = N.type !== 'single'; $('cw-biome').textContent = 'Biome: ' + BIOME_NAMES[N.biome];
+    for (const b of document.querySelectorAll('[data-diff]')) b.disabled = N.mode === 'hardcore';
+    $('diff-hint') && N.mode === 'hardcore' && ($('diff-hint').textContent = 'Hardcore is always Hard.');
+    this.renderRules($('cw-rules'), N.rules, (k, v) => { N.rules[k] = v; });
+  },
+  /* a list of game rules: switches for on/off rules, a button that cycles for number rules */
+  renderRules(box, values, change) {
+    if (!box) return;
+    box.innerHTML = '';
+    for (const [k, def, name, desc, choices] of G.RULE_LIST) {
+      const b = document.createElement('button'); b.type = 'button';
+      const v = values[k] !== undefined ? values[k] : def;
+      if (typeof def === 'boolean') {
+        b.className = 'toggle-row'; b.setAttribute('role', 'switch'); b.setAttribute('aria-checked', v ? 'true' : 'false');
+        b.innerHTML = '<span class="toggle-text"><b></b><small></small></span><span class="switch"><span class="knob"></span></span>';
+        b.addEventListener('click', () => { change(k, !(values[k] !== undefined ? values[k] : def)); this.renderRules(box, values, change); });
+      } else {
+        b.className = 'toggle-row'; b.innerHTML = '<span class="toggle-text"><b></b><small></small></span><span class="rule-val"></span>';
+        b.querySelector('.rule-val').textContent = String(v);
+        b.addEventListener('click', () => { const i = choices.indexOf(v); change(k, choices[(i + 1) % choices.length]); this.renderRules(box, values, change); });
+      }
+      b.querySelector('b').textContent = name; b.querySelector('small').textContent = desc;
+      box.appendChild(b);
+    }
+  },
+  /* ---------- options for this device: like Minecraft's Options screen ---------- */
+  renderOptions(box) {
+    if (!box) return;
+    const O = G.opt;
+    box.innerHTML = '';
+    const slider = (label, key, min, max, step, fmt) => {
+      const l = document.createElement('label'); l.className = 'slider';
+      l.innerHTML = '<span></span> <span class="v"></span><input type="range">';
+      const inp = l.querySelector('input'); inp.min = min; inp.max = max; inp.step = step; inp.value = O[key];
+      l.querySelector('span').textContent = label; l.querySelector('.v').textContent = fmt(O[key]);
+      inp.addEventListener('input', () => { O[key] = +inp.value; l.querySelector('.v').textContent = fmt(O[key]); G.applyOptions(); });
+      box.appendChild(l);
+    };
+    const toggle = (label, desc, key) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'toggle-row'; b.setAttribute('role', 'switch'); b.setAttribute('aria-checked', O[key] ? 'true' : 'false');
+      b.innerHTML = '<span class="toggle-text"><b></b><small></small></span><span class="switch"><span class="knob"></span></span>';
+      b.querySelector('b').textContent = label; b.querySelector('small').textContent = desc;
+      b.addEventListener('click', () => { O[key] = !O[key]; b.setAttribute('aria-checked', O[key] ? 'true' : 'false'); G.applyOptions(); });
+      box.appendChild(b);
+    };
+    const cycle = (label, key, choices) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'btn wide';
+      const show = () => { b.textContent = label + ': ' + choices.find(c => c[0] === O[key])[1]; };
+      b.addEventListener('click', () => { const i = choices.findIndex(c => c[0] === O[key]); O[key] = choices[(i + 1) % choices.length][0]; show(); G.applyOptions(); });
+      show(); box.appendChild(b);
+    };
+    slider('FOV', 'fov', 50, 110, 1, v => (v === 75 ? 'Normal' : v >= 110 ? 'Quake Pro' : v));
+    slider('Brightness', 'bright', 0, 1, 0.05, v => (v === 0 ? 'Moody' : v === 1 ? 'Bright' : Math.round(v * 100) + '%'));
+    slider('Sound volume', 'vol', 0, 1, 0.05, v => Math.round(v * 100) + '%');
+    cycle('Particles', 'particles', [['all', 'All'], ['less', 'Decreased'], ['min', 'Minimal']]);
+    cycle('GUI Scale', 'gui', [[1, 'Normal'], [1.25, 'Large'], [0.85, 'Small']]);
+    toggle('View Bobbing', 'The view gently bobs up and down as you walk', 'bobbing');
+    toggle('Clouds', 'Clouds in the sky', 'clouds');
+    toggle('Invert Mouse', 'Looking up and down is flipped', 'invert');
+    toggle('Show Debug Screen', 'FPS, biome and position in the corner (also F3)', 'debug');
+    const fs = document.createElement('button'); fs.type = 'button'; fs.className = 'btn wide'; fs.textContent = 'Fullscreen';
+    fs.addEventListener('click', () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) { this.message('Fullscreen does not work here.'); } });
+    box.appendChild(fs);
+  },
+  /* ---------- the command line (worlds with cheats) ---------- */
+  openCommand(start) {
+    if (!G.cheats) { this.message('Commands are off in this world. Turn on "Allow Cheats" when you make a world.', 'purple'); return; }
+    $('cmd-box').hidden = false; const i = $('cmd-input'); i.value = start || '/'; G.unlock();
+    if (G.state === 'play' || G.state === 'paused') { $('menu-pause').hidden = true; G.setState('sign'); }
+    setTimeout(() => i.focus(), 30);
+  },
+  closeCommand() { $('cmd-box').hidden = true; if (G.state === 'sign' && $('menu-sign').hidden) G.resume(); },
+
   titlePage(name) {
     for (const pg of document.querySelectorAll('.title-page')) pg.hidden = pg.dataset.page !== name;
     $('menu-start').classList.toggle('sub', name !== 'main');
@@ -695,6 +791,8 @@ const UI = {
     if (name === 'skins') this.renderSkins();
     if (name === 'single') this.renderWorldList();
     if (name === 'create' || name === 'multi') this.seedHints();
+    if (name === 'create') this.newWorldDefaults();
+    if (name === 'options') this.renderOptions(document.querySelector('.title-page[data-page="options"] .opt-slot'));
     if (G.sound && G.state === 'title') G.sound.play('click');
   },
 
@@ -1279,7 +1377,7 @@ const UI = {
     $('btn-creative').addEventListener('click', () => G.startNew('creative'));
     $('btn-continue').addEventListener('click', () => G.continueSaved());
     $('btn-random').addEventListener('click', () => { G.seedTouched = true; G.previewWorld(null); });
-    $('btn-play-seed-s').addEventListener('click', () => G.startNew('survival', $('world-name').value));
+    $('btn-play-seed-s').addEventListener('click', () => { const N = G.newWorld; G.startNew(N ? (N.mode === 'hardcore' ? 'hardcore' : N.mode) : 'survival', $('world-name').value); });
     $('btn-play-seed-c').addEventListener('click', () => G.startNew('creative', $('world-name').value));
     $('world-name').addEventListener('keydown', e => e.stopPropagation());
     $('mp-world-name').addEventListener('keydown', e => e.stopPropagation());
@@ -1287,11 +1385,26 @@ const UI = {
     $('btn-resume').addEventListener('click', () => G.resume());
     $('btn-mode').addEventListener('click', () => {
       const P = G.player;
-      P.mode = P.mode === 'survival' ? 'creative' : 'survival';
-      if (P.mode === 'survival') P.flying = false;
+      if (G.hardcore) { this.message('This is a Hardcore world: the game mode can\'t change.', 'purple'); return; }
+      if (!G.cheats) { this.message('Cheats are off in this world, so the game mode can\'t change.', 'purple'); return; }
+      const order = ['survival', 'creative', 'adventure', 'spectator'], cur = P.adventure ? 'adventure' : P.mode, next = order[(order.indexOf(cur) + 1) % order.length];
+      P.adventure = next === 'adventure';
+      G.setGameMode(next === 'adventure' ? 'survival' : next);
       this.syncPause();
-      this.message('Game mode: ' + (P.mode === 'survival' ? 'Survival' : 'Creative'));
+      this.message('Game mode: ' + next[0].toUpperCase() + next.slice(1));
     });
+    $('btn-commands').addEventListener('click', () => this.openCommand('/'));
+    $('cmd-go').addEventListener('click', () => { const v = $('cmd-input').value; $('cmd-input').value = ''; this.closeCommand(); if (v.trim()) G.runCommand(v); });
+    $('cmd-x').addEventListener('click', () => this.closeCommand());
+    $('cmd-input').addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') $('cmd-go').click(); else if (e.key === 'Escape') this.closeCommand(); });
+    $('btn-rules').addEventListener('click', () => { const b = $('pause-rules'); b.hidden = !b.hidden; if (!b.hidden) this.renderRules(b, G.rules, (k, v) => { G.setRule(k, v); this.syncPause(); }); });
+    for (const t of document.querySelectorAll('.cw-tab')) t.addEventListener('click', () => this.cwTab(t.dataset.ctab));
+    $('cw-mode').addEventListener('click', () => { const N = G.newWorld, order = ['survival', 'hardcore', 'creative', 'adventure']; N.mode = order[(order.indexOf(N.mode) + 1) % order.length]; if (!N.cheatsTouched) N.cheats = N.mode === 'creative'; if (N.mode === 'hardcore') N.cheats = false; this.renderCreate(); });
+    $('cw-cheats').addEventListener('click', () => { const N = G.newWorld; if (N.mode === 'hardcore') return; N.cheats = !N.cheats; N.cheatsTouched = true; this.renderCreate(); });
+    $('cw-structures').addEventListener('click', () => { G.newWorld.structures = !G.newWorld.structures; this.renderCreate(); });
+    $('cw-bonus').addEventListener('click', () => { G.newWorld.bonus = !G.newWorld.bonus; this.renderCreate(); });
+    $('cw-type').addEventListener('click', () => { const N = G.newWorld, order = ['default', 'flat', 'large', 'amplified', 'single']; N.type = order[(order.indexOf(N.type) + 1) % order.length]; this.renderCreate(); });
+    $('cw-biome').addEventListener('click', () => { const N = G.newWorld; let b = N.biome; do { b = (b + 1) % BIOME_NAMES.length; } while (b === BIOME.LUSH_CAVES || b === BIOME.DRIPSTONE_CAVES || b === BIOME.DEEP_DARK); N.biome = b; this.renderCreate(); });
     $('btn-dragon').addEventListener('click', () => { if (G.summonDragon()) G.resume(); });
     $('btn-time').addEventListener('click', () => { G.time = G.isNight() ? 0.02 : 0.52; G.timeEventAt = Date.now(); this.message(G.isNight() ? 'Night falls.' : 'The sun rises.'); });
     $('btn-cam').addEventListener('click', () => { G.camMode = (G.camMode + 1) % 3; this.syncPause(); });
@@ -1314,7 +1427,10 @@ const UI = {
 
   syncPause() {
     const P = G.player;
-    $('btn-mode').textContent = 'Game mode: ' + (P.mode === 'survival' ? 'Survival' : 'Creative');
+    $('btn-mode').textContent = 'Game mode: ' + (P.adventure ? 'Adventure' : P.mode[0].toUpperCase() + P.mode.slice(1)) + (G.hardcore ? ' (Hardcore)' : '');
+    $('btn-commands').hidden = !G.cheats;
+    for (const b of document.querySelectorAll('[data-pdiff]')) b.disabled = !!G.hardcore;
+    this.renderOptions(document.querySelector('#pause-settings .opt-slot'));
     for (const b of document.querySelectorAll('[data-pdiff]')) b.classList.toggle('on', b.dataset.pdiff === G.difficulty);
     $('btn-keepinv').setAttribute('aria-checked', G.keepInventory ? 'true' : 'false');
     $('btn-firespread').setAttribute('aria-checked', G.noFireSpread ? 'false' : 'true');
@@ -1458,6 +1574,7 @@ const UI = {
     else if (k === 'Escape' && Input.fallback) G.pause();
     else if (k === 'KeyQ') P.dropHeld(e.ctrlKey);
     else if (k === 'F3' || k === 'KeyH') { e.preventDefault(); $('debug').hidden = !$('debug').hidden; }
+    else if (k === 'Slash' || k === 'KeyT') { e.preventDefault(); this.openCommand(k === 'Slash' ? '/' : ''); }
     else if (k === 'KeyF') { if (P.mode === 'creative') Input.flyToggle = true; }
     else if (k === 'Space') { const now = performance.now(); if (now - Input.lastSpace < 300 && P.mode === 'creative') Input.flyToggle = true; Input.lastSpace = now; }
     else if (k === 'KeyP') G.pause();

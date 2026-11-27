@@ -301,6 +301,7 @@ function updateSky(dt) {
   if (P.fx && P.fx('darkness')) { const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 600); near = 1; far = Math.min(far, 5 + 9 * pulse); fogCol.setRGB(0, 0, 0); G.scene.fog.color.copy(fogCol); }
   G.scene.fog.near = near; G.scene.fog.far = far;
   let bright = (0.22 + 0.78 * dl) * (1 - ug * 0.55);
+  bright = bright + (1 - bright) * (G.opt.bright - 0.5) * 0.5; // the Brightness option
   if (P.fx && P.fx('night_vision')) bright = Math.max(bright, 0.95);
   for (const k of ['opaque', 'trans', 'item', 'held']) G.mats[k].color.setScalar(bright);
   G.ambient.intensity = 0.25 + 0.5 * dl * (1 - ug * 0.5);
@@ -326,7 +327,7 @@ G.spawnDrop = (id, count, x, y, z, vel, opts) => {
   return d;
 };
 G.spawnProjectile = (kind, pos, vel, owner) => { G.projectiles.push(new Projectile(kind, pos, vel, owner)); };
-G.primeTNT = (x, y, z, fuse) => { G.tnts.push(new PrimedTNT(x + 0.5, y, z + 0.5, fuse)); };
+G.primeTNT = (x, y, z, fuse) => { if (!G.rule('tntExplodes')) { G.world.setBlock(x, y, z, ID.tnt); return; } G.tnts.push(new PrimedTNT(x + 0.5, y, z + 0.5, fuse)); };
 
 /* how much of a body (feet, middle, head) the blast can see: 0 behind a wall, 1 in the open */
 function blastExposure(x, y, z, px, py, pz) {
@@ -511,7 +512,7 @@ G.tickAmbient = (dt) => {
           G.shriekAt = performance.now() + 10000; G.warnings = (G.warnings || 0) + 1;
           Sound.play('mob_phantom', new THREE.Vector3(x, y, z)); P.addEffect('darkness', 1, 12);
           G.particles.burst(x + 0.5, y + 1, z + 0.5, [0x2ad8e8, 0x0e3a4a], 14, 1.5, 0.12, -1);
-          if (G.warnings >= 4 && !G.mobs.some(m => m.type === 'warden' && !m.dead)) { G.warnings = 0; for (let t = 0; t < 10; t++) { const wx = x + (Math.random() * 10 | 0) - 5, wz = z + (Math.random() * 10 | 0) - 5; if (!W.getBlock(wx, y, wz) && !W.getBlock(wx, y + 1, wz) && !W.getBlock(wx, y + 2, wz)) { const w = spawnMob('warden', wx + 0.5, y, wz + 0.5); w.anger = 80; G.ui.message('The Warden is coming out of the ground!', 'purple'); break; } } }
+          if (G.warnings >= 4 && G.rule('doWardenSpawning') && !G.mobs.some(m => m.type === 'warden' && !m.dead)) { G.warnings = 0; for (let t = 0; t < 10; t++) { const wx = x + (Math.random() * 10 | 0) - 5, wz = z + (Math.random() * 10 | 0) - 5; if (!W.getBlock(wx, y, wz) && !W.getBlock(wx, y + 1, wz) && !W.getBlock(wx, y + 2, wz)) { const w = spawnMob('warden', wx + 0.5, y, wz + 0.5); w.anger = 80; G.ui.message('The Warden is coming out of the ground!', 'purple'); break; } } }
           else G.ui.message(['The shrieker screamed...', 'Something heard that...', 'It is getting closer...'][Math.min(2, G.warnings - 1)], 'purple');
         }
         break;
@@ -1202,6 +1203,165 @@ G.tickHeldHud = (k, dt) => {
     ctx.putImageData(img, 0, 0);
     ctx.save(); ctx.translate(64, 64); ctx.rotate(-P.yaw + Math.PI); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(4, 4); ctx.lineTo(-4, 4); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
   }
+};
+
+/* ================= world settings: game rules, hardcore, cheats and commands (like Minecraft) ================= */
+const GAME_RULES = [
+  ['keepInventory', false, 'Keep Inventory', 'Keep your items and XP when you die'],
+  ['doDaylightCycle', true, 'Day and Night', 'The sun moves and night comes (off: the time stays the same)'],
+  ['doMobSpawning', true, 'Spawn Mobs', 'Animals and monsters appear by themselves'],
+  ['doInsomnia', true, 'Phantoms', 'Phantoms come at night if you stay up high'],
+  ['doTraderSpawning', true, 'Wandering Traders', 'A wandering trader visits now and then'],
+  ['doWardenSpawning', true, 'Warden', 'Sculk shriekers can call the Warden'],
+  ['doFireTick', true, 'Fire Spreads', 'Fire spreads along wood, leaves and wool and burns them away'],
+  ['mobGriefing', true, 'Mob Griefing', 'Creepers and ghasts break blocks when they blow up'],
+  ['tntExplodes', true, 'TNT Explodes', 'TNT blows up when it is lit'],
+  ['naturalRegeneration', true, 'Natural Regeneration', 'You heal by yourself when you are not hungry'],
+  ['fallDamage', true, 'Fall Damage', 'Falling from high up hurts'],
+  ['fireDamage', true, 'Fire Damage', 'Fire and lava hurt'],
+  ['drowningDamage', true, 'Drowning Damage', 'You run out of air under water'],
+  ['freezeDamage', true, 'Freeze Damage', 'Powder snow freezes you'],
+  ['doImmediateRespawn', false, 'Instant Respawn', 'Come straight back when you die, with no death screen'],
+  ['doMobLoot', true, 'Mob Drops', 'Animals and monsters drop things when they die'],
+  ['doTileDrops', true, 'Block Drops', 'Broken blocks drop themselves'],
+  ['waterSourceConversion', true, 'Infinite Water', 'Water between two water sources becomes a new source'],
+  ['lavaSourceConversion', false, 'Infinite Lava', 'Lava between two lava sources becomes a new source'],
+  ['sendCommandFeedback', true, 'Command Messages', 'Commands tell you what they did'],
+  ['randomTickSpeed', 3, 'Growing Speed', 'How fast crops, saplings and plants grow (0 stops them, Minecraft uses 3)', [0, 1, 3, 10, 30, 100]],
+];
+G.rules = {};
+G.resetRules = (from) => { G.rules = {}; for (const [k, def] of GAME_RULES) G.rules[k] = from && from[k] !== undefined ? from[k] : def; G.keepInventory = !!G.rules.keepInventory; G.noFireSpread = !G.rules.doFireTick; };
+G.rule = k => (k === 'keepInventory' ? !!G.keepInventory : k === 'doFireTick' ? !G.noFireSpread : G.rules[k] !== undefined ? G.rules[k] : (GAME_RULES.find(r => r[0] === k) || [])[1]);
+G.setRule = (k, v) => {
+  const R = GAME_RULES.find(r => r[0] === k); if (!R) return false;
+  if (typeof R[1] === 'boolean') v = v === true || v === 'true' || v === 'on' || v === 1; else { v = Number(v); if (!Number.isFinite(v) || v < 0) return false; }
+  G.rules[k] = v;
+  if (k === 'keepInventory') G.keepInventory = v;
+  if (k === 'doFireTick') G.noFireSpread = !v;
+  return true;
+};
+G.resetRules();
+G.RULE_LIST = GAME_RULES;
+/* a starter chest next to where you first come into the world */
+G.bonusChest = (sx, sy, sz) => {
+  const W = G.world, x = Math.floor(sx) + 2, z = Math.floor(sz) - 2, y = W.surfaceY(x, z) + 1;
+  W.setBlock(x, y, z, ID.chest);
+  for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!W.getBlock(x + a, y, z + b)) W.setBlock(x + a, y, z + b, ID.torch);
+  const slots = G.chestSlots(x, y, z, true);
+  [['oak_log', 6], ['oak_planks', 12], ['stick', 12], ['wooden_pickaxe', 1], ['wooden_axe', 1], ['apple', 5], ['bread', 3], ['cooked_salmon', 2], ['torch', 8]].forEach(([k, n], i) => { if (ID[k]) slots[i * 3 % 27] = { id: ID[k], count: n }; });
+};
+/* commands (only in worlds with cheats allowed): /gamemode, /time, /give, /tp, /summon, /effect, /gamerule ... */
+const COMMAND_HELP = '/gamemode <survival|creative|adventure|spectator>, /time set <day|noon|night|midnight>, /difficulty <peaceful|easy|normal|hard>, /give <item> [count], /tp <x> <y> <z>, /summon <mob>, /kill, /clear, /effect give <effect> [seconds] [level], /effect clear, /gamerule <rule> [value], /xp <levels>, /setblock <x> <y> <z> <block>, /fill <x1> <y1> <z1> <x2> <y2> <z2> <block>, /spawnpoint, /locate <structure>, /seed';
+G.runCommand = (line) => {
+  const P = G.player, W = G.world;
+  const say = (t, tone) => { if (G.rule('sendCommandFeedback') || tone === 'purple') G.ui.message(t, tone || 'gold'); };
+  if (!G.cheats) { say('Commands are off in this world. Turn on "Allow Cheats" when you make a world.', 'purple'); return; }
+  const parts = String(line || '').trim().replace(/^\//, '').split(/\s+/), cmd = (parts.shift() || '').toLowerCase();
+  const num = (s, base) => { if (s === undefined) return NaN; if (s[0] === '~') return base + (Number(s.slice(1)) || 0); return Number(s); };
+  const findKey = k => { k = String(k || '').toLowerCase().replace(/^minecraft:/, ''); if (ID[k] !== undefined) return k; const hit = Object.keys(ID).find(x => x === k + '_n' || x === k + '_s' || x === k + '_0' || x === k + '_n_0'); return hit || Object.keys(ID).find(x => DEFS[ID[x]] && DEFS[ID[x]].name.toLowerCase() === k.replace(/_/g, ' ')); };
+  switch (cmd) {
+    case 'help': case '?': say(COMMAND_HELP); return;
+    case 'gamemode': case 'gm': {
+      const m = { s: 'survival', 0: 'survival', survival: 'survival', c: 'creative', 1: 'creative', creative: 'creative', a: 'adventure', 2: 'adventure', adventure: 'adventure', sp: 'spectator', 3: 'spectator', spectator: 'spectator' }[(parts[0] || '').toLowerCase()];
+      if (!m) { say('Try: /gamemode survival, creative, adventure or spectator', 'purple'); return; }
+      G.setGameMode(m); say('Game mode: ' + m[0].toUpperCase() + m.slice(1)); return;
+    }
+    case 'time': {
+      const v = (parts[1] || '').toLowerCase(), T = { day: 1000, noon: 6000, night: 13000, midnight: 18000, sunrise: 23000, sunset: 12000 };
+      if (parts[0] === 'set') { const t = T[v] !== undefined ? T[v] : Number(v); if (!Number.isFinite(t)) { say('Try: /time set day', 'purple'); return; } G.time = ((t % 24000) / 24000); say('Time set to ' + (T[v] !== undefined ? v : t)); return; }
+      if (parts[0] === 'add') { const t = Number(v) || 0; G.time = (G.time + t / 24000) % 1; say('Added ' + t + ' to the time'); return; }
+      say('It is ' + Math.round(G.time * 24000) + ' (day ticks)'); return;
+    }
+    case 'difficulty': { const d = (parts[0] || '').toLowerCase(); if (G.hardcore) { say('A hardcore world is always Hard.', 'purple'); return; } if (G.DIFFS[d]) { G.setDifficulty(d); return; } say('Try: /difficulty peaceful, easy, normal or hard', 'purple'); return; }
+    case 'give': {
+      let a = parts[0]; if (a && a[0] === '@') a = parts[1], parts.shift();
+      const k = findKey(a), n = Math.max(1, Math.min(6400, Number(parts[1]) || 1));
+      if (!k) { say('No item called "' + a + '"', 'purple'); return; }
+      const left = P.inv.add(ID[k], n); if (left) G.spawnDrop(ID[k], left, P.pos.x, P.pos.y + 1, P.pos.z); P.inv.changed();
+      say('Gave ' + n + ' ' + DEFS[ID[k]].name); return;
+    }
+    case 'tp': case 'teleport': {
+      let p = parts; if (p[0] && p[0][0] === '@') p = p.slice(1);
+      const x = num(p[0], P.pos.x), y = num(p[1], P.pos.y), z = num(p[2], P.pos.z);
+      if (![x, y, z].every(Number.isFinite)) { say('Try: /tp 100 70 -200 (use ~ for where you are)', 'purple'); return; }
+      P.pos.set(x, Math.max(1, Math.min(WH + 50, y)), z); P.vel.set(0, 0, 0); P.fallStart = null; loadAround(x, z, 2);
+      say('Teleported to ' + Math.round(x) + ', ' + Math.round(y) + ', ' + Math.round(z)); return;
+    }
+    case 'summon': {
+      const t = (parts[0] || '').toLowerCase().replace(/^minecraft:/, '');
+      if (t === 'ender_dragon' || t === 'dragon') { G.summonDragon('ender'); return; }
+      if (!MOB_TYPES[t]) { say('No mob called "' + t + '"', 'purple'); return; }
+      const x = num(parts[1], P.pos.x + 2), y = num(parts[2], P.pos.y), z = num(parts[3], P.pos.z);
+      spawnMob(t, x, y, z); say('Summoned a ' + MOB_TYPES[t].name); return;
+    }
+    case 'kill': if (P.mode === 'creative' || P.mode === 'spectator') P.mode = 'survival'; P.hurt(9999, null, 0, true, 'You used /kill.'); return;
+    case 'clear': P.inv.slots.fill(null); P.inv.changed(); say('Cleared your inventory'); return;
+    case 'effect': {
+      if (parts[0] === 'clear') { P.effects = {}; say('Removed all effects'); return; }
+      let p = parts.slice(parts[0] === 'give' ? 1 : 0); if (p[0] && p[0][0] === '@') p = p.slice(1);
+      const e = (p[0] || '').toLowerCase().replace(/^minecraft:/, ''), secs = Number(p[1]) || 30, lvl = Math.max(1, (Number(p[2]) || 0) + 1);
+      if (e === 'instant_health' || e === 'healing') { G.applyPotion(P, 'healing'); return; }
+      if (!e) { say('Try: /effect give speed 60', 'purple'); return; }
+      P.addEffect(e, Math.min(lvl, 5), secs); say('Gave the ' + e.replace(/_/g, ' ') + ' effect for ' + secs + ' seconds'); return;
+    }
+    case 'gamerule': {
+      const R = GAME_RULES.find(r => r[0].toLowerCase() === (parts[0] || '').toLowerCase());
+      if (!R) { say('Game rules: ' + GAME_RULES.map(r => r[0]).join(', ')); return; }
+      if (parts[1] === undefined) { say(R[0] + ' is ' + G.rule(R[0])); return; }
+      if (G.setRule(R[0], parts[1])) say('Game rule ' + R[0] + ' is now ' + G.rule(R[0])); else say('That value doesn\'t work for ' + R[0], 'purple');
+      return;
+    }
+    case 'xp': case 'experience': { const n = parseInt(parts[parts.length - 1], 10); if (!Number.isFinite(n)) { say('Try: /xp 10', 'purple'); return; } P.level = Math.max(0, P.level + n); say('Gave ' + n + ' levels'); return; }
+    case 'setblock': {
+      const x = Math.floor(num(parts[0], P.pos.x)), y = Math.floor(num(parts[1], P.pos.y)), z = Math.floor(num(parts[2], P.pos.z)), k = parts[3] === 'air' ? 'air' : findKey(parts[3]);
+      if (![x, y, z].every(Number.isFinite) || !k || (k !== 'air' && !DEFS[ID[k]].isBlock)) { say('Try: /setblock ~ ~ ~ stone', 'purple'); return; }
+      W.setBlock(x, y, z, k === 'air' ? 0 : ID[k]); say('Block placed'); return;
+    }
+    case 'fill': {
+      const c = parts.slice(0, 6).map((v, i) => Math.floor(num(v, [P.pos.x, P.pos.y, P.pos.z][i % 3]))), k = parts[6] === 'air' ? 'air' : findKey(parts[6]);
+      if (!c.every(Number.isFinite) || !k || (k !== 'air' && !DEFS[ID[k]].isBlock)) { say('Try: /fill ~ ~ ~ ~5 ~5 ~5 glass', 'purple'); return; }
+      const [x1, y1, z1, x2, y2, z2] = c, vol = (Math.abs(x2 - x1) + 1) * (Math.abs(y2 - y1) + 1) * (Math.abs(z2 - z1) + 1);
+      if (vol > 32768) { say('That is too many blocks (' + vol + '). The most is 32768.', 'purple'); return; }
+      for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) for (let z = Math.min(z1, z2); z <= Math.max(z1, z2); z++) W.setBlock(x, y, z, k === 'air' ? 0 : ID[k]);
+      say('Filled ' + vol + ' blocks'); return;
+    }
+    case 'spawnpoint': P.spawn.copy(P.pos); say('Your spawn point is set here'); return;
+    case 'seed': say('Seed: ' + G.seed); return;
+    case 'weather': say('The weather here is always clear.'); return;
+    case 'locate': {
+      const what = (parts[1] || parts[0] || '').toLowerCase().replace(/^minecraft:/, ''), cx = Math.floor(P.pos.x / 16), cz = Math.floor(P.pos.z / 16);
+      const finders = { village: (gx, gz) => W.villageAt && W.villageAt(gx, gz), trial_chambers: (gx, gz) => W.trialAt(Math.floor(gx / 24), Math.floor(gz / 24)), monument: (gx, gz) => W.monumentAt(Math.floor(gx / 24), Math.floor(gz / 24)), ancient_city: (gx, gz) => W.ancientCityAt(Math.floor(gx / 24), Math.floor(gz / 24)), mansion: (gx, gz) => W.mansionAt(Math.floor(gx / 24), Math.floor(gz / 24)) };
+      const f = finders[what];
+      if (!f) { say('You can locate: ' + Object.keys(finders).join(', ')); return; }
+      let best = null;
+      for (let r = 0; r < 200 && !best; r += 4) for (let a = 0; a < 16 && !best; a++) { const gx = cx + Math.round(Math.cos(a / 8 * Math.PI) * r), gz = cz + Math.round(Math.sin(a / 8 * Math.PI) * r), v = f(gx, gz); if (v) best = v.x !== undefined ? v : { x: gx * 16 + 8, z: gz * 16 + 8 }; }
+      if (best) say('The nearest ' + what.replace(/_/g, ' ') + ' is at X ' + best.x + ', Z ' + best.z + ' (' + Math.round(Math.hypot(best.x - P.pos.x, best.z - P.pos.z)) + ' blocks away)'); else say('None found nearby.', 'purple');
+      return;
+    }
+    default: say('Unknown command "/' + cmd + '". Type /help to see the commands.', 'purple');
+  }
+};
+/* game modes: survival, creative, adventure (can't break or place blocks) and spectator (fly through everything, touch nothing) */
+G.setGameMode = (m) => {
+  const P = G.player;
+  if (G.hardcore && m !== 'spectator' && P.mode === 'spectator') return;
+  P.mode = m;
+  P.flying = m === 'spectator' ? true : m === 'creative' ? P.flying : false;
+  G.ui.syncPause && G.ui.syncPause();
+  G.ui.refreshHud && G.ui.refreshHud();
+};
+
+/* this device's options (kept on the device, like Minecraft's options.txt) */
+G.opt = { fov: 75, bright: 0.5, vol: 1, particles: 'all', gui: 1, bobbing: true, clouds: true, invert: false, debug: false };
+try { Object.assign(G.opt, JSON.parse(localStorage.getItem('blockrealm-opts') || '{}')); } catch (e) { /* defaults */ }
+G.applyOptions = () => {
+  const O = G.opt;
+  try { localStorage.setItem('blockrealm-opts', JSON.stringify(O)); } catch (e) { /* only for now */ }
+  if (Sound.master) Sound.master.gain.value = 0.32 * O.vol;
+  if (G.clouds) G.clouds.visible = !!O.clouds;
+  const dbg = $('debug'); if (dbg && O.debug !== G.optDebug) { G.optDebug = O.debug; dbg.hidden = !O.debug; }
+  const hud = $('hotbar'), st = $('stats');
+  for (const el of [hud, st]) if (el) { el.style.transform = O.gui === 1 ? '' : 'scale(' + O.gui + ')'; el.style.transformOrigin = 'bottom center'; }
 };
 /* tap a lever to flip it; tap a button to press it for a moment */
 G.useSwitch = (x, y, z) => {
@@ -1983,10 +2143,11 @@ function spawnTick() {
     if (d > (m.T.passive ? 160 : 64) || !W.isLoaded(m.pos.x, m.pos.z)) { m.remove(); continue; }
     if (m.T.passive) passive++; else hostile++;
   }
-  if (G.dim === 'nether') { netherSpawn(hostile); return; }
+  if (G.dim === 'nether') { if (G.rule('doMobSpawning')) netherSpawn(hostile); return; }
   if (G.dim === 'end') { endSpawn(hostile); return; }
   structureSpawns();
-  traderSpawn();
+  if (G.rule('doTraderSpawning')) traderSpawn();
+  if (!G.rule('doMobSpawning')) return;
   // farm animals, horses and wolves: plenty of them around (monsters are counted separately)
   if (passive < 30 && Math.random() < 0.5) {
     const a = Math.random() * Math.PI * 2, r = 22 + Math.random() * 34;
@@ -2067,7 +2228,7 @@ function spawnTick() {
       if (outside && Math.random() < (hb === BIOME.MANGROVE || hb === BIOME.SWAMP ? 0.35 : 0.06)) type = 'slime';
       if (hb === BIOME.MUSHROOM) continue; // no monsters ever on mushroom islands, like Minecraft
       const cb = W.caveBiomeAt(x, y, z);
-      if (cb === BIOME.DEEP_DARK) { if (Math.random() < 0.15 && !W.getBlock(x, y + 2, z) && !G.mobs.some(m => m.type === 'warden' && !m.dead)) type = 'warden'; }
+      if (cb === BIOME.DEEP_DARK) { if (G.rule('doWardenSpawning') && Math.random() < 0.15 && !W.getBlock(x, y + 2, z) && !G.mobs.some(m => m.type === 'warden' && !m.dead)) type = 'warden'; }
       else if (cb === BIOME.LUSH_CAVES && W.liquidAt(x, y - 0.5, z) === ID.water) type = 'axolotl';
       if (type === 'enderman' && (W.getBlock(x, y + 2, z))) type = 'zombie';
       if (type === 'spider' && (W.getBlock(x + 1, y, z) || W.getBlock(x - 1, y, z))) type = 'skeleton';
@@ -2082,7 +2243,7 @@ function spawnTick() {
       const sb = W.biomeAt(x, z, W.heightAt(x, z));
       if (W.getBlock(x, top, z) === ID.water && W.getBlock(x, top - 6, z) === ID.water && (sb === BIOME.OCEAN || sb === BIOME.WARM_OCEAN || sb === BIOME.FROZEN_OCEAN) && Math.random() < 0.12) spawnMob('guardian', x + 0.5, top - 4, z + 0.5);
       else if (W.getBlock(x, top, z) === ID.water && Math.random() < 0.25) spawnMob('drowned', x + 0.5, top - 1, z + 0.5);
-      else if (night && P.pos.y > 50 && Math.random() < 0.08 && !G.mobs.some(m => m.type === 'phantom' && !m.dead)) spawnMob('phantom', x + 0.5, Math.max(top, P.pos.y) + 18, z + 0.5);
+      else if (G.rule('doInsomnia') && night && P.pos.y > 50 && Math.random() < 0.08 && !G.mobs.some(m => m.type === 'phantom' && !m.dead)) spawnMob('phantom', x + 0.5, Math.max(top, P.pos.y) + 18, z + 0.5);
     }
   }
 }
@@ -2292,6 +2453,7 @@ function makeWorld(seed, legacy) {
   for (const dim of ['overworld', 'nether', 'end']) {
     const w = new World(seed, G.mats, dim, legacy);
     w.renderDist = rd;
+    w.opts = G.worldOpts || {};
     w.onEdit = (x, y, z, id) => Net.edit(dim, x, y, z, id);
     G.worlds[dim] = w;
   }
@@ -2607,8 +2769,8 @@ G.tickFluids = () => {
       // only water closer to the source can feed it (so a puddle with no source dries up quickly instead of feeding itself)
       else for (const [a, c] of NB4) { const nid = W.getBlock(x + a, y, z + c); if (fluidOf(nid) === F) { const st = strengthOf(nid); if (DEFS[nid].level === 8 && fluidOf(W.getBlock(x + a, y - 1, z + c)) === F) continue; if (st < (lv === 8 ? 99 : lv)) want = Math.min(want, st + step); } }
       // water between two sources (on something solid, or more water) becomes a new source
-      if (F === 'water' && want !== 8) {
-        let src = 0; for (const [a, c] of NB4) if (isSource(W.getBlock(x + a, y, z + c)) && fluidOf(W.getBlock(x + a, y, z + c)) === 'water') src++;
+      if ((F === 'water' ? G.rule('waterSourceConversion') : G.rule('lavaSourceConversion')) && want !== 8) {
+        let src = 0; for (const [a, c] of NB4) if (isSource(W.getBlock(x + a, y, z + c)) && fluidOf(W.getBlock(x + a, y, z + c)) === F) src++;
         const below = DEFS[W.getBlock(x, y - 1, z)];
         if (src >= 2 && below && (below.solid || isSource(W.getBlock(x, y - 1, z)))) want = 0;
       }
@@ -2733,6 +2895,13 @@ G.throwEye = () => {
 };
 
 G.respawnPlayer = () => {
+  if (G.hardcore) {
+    const P = G.player, at = G.lastDeath;
+    P.dead = false; P.health = 20; P.hunger = 20; G.setGameMode('spectator');
+    if (at) P.pos.set(at.x, at.y + 1, at.z);
+    G.ui.message('Hardcore: you cannot come back to life in this world, but you can fly around and watch.', 'purple');
+    return;
+  }
   // a charged respawn anchor in the Nether brings you back there
   const A = G.anchor;
   if (A && G.worlds && G.worlds.nether) {
@@ -2754,11 +2923,13 @@ function seedFromText(t) {
 }
 
 function findSpawn(world) {
+  if (world.wtype === 'flat') return [0.5, 0.5];
+  const any = world.wtype === 'single';
   for (let r = 0; r < 600; r += 8) {
     for (let a = 0; a < 12; a++) {
       const x = Math.round(Math.cos(a / 12 * Math.PI * 2) * r), z = Math.round(Math.sin(a / 12 * Math.PI * 2) * r);
       const h = world.heightAt(x, z), b = world.biomeAt(x, z, h);
-      if (h > SEA + 1 && b !== BIOME.MOUNTAIN && b !== BIOME.OCEAN && b !== BIOME.BEACH) return [x + 0.5, z + 0.5];
+      if (h > SEA + 1 && (any || (b !== BIOME.MOUNTAIN && b !== BIOME.OCEAN && b !== BIOME.BEACH))) return [x + 0.5, z + 0.5];
     }
   }
   return [0.5, 0.5];
@@ -2789,15 +2960,23 @@ G.startNew = (mode, name) => {
   G.worldId = String(seedNow);
   G.worldName = (name || '').trim() || 'New World';
   G.adoptName = G.ui.fromMultiplayer && !(Net.friendWorldName && Net.friendWorldName(seedNow));
+  // the Create New World settings (a friend's world you join uses the friend's world type)
+  const NO = G.ui.fromMultiplayer ? null : G.newWorld, fw = Net.friendWorldName && Net.friendWorldName(seedNow);
+  G.worldOpts = NO ? { type: NO.type || 'default', biome: NO.biome || 0, structures: NO.structures !== false } : (fw && fw.opts) || { type: 'default', structures: true };
+  G.hardcore = !!(NO && NO.mode === 'hardcore');
+  if (G.hardcore) mode = 'survival';
+  G.cheats = NO ? !!NO.cheats : true;
   makeWorld(txt ? seedFromText(txt) : G.seed);
-  P.inv = new Inventory(); P.reset(); P.mode = mode; P.sel = 0; G.enderChest = null;
-  G.setDifficulty(G.pickedDifficulty(), true);
+  G.resetRules(NO && NO.rules);
+  P.inv = new Inventory(); P.reset(); P.mode = mode === 'adventure' ? 'survival' : mode; P.adventure = mode === 'adventure'; P.sel = 0; G.enderChest = null;
+  G.setDifficulty(G.hardcore ? 'hard' : G.pickedDifficulty(), true);
   const [sx, sz] = findSpawn(G.world);
   loadAround(sx, sz, 2);
   const sy = G.world.surfaceY(sx, sz) + 1;
   P.spawn.set(sx, sy, sz); P.pos.copy(P.spawn); P.vel.set(0, 0, 0);
   P.yaw = 0; P.pitch = -0.1;
   G.time = 0.03; G.dragonTimer = 30; G.netherVisited = false;
+  if (NO && NO.bonus) G.bonusChest(sx, sy, sz);
   const fx = Math.floor(sx) + 4, fz = Math.floor(sz) + 4;
   const fy = G.world.surfaceY(fx, fz);
   if (G.world.getBlock(fx, fy, fz) !== ID.water) G.world.buildPortal(fx, fy + 1, fz, false);
@@ -2867,6 +3046,8 @@ G.continueSaved = async (id) => {
   translateSave(s);
   if (Cloud.ready) await Cloud.loadFixes(entry.id); else Cloud.fixList = [];
   G.worldId = entry.id; G.worldName = entry.name;
+  G.worldOpts = s.worldOpts || { type: 'default', structures: true };
+  G.cheats = s.cheats === undefined ? true : !!s.cheats; G.hardcore = !!s.hardcore;
   makeWorld(s.seed, !s.gen); // saves from before seed personalities keep their old landscape
   G.worlds.overworld.loadEdits(s.edits || {});
   G.worlds.nether.loadEdits(s.netherEdits || {});
@@ -2885,7 +3066,9 @@ G.continueSaved = async (id) => {
   G.findFires();
   G.signs = s.signs || {};
   G.crops = s.crops || {};
+  G.resetRules(s.rules);
   G.keepInventory = !!s.keepInventory;
+  G.player.adventure = !!s.adventure;
   G.noFireSpread = !!s.noFireSpread;
   G.myFlag = s.myFlag && ['overworld', 'nether', 'end'].includes(s.myFlag.dim) && [s.myFlag.x, s.myFlag.y, s.myFlag.z].every(Number.isInteger) ? s.myFlag : null;
   G.showFlag = false;
@@ -2954,7 +3137,7 @@ G.save = (opts) => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, enderChest: G.enderChest ? slotsJSON(G.enderChest) : null, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, anchor: G.anchor || null, trials: G.trials || {}, lastDeath: G.lastDeath || null, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, enderChest: G.enderChest ? slotsJSON(G.enderChest) : null, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, worldOpts: G.worldOpts || null, cheats: !!G.cheats, hardcore: !!G.hardcore, rules: G.rules || {}, adventure: !!G.player.adventure, anchor: G.anchor || null, trials: G.trials || {}, lastDeath: G.lastDeath || null, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   let ok = true;
   G.lastSaveText = JSON.stringify(data);
@@ -3070,6 +3253,7 @@ G.lockFailed = () => {
 /* difficulty: how many monsters, how hard they hit, how fast you get hungry and heal */
 G.DIFFS = {
   peaceful: { name: 'Peaceful', dmg: 0.5, mobs: 0, hunger: 0, regen: 1, starve: 20 },
+  easy: { name: 'Easy', dmg: 0.6, mobs: 0.7, hunger: 0.8, regen: 2, starve: 10 },
   normal: { name: 'Normal', dmg: 1, mobs: 1, hunger: 1, regen: 2.5, starve: 2 },
   hard: { name: 'Hard', dmg: 1.5, mobs: 1.5, hunger: 1.3, regen: 3.5, starve: 1 },
   extreme: { name: 'Extreme', dmg: 2, mobs: 2, hunger: 1.6, regen: 5, starve: 0 },
@@ -3155,11 +3339,11 @@ function frame(now) {
   const running = active || G.state === 'inventory' || G.state === 'trade' || G.state === 'sign';
   if (running) G.tickFurnaces(dt);
   if (running) {
-    G.time = (G.time + dt / DAY_LENGTH) % 1;
+    if (G.rule('doDaylightCycle')) G.time = (G.time + dt / DAY_LENGTH) % 1;
     // look
     if (active) {
       const sens = 0.0024 * Input.sens;
-      P.yaw -= Input.lookDX * sens; P.pitch -= Input.lookDY * sens;
+      P.yaw -= Input.lookDX * sens; P.pitch -= Input.lookDY * sens * (G.opt.invert ? -1 : 1);
       P.pitch = clamp(P.pitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01);
       G.ui.readMovement();
     }
@@ -3232,7 +3416,7 @@ function frame(now) {
     G.plateT = (G.plateT || 0) - dt;
     if (G.plateT <= 0) { G.plateT = 0.1; G.tickPlates(); G.tickRedstone(); }
     G.spawnT -= dt;
-    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.tickCrops(); G.tickGrass(); G.tickSigns(); G.tickFires(); G.beaconT = (G.beaconT || 0) + 1; if (G.beaconT % 2 === 0) G.tickBeacons(); }
+    if (G.spawnT <= 0) { G.spawnT = 1; spawnTick(); G.cropAcc = (G.cropAcc || 0) + G.rule('randomTickSpeed') / 3; while (G.cropAcc >= 1 && G.cropAcc < 60) { G.cropAcc--; G.tickCrops(); } if (G.cropAcc >= 60) G.cropAcc = 0; G.tickGrass(); G.tickSigns(); G.tickFires(); G.beaconT = (G.beaconT || 0) + 1; if (G.beaconT % 2 === 0) G.tickBeacons(); }
     // no dragons outside the End
     if (G.dim !== 'end') for (const d of G.dragons) if (!d.done && !d.remoteCtl) d.remove();
     if (Date.now() - (G.fixAt || 0) > 3000) { G.fixAt = Date.now(); G.applyFixes(); }
@@ -3273,7 +3457,7 @@ function frame(now) {
   const eye = P.eyePos();
   const hs = Math.hypot(P.vel.x, P.vel.z);
   G.bob = (G.bob || 0) + (P.onGround ? hs * dt * 1.6 : 0);
-  const bobAmt = P.onGround && !P.flying ? Math.min(1, hs / 4.3) * 0.05 : 0;
+  const bobAmt = P.onGround && !P.flying && G.opt.bobbing ? Math.min(1, hs / 4.3) * 0.05 : 0;
   G.shake = Math.max(0, G.shake - dt * 1.5);
   const sh = G.shake * 0.35;
   G.camera.position.set(eye.x + (Math.random() - 0.5) * sh, eye.y + Math.abs(Math.sin(G.bob * 2)) * bobAmt + (Math.random() - 0.5) * sh, eye.z + (Math.random() - 0.5) * sh);
@@ -3297,7 +3481,7 @@ function frame(now) {
   }
   const heldK = P.heldDef && P.heldDef() ? P.heldDef().key : '';
   if (G.zoom && heldK !== 'spyglass') G.zoom = false;
-  const fov = G.zoom ? 16 : 75 + (P.sprinting ? 8 : 0) + (P.flying && hs > 8 ? 6 : 0);
+  const fov = G.zoom ? 16 : G.opt.fov + (P.sprinting ? 8 : 0) + (P.flying && hs > 8 ? 6 : 0);
   G.tickHeldHud(heldK, dt);
   if (Math.abs(G.camera.fov - fov) > 0.1) { G.camera.fov += (fov - G.camera.fov) * Math.min(1, dt * 8); G.camera.updateProjectionMatrix(); }
 
@@ -3354,6 +3538,7 @@ function boot() {
   migrateOldSave();
   recoverWorlds();
   G.cloudInit = Cloud.init();
+  G.applyOptions();
   const recent = G.worldList()[0];
   G.bootRecent = !!recent;
   refreshContinue();

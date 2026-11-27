@@ -83,7 +83,9 @@ class Player {
   }
 
   hurt(amount, from, kb = 6, force = false, cause = '') {
-    if (this.dead || this.mode === 'creative') return;
+    if (this.dead || this.mode === 'creative' || this.mode === 'spectator') return;
+    // game rules can switch off kinds of hurt
+    if ((!G.rule('fallDamage') && /fell|fall/i.test(cause || '')) || (!G.rule('fireDamage') && /fire|lava|burn|flame|magma/i.test(cause || '')) || (!G.rule('drowningDamage') && /drown/i.test(cause || '')) || (!G.rule('freezeDamage') && /froze|freez/i.test(cause || ''))) return;
     if (!(amount >= 1)) return; // nothing to lose: no hurt, no message
     if (this.fireProof(cause)) return;
     if (this.hurtCd > 0 && !force) return;
@@ -148,13 +150,14 @@ class Player {
     }
     if (this.riding) this.dismount();
     this.health = 0; this.dead = true; this.effects = {};
-    if (G.keepInventory) { G.ui.showDeath(); return; } // keep inventory: items and XP stay with you
+    if (G.keepInventory) { if (G.rule('doImmediateRespawn') && !G.hardcore) { G.respawnPlayer(); return; } G.ui.showDeath(); return; } // keep inventory: items and XP stay with you
     for (let i = 0; i < 40; i++) {
       const s = this.inv.slots[i];
       if (s) G.spawnDrop(s.id, s.count, this.pos.x, this.pos.y + 1, this.pos.z, new THREE.Vector3((Math.random() - 0.5) * 6, 4, (Math.random() - 0.5) * 6), slotExtras(s));
     }
     this.inv.slots.fill(null); this.inv.changed();
     this.xp = 0; this.level = 0;
+    if (G.rule('doImmediateRespawn') && !G.hardcore) { G.respawnPlayer(); return; }
     G.ui.showDeath();
   }
 
@@ -177,8 +180,9 @@ class Player {
     const W = G.world;
     this.hurtCd -= dt; this.attackCd -= dt; this.useCd -= dt; this.breakCd -= dt;
     this.swing = Math.max(0, this.swing - dt * 3.5);
-    const creative = this.mode === 'creative';
+    const spectator = this.mode === 'spectator', creative = this.mode === 'creative' || spectator;
     if (!creative) this.flying = false;
+    if (spectator) this.flying = true;
     if (this.riding) {
       const h = this.riding;
       if (h.dead || h.removed || input.sneak) { this.dismount(); return; }
@@ -281,7 +285,8 @@ class Player {
       if (!W.collides(nx, this.pos.y - 0.6, this.pos.z, this.w, 0.55)) this.vel.x = 0;
       if (!W.collides(this.pos.x, this.pos.y - 0.6, nz, this.w, 0.55)) this.vel.z = 0;
     }
-    W.moveBody(this, dt);
+    if (this.mode === 'spectator') { this.pos.addScaledVector(this.vel, dt); this.onGround = false; } // a spectator flies through everything
+    else W.moveBody(this, dt);
     if (this.flying && this.onGround && !input.jump) this.flying = false;
 
     // fall damage
@@ -357,7 +362,7 @@ class Player {
     this.hungerDrain(dt * (this.sprinting ? 1 / 25 : moving ? 1 / 100 : 1 / 200)); // walking: a full bar lasts about 40 minutes
     const D = G.diff();
     if (D.mobs === 0 && this.hunger < 20) this.hunger = Math.min(20, this.hunger + dt / 3); // peaceful: never hungry for long
-    if ((this.hunger >= 17 || D.mobs === 0) && this.health < 20) {
+    if ((this.hunger >= 17 || D.mobs === 0) && this.health < 20 && G.rule('naturalRegeneration')) {
       this.regenT += dt;
       if (this.regenT > D.regen) { this.regenT = 0; this.health = Math.min(20, this.health + 1); this.hungerDrain(0.25); }
     } else this.regenT = 0;
@@ -485,7 +490,7 @@ class Player {
     if (this.mode === 'survival') {
       if (this.canHarvest(def)) {
         const fortune = def.xp && def.drop !== undefined ? enchLv(this.heldSlot(), 'fortune') : 0; // ores give more with Fortune
-        for (const [did, n] of getDrops(def, Math.random)) G.spawnDrop(did, n * (fortune ? 1 + Math.max(0, (Math.random() * (fortune + 2) | 0) - 1) : 1), x + 0.5, y + 0.3, z + 0.5);
+        if (G.rule('doTileDrops')) for (const [did, n] of getDrops(def, Math.random)) G.spawnDrop(did, n * (fortune ? 1 + Math.max(0, (Math.random() * (fortune + 2) | 0) - 1) : 1), x + 0.5, y + 0.3, z + 0.5);
         if (def.xp && def.drop !== undefined) this.addXp(def.xp);
       }
       this.hungerDrain(0.005);
@@ -537,6 +542,8 @@ class Player {
 
   /* left button held */
   primary(dt, pressed, tgt) {
+    if (this.mode === 'spectator') { this.breaking = null; return; }
+    if (this.adventure && !tgt.mob) { this.breaking = null; return; } // adventure: you can't break blocks
     const creative = this.mode === 'creative';
     if (tgt.mob) {
       this.breaking = null;
@@ -867,7 +874,7 @@ class Player {
   }
 
   use(tgt) {
-    if (this.useCd > 0) return;
+    if (this.useCd > 0 || this.mode === 'spectator') return;
     const W = G.world, held = this.heldSlot(), hd = held ? DEFS[held.id] : null;
     const b = tgt.block;
     // one tap on fire puts it out
@@ -1066,6 +1073,7 @@ class Player {
       return;
     }
     if (!hd.isBlock || !b) return;
+    if (this.adventure) { G.ui.message('Adventure mode: you can use things, but not place or break blocks.'); this.useCd = 0.5; return; }
     let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
     if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
     if (py >= WH) { G.ui.message('Height limit for building is ' + WH + ' blocks. You can\'t build any higher!'); this.useCd = 0.5; return; }
