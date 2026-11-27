@@ -335,12 +335,14 @@ const UI = {
   renderFurnace() {
     const f = this.furnace;
     if (!f) return;
-    if (DEFS[G.world.getBlock(f.x, f.y, f.z)].base !== 'furnace') { this.closeInventory(); return; }
+    const fd = DEFS[G.world.getBlock(f.x, f.y, f.z)];
+    if (!isFurnace(fd)) { this.closeInventory(); return; }
+    if ($('f-title').textContent !== FURNACE_KINDS[fd.base]) $('f-title').textContent = FURNACE_KINDS[fd.base];
     for (let k = 0; k < 3; k++) { this.fillSlot(this.invSlots[200 + k], f.slots[k]); this.invSlots[200 + k].classList.toggle('empty', !f.slots[k]); }
     $('f-flame').style.height = (f.burnMax ? Math.round(100 * f.burn / f.burnMax) : 0) + '%';
     $('f-arrow').style.width = Math.round(100 * f.cook / SMELT_TIME) + '%';
     const st = !f.slots[0] ? (f.burn > 0 ? 'Fire saved for later: put something to smelt on top' : 'Put something to smelt on top')
-      : !SMELT[f.slots[0].id] ? 'That can\'t be smelted' : f.burn > 0 ? 'Smelting...' : !f.slots[1] ? 'Add fuel below (coal, wood or planks)' : '';
+      : !SMELT[f.slots[0].id] ? 'That can\'t be smelted' : !furnaceTakes(fd.base, f.slots[0].id) ? (fd.base === 'smoker' ? 'A smoker only cooks food' : 'A blast furnace only smelts ores and metal') : f.burn > 0 ? 'Smelting...' : !f.slots[1] ? 'Add fuel below (coal, wood or planks)' : '';
     if ($('f-status').textContent !== st) $('f-status').textContent = st;
   },
 

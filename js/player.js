@@ -513,7 +513,7 @@ class Player {
     // stone in the mountains sometimes hides a silverfish
     if ((id === ID.stone || id === ID.deepslate) && this.mode === 'survival' && G.dim === 'overworld' && Math.random() < (G.world.biomeAt(x, z, G.world.heightAt(x, z)) === BIOME.MOUNTAIN ? 0.03 : 0.004)) spawnMob('silverfish', x + 0.5, y, z + 0.5);
     if (def.shulker) { G.shulkerId = id; G.breakShulker(x, y, z); }
-    if (DEFS[id].base === 'furnace') G.breakFurnace(x, y, z);
+    if (isFurnace(DEFS[id])) G.breakFurnace(x, y, z);
     if (DEFS[id].sign) G.setSign(x, y, z, null);
     if (def.lever || def.button || def.plate) G.switchGone(x, y, z, def);
     if (DEFS[id].door) {
@@ -982,7 +982,7 @@ class Player {
       if (b.id === ID.chest_loot || b.id === ID.chest) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
       if (DEFS[b.id].shulker) { this.useCd = 0.5; this.swing = 1; G.openShulker(b.x, b.y, b.z); return; }
       if (b.id === ID.ender_chest) { this.useCd = 0.5; this.swing = 1; G.openEnderChest(b.x, b.y, b.z); return; }
-      if (DEFS[b.id].base === 'furnace') { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
+      if (isFurnace(DEFS[b.id])) { this.useCd = 0.4; G.openFurnace(b.x, b.y, b.z); return; }
       if (DEFS[b.id].beacon) { this.useCd = 0.4; G.ui.openBeacon(b.x, b.y, b.z); return; }
       if (DEFS[b.id].lever || DEFS[b.id].button || DEFS[b.id].repeater) { this.useCd = 0.3; this.swing = 1; G.useSwitch(b.x, b.y, b.z); return; }
       if (DEFS[b.id].door && DEFS[b.id].door.wood === 'iron') { this.useCd = 0.4; G.ui.message('An iron door only opens with a button, a lever or a pressure plate.'); return; }

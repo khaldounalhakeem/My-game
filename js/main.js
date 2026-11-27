@@ -1926,8 +1926,17 @@ G.furnaceChanged = (k, byHand) => {
   if (!byHand || !Net.inShared() || Net.isHost()) G.furnVer[k] = (G.furnVer[k] || 0) + 1;
   Net.furnaceChanged(k, byHand);
 };
-function furnaceCanSmelt(f) {
-  const [inp, , out] = f.slots, r = inp && SMELT[inp.id];
+/* a smoker cooks only food and a blast furnace smelts only ores and metal, both twice as fast, like Minecraft */
+const FURNACE_KINDS = { furnace: 'Furnace', smoker: 'Smoker', blast_furnace: 'Blast Furnace' };
+const isFurnace = d => !!(d && FURNACE_KINDS[d.base]);
+function furnaceTakes(kind, id) {
+  const r = SMELT[id];
+  if (!r) return false;
+  const food = !!(DEFS[r[0]] && DEFS[r[0]].food);
+  return kind === 'smoker' ? food : kind === 'blast_furnace' ? !food && /ore|raw_|iron|gold|copper|debris|_pickaxe|_sword|_axe|_shovel|_hoe|_helmet|_chestplate|_leggings|_boots/.test(DEFS[id].key) : true;
+}
+function furnaceCanSmelt(f, kind) {
+  const [inp, , out] = f.slots, r = inp && furnaceTakes(kind || 'furnace', inp.id) && SMELT[inp.id];
   return !!r && (!out || (out.id === r[0] && out.count + r[1] <= DEFS[out.id].stack));
 }
 /* furnaces keep working while you do other things, as long as they are in the loaded world */
@@ -1943,8 +1952,9 @@ G.tickFurnaces = (dt) => {
     const f = G.furnaces[k];
     const [x, y, z] = k.slice(pre.length).split(',').map(Number);
     if (!G.world.isLoaded(x, z)) continue;
-    if (DEFS[G.world.getBlock(x, y, z)].base !== 'furnace') { delete G.furnaces[k]; continue; }
-    const can = furnaceCanSmelt(f);
+    const fd = DEFS[G.world.getBlock(x, y, z)];
+    if (!isFurnace(fd)) { delete G.furnaces[k]; continue; }
+    const can = furnaceCanSmelt(f, fd.base), speed = fd.base === 'furnace' ? 1 : 2;
     if (f.burn <= 0 && can && f.slots[1] && FUEL[f.slots[1].id]) {
       G.furnaceChanged(k);
       f.burn = f.burnMax = FUEL[f.slots[1].id];
@@ -1953,9 +1963,9 @@ G.tickFurnaces = (dt) => {
     }
     // the fire only burns while something is smelting: with nothing left to smelt it waits, so no fuel is wasted
     if (f.burn > 0 && can) {
-      f.burn = Math.max(0, f.burn - dt);
+      f.burn = Math.max(0, f.burn - dt * speed);
       {
-        f.cook += dt;
+        f.cook += dt * speed;
         if (f.cook >= SMELT_TIME) {
           f.cook = 0;
           const [outId, n, xp] = SMELT[f.slots[0].id];
