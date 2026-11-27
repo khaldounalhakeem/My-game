@@ -497,7 +497,7 @@ const UI = {
     for (const d of DEFS) {
       if (!d || d.id === 0 || d.liquid || d.portal || d.key === 'bed_head' || d.bedPart || d.door || d.trapdoor || d.stair || d.slab || d.ladder || d.gate || d.sign || d.key === 'wheat_sprout') continue;
       // the other versions of a block (switched on, turned, ...) only appear in the world
-      if (d.lever || d.button || d.plate || d.wire || d.rsTorch || d.repeater || (d.lamp && d.lamp.on) || (d.base && d.facing !== 's') || (d.beacon && d.beacon.effect)) continue;
+      if (d.hide || d.lever || d.button || d.plate || d.wire || d.rsTorch || d.repeater || (d.lamp && d.lamp.on) || (d.base && d.facing !== 's') || (d.beacon && d.beacon.effect)) continue;
       if (q ? !d.name.toLowerCase().includes(q) : (this.tab === 'blocks') !== d.isBlock) continue;
       ids.push(d.id);
     }
@@ -523,6 +523,7 @@ const UI = {
 
   stationRecipes() {
     const st = this.station;
+    if (st === 'brewing' || st === 'stonecutter') return RECIPES.filter(r => r[3] === st);
     return RECIPES.filter(r => (st === 'furnace' ? r[3] === 'furnace' : (!r[3] || (r[3] === 'table' && st === 'table'))));
   },
 
@@ -549,9 +550,11 @@ const UI = {
   },
 
   renderRecipes() {
-    const title = { table: 'Crafting Table', furnace: 'Furnace' }[this.station] || 'Crafting';
+    const title = { table: 'Crafting Table', furnace: 'Furnace', brewing: 'Brewing Stand', stonecutter: 'Stonecutter' }[this.station] || 'Crafting';
     $('craft-title').textContent = title;
     $('craft-hint').textContent = this.station === 'furnace' ? 'Put what you want to smelt in the top slot and fuel in the bottom slot. Each item takes 6 seconds. Coal smelts 5 items, wood or planks 1 and a half, a stick half of one.'
+      : this.station === 'brewing' ? 'Fill glass bottles with water, add Nether Wart for an Awkward Potion, then add something special. Add gunpowder to make a splash potion you can throw.'
+      : this.station === 'stonecutter' ? 'One block makes stairs, a wall, or two slabs. Nothing is wasted.'
       : this.station === 'table' ? 'Every recipe is available here.' : 'Place a Crafting Table and ' + (Input.touch ? 'tap' : 'right-click') + ' it for tools, weapons and more.';
     const list = $('recipes');
     // searching shows every recipe whose result matches, wherever it's made, and what it needs
@@ -585,7 +588,7 @@ const UI = {
       let extra = '';
       if (q) {
         const needs = Object.keys(r[2]).map(k => r[2][k] + ' ' + (GROUPS[k] ? 'any ' + k.slice(1) : nameOf(k))).join(', ');
-        const where = r[3] === 'furnace' ? 'Smelt it in a Furnace' : r[3] === 'table' ? 'Make it at a Crafting Table' : 'Make it anywhere (in your inventory)';
+        const where = r[3] === 'furnace' ? 'Smelt it in a Furnace' : r[3] === 'table' ? 'Make it at a Crafting Table' : r[3] === 'brewing' ? 'Brew it at a Brewing Stand' : r[3] === 'stonecutter' ? 'Cut it at a Stonecutter' : 'Make it anywhere (in your inventory)';
         extra = `<small class="rhow">${where}. Needs ${needs}.</small>`;
       }
       row.innerHTML = `<span class="out"><img alt="" src="${iconURL(outId)}">${r[1] > 1 ? '<b>' + r[1] + '</b>' : ''}</span><span class="rname">${DEFS[outId].name}${extra}</span><span class="ins">${ins}</span>`;

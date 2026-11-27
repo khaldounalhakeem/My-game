@@ -935,6 +935,66 @@ makeTile('i_snow_layer', pPlant(P => { P.rect(1, 12, 14, 3, 0xf2f6fa); P.rect(1,
 makeTile('i_sea_pickle', pPlant(P => { P.rect(6, 6, 4, 9, 0x6a8a2a); P.rect(7, 4, 2, 2, 0xc8ff8a); }));
 makeTile('i_vine', P => { P.clear(); for (let i = 0; i < 5; i++) { const x = 2 + i * 3; P.line(x, 1, x + 1, 14, 0x3a7a1e); } P.speck(0x4a9a2a, 0.12, 10); });
 
+/* ---------- machines and working blocks ---------- */
+makeTile('barrel_side', P => { pPlanks(0x8a6438)(P); P.rect(0, 2, 16, 1, 0x4a4a4a); P.rect(0, 13, 16, 1, 0x4a4a4a); });
+makeTile('barrel_top', P => { P.fill(0x8a6438, 8); P.rect(0, 0, 16, 1, 0x4a4a4a); P.rect(0, 15, 16, 1, 0x4a4a4a); P.rect(0, 0, 1, 16, 0x4a4a4a); P.rect(15, 0, 1, 16, 0x4a4a4a); P.rect(6, 6, 4, 4, 0x3a2410); });
+makeTile('stonecutter_top', P => { pSmooth(P); P.rect(1, 7, 14, 2, 0x5a5a5a); P.disc(8, 8, 3, 0xd8d8d8); P.disc(8, 8, 1, 0x8a8a8a); });
+makeTile('stonecutter_side', P => { pSmooth(P); P.rect(0, 0, 16, 7, 0, 0); P.clear(); P.rect(0, 7, 16, 9, 0x8c8c8c, 5); P.rect(3, 2, 10, 5, 0xd8d8d8); P.rect(4, 3, 8, 3, 0xb0b0b0); });
+makeTile('cauldron_side', P => { P.fill(0x3a3a3e, 6); P.rect(0, 0, 16, 2, 0x4a4a50); P.rect(3, 13, 3, 3, 0x2a2a2e); P.rect(10, 13, 3, 3, 0x2a2a2e); });
+for (const [k, c] of [['empty', 0x1a1a1e], ['water', 0x2f62d4], ['lava', 0xcf4f12]]) makeTile('cauldron_top_' + k, P => { P.fill(0x3a3a3e, 6); P.rect(2, 2, 12, 12, c, k === 'empty' ? 2 : 12); });
+makeTile('brewing_stand', pPlant(P => { P.rect(7, 2, 2, 12, 0xd8c070); P.rect(2, 13, 12, 3, 0x6a6a6a); for (const x of [2, 12]) { P.rect(x, 7, 2, 5, 0xd8ecf8); P.rect(x, 9, 2, 3, 0xc84a8a); } P.rect(6, 1, 4, 2, 0xb8a050); }));
+makeTile('jukebox_side', P => { pPlanks(0x7a4a2a)(P); P.rect(0, 0, 16, 2, 0x5a3418); P.rect(0, 14, 16, 2, 0x5a3418); });
+makeTile('jukebox_top', P => { P.fill(0x7a4a2a, 6); P.rect(2, 7, 12, 2, 0x1a1a1a); });
+makeTile('note_block', P => { pPlanks(0x7a4a2a)(P); P.rect(4, 4, 8, 8, 0x5a3418); P.rect(6, 5, 2, 6, 0x1a1a1a); P.rect(7, 5, 3, 2, 0x1a1a1a); P.disc(6, 11, 1.5, 0x1a1a1a); });
+makeTile('hopper_side', P => { P.fill(0x4a4a50, 6); P.rect(0, 0, 16, 3, 0x5a5a60); P.rect(3, 3, 10, 6, 0x3a3a40); P.rect(6, 9, 4, 7, 0x3a3a40); });
+makeTile('hopper_top', P => { P.fill(0x4a4a50, 6); P.rect(2, 2, 12, 12, 0x1a1a1e); P.rect(6, 6, 4, 4, 0x3a3a40); });
+makeTile('dispenser_front', P => { pSmooth(P); P.disc(8, 8, 3.5, 0x1a1a1a); P.disc(8, 8, 1.6, 0x4a4a4a); });
+makeTile('dropper_front', P => { pSmooth(P); P.rect(5, 5, 6, 6, 0x1a1a1a); P.rect(7, 7, 2, 2, 0x3a3a3a); });
+makeTile('piston_top', P => { pPlanks(0xa8834f)(P); P.rect(0, 0, 16, 2, 0x8a8a8a); P.rect(0, 14, 16, 2, 0x8a8a8a); P.rect(0, 0, 2, 16, 0x8a8a8a); P.rect(14, 0, 2, 16, 0x8a8a8a); });
+makeTile('piston_top_sticky', P => { pPlanks(0xa8834f)(P); P.rect(0, 0, 16, 2, 0x8a8a8a); P.rect(0, 14, 16, 2, 0x8a8a8a); P.rect(0, 0, 2, 16, 0x8a8a8a); P.rect(14, 0, 2, 16, 0x8a8a8a); P.rect(3, 3, 10, 10, 0x6ac84a, 10); });
+makeTile('piston_side', P => { P.fill(0x7a7a7a, 8); P.rect(0, 0, 16, 4, 0xa8834f, 6); P.rect(0, 4, 16, 1, 0x5a5a5a); P.rect(6, 5, 4, 11, 0x6a6a6a); });
+makeTile('piston_bottom', P => { P.fill(0x7a7a7a, 8); P.rect(2, 2, 12, 12, 0x6a6a6a); });
+makeTile('piston_inner', P => { P.fill(0x7a7a7a, 8); P.rect(5, 5, 6, 6, 0xc8a070); });
+makeTile('observer_face', P => { P.fill(0x5a5a5a, 6); P.rect(1, 4, 14, 3, 0x2a2a2a); P.rect(3, 9, 4, 3, 0x2a2a2a); P.rect(9, 9, 4, 3, 0x2a2a2a); });
+makeTile('observer_back', P => { P.fill(0x5a5a5a, 6); P.rect(6, 6, 4, 4, 0x3a1a1a); });
+makeTile('observer_back_on', P => { P.fill(0x5a5a5a, 6); P.rect(6, 6, 4, 4, 0xff2a1a); });
+makeTile('observer_side', P => { P.fill(0x5a5a5a, 6); P.rect(0, 7, 16, 2, 0x3a3a3a); P.rect(7, 0, 2, 16, 0x3a3a3a); });
+makeTile('daylight_top', P => { P.fill(0xc8c0a0, 6); for (let x = 0; x < 16; x += 4) for (let y = 0; y < 16; y += 4) P.rect(x + 1, y + 1, 2, 2, 0x5a6a8a); });
+makeTile('target_side', P => { P.fill(0xe8dcc8, 6); P.disc(8, 8, 7, 0xc82a2a); P.disc(8, 8, 5, 0xe8dcc8); P.disc(8, 8, 3, 0xc82a2a); P.disc(8, 8, 1.2, 0xe8dcc8); });
+makeTile('target_top', P => { P.fill(0xd8ccb0, 8); P.speck(0xa8a080, 0.2, 6); });
+makeTile('scaffolding_top', P => { P.clear(); P.rect(0, 0, 16, 2, 0xd8b870); P.rect(0, 14, 16, 2, 0xd8b870); P.rect(0, 0, 2, 16, 0xd8b870); P.rect(14, 0, 2, 16, 0xd8b870); P.line(1, 1, 14, 14, 0xc8a860); });
+makeTile('scaffolding_side', P => { P.clear(); P.rect(0, 0, 2, 16, 0xd8b870); P.rect(14, 0, 2, 16, 0xd8b870); P.rect(0, 0, 16, 2, 0xd8b870); P.line(2, 14, 13, 2, 0xc8a860); });
+makeTile('item_frame', P => { P.clear(); P.rect(0, 0, 16, 16, 0x8a5a2a); P.rect(2, 2, 12, 12, 0xc8a878); });
+makeTile('candle', P => { P.clear(); P.rect(6, 6, 4, 10, 0xe8e0c8); P.rect(7, 4, 2, 2, 0x3a3a3a); });
+makeTile('candle_lit', P => { P.clear(); P.rect(6, 6, 4, 10, 0xe8e0c8); P.rect(7, 4, 2, 2, 0x3a3a3a); P.rect(7, 1, 2, 3, 0xffc040); });
+makeTile('comparator_top', P => { P.fill(0xa8a8a8, 4); P.rect(3, 2, 2, 3, 0x5a0c0c); P.rect(11, 2, 2, 3, 0x5a0c0c); P.rect(7, 11, 2, 3, 0x5a0c0c); P.rect(2, 7, 12, 1, 0x7a1a14); });
+makeTile('comparator_top_on', P => { P.fill(0xa8a8a8, 4); P.rect(3, 2, 2, 3, 0xe81e10); P.rect(11, 2, 2, 3, 0xe81e10); P.rect(7, 11, 2, 3, 0xe81e10); P.rect(2, 7, 12, 1, 0xff4a2a); });
+makeTile('anchor_side', P => { P.fill(0x1a0a2a, 6); P.speck(0x3a1a5a, 0.2, 6); P.rect(0, 0, 16, 3, 0x2a2a30); });
+makeTile('anchor_top', P => { P.fill(0x2a2a30, 6); P.rect(3, 3, 10, 10, 0x1a0a2a); });
+makeTile('anchor_top_on', P => { P.fill(0x2a2a30, 6); P.rect(3, 3, 10, 10, 0xff9a2a); P.rect(5, 5, 6, 6, 0xffe060); });
+/* item pictures */
+makeTile('i_hopper', pPlant(P => { P.rect(1, 2, 14, 5, 0x4a4a50); P.rect(4, 7, 8, 4, 0x3a3a40); P.rect(6, 11, 4, 4, 0x3a3a40); P.rect(2, 3, 12, 2, 0x1a1a1e); }));
+makeTile('i_item_frame', P => { P.clear(); P.rect(1, 1, 14, 14, 0x8a5a2a); P.rect(3, 3, 10, 10, 0xc8a878); });
+makeTile('i_candle', P => { P.clear(); P.rect(6, 6, 4, 10, 0xe8e0c8); P.rect(7, 3, 2, 3, 0x3a3a3a); });
+makeTile('i_brewing_stand', pPlant(P => { P.rect(7, 2, 2, 12, 0xd8c070); P.rect(2, 13, 12, 3, 0x6a6a6a); P.rect(2, 8, 2, 4, 0xc84a8a); P.rect(12, 8, 2, 4, 0x4a8ac8); }));
+makeTile('i_comparator', pPlant(P => { P.rect(1, 9, 14, 6, 0xa8a8a8); P.rect(3, 6, 2, 3, 0xe81e10); P.rect(11, 6, 2, 3, 0xe81e10); P.rect(7, 7, 2, 2, 0xe81e10); }));
+makeTile('i_scaffolding', pPlant(P => { P.rect(2, 2, 12, 2, 0xd8b870); P.rect(2, 2, 2, 12, 0xd8b870); P.rect(12, 2, 2, 12, 0xd8b870); P.line(4, 13, 12, 4, 0xc8a860); }));
+for (const [k, c] of [['nether_wart', 0x9a1a2a], ['sugar', 0xf4f4f4], ['spider_eye', 0x8a1a2a], ['fermented_spider_eye', 0x6a3a4a], ['magma_cream', 0xe8902a], ['rabbit_foot', 0xc8a070]]) makeTile('i_' + k, pBlob(c, 4, shadeC(rgb(c), 1.3)));
+makeTile('i_glistering_melon', pPlant(P => { P.rect(3, 5, 10, 8, 0xd83a3a); P.rect(3, 12, 10, 2, 0x5aa83a); P.speck(0xf5cc2e, 0.25, 0); clipToDisc(P, 7); }));
+makeTile('i_golden_carrot', pPlant(P => { for (let i = 0; i < 9; i++) P.rect(4 + i, 12 - i, 3, 2, 0xf5cc2e); P.rect(12, 2, 2, 3, 0x5aa83a); }));
+for (const [k, c] of [['13', 0xd8c84a], ['cat', 0x5ad84a], ['blocks', 0xd85a3a], ['chirp', 0xc83a3a], ['far', 0x8ad84a], ['mall', 0x8a5ad8], ['stal', 0x3a3a3a], ['pigstep', 0xd88a3a]]) makeTile('i_disc_' + k, pPlant(P => { P.disc(8, 8, 7, 0x1a1a1a); P.disc(8, 8, 3, c); P.disc(8, 8, 1, 0x1a1a1a); P.line(4, 4, 6, 3, 0x3a3a3a); }));
+makeTile('i_compass', pPlant(P => { P.disc(8, 8, 6.5, 0x8a8a8a); P.disc(8, 8, 5, 0x3a3a3a); P.line(8, 8, 8, 4, 0xd82a2a); P.line(8, 8, 8, 12, 0xd8d8d8); }));
+makeTile('i_clock', pPlant(P => { P.disc(8, 8, 6.5, 0xf5cc2e); P.disc(8, 8, 5, 0x3a6ad8); for (let y = 8; y < 14; y++) for (let x = 3; x < 14; x++) if ((x - 8) * (x - 8) + (y - 8) * (y - 8) <= 25) P.put(x, y, 0x1a2a4a); P.disc(10, 6, 1.5, 0xffe060); }));
+makeTile('i_map', pPlant(P => { P.rect(2, 2, 12, 12, 0xe8dcb8); P.rect(4, 4, 4, 3, 0x5aa83a); P.rect(8, 7, 4, 4, 0x3a6ad8); P.rect(5, 9, 2, 3, 0x9a7a4a); }));
+makeTile('i_spyglass', pPlant(P => { for (let i = 0; i < 10; i++) { P.rect(3 + i, 12 - i, 2, 2, i < 3 ? 0xb48ae8 : 0xc87a4a); } }));
+const POTIONS = [['awkward', 'Awkward', 0x3a5ad8], ['speed', 'Swiftness', 0x7ac8f8], ['jump_boost', 'Leaping', 0x5af83a], ['strength', 'Strength', 0x9a2a2a], ['regeneration', 'Regeneration', 0xd85aa8],
+  ['fire_resistance', 'Fire Resistance', 0xe89a3a], ['healing', 'Healing', 0xf83a3a], ['night_vision', 'Night Vision', 0x2a3a9a], ['invisibility', 'Invisibility', 0x8a8aa8], ['poison', 'Poison', 0x4a8a2a],
+  ['weakness', 'Weakness', 0x4a4a5a], ['slow_falling', 'Slow Falling', 0xf0e8d8], ['water_breathing', 'Water Breathing', 0x2a6ad8], ['harming', 'Harming', 0x4a0a2a]];
+for (const [k, , c] of POTIONS) {
+  makeTile('i_potion_' + k, pPlant(P => { P.rect(7, 2, 2, 3, 0xc8e0f0); P.rect(4, 5, 8, 9, 0xd8ecf8); P.rect(5, 7, 6, 6, c); P.rect(6, 1, 4, 1, 0x8a6030); }));
+  if (k !== 'awkward') makeTile('i_splash_' + k, pPlant(P => { P.rect(7, 2, 2, 2, 0xc8e0f0); P.disc(8, 9, 5, 0xd8ecf8); P.disc(8, 9, 4, c); P.rect(6, 1, 4, 1, 0x8a6030); }));
+}
+
 /* the animations themselves */
 const waveRows = [[2, 3], [5, 9], [8, 1], [11, 6], [14, 11], [0, 12]];
 animTile('water', 16, 140, (P, f) => {
@@ -1470,6 +1530,40 @@ for (const [full, n] of NEW_SHAPES) {
 const WALLS = [['cobblestone', 'Cobblestone'], ['mossy_cobblestone', 'Mossy Cobblestone'], ['stone_bricks', 'Stone Brick'], ['mossy_stone_bricks', 'Mossy Stone Brick'], ['granite', 'Granite'], ['diorite', 'Diorite'], ['andesite', 'Andesite'], ['sandstone', 'Sandstone'], ['red_sandstone', 'Red Sandstone'], ['bricks', 'Brick'], ['cobbled_deepslate', 'Cobbled Deepslate'], ['deepslate_bricks', 'Deepslate Brick'], ['deepslate_tiles', 'Deepslate Tile'], ['blackstone', 'Blackstone'], ['polished_blackstone_bricks', 'Polished Blackstone Brick'], ['nether_bricks', 'Nether Brick'], ['red_nether_bricks', 'Red Nether Brick'], ['mud_bricks', 'Mud Brick'], ['end_stone_bricks', 'End Stone Brick'], ['prismarine', 'Prismarine'], ['tuff', 'Tuff'], ['tuff_bricks', 'Tuff Brick']];
 for (const [full, n] of WALLS) { const f = DEFS[ID[full]]; if (!f) continue; const d = block(full + '_wall', n + ' Wall', 'stone', { tool: 'pick', tier: 1, hardness: 2, opaque: false, fence: true, wall: true, iconTile: 'i_wall' }); d.faces = f.faces.slice(); d.color = f.color; }
 
+/* ================= machines and working blocks ================= */
+const FI6 = { e: 0, w: 1, u: 2, d: 3, s: 4, n: 5 }, OPP6 = { e: 'w', w: 'e', u: 'd', d: 'u', s: 'n', n: 's' };
+const DIR6 = { e: [1, 0, 0], w: [-1, 0, 0], u: [0, 1, 0], d: [0, -1, 0], s: [0, 0, 1], n: [0, 0, -1] };
+/* a box from 'a' to 'b' of the way along a direction (0 = the back, 1 = the front), across the whole face or thin like a rod */
+function boxAlong(dir, a, b, thin) {
+  const lo = thin ? 0.375 : 0, hi = thin ? 0.625 : 1, v = DIR6[dir], out = [lo, lo, lo, hi, hi, hi];
+  for (let i = 0; i < 3; i++) if (v[i]) { if (v[i] > 0) { out[i] = a; out[i + 3] = b; } else { out[i] = 1 - b; out[i + 3] = 1 - a; } }
+  return out;
+}
+const TILES_AVG_OF = k => TILE_AVG[TILES[k]];
+const faces6 = (dir, front, back, side) => { const f = [side, side, side, side, side, side]; f[FI6[dir]] = TILES[front]; f[FI6[OPP6[dir]]] = TILES[back]; return f; };
+block('barrel', 'Barrel', { top: 'barrel_top', side: 'barrel_side', bottom: 'barrel_top' }, { tool: 'axe', hardness: 2.5, container: true });
+block('stonecutter', 'Stonecutter', { top: 'stonecutter_top', side: 'stonecutter_side', bottom: 'furnace_top' }, PK(3.5, { opaque: false, box: [0, 0, 0, 1, 0.5625, 1], boxes: [[0, 0, 0, 1, 0.5625, 1]], station: 'stonecutter' }));
+for (const k of ['empty', 'water', 'lava']) block(k === 'empty' ? 'cauldron' : k + '_cauldron', k === 'lava' ? 'Lava Cauldron' : k === 'water' ? 'Water Cauldron' : 'Cauldron', { top: 'cauldron_top_' + k, side: 'cauldron_side', bottom: 'cauldron_side' }, PK(2, { cauldron: k, drop: 'cauldron', light: k === 'lava', emit: k === 'lava' ? 15 : undefined, hide: k !== 'empty' }));
+block('brewing_stand', 'Brewing Stand', 'brewing_stand', Object.assign({}, CROSS, { tool: 'pick', hardness: 0.5, station: 'brewing', light: true, emit: 1, iconTile: 'i_brewing_stand' }));
+block('jukebox', 'Jukebox', { top: 'jukebox_top', side: 'jukebox_side' }, { tool: 'axe', hardness: 2, jukebox: true });
+block('note_block', 'Note Block', 'note_block', { tool: 'axe', hardness: 0.8, machine: 'note' });
+for (const d of ['d', 'n', 's', 'e', 'w']) block('hopper' + (d === 'd' ? '' : '_' + d), 'Hopper', { top: 'hopper_top', side: 'hopper_side', bottom: 'hopper_side' }, PK(3, { opaque: false, boxes: [[0, 0.625, 0, 1, 1, 1], [0.25, 0.25, 0.25, 0.75, 0.625, 0.75], [0.375, 0, 0.375, 0.625, 0.25, 0.625]], hopper: d, hide: d !== 'd', drop: 'hopper', iconTile: 'i_hopper' }));
+for (const kind of ['dispenser', 'dropper']) for (const d of ['n', 's', 'e', 'w', 'u', 'd']) { const b = block(kind + '_' + d, kind[0].toUpperCase() + kind.slice(1), 'stone', PK(3.5, { container: true, machine: kind, facing6: d, drop: kind + '_s', hide: d !== 's', facePlace: kind })); b.faces = faces6(d, kind + '_front', 'furnace_top', TILES.furnace_side); b.color = DEFS[ID.furnace].color; }
+for (const sticky of [false, true]) for (const d of ['n', 's', 'e', 'w', 'u', 'd']) {
+  const kind = sticky ? 'sticky_piston' : 'piston', name = sticky ? 'Sticky Piston' : 'Piston', top = sticky ? 'piston_top_sticky' : 'piston_top';
+  let b = block(kind + '_' + d, name, 'stone', { tool: 'pick', hardness: 1.5, machine: 'piston', piston: { d, sticky, ext: false }, drop: kind + '_n', hide: d !== 'n', facePlace: kind }); b.faces = faces6(d, top, 'piston_bottom', TILES.piston_side); b.color = TILES_AVG_OF('piston_side');
+  b = block(kind + '_' + d + '_x', name, 'stone', { tool: 'pick', hardness: 1.5, opaque: false, machine: 'piston', piston: { d, sticky, ext: true }, boxes: [boxAlong(d, 0, 0.75)], drop: kind + '_n', hide: true, noPush: true }); b.faces = faces6(d, 'piston_inner', 'piston_bottom', TILES.piston_side); b.color = TILES_AVG_OF('piston_side');
+  b = block(kind + '_head_' + d, name + ' Head', 'stone', { tool: 'pick', hardness: 1.5, opaque: false, pistonHead: { d, sticky }, boxes: [boxAlong(d, 0.75, 1), boxAlong(d, 0, 0.75, true)], drop: null, hide: true, noPush: true }); b.faces = faces6(d, top, top, TILES.piston_side); b.color = TILES_AVG_OF('piston_side');
+}
+for (const d of ['n', 's', 'e', 'w', 'u', 'd']) for (const on of [0, 1]) { const b = block('observer_' + d + '_' + on, 'Observer', 'stone', PK(3, { observer: { d, on: !!on }, drop: 'observer_n_0', hide: !(d === 'n' && !on), facePlace: 'observer' })); b.faces = faces6(d, 'observer_face', on ? 'observer_back_on' : 'observer_back', TILES.observer_side); b.color = TILES_AVG_OF('observer_side'); }
+for (const on of [0, 1]) block('daylight_detector_' + on, 'Daylight Detector', { top: 'daylight_top', side: 'barrel_top', bottom: 'barrel_top' }, { tool: 'axe', hardness: 0.2, opaque: false, box: [0, 0, 0, 1, 0.375, 1], boxes: [[0, 0, 0, 1, 0.375, 1]], daylight: { on: !!on }, drop: 'daylight_detector_0', hide: !!on });
+for (const on of [0, 1]) block('target_' + on, 'Target', { top: 'target_top', side: 'target_side' }, { hardness: 0.5, target: { on: !!on }, drop: 'target_0', hide: !!on });
+for (const d of ['n', 's', 'w', 'e']) for (const on of [0, 1]) block('comparator_' + d + '_' + on, 'Redstone Comparator', { top: 'comparator_top' + (on ? '_on' : ''), side: 'stone', bottom: 'stone' }, { hardness: 0, solid: false, opaque: false, box: [0, 0, 0, 1, 0.125, 1], boxes: [[0, 0, 0, 1, 0.125, 1]], comparator: { dir: d, on: !!on }, drop: 'comparator', iconTile: 'i_comparator', hide: true });
+block('scaffolding', 'Scaffolding', { top: 'scaffolding_top', side: 'scaffolding_side' }, { hardness: 0, opaque: false, cutout: true, boxes: [[0, 0.875, 0, 1, 1, 1]], ladder: 'u', scaffold: true, iconTile: 'i_scaffolding' });
+for (const d of ['n', 's', 'w', 'e']) block('item_frame_' + d, 'Item Frame', 'item_frame', { hardness: 0.3, opaque: false, solid: false, box: { w: [0, 0.125, 0.125, 0.0625, 0.875, 0.875], e: [0.9375, 0.125, 0.125, 1, 0.875, 0.875], n: [0.125, 0.125, 0, 0.875, 0.875, 0.0625], s: [0.125, 0.125, 0.9375, 0.875, 0.875, 1] }[d], frame: d, drop: 'item_frame', iconTile: 'i_item_frame', hide: true });
+for (const lit of [0, 1]) block('candle' + (lit ? '_lit' : ''), 'Candle', lit ? 'candle_lit' : 'candle', { hardness: 0.1, opaque: false, cutout: true, solid: false, box: [0.375, 0, 0.375, 0.625, 0.5, 0.625], candle: !!lit, light: !!lit, emit: lit ? 6 : undefined, drop: 'candle', iconTile: 'i_candle', hide: !!lit });
+for (let c = 0; c <= 4; c++) block('respawn_anchor_' + c, 'Respawn Anchor', { top: c ? 'anchor_top_on' : 'anchor_top', side: 'anchor_side', bottom: 'anchor_top' }, PICK(4, 50, { anchor: c, light: c > 0, emit: c ? 3 + c * 3 : undefined, drop: 'respawn_anchor_0', hide: c > 0 }));
+
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
   const id = nextItemId++;
@@ -1647,6 +1741,7 @@ item('copper_ingot', 'Copper Ingot', 'copper_ingot');
 item('amethyst_shard', 'Amethyst Shard', 'amethyst_shard');
 item('prismarine_shard', 'Prismarine Shard', 'prismarine_shard');
 item('prismarine_crystals', 'Prismarine Crystals', 'prismarine_crystals');
+
 for (const [k, n, full] of NS) {
   const c = DEFS[ID[full]].color, hi = c.map(v => Math.min(255, v + 30)), lo = c.map(v => Math.round(v * 0.6));
   makeTile('i_' + k + '_slab', pPlant(P => { P.rect(1, 8, 14, 6, c); P.rect(1, 8, 14, 1, hi); P.rect(1, 13, 14, 1, lo); P.rect(1, 8, 1, 6, hi); P.rect(14, 8, 1, 6, lo); }));
@@ -1654,6 +1749,21 @@ for (const [k, n, full] of NS) {
   item(k + '_slab', n + ' Slab', k + '_slab', { placesSlab: k });
   item(k + '_stairs', n + ' Stairs', k + '_stairs', { placesStair: k });
 }
+
+/* the machines round's items */
+item('comparator', 'Redstone Comparator', 'comparator', { placesComparator: true });
+item('item_frame', 'Item Frame', 'item_frame', { placesLadder: 'item_frame' });
+for (const [k, n] of POTIONS) {
+  item('potion_' + k, 'Potion of ' + n, 'potion_' + k, { stack: 1, potion: k });
+  if (k !== 'awkward') item('splash_' + k, 'Splash Potion of ' + n, 'splash_' + k, { stack: 1, splash: k });
+}
+DEFS[ID.potion_awkward].name = 'Awkward Potion';
+for (const [k, n, extra] of [['nether_wart', 'Nether Wart'], ['sugar', 'Sugar'], ['spider_eye', 'Spider Eye', { food: 2 }], ['fermented_spider_eye', 'Fermented Spider Eye'], ['magma_cream', 'Magma Cream'], ['rabbit_foot', "Rabbit's Foot"], ['glistering_melon', 'Glistering Melon Slice'], ['golden_carrot', 'Golden Carrot', { food: 6 }]]) item(k, n, k, extra || {});
+for (const [k, n] of [['13', '13'], ['cat', 'cat'], ['blocks', 'blocks'], ['chirp', 'chirp'], ['far', 'far'], ['mall', 'mall'], ['stal', 'stal'], ['pigstep', 'Pigstep']]) item('disc_' + k, 'Music Disc (' + n + ')', 'disc_' + k, { stack: 1, disc: k });
+item('compass', 'Compass', 'compass', { stack: 1 });
+item('clock', 'Clock', 'clock', { stack: 1 });
+item('map', 'Map', 'map', { stack: 1 });
+item('spyglass', 'Spyglass', 'spyglass', { stack: 1 });
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
@@ -1904,6 +2014,28 @@ RECIPES.push(
   ]),
   ...NS.flatMap(([k, , full]) => [[k + '_slab', 6, { [full]: 3 }, 'table'], [k + '_stairs', 4, { [full]: 6 }, 'table']]),
   ...WALLS.filter(([f]) => ID[f]).map(([f]) => [f + '_wall', 6, { [f]: 6 }, 'table']),
+);
+
+/* the machines round's recipes */
+RECIPES.push(
+  ['barrel', 1, { '#planks': 7 }, 'table'], ['stonecutter', 1, { iron_ingot: 1, stone: 3 }, 'table'], ['cauldron', 1, { iron_ingot: 7 }, 'table'],
+  ['brewing_stand', 1, { blaze_rod: 1, cobblestone: 3 }, 'table'], ['jukebox', 1, { '#planks': 8, diamond: 1 }, 'table'], ['note_block', 1, { '#planks': 8, redstone: 1 }, 'table'],
+  ['hopper', 1, { iron_ingot: 5, chest: 1 }, 'table'], ['dispenser_s', 1, { cobblestone: 7, bow: 1, redstone: 1 }, 'table'], ['dropper_s', 1, { cobblestone: 7, redstone: 1 }, 'table'],
+  ['piston_n', 1, { '#planks': 3, cobblestone: 4, iron_ingot: 1, redstone: 1 }, 'table'], ['sticky_piston_n', 1, { piston_n: 1, slime_ball: 1 }], ['observer_n_0', 1, { cobblestone: 6, redstone: 2, quartz: 1 }, 'table'],
+  ['daylight_detector_0', 1, { glass: 3, quartz: 3, '#planks': 3 }, 'table'], ['target_0', 1, { redstone: 4, hay_bale: 1 }, 'table'], ['comparator', 1, { redstone_torch: 3, quartz: 1, stone: 3 }, 'table'],
+  ['scaffolding', 6, { bamboo: 6, string: 1 }, 'table'], ['item_frame', 1, { stick: 8, leather: 1 }, 'table'], ['candle', 1, { string: 1, honeycomb: 1 }], ['respawn_anchor_0', 1, { crying_obsidian: 6, glowstone: 3 }, 'table'],
+  ['compass', 1, { iron_ingot: 4, redstone: 1 }, 'table'], ['clock', 1, { gold_ingot: 4, redstone: 1 }, 'table'], ['map', 1, { paper: 8, compass: 1 }, 'table'], ['spyglass', 1, { copper_ingot: 2, amethyst_shard: 1 }, 'table'],
+  ['sugar', 1, { sugar_cane: 1 }], ['fermented_spider_eye', 1, { spider_eye: 1, sugar: 1, brown_mushroom: 1 }], ['magma_cream', 1, { slime_ball: 1, blaze_powder: 1 }],
+  ['glistering_melon', 1, { melon_slice: 1, gold_ingot: 1 }, 'table'], ['golden_carrot', 1, { carrot: 1, gold_ingot: 1 }, 'table'],
+  // brewing (at a brewing stand)
+  ['potion_awkward', 1, { water_bottle: 1, nether_wart: 1 }, 'brewing'],
+  ...[['speed', 'sugar'], ['jump_boost', 'rabbit_foot'], ['strength', 'blaze_powder'], ['regeneration', 'ghast_tear'], ['fire_resistance', 'magma_cream'], ['healing', 'glistering_melon'], ['night_vision', 'golden_carrot'], ['poison', 'spider_eye'], ['slow_falling', 'phantom_membrane'], ['water_breathing', 'turtle_scute']].map(([k, ing]) => ['potion_' + k, 1, { potion_awkward: 1, [ing]: 1 }, 'brewing']),
+  ['potion_invisibility', 1, { potion_night_vision: 1, fermented_spider_eye: 1 }, 'brewing'], ['potion_weakness', 1, { water_bottle: 1, fermented_spider_eye: 1 }, 'brewing'], ['potion_harming', 1, { potion_poison: 1, fermented_spider_eye: 1 }, 'brewing'],
+  ...POTIONS.filter(([k]) => k !== 'awkward').map(([k]) => ['splash_' + k, 1, { ['potion_' + k]: 1, gunpowder: 1 }, 'brewing']),
+  // the stonecutter: one block in, stairs, slabs or walls out (no waste)
+  ...NS.filter(([k, , full]) => DEFS[ID[full]].tool === 'pick').flatMap(([k, , full]) => [[k + '_slab', 2, { [full]: 1 }, 'stonecutter'], [k + '_stairs', 1, { [full]: 1 }, 'stonecutter']]),
+  ...WALLS.filter(([f]) => ID[f]).map(([f]) => [f + '_wall', 1, { [f]: 1 }, 'stonecutter']),
+  ...[['polished_granite', 'granite'], ['polished_diorite', 'diorite'], ['polished_andesite', 'andesite'], ['polished_tuff', 'tuff'], ['tuff_bricks', 'tuff'], ['polished_deepslate', 'cobbled_deepslate'], ['deepslate_bricks', 'cobbled_deepslate'], ['deepslate_tiles', 'cobbled_deepslate'], ['stone_bricks', 'stone'], ['chiseled_stone_bricks', 'stone'], ['polished_blackstone', 'blackstone'], ['polished_blackstone_bricks', 'blackstone'], ['cut_sandstone', 'sandstone'], ['chiseled_sandstone', 'sandstone'], ['end_stone_bricks', 'end_stone'], ['quartz_bricks', 'quartz_block'], ['chiseled_quartz', 'quartz_block'], ['quartz_pillar', 'quartz_block'], ['cut_copper', 'copper_block']].map(([o, i]) => [o, 1, { [i]: 1 }, 'stonecutter']),
 );
 
 /* ---------- inventory icons ---------- */

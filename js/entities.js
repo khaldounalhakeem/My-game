@@ -200,7 +200,7 @@ const MOB_TYPES = {
   zombie: { name: 'Zombie', hp: 20, w: 0.6, h: 1.95, speed: 2.3, hostile: true, dmg: 3, burns: true, xp: 5, drops: [['rotten_flesh', 0, 2]] },
   skeleton: { name: 'Skeleton', hp: 20, w: 0.6, h: 1.95, speed: 2.4, hostile: true, ranged: true, dmg: 3, burns: true, xp: 5, drops: [['bone', 0, 2], ['arrow', 0, 2]] },
   creeper: { name: 'Creeper', hp: 20, w: 0.6, h: 1.7, speed: 2.5, hostile: true, explode: true, xp: 5, drops: [['gunpowder', 0, 2]] },
-  spider: { name: 'Spider', hp: 16, w: 1.3, h: 0.9, speed: 3.3, hostile: true, dmg: 2, xp: 5, nightOnly: true, drops: [['string', 0, 2]] },
+  spider: { name: 'Spider', hp: 16, w: 1.3, h: 0.9, speed: 3.3, hostile: true, dmg: 2, xp: 5, nightOnly: true, drops: [['string', 0, 2], ['spider_eye', 0, 1]] },
   enderman: { name: 'Enderman', hp: 40, w: 0.6, h: 2.9, speed: 3.6, neutral: true, dmg: 6, xp: 5, drops: [['ender_pearl', 0, 1]] },
   zombified_piglin: { name: 'Zombified Piglin', hp: 20, w: 0.6, h: 1.95, speed: 2.7, neutral: true, dmg: 5, xp: 5, fireproof: true, drops: [['rotten_flesh', 0, 1], ['gold_ingot', 0, 1]] },
   wither_skeleton: { name: 'Wither Skeleton', hp: 20, w: 0.7, h: 2.35, speed: 2.7, hostile: true, dmg: 6, xp: 5, fireproof: true, drops: [['coal', 0, 1], ['bone', 0, 2]] },
@@ -231,7 +231,7 @@ const MORE_MOBS = {
     M: { body: [0.42, 0.4, 0.6], by: 0.3, col: 0xf0c020, legs: 0, head: [0.3, 0.3, 0.2], hy: 0.32, hz: 0.38, x: [[0.44, 0.1, 0.62, 0x2a2a1a, 0, 0.32, -0.05], [0.44, 0.1, 0.62, 0x2a2a1a, 0, 0.32, 0.12], [0.3, 0.02, 0.25, 0xd8f0ff, -0.18, 0.52, 0], [0.3, 0.02, 0.25, 0xd8f0ff, 0.18, 0.52, 0], [0.05, 0.05, 0.12, 0x2a2a1a, 0, 0.3, -0.36]], eye: '#222' } },
   fox: { T: { name: 'Fox', hp: 10, pet: true, w: 0.6, h: 0.7, speed: 3.2, passive: true, xp: 1, drops: [] },
     M: { body: [0.4, 0.38, 0.7], by: 0.45, col: 0xe07a2a, leg: [0.12, 0.3], legCol: 0x2a1a10, head: [0.42, 0.36, 0.34], hy: 0.62, hz: 0.48, x: [[0.1, 0.14, 0.06, 0xe07a2a, -0.14, 0.86, 0.45], [0.1, 0.14, 0.06, 0xe07a2a, 0.14, 0.86, 0.45], [0.2, 0.12, 0.14, 0xf4f0e8, 0, 0.55, 0.7], [0.22, 0.22, 0.55, 0xe07a2a, 0, 0.5, -0.55], [0.22, 0.22, 0.12, 0xf4f0e8, 0, 0.5, -0.86]], eye: '#222' } },
-  rabbit: { T: { name: 'Rabbit', hp: 3, w: 0.4, h: 0.5, speed: 3.4, passive: true, xp: 1, drops: [['rabbit', 0, 1], ['leather', 0, 1]] },
+  rabbit: { T: { name: 'Rabbit', hp: 3, w: 0.4, h: 0.5, speed: 3.4, passive: true, xp: 1, drops: [['rabbit', 0, 1], ['leather', 0, 1], ['rabbit_foot', 0, 0]] },
     M: { body: [0.3, 0.28, 0.42], by: 0.24, col: 0x9a7a5a, leg: [0.08, 0.12], head: [0.26, 0.24, 0.24], hy: 0.42, hz: 0.24, x: [[0.06, 0.24, 0.04, 0x9a7a5a, -0.07, 0.64, 0.22], [0.06, 0.24, 0.04, 0x9a7a5a, 0.07, 0.64, 0.22], [0.12, 0.12, 0.1, 0xf4f0e8, 0, 0.28, -0.26]], eye: '#222' } },
   goat: { T: { name: 'Goat', hp: 10, w: 0.9, h: 1.3, speed: 2, passive: true, xp: 1, drops: [] },
     M: { body: [0.6, 0.6, 0.95], by: 0.85, col: 0xe8e4dc, leg: [0.2, 0.55], head: [0.36, 0.4, 0.5], hy: 1.15, hz: 0.6, x: [[0.06, 0.3, 0.06, 0x8a8070, -0.12, 1.5, 0.55], [0.06, 0.3, 0.06, 0x8a8070, 0.12, 1.5, 0.55], [0.12, 0.2, 0.06, 0xd8d4cc, 0, 0.88, 0.85]], eye: '#c8a020' } },
@@ -311,7 +311,7 @@ const MORE_PEOPLE = {
   husk: { T: { name: 'Husk', hp: 20, w: 0.6, h: 1.95, speed: 2.3, hostile: true, dmg: 3, xp: 5, drops: [['rotten_flesh', 0, 2]] }, skin: 0xb8a070, shirt: 0x7a6a4a, pants: 0x5a4a3a, like: 'zombie' },
   stray: { T: { name: 'Stray', hp: 20, w: 0.6, h: 1.95, speed: 2.4, hostile: true, ranged: true, dmg: 3, burns: true, xp: 5, drops: [['bone', 0, 2], ['arrow', 0, 2]] }, skin: 0x9ab0b0, shirt: 0x6a8a8a, pants: 0x5a6a6a, like: 'skeleton' },
   drowned: { T: { name: 'Drowned', hp: 20, w: 0.6, h: 1.95, speed: 2.3, hostile: true, dmg: 3, burns: true, amphib: true, xp: 5, drops: [['rotten_flesh', 0, 2]] }, skin: 0x5a9a8a, shirt: 0x3a7a8a, pants: 0x4a5a7a, like: 'zombie' },
-  witch: { T: { name: 'Witch', hp: 26, w: 0.6, h: 1.95, speed: 2, hostile: true, ranged: true, dmg: 3, xp: 5, drops: [['redstone', 0, 2], ['glowstone', 0, 1], ['stick', 0, 2], ['sugar_cane', 0, 1]] }, skin: 0xc8a07a, shirt: 0x3a1a4a, pants: 0x2a1a3a, like: 'witch' },
+  witch: { T: { name: 'Witch', hp: 26, w: 0.6, h: 1.95, speed: 2, hostile: true, ranged: true, shoot: 'potion', dmg: 3, xp: 5, drops: [['redstone', 0, 2], ['glowstone', 0, 1], ['stick', 0, 2], ['sugar_cane', 0, 1]] }, skin: 0xc8a07a, shirt: 0x3a1a4a, pants: 0x2a1a3a, like: 'witch' },
   wandering_trader: { T: { name: 'Wandering Trader', hp: 20, w: 0.6, h: 1.95, speed: 2, passive: true, trader: true, xp: 0, drops: [] }, skin: 0xc8a07a, shirt: 0x2a4a9a, pants: 0x1a3a7a, like: 'trader', nose: true },
   vindicator: { T: { name: 'Vindicator', hp: 24, w: 0.6, h: 1.95, speed: 2.6, hostile: true, dmg: 7, xp: 5, drops: [['emerald', 0, 1]] }, skin: 0x8a9a9a, shirt: 0x3a3a3a, pants: 0x2a2a3a, like: 'illager', nose: true, axe: 0xd8d8d8 },
   evoker: { T: { name: 'Evoker', hp: 24, w: 0.6, h: 1.95, speed: 2.2, hostile: true, evoker: true, dmg: 2, xp: 10, drops: [['totem_of_undying', 1, 1], ['emerald', 0, 1]] }, skin: 0x8a9a9a, shirt: 0x1a1a1a, pants: 0x1a1a1a, like: 'illager', nose: true },
@@ -1173,6 +1173,8 @@ class Mob {
         if (n > 0) G.spawnDrop(ID[k], n, this.pos.x, this.pos.y + 0.5, this.pos.z);
       }
       if (this.type === 'wither_skeleton' && byPlayer && Math.random() < 0.1 + 0.05 * (G.looting || 0)) G.spawnDrop(ID.wither_skull, 1, this.pos.x, this.pos.y + 0.5, this.pos.z);
+      if (this.type === 'rabbit' && Math.random() < 0.15) G.spawnDrop(ID.rabbit_foot, 1, this.pos.x, this.pos.y + 0.5, this.pos.z);
+      if (this.type === 'witch' && Math.random() < 0.5) G.spawnDrop([ID.sugar, ID.spider_eye, ID.glass_bottle, ID.gunpowder][Math.random() * 4 | 0], 1, this.pos.x, this.pos.y + 0.5, this.pos.z);
       if (this.type === 'wither') G.ui.message('You defeated the Wither! Pick up the Nether Star: it makes a beacon.', 'gold');
       if (byPlayer) G.player.addXp(this.T.xp);
     }
@@ -1199,7 +1201,7 @@ class Mob {
     const toP = tmpV2.set(P.pos.x - this.pos.x, P.pos.y - this.pos.y, P.pos.z - this.pos.z);
     const dist = toP.length();
     const night = G.isNight();
-    const canTarget = !P.dead && P.mode === 'survival' && dist < (T.ranged === 'ghast' ? 44 : T.fly ? 26 : 18);
+    const canTarget = !P.dead && P.mode === 'survival' && dist < (T.ranged === 'ghast' ? 44 : T.fly ? 26 : 18) && !(P.fx && P.fx('invisibility') && dist > 3);
     let hostileNow = T.hostile && (!T.nightOnly || night || this.angry) || (T.neutral && this.angry);
     // piglins leave you alone only if you wear something gold, like Minecraft
     if (T.goldLover && !this.angry && canTarget && dist < 10 && !P.inv.slots.slice(36, 40).some(sl => sl && /^golden_/.test(DEFS[sl.id].key))) hostileNow = true;
@@ -1310,7 +1312,8 @@ class Mob {
           const dir = to.sub(from); const d = dir.length(); dir.normalize();
           dir.y += d * 0.012;
           const kind = T.shoot || 'arrow';
-          G.spawnProjectile(kind, from, dir.normalize().multiplyScalar(kind === 'laser' ? 30 : kind === 'spit' ? 18 : kind === 'wind' ? 16 : 24), this);
+          G.spawnProjectile(kind, from, dir.normalize().multiplyScalar(kind === 'laser' ? 30 : kind === 'spit' ? 18 : kind === 'wind' ? 16 : kind === 'potion' ? 13 : 24), this);
+          if (kind === 'potion') G.projectiles[G.projectiles.length - 1].potion = ['poison', 'harming', 'weakness'][Math.random() * 3 | 0];
           G.sound.play(kind === 'spit' ? 'llamaSpit' : kind === 'arrow' ? 'bow' : 'fireball', this.pos);
           if (kind === 'spit' && (this.spits = (this.spits || 0) + 1) >= 2) { this.angry = false; this.spits = 0; } // a llama spits a couple of times, then calms down
         }
@@ -1822,8 +1825,9 @@ const PROJ_GEO = {
   laser: new THREE.BoxGeometry(0.08, 0.08, 0.9),
   wind: new THREE.BoxGeometry(0.35, 0.35, 0.35),
   wind_charge: new THREE.BoxGeometry(0.3, 0.3, 0.3),
+  potion: new THREE.BoxGeometry(0.25, 0.3, 0.25),
 };
-const PROJ_COLOR = { spit: 0xf0f0e0, snowball: 0xf4f8fc, laser: 0x5af8e8, wind: 0xc8e8f8, wind_charge: 0xc8e8f8 };
+const PROJ_COLOR = { potion: 0xc84a8a, spit: 0xf0f0e0, snowball: 0xf4f8fc, laser: 0x5af8e8, wind: 0xc8e8f8, wind_charge: 0xc8e8f8 };
 const MOB_FIRE = [0xff6a00, 0xffc000, 0x5a5a5a];
 class Projectile {
   constructor(kind, pos, vel, owner) {
@@ -1843,6 +1847,7 @@ class Projectile {
     this.life -= dt;
     if (this.life <= 0) return this.finish();
     if (this.stuck) return;
+    if (this.kind === 'potion' && !this.potionHit) { /* a splash potion breaks on whatever it touches */ }
     const grav = this.kind === 'fireball' || this.kind === 'smallfire' || this.kind === 'laser' || this.kind === 'wind' || this.kind === 'wind_charge' ? 0 : this.kind === 'arrow' ? 12 : this.kind === 'spit' ? 6 : 16;
     this.vel.y -= grav * dt;
     const step = this.vel.length() * dt;
@@ -1861,6 +1866,7 @@ class Projectile {
         const t = dr.hitTest(this.pos, dir, step + 0.5);
         if (t !== null && t < bestT) { best = dr; bestT = t; }
       }
+      if (best && this.kind === 'potion') { G.splashAt(this.pos, this.potion); return this.finish(); }
       if (best && (this.kind === 'snowball' || this.kind === 'wind_charge')) {
         if (this.kind === 'wind_charge') { this.pos.copy(best.pos); return this.windBurst(); }
         if (best instanceof Mob) best.hurt(best.type === 'blaze' ? 3 : 0.01, this.pos, 3, fromPlayer);
@@ -1879,6 +1885,7 @@ class Projectile {
       if (t !== null && t < step + 0.2) {
         if (this.kind === 'fireball') { this.pos.addScaledVector(dir, t); return this.explodeHere(); }
         if (this.kind === 'wind') { this.pos.copy(P.pos); return this.windBurst(); }
+        if (this.kind === 'potion') { G.splashAt(this.pos, this.potion); return this.finish(); }
         if (this.owner instanceof Mob) G.lastAttacker = this.owner;
         const MSG = { spit: ['A llama spat at you!', 1], laser: ['A guardian zapped you with its laser.', 5] }[this.kind];
         if (MSG) { P.hurt(G.mobDmg(MSG[1]), this.pos, 2, false, MSG[0]); G.particles.burst(this.pos.x, this.pos.y, this.pos.z, [PROJ_COLOR[this.kind]], 6, 1, 0.1); return this.finish(); }
@@ -1891,6 +1898,8 @@ class Projectile {
     if (hit && (DEFS[hit.id].solid || DEFS[hit.id].liquid)) {
       this.pos.addScaledVector(dir, Math.max(0, hit.dist - 0.05));
       if (this.kind === 'fireball') return this.explodeHere();
+      if (DEFS[hit.id].target) G.hitTarget(hit.x, hit.y, hit.z);
+      if (this.kind === 'potion') { G.splashAt(this.pos, this.potion); return this.finish(); }
       if (this.kind === 'wind' || this.kind === 'wind_charge') return this.windBurst();
       if (this.kind === 'snowball' || this.kind === 'spit' || this.kind === 'laser') { G.particles.burst(this.pos.x, this.pos.y, this.pos.z, [PROJ_COLOR[this.kind]], 5, 1, 0.1); return this.finish(); }
       if (this.kind === 'ender_pearl' && Math.random() < 0.05) spawnMob('endermite', hit.x + 0.5 + hit.nx, hit.y + 1, hit.z + 0.5 + hit.nz); // sometimes an endermite comes out

@@ -85,6 +85,7 @@ class Player {
   hurt(amount, from, kb = 6, force = false, cause = '') {
     if (this.dead || this.mode === 'creative') return;
     if (!(amount >= 1)) return; // nothing to lose: no hurt, no message
+    if (this.fireProof(cause)) return;
     if (this.hurtCd > 0 && !force) return;
     if (this.sleeping) G.wake('You were woken up!');
     // armor softens every kind of hurt except falling, drowning, starving and the void (4% per armor point, like Minecraft)
@@ -115,6 +116,8 @@ class Player {
     if (this.health <= 0) this.die();
   }
 
+  /* fire resistance keeps fire and lava from hurting you */
+  fireProof(cause) { return this.fx('fire_resistance') && /fire|lava|burn|flame|magma|blaze/i.test(cause || ''); }
   die() {
     // holding a Totem of Undying: it saves you instead, like Minecraft
     const held = this.heldSlot();
@@ -244,6 +247,7 @@ class Player {
       this.fallStart = null;
     } else {
       this.vel.y -= 28 * dt;
+      if (this.fx('slow_falling') && this.vel.y < -2.5) { this.vel.y = -2.5; this.fallStart = null; }
       if (this.vel.y < -55) this.vel.y = -55;
       if (input.jump && this.onGround) { this.vel.y = (this.onHoney ? 5 : 8.7) + 1.7 * this.fx('jump_boost'); this.hungerDrain(this.sprinting ? 0.05 : 0.0125); }
       if (this.inSnow) { this.vel.y = Math.max(this.vel.y, -1.2); if (input.jump) this.vel.y = Math.max(this.vel.y, 2.2); this.fallStart = null; }
@@ -345,7 +349,7 @@ class Player {
     }
     // a turtle shell lets you breathe a little longer under water
     const turtle = this.inv.slots[36] && DEFS[this.inv.slots[36].id].key === 'turtle_helmet';
-    if (this.headInWater && turtle && (this.turtleT = (this.turtleT || 0) + dt) < 12) { /* still breathing */ }
+    if (this.headInWater && ((turtle && (this.turtleT = (this.turtleT || 0) + dt) < 12) || this.fx('water_breathing'))) { /* still breathing */ }
     else if (this.headInWater) {
       this.air -= dt;
       if (this.air < 5 && !this.airWarned) { this.airWarned = true; G.ui.message('You are running out of air! Swim up to the surface!', 'purple'); }
@@ -415,7 +419,7 @@ class Player {
     if (this.attackCd > 0) return;
     const held = this.heldDef();
     const hs = this.heldSlot(), sharp = enchLv(hs, 'sharpness');
-    let dmg = (held && held.damage ? held.damage : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + 3 * this.fx('strength');
+    let dmg = Math.max(0.5, (held && held.damage ? held.damage : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + 3 * this.fx('strength') - 4 * this.fx('weakness'));
     const crit = !this.onGround && this.vel.y < -1 && !this.flying;
     if (crit) dmg = Math.round(dmg * 1.5);
     this.attackCd = 0.45; this.swing = 1;
@@ -462,6 +466,11 @@ class Player {
     if (ad && (ad.cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.repeater || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
     if (DEFS[id].hive) G.angerBees(x, y, z, this);
+    { const bd = DEFS[id];
+      if (bd.container || bd.jukebox || bd.frame) G.breakChest(x, y, z, false);
+      if (bd.piston && bd.piston.ext) { const v = DIR6[bd.piston.d]; if (DEFS[W.getBlock(x + v[0], y + v[1], z + v[2])].pistonHead) W.setBlock(x + v[0], y + v[1], z + v[2], 0); }
+      if (bd.pistonHead) { const v = DIR6[bd.pistonHead.d], bx = x - v[0], by = y - v[1], bz = z - v[2], base = DEFS[W.getBlock(bx, by, bz)]; if (base && base.piston && base.piston.ext) { W.setBlock(bx, by, bz, 0); if (this.mode === 'survival') G.spawnDrop(ID[bd.pistonHead.sticky ? 'sticky_piston_n' : 'piston_n'], 1, bx + 0.5, by + 0.5, bz + 0.5); } }
+    }
     if (DEFS[id].creakingHeart) { for (const m of G.mobs) if (m.type === 'creaking' && m.heart && m.heart[0] === x && m.heart[1] === y && m.heart[2] === z) m.hurt(0, null); G.ui.message('You broke the Creaking Heart!', 'gold'); }
     // stone in the mountains sometimes hides a silverfish
     if ((id === ID.stone || id === ID.deepslate) && this.mode === 'survival' && G.dim === 'overworld' && Math.random() < (G.world.biomeAt(x, z, G.world.heightAt(x, z)) === BIOME.MOUNTAIN ? 0.03 : 0.004)) spawnMob('silverfish', x + 0.5, y, z + 0.5);
@@ -586,6 +595,25 @@ class Player {
       W.setBlock(px, py, pz, ID[k + '_slab_' + half]);
       return done();
     }
+    if ((hd.facePlace || hd.hopper !== undefined || hd.placesComparator) && b && hd.isBlock !== false) {
+      let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
+      if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
+      const cur = W.getBlock(px, py, pz);
+      if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return true;
+      const e = 1e-3;
+      if (!hd.placesComparator && this.pos.x + this.w / 2 > px + e && this.pos.x - this.w / 2 < px + 1 - e && this.pos.z + this.w / 2 > pz + e && this.pos.z - this.w / 2 < pz + 1 - e && this.pos.y < py + 1 && this.pos.y + this.h > py) return true;
+      const L = this.lookDir(), look = Math.abs(L.y) > 0.75 ? (L.y > 0 ? 'u' : 'd') : Math.abs(L.x) > Math.abs(L.z) ? (L.x > 0 ? 'e' : 'w') : (L.z > 0 ? 's' : 'n');
+      const toward = { e: 'w', w: 'e', u: 'd', d: 'u', s: 'n', n: 's' }[look];
+      let id;
+      if (hd.placesComparator) { const h = Math.abs(L.x) > Math.abs(L.z) ? (L.x > 0 ? 'e' : 'w') : (L.z > 0 ? 's' : 'n'); id = ID['comparator_' + h + '_0']; }
+      else if (hd.hopper !== undefined) { const side = b.nx === 1 ? 'w' : b.nx === -1 ? 'e' : b.nz === 1 ? 'n' : b.nz === -1 ? 's' : 'd'; id = ID[side === 'd' ? 'hopper' : 'hopper_' + side]; }
+      else if (hd.facePlace === 'observer') id = ID['observer_' + look + '_0'];
+      else id = ID[hd.facePlace + '_' + toward];
+      W.setBlock(px, py, pz, id);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('place', null, id); this.useCd = 0.2; this.swing = 1;
+      return true;
+    }
     if (hd.placesRepeater && b) {
       // a repeater goes on top of a solid block, pointing the way you face
       let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
@@ -701,6 +729,15 @@ class Player {
       G.sound.play('place'); this.useCd = 0.25; this.swing = 1;
       return true;
     }
+    if (b && DEFS[b.id].cauldron) {
+      const c = DEFS[b.id].cauldron;
+      if (k === 'water_bucket' && c === 'empty') { W.setBlock(b.x, b.y, b.z, ID.water_cauldron); this.swapHeld(ID.bucket); G.sound.play('place'); this.useCd = 0.4; return true; }
+      if (k === 'lava_bucket' && c === 'empty') { W.setBlock(b.x, b.y, b.z, ID.lava_cauldron); this.swapHeld(ID.bucket); G.sound.play('place'); this.useCd = 0.4; return true; }
+      if (k === 'bucket' && c !== 'empty') { W.setBlock(b.x, b.y, b.z, ID.cauldron); this.swapHeld(c === 'water' ? ID.water_bucket : ID.lava_bucket); G.sound.play('pickup'); this.useCd = 0.4; return true; }
+      if (k === 'glass_bottle' && c === 'water') { W.setBlock(b.x, b.y, b.z, ID.cauldron); this.swapHeld(ID.water_bottle); G.sound.play('pickup'); this.useCd = 0.4; return true; }
+      if (k === 'water_bottle' && c === 'empty') { W.setBlock(b.x, b.y, b.z, ID.water_cauldron); this.swapHeld(ID.glass_bottle); G.sound.play('place'); this.useCd = 0.4; return true; }
+    }
+    if (k === 'flint_and_steel' && b && b.id === ID.candle) { W.setBlock(b.x, b.y, b.z, ID.candle_lit); this.useCd = 0.3; this.swing = 1; return true; }
     if (k === 'bucket') {
       const o = this.eyePos(), d = this.lookDir();
       const hit = W.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 4.6, true);
@@ -823,6 +860,30 @@ class Player {
     if (b && !this.sneaking) {
       if (DEFS[b.id].base === 'crafting_table') { G.ui.openInventory('table'); return; }
       if (b.id === ID.enchanting_table) { G.ui.openEnchant(b.x, b.y, b.z); return; }
+      const bd = DEFS[b.id];
+      if (bd.station) { G.ui.openInventory(bd.station); return; }
+      if (bd.container) { this.useCd = 0.5; this.swing = 1; G.openChest(b.x, b.y, b.z); return; }
+      if (bd.machine === 'note') { this.useCd = 0.25; this.swing = 1; G.playNote(b.x, b.y, b.z, true); return; }
+      if (bd.jukebox) {
+        const sl = G.chestSlots(b.x, b.y, b.z, true);
+        if (sl[0]) { G.spawnDrop(sl[0].id, 1, b.x + 0.5, b.y + 1.2, b.z + 0.5); sl[0] = null; G.chestChanged(chestKey(b.x, b.y, b.z)); }
+        else if (hd && hd.disc) { sl[0] = { id: hd.id, count: 1 }; if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1); G.chestChanged(chestKey(b.x, b.y, b.z)); G.ui.message('Now playing: ' + hd.name.replace('Music Disc ', ''), 'gold'); }
+        else G.ui.message('Put a music disc in the jukebox. Music discs are found in dungeon and mineshaft chests.');
+        this.useCd = 0.4; this.swing = 1; return;
+      }
+      if (bd.frame) {
+        const sl = G.chestSlots(b.x, b.y, b.z, true);
+        if (!sl[0] && hd) { sl[0] = { id: hd.id, count: 1 }; if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1); G.chestChanged(chestKey(b.x, b.y, b.z)); G.sound.play('place'); }
+        else if (sl[0] && !hd) { G.spawnDrop(sl[0].id, 1, b.x + 0.5, b.y + 0.5, b.z + 0.5); sl[0] = null; G.chestChanged(chestKey(b.x, b.y, b.z)); }
+        this.useCd = 0.3; this.swing = 1; return;
+      }
+      if (bd.candle !== undefined && bd.candle && !hd) { G.world.setBlock(b.x, b.y, b.z, ID.candle); this.useCd = 0.3; return; }
+      if (bd.anchor !== undefined) {
+        if (hd && hd.key === 'glowstone' && bd.anchor < 4) { G.world.setBlock(b.x, b.y, b.z, ID['respawn_anchor_' + (bd.anchor + 1)]); if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1); G.sound.play('levelup'); this.useCd = 0.3; return; }
+        if (bd.anchor > 0 && G.dim === 'nether') { G.anchor = { x: b.x, y: b.y, z: b.z }; G.ui.message('Respawn point set! You will come back here in the Nether (it uses one charge each time).', 'gold'); this.useCd = 0.5; return; }
+        if (bd.anchor > 0) { G.world.setBlock(b.x, b.y, b.z, 0); G.explode(b.x + 0.5, b.y + 0.5, b.z + 0.5, 5, true, true, null, 'A respawn anchor blew up! They only work in the Nether.'); return; }
+        G.ui.message('Charge the respawn anchor with glowstone, in the Nether.'); this.useCd = 0.3; return;
+      }
       if (b.id === ID.anvil) { G.ui.openAnvil(b.x, b.y, b.z); return; }
       if (b.id === ID.grindstone) { G.ui.openGrindstone(); return; }
       if (b.id === ID.smithing_table) { G.ui.openSmithing(); return; }
@@ -903,6 +964,21 @@ class Player {
       this.useCd = 0.45; this.swing = 1;
       return;
     }
+    if (hd.potion) {
+      G.applyPotion(this, hd.potion, 1);
+      if (this.mode === 'survival') { this.inv.takeFrom(this.sel, 1); this.inv.add(ID.glass_bottle, 1); }
+      G.sound.play('eat'); this.useCd = 0.6; this.swing = 1;
+      return;
+    }
+    if (hd.splash) {
+      const o = this.eyePos(), d = this.lookDir();
+      G.spawnProjectile('potion', o.addScaledVector(d, 0.5), d.multiplyScalar(15), this);
+      G.projectiles[G.projectiles.length - 1].potion = hd.splash;
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      this.useCd = 0.5; this.swing = 1; G.sound.play('bow');
+      return;
+    }
+    if (hd.key === 'spyglass') { G.zoom = !G.zoom; this.useCd = 0.3; return; }
     if (hd.key === 'snowball' || hd.key === 'wind_charge') {
       const o = this.eyePos(), d = this.lookDir();
       G.spawnProjectile(hd.key, o.addScaledVector(d, 0.5), d.multiplyScalar(hd.key === 'snowball' ? 24 : 20), this);

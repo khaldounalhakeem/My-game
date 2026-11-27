@@ -299,7 +299,8 @@ function updateSky(dt) {
   G.scene.background = skyCol;
   G.scene.fog.color.copy(fogCol);
   G.scene.fog.near = near; G.scene.fog.far = far;
-  const bright = (0.22 + 0.78 * dl) * (1 - ug * 0.55);
+  let bright = (0.22 + 0.78 * dl) * (1 - ug * 0.55);
+  if (P.fx && P.fx('night_vision')) bright = Math.max(bright, 0.95);
   for (const k of ['opaque', 'trans', 'item', 'held']) G.mats[k].color.setScalar(bright);
   G.ambient.intensity = 0.25 + 0.5 * dl * (1 - ug * 0.5);
   G.sunLight.intensity = 0.55 * dl * (1 - ug);
@@ -474,11 +475,17 @@ G.tickAmbient = (dt) => {
       else if (d.powder && [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(([a, b, c]) => W.getBlock(x + a, y + b, z + c) === ID.water)) { W.setBlock(x, y, z, ID[d.powder]); continue; }
       else if (d.copper !== undefined && d.copper < 3 && Math.random() < 0.0004) { W.setBlock(x, y, z, ID[['', 'exposed_', 'weathered_', 'oxidized_'][d.copper + 1] + d.copperKind]); continue; }
       else if (id === ID.end_rod) kind = 'endrod';
+      else if (d.hopper) kind = 'hopper';
+      else if (d.jukebox) kind = 'juke';
+      else if (d.frame) kind = 'frame';
+      else if (d.daylight) { const want = G.dim === 'overworld' && G.daylight() > 0.45 && W.skyExposed(x, y + 1, z); if (want !== d.daylight.on) W.setBlock(x, y, z, ID['daylight_detector_' + (want ? 1 : 0)]); }
+      else if (d.comparator && d.comparator.on === false && Math.random() < 0.3) G.rsMark(x, y, z);
       if (kind) { A.list.push([kind, x, y, z, d]); if (A.list.length > 300) break; }
     }
   }
   const r = Math.random;
-  const books = new Set(), glows = new Set();
+  const books = new Set(), glows = new Set(), frames = new Set();
+  A.hopT = (A.hopT || 0) - dt; const hopNow = A.hopT <= 0; if (hopNow) A.hopT = 0.5;
   for (const [kind, x, y, z, d] of A.list) {
     switch (kind) {
       case 'torch': {
@@ -493,6 +500,9 @@ G.tickAmbient = (dt) => {
       case 'portal': if (r() < dt * 4) PT.spawn(x + r(), y + r(), z + r(), r() < 0.5 ? 0xb05aff : 0x7a1ad8, (r() - 0.5) * 1.2, (r() - 0.5) * 1.2, (r() - 0.5) * 1.2, 0.06, 1, 0); break;
       case 'lavatop': if (r() < dt * 0.15) { PT.burst(x + 0.5, y + 1, z + 0.5, [0xff8a1a, 0xffd04a, 0x333333], 4, 1.5, 0.08); if (P.pos.distanceTo(new THREE.Vector3(x, y, z)) < 10 && r() < 0.3) Sound.play('dig', new THREE.Vector3(x, y, z), ID.lava); } break;
       case 'dripw': case 'dripl': if (r() < dt * 0.25) PT.spawn(x + 0.2 + r() * 0.6, y - 0.05, z + 0.2 + r() * 0.6, kind === 'dripw' ? 0x3a6ad8 : 0xff7a1a, 0, 0, 0, 0.06, 1.2, 9); break;
+      case 'hopper': if (hopNow) G.tickHopper(x, y, z, d); break;
+      case 'juke': G.tickJuke(x, y, z); break;
+      case 'frame': G.tickFrame(x, y, z, d, frames); break;
       case 'endrod': if (r() < dt * 0.8) PT.spawn(x + 0.5, y + 0.5 + r() * 0.5, z + 0.5, 0xffffff, (r() - 0.5) * 0.6, (r() - 0.5) * 0.4, (r() - 0.5) * 0.6, 0.05, 1.5, 0); break;
       case 'sculk': if (r() < dt * 0.4) PT.spawn(x + 0.5, y + 0.6, z + 0.5, 0x2ad8e8, 0, 0.5, 0, 0.06, 0.8, 0); break;
       case 'ench': {
@@ -543,6 +553,7 @@ G.tickAmbient = (dt) => {
     g.userData.L.rotation.z = -(1 - o) * 1.45 + Math.sin(t * 5) * 0.06 * o;
     g.userData.R.rotation.z = (1 - o) * 1.45 - Math.sin(t * 5 + 1) * 0.06 * o;
   }
+  for (const [k, F] of G.frameMeshes) if (!frames.has(k) && (A.scanT > 0.5)) { const [fx, fy, fz] = k.split(',').map(Number); if (!DEFS[W.getBlock(fx, fy, fz)].frame || Math.hypot(fx - P.pos.x, fz - P.pos.z) > 14) { G.scene.remove(F.mesh); G.frameMeshes.delete(k); } }
   // a cooking furnace: its door glows and flickers
   for (const k of glows) if (!A.glows.has(k)) {
     const [x, y, z] = k.split(','), d = DEFS[W.getBlock(+x, +y, +z)], [fx, fz] = { s: [0, 1], n: [0, -1], e: [1, 0], w: [-1, 0] }[d.facing || 's'];
@@ -765,10 +776,10 @@ const supportOf = (x, y, z, d) => { const v = SUPPORT[supportDir(d)]; return [x 
 const fullBlock = d => !!(d && d.solid && d.opaque && !d.boxes && !d.box);
 const torchOn = d => !!(d && d.rsTorch && d.rsTorch.on);
 const wireOn = d => !!(d && d.wire && d.wire.on);
-const isDevice = d => !!(d && (d.door || d.trapdoor || d.gate || d.key === 'tnt' || d.lamp));
+const isDevice = d => !!(d && (d.door || d.trapdoor || d.gate || d.key === 'tnt' || d.lamp || d.machine));
 const REP_DIR = { n: [0, 0, -1], s: [0, 0, 1], w: [-1, 0, 0], e: [1, 0, 0] };
 /* is there a lit repeater at (rx, ry, rz) pointing its front at (x, y, z)? */
-const repInto = (rx, ry, rz, x, y, z) => { const d = rsD(rx, ry, rz); if (!d || !d.repeater || !d.repeater.on) return false; const v = REP_DIR[d.repeater.dir]; return rx + v[0] === x && ry === y && rz + v[2] === z; };
+const repInto = (rx, ry, rz, x, y, z) => { const d = rsD(rx, ry, rz); const r = d && (d.repeater || d.comparator); if (!r || !r.on) return false; const v = REP_DIR[r.dir]; return rx + v[0] === x && ry === y && rz + v[2] === z; };
 /* a block with a switch stuck to it, or a lit redstone torch under it: strong power (it feeds dust too) */
 function strongPowered(x, y, z) {
   for (const [a, b, c] of NB6) {
@@ -791,7 +802,7 @@ function wireLinks(x, y, z) {
 }
 /* any power at all in this block (strong, or from dust on top of it or pointing into it) */
 function weakPowered(x, y, z) {
-  if (rsB(x, y, z) === ID.redstone_block) return true;
+  if (rsB(x, y, z) === ID.redstone_block || srcOn(rsD(x, y, z))) return true;
   if (strongPowered(x, y, z)) return true;
   if (wireOn(rsD(x, y + 1, z))) return true;
   for (const [a, c] of H4) if (wireOn(rsD(x + a, y, z + c)) && wireLinks(x + a, y, z + c).length <= 1) return true;
@@ -803,7 +814,7 @@ function devicePowered(x, y, z, forDoor) {
     const nx = x + a, ny = y + b, nz = z + c, d = rsD(nx, ny, nz);
     if (!d) continue;
     if (forDoor && d.plate) continue;
-    if (switchOn(d) || wireOn(d) || d.key === 'redstone_block') return true;
+    if (switchOn(d) || wireOn(d) || d.key === 'redstone_block' || srcOn(d)) return true;
     if (repInto(nx, ny, nz, x, y, z)) return true;
     if (torchOn(d)) { const s = supportOf(nx, ny, nz, d); if (!(s[0] === x && s[1] === y && s[2] === z)) return true; }
     if (fullBlock(d) && !d.lamp && weakPowered(nx, ny, nz)) return true;
@@ -815,7 +826,7 @@ function wireSource(x, y, z) {
   for (const [a, b, c] of NB6) {
     const nx = x + a, ny = y + b, nz = z + c, d = rsD(nx, ny, nz);
     if (!d) continue;
-    if (switchOn(d) || torchOn(d) || d.key === 'redstone_block') return true;
+    if (switchOn(d) || torchOn(d) || d.key === 'redstone_block' || srcOn(d)) return true;
     if (repInto(nx, ny, nz, x, y, z)) return true;
     if (fullBlock(d) && strongPowered(nx, ny, nz)) return true;
   }
@@ -845,12 +856,12 @@ function updateWireNet(x, y, z, done) {
 }
 G.rsDirty = new Set();
 G.devPow = new Map();
-G.rsMark = (x, y, z) => { if (G.rsDirty.size < 4000) G.rsDirty.add(x + ',' + y + ',' + z); };
+G.rsMark = (x, y, z) => { if (G.rsDirty.size < 4000) G.rsDirty.add(x + ',' + y + ',' + z); G.observerSaw(x, y, z); };
 /* a repeater: what comes in at its back */
 function repeaterInput(x, y, z, d) {
-  const v = REP_DIR[d.repeater.dir], bx = x - v[0], by = y, bz = z - v[2], b = rsD(bx, by, bz);
+  const v = REP_DIR[(d.repeater || d.comparator).dir], bx = x - v[0], by = y, bz = z - v[2], b = rsD(bx, by, bz);
   if (!b) return false;
-  if (wireOn(b) || switchOn(b) || torchOn(b) || b.key === 'redstone_block' || repInto(bx, by, bz, x, y, z)) return true;
+  if (wireOn(b) || switchOn(b) || torchOn(b) || b.key === 'redstone_block' || srcOn(b) || repInto(bx, by, bz, x, y, z)) return true;
   return fullBlock(b) && weakPowered(bx, by, bz);
 }
 G.rsPending = new Map(); // repeaters waiting to switch: key -> [time, wanted]
@@ -877,7 +888,7 @@ G.tickRedstone = () => {
       seen.add(pk);
       const d = rsD(px, py, pz);
       if (!d) continue;
-      if (d.wire) wires.push([px, py, pz]); else if (d.rsTorch || d.repeater || isDevice(d)) things.push([px, py, pz]);
+      if (d.wire) wires.push([px, py, pz]); else if (d.rsTorch || d.repeater || d.comparator || isDevice(d)) things.push([px, py, pz]);
     }
   }
   const done = new Set();
@@ -889,6 +900,19 @@ G.tickRedstone = () => {
     if (d.rsTorch) {
       const s = supportOf(x, y, z, d), want = !weakPowered(s[0], s[1], s[2]);
       if (want !== d.rsTorch.on) W.setBlock(x, y, z, ID['redstone_torch_' + d.rsTorch.d + '_' + (want ? 1 : 0)]);
+      continue;
+    }
+    if (d.comparator) {
+      // a comparator: on when something behind it is on, or a box behind it has anything in it
+      const v = REP_DIR[d.comparator.dir], h = holder(x - v[0], y, z - v[2], false);
+      const want = repeaterInput(x, y, z, d) || !!(h && h.slots.some(Boolean)) || !!(rsD(x - v[0], y, z - v[2]) && rsD(x - v[0], y, z - v[2]).cauldron === 'water') || !!(rsD(x - v[0], y, z - v[2]) && rsD(x - v[0], y, z - v[2]).jukebox && G.chestSlots(x - v[0], y, z - v[2], false) && G.chestSlots(x - v[0], y, z - v[2], false)[0]);
+      if (want !== d.comparator.on) W.setBlock(x, y, z, ID['comparator_' + d.comparator.dir + '_' + (want ? 1 : 0)]);
+      continue;
+    }
+    if (d.machine) {
+      const p = devicePowered(x, y, z), k = G.dim + ':' + x + ',' + y + ',' + z, before = !!G.devPow.get(k);
+      G.devPow.set(k, p);
+      if (p !== before || (d.piston && p !== d.piston.ext)) G.machine(x, y, z, d, p);
       continue;
     }
     if (d.key === 'tnt') { if (devicePowered(x, y, z)) { W.setBlock(x, y, z, 0); G.primeTNT(x, y, z, 4); } continue; }
@@ -911,6 +935,256 @@ G.tickRedstone = () => {
     G.devPow.set(k, p);
     if (p && !before && !open) G.toggleDoor(x, y, z);
     else if (!p && before && open) G.toggleDoor(x, y, z);
+  }
+};
+
+/* ================= machines: pistons, dispensers, droppers, hoppers, observers, note blocks, jukeboxes ================= */
+const srcOn = d => !!(d && ((d.observer && d.observer.on) || (d.daylight && d.daylight.on) || (d.target && d.target.on)));
+const NOT_PUSHABLE = d => !d || d.container || d.jukebox || d.noPush || d.hopper || d.base === 'furnace' || d.base === 'smoker' || d.base === 'blast_furnace' || d.key === 'chest' || d.key === 'chest_loot' || d.key === 'ender_chest' || d.shulker || d.key === 'bedrock' || d.key === 'obsidian' || d.key === 'crying_obsidian' || d.key === 'spawner' || d.beacon || d.key === 'enchanting_table' || d.key === 'end_portal_frame' || d.key === 'end_portal_frame_eye' || d.portal || d.bedPart || d.key === 'bed' || d.key === 'bed_head' || d.door || d.sign || d.frame || (d.piston && d.piston.ext) || d.respawn;
+const breaksWhenPushed = d => d.liquid || d.replaceable || (d.cross && !d.solid) || d.key === 'torch' || d.wire || d.rsTorch || d.lever || d.button || d.plate || d.ladder || d.candle;
+/* things inside other things: a stack goes into a list of slots (returns what didn't fit) */
+function addToSlots(slots, it, from, to) {
+  const def = DEFS[it.id], max = def.stack || 64;
+  let left = it.count;
+  for (let i = from || 0; i < (to || slots.length) && left > 0; i++) { const s = slots[i]; if (s && s.id === it.id && !s.e && !s.n && !s.c && !it.e && !it.n && !it.c && s.count < max) { const k = Math.min(max - s.count, left); s.count += k; left -= k; } }
+  for (let i = from || 0; i < (to || slots.length) && left > 0; i++) if (!slots[i]) { slots[i] = Object.assign({}, it, { count: Math.min(max, left) }); left -= Math.min(max, left); }
+  return left;
+}
+/* what's at a place that holds items: [slots, which slots to take from, which to put into, on change] */
+function holder(x, y, z, fromAbove) {
+  const d = rsD(x, y, z);
+  if (!d) return null;
+  if (d.container || d.key === 'chest' || d.key === 'chest_loot') { const k = chestKey(x, y, z); return { slots: G.chestSlots(x, y, z, true), take: [0, 27], put: [0, 27], done: () => G.chestChanged(k) }; }
+  if (d.base === 'furnace' || d.base === 'smoker' || d.base === 'blast_furnace') { const f = G.furnaceAt(x, y, z, true), k = chestKey(x, y, z); return { slots: f.slots, take: [2, 3], put: fromAbove ? [0, 1] : [1, 2], done: () => G.furnaceChanged && G.furnaceChanged(k) }; }
+  return null;
+}
+function takeOne(h) {
+  for (let i = h.take[0]; i < h.take[1]; i++) { const s = h.slots[i]; if (s) { const it = Object.assign({}, s, { count: 1 }); if (--s.count <= 0) h.slots[i] = null; return it; } }
+  return null;
+}
+G.machine = (x, y, z, d, powered) => {
+  if (d.machine === 'note') { if (powered) G.playNote(x, y, z, false); return; }
+  if (d.machine === 'piston') { if (powered && !d.piston.ext) G.pistonPush(x, y, z, d); else if (!powered && d.piston.ext) G.pistonPull(x, y, z, d); return; }
+  if ((d.machine === 'dispenser' || d.machine === 'dropper') && powered) G.dispense(x, y, z, d);
+};
+G.pistonPush = (x, y, z, d) => {
+  const W = G.world, p = d.piston, v = DIR6[p.d], kind = p.sticky ? 'sticky_piston' : 'piston', cells = [];
+  let cx = x + v[0], cy = y + v[1], cz = z + v[2];
+  for (let i = 0; ; i++) {
+    if (cy < 1 || cy >= WH) return false;
+    const id = W.getBlock(cx, cy, cz), dd = DEFS[id];
+    if (!id || breaksWhenPushed(dd)) { if (id && !dd.liquid) G.spawnDrop(ID[dd.drop || dd.key] || id, 1, cx + 0.5, cy + 0.5, cz + 0.5); break; }
+    if (i >= 12 || NOT_PUSHABLE(dd)) return false;
+    cells.push([cx, cy, cz, id]); cx += v[0]; cy += v[1]; cz += v[2];
+  }
+  for (let i = cells.length - 1; i >= 0; i--) { const [a, b, c, id] = cells[i]; W.setBlock(a + v[0], b + v[1], c + v[2], id); }
+  W.setBlock(x + v[0], y + v[1], z + v[2], ID[kind + '_head_' + p.d]);
+  W.setBlock(x, y, z, ID[kind + '_' + p.d + '_x']);
+  // anything standing in the way gets pushed along
+  const P = G.player, moved = [[x + v[0], y + v[1], z + v[2]], ...cells.map(([a, b, c]) => [a + v[0], b + v[1], c + v[2]])];
+  for (const e of [P, ...G.mobs]) {
+    if (e.dead || (e.remoteCtl)) continue;
+    const ex = Math.floor(e.pos.x), ez = Math.floor(e.pos.z), ey = Math.floor(e.pos.y + 0.1);
+    if (moved.some(([a, b, c]) => a === ex && c === ez && (b === ey || b === ey + 1 || (v[1] === 1 && b === ey - 1)))) { e.pos.x += v[0]; e.pos.y += v[1] * 1.05; e.pos.z += v[2]; if (v[1] > 0 && e.vel) e.vel.y = Math.max(e.vel.y, 2); }
+  }
+  G.sound.play('dig', new THREE.Vector3(x, y, z), ID.stone);
+  return true;
+};
+G.pistonPull = (x, y, z, d) => {
+  const W = G.world, p = d.piston, v = DIR6[p.d], kind = p.sticky ? 'sticky_piston' : 'piston';
+  const hx = x + v[0], hy = y + v[1], hz = z + v[2], hd = DEFS[W.getBlock(hx, hy, hz)];
+  if (hd && hd.pistonHead) W.setBlock(hx, hy, hz, 0);
+  W.setBlock(x, y, z, ID[kind + '_' + p.d]);
+  if (p.sticky) {
+    const fx = hx + v[0], fy = hy + v[1], fz = hz + v[2], id = W.getBlock(fx, fy, fz), fd = DEFS[id];
+    if (id && !NOT_PUSHABLE(fd) && !breaksWhenPushed(fd) && !W.getBlock(hx, hy, hz)) { W.setBlock(fx, fy, fz, 0); W.setBlock(hx, hy, hz, id); }
+  }
+  G.sound.play('dig', new THREE.Vector3(x, y, z), ID.stone);
+};
+G.dispense = (x, y, z, d) => {
+  const W = G.world, slots = G.chestSlots(x, y, z, true), full = slots.map((s, i) => (s ? i : -1)).filter(i => i >= 0);
+  if (!full.length) { G.sound.play('click', new THREE.Vector3(x, y, z)); return; }
+  const i = full[Math.random() * full.length | 0], s = slots[i], k = DEFS[s.id].key, v = DIR6[d.facing6];
+  const fx = x + v[0], fy = y + v[1], fz = z + v[2], front = W.getBlock(fx, fy, fz);
+  const take = () => { if (--s.count <= 0) slots[i] = null; };
+  const from = new THREE.Vector3(x + 0.5 + v[0] * 0.7, y + 0.5 + v[1] * 0.7, z + 0.5 + v[2] * 0.7), dir = new THREE.Vector3(v[0], v[1] + 0.1, v[2]).normalize();
+  let done = false;
+  if (d.machine === 'dropper') {
+    const h = holder(fx, fy, fz, v[1] < 0);
+    if (h) { if (addToSlots(h.slots, Object.assign({}, s, { count: 1 }), h.put[0], h.put[1]) === 0) { take(); h.done(); } done = true; }
+  } else if (k === 'arrow' || k === 'snowball' || k === 'wind_charge') { G.spawnProjectile(k, from, dir.multiplyScalar(k === 'arrow' ? 26 : 20), null); take(); done = true; }
+  else if (DEFS[s.id].splash) { const pr = G.spawnProjectile('potion', from, dir.multiplyScalar(14), null); take(); done = true; G.projectiles[G.projectiles.length - 1].potion = DEFS[s.id].splash; }
+  else if ((k === 'water_bucket' || k === 'lava_bucket') && (!front || DEFS[front].replaceable)) { W.setBlock(fx, fy, fz, k === 'water_bucket' ? ID.water : ID.lava); slots[i] = { id: ID.bucket, count: 1 }; done = true; }
+  else if (k === 'bucket' && (front === ID.water || front === ID.lava)) { W.setBlock(fx, fy, fz, 0); if (s.count === 1) slots[i] = { id: front === ID.water ? ID.water_bucket : ID.lava_bucket, count: 1 }; else { take(); addToSlots(slots, { id: front === ID.water ? ID.water_bucket : ID.lava_bucket, count: 1 }); } done = true; }
+  else if (k === 'bone_meal' && front) { if (G.boneMeal(fx, fy, fz)) take(); done = true; }
+  else if (k === 'flint_and_steel' && !front) { W.setBlock(fx, fy, fz, ID.fire); done = true; }
+  else if (k === 'tnt' && !front) { G.primeTNT(fx, fy, fz, 4); take(); done = true; }
+  if (!done) { G.spawnDrop(s.id, 1, from.x, from.y - 0.2, from.z, new THREE.Vector3(v[0] * 4, v[1] * 4 + 1.5, v[2] * 4), slotExtras(s)); take(); }
+  G.chestChanged(chestKey(x, y, z));
+  G.sound.play('click', new THREE.Vector3(x, y, z));
+  G.particles.burst(from.x, from.y, from.z, [0x8a8a8a, 0xcccccc], 5, 1, 0.08);
+};
+/* hoppers move one item every half second: out of what's above them (or picked up off the floor) into what they point at */
+G.tickHopper = (x, y, z, d) => {
+  const W = G.world, v = d.hopper === 'd' ? [0, -1, 0] : DIR6[d.hopper];
+  let tx = x + v[0], ty = y + v[1], tz = z + v[2];
+  // a chain of hoppers: pass straight on (a few at most)
+  for (let n = 0; n < 4; n++) { const td = rsD(tx, ty, tz); if (!td || !td.hopper) break; const w = td.hopper === 'd' ? [0, -1, 0] : DIR6[td.hopper]; tx += w[0]; ty += w[1]; tz += w[2]; }
+  const dst = holder(tx, ty, tz, ty < y);
+  if (!dst) return;
+  let it = null;
+  const src = holder(x, y + 1, z, false);
+  if (src) { it = takeOne(src); if (it) src.done(); }
+  if (!it) {
+    // items lying on top of the hopper fall in
+    const drop = G.drops.find(dr => !dr.done && !dr.owner && dr.pos.x >= x && dr.pos.x < x + 1 && dr.pos.z >= z && dr.pos.z < z + 1 && dr.pos.y >= y + 0.5 && dr.pos.y < y + 2);
+    if (drop) { const left = addToSlots(dst.slots, { id: drop.id, count: drop.count, e: drop.e, n: drop.n, c: drop.c }, dst.put[0], dst.put[1]); if (left < drop.count) { if (left === 0) { Net.dropPicked(drop.did); drop.finish(); } else drop.count = left; dst.done(); } return; }
+    return;
+  }
+  if (addToSlots(dst.slots, it, dst.put[0], dst.put[1]) > 0) { addToSlots(src.slots, it); src.done(); } else dst.done();
+};
+/* observers: when the block in front of one changes, it sends out a short pulse */
+G.observerSaw = (x, y, z) => {
+  for (const [a, b, c] of NB6) {
+    const ox = x - a, oy = y - b, oz = z - c, d = rsD(ox, oy, oz);
+    if (!d || !d.observer || d.observer.on) continue;
+    const v = DIR6[d.observer.d];
+    if (v[0] !== a || v[1] !== b || v[2] !== c) continue;
+    const dim = G.dim, k = ox + ',' + oy + ',' + oz;
+    G.obsBusy = G.obsBusy || new Set();
+    if (G.obsBusy.has(k)) continue;
+    G.obsBusy.add(k);
+    setTimeout(() => {
+      if (G.dim !== dim) { G.obsBusy.delete(k); return; }
+      const cur = rsD(ox, oy, oz);
+      if (cur && cur.observer) G.world.setBlock(ox, oy, oz, ID['observer_' + cur.observer.d + '_1']);
+      setTimeout(() => { G.obsBusy.delete(k); if (G.dim !== dim) return; const c2 = rsD(ox, oy, oz); if (c2 && c2.observer) G.world.setBlock(ox, oy, oz, ID['observer_' + c2.observer.d + '_0']); }, 200);
+    }, 100);
+  }
+};
+G.hitTarget = (x, y, z) => {
+  const d = rsD(x, y, z); if (!d || !d.target) return;
+  G.world.setBlock(x, y, z, ID.target_1); const dim = G.dim;
+  setTimeout(() => { if (G.dim === dim && G.world.getBlock(x, y, z) === ID.target_1) G.world.setBlock(x, y, z, ID.target_0); }, 1000);
+};
+/* note blocks: each tap goes up a note; the block underneath picks the instrument */
+G.notes = {};
+G.playNote = (x, y, z, step) => {
+  const k = chestKey(x, y, z);
+  if (step) G.notes[k] = ((G.notes[k] || 0) + 1) % 25;
+  const n = G.notes[k] || 0, f = 185 * Math.pow(2, n / 12), under = DEFS[G.world.getBlock(x, y - 1, z)] || {}, pos = new THREE.Vector3(x, y, z);
+  const S = Sound; if (!S.ctx || S.ctx.state !== 'running') return;
+  const v = clamp(1 - pos.distanceTo(G.player.pos) / 40, 0, 1) * 0.12;
+  if (under.tool === 'pick' && /stone|cobble|brick|deepslate|ore/.test(under.key || '')) S.noise(0.12, v * 3, 120 + n * 6, 'lowpass');
+  else if (under.key === 'sand' || under.key === 'gravel') S.noise(0.08, v * 2, 2000 + n * 60, 'bandpass');
+  else if (under.glassy) S.noise(0.03, v * 2, 5000, 'highpass');
+  else if (under.tool === 'axe') S.tone(f / 2, 0.4, 'sawtooth', v * 0.8, f / 2);
+  else if (under.key === 'gold_block') S.tone(f * 2, 0.8, 'sine', v);
+  else S.tone(f, 0.5, 'triangle', v);
+  G.particles.spawn(x + 0.5, y + 1.2, z + 0.5, [0x5ad84a, 0xd8d84a, 0xd84a4a, 0x4a8ad8, 0xd84ad8][n % 5], 0, 0.8, 0, 0.12, 0.6, 0);
+};
+/* jukeboxes: a music disc plays its own little tune (every disc has a different one) */
+G.juke = {};
+const DISC_SONGS = {};
+function discSong(k) {
+  if (DISC_SONGS[k]) return DISC_SONGS[k];
+  const r = mulberry32(hashStr('disc' + k)), scale = [[0, 2, 4, 7, 9], [0, 3, 5, 7, 10], [0, 2, 3, 7, 8], [0, 2, 4, 5, 7, 9, 11]][r() * 4 | 0];
+  const root = 196 * Math.pow(2, (r() * 7 | 0) / 12), beat = 0.18 + r() * 0.16, wave = ['triangle', 'sine', 'square', 'sawtooth'][r() * 4 | 0];
+  const motif = Array.from({ length: 8 }, () => [scale[r() * scale.length | 0] + 12 * (r() * 2 | 0), 1 + (r() < 0.3 ? 1 : 0)]);
+  const notes = [];
+  for (let bar = 0; bar < 8; bar++) for (const [p, len] of motif) notes.push([p + (bar % 4 === 3 ? scale[1] : bar % 2 ? -12 : 0), len]);
+  return (DISC_SONGS[k] = { notes, root, beat, wave });
+}
+G.tickJuke = (x, y, z) => {
+  const k = chestKey(x, y, z), slots = G.chestSlots(x, y, z, false), disc = slots && slots[0] && DEFS[slots[0].id].disc;
+  const now = performance.now() / 1000;
+  if (!disc) { delete G.juke[k]; return; }
+  let J = G.juke[k];
+  if (!J || J.disc !== disc) J = G.juke[k] = { disc, i: 0, at: now };
+  const song = discSong(disc), pos = new THREE.Vector3(x, y, z), v = clamp(1 - pos.distanceTo(G.player.pos) / 48, 0, 1);
+  while (J.at < now + 0.3) {
+    const [p, len] = song.notes[J.i % song.notes.length];
+    const S = Sound, when = Math.max(0, J.at - now);
+    if (v > 0.02 && S.ctx && S.ctx.state === 'running') { S.tone(song.root * Math.pow(2, p / 12), song.beat * len * 0.9, song.wave, 0.06 * v, null, when); if (J.i % 4 === 0) S.tone(song.root / 2 * Math.pow(2, (song.notes[J.i % song.notes.length][0] % 12) / 12), song.beat * 3.5, 'sine', 0.05 * v, null, when); }
+    J.at += song.beat * len; J.i++;
+  }
+  if (Math.random() < 0.05) G.particles.spawn(x + 0.5, y + 1.2, z + 0.5, [0x5ad84a, 0xd84ad8, 0x4a8ad8][J.i % 3], (Math.random() - 0.5) * 0.4, 0.8, 0, 0.1, 1, 0);
+};
+/* item frames show what's in them */
+G.frameMeshes = new Map();
+G.tickFrame = (x, y, z, d, seen) => {
+  const k = x + ',' + y + ',' + z, slots = G.chestSlots(x, y, z, false), it = slots && slots[0];
+  seen.add(k);
+  let F = G.frameMeshes.get(k);
+  if (F && (!it || F.id !== it.id)) { G.scene.remove(F.mesh); G.frameMeshes.delete(k); F = null; }
+  if (!it || F) return;
+  const mesh = new THREE.Mesh(itemGeometry(it.id), G.mats.item);
+  const o = { w: [0.1, 0, 0, Math.PI / 2], e: [0.9, 0, 0, -Math.PI / 2], n: [0, 0, 0.1, 0], s: [0, 0, 0.9, Math.PI] }[d.frame];
+  mesh.position.set(x + (d.frame === 'w' || d.frame === 'e' ? o[0] : 0.5), y + 0.5, z + (d.frame === 'n' || d.frame === 's' ? o[2] : 0.5));
+  mesh.rotation.y = o[3]; mesh.scale.setScalar(DEFS[it.id].isBlock && !DEFS[it.id].cross ? 0.4 : 0.55);
+  G.scene.add(mesh); G.frameMeshes.set(k, { mesh, id: it.id });
+};
+/* potions: what each one does to you */
+const POTION_FX = { speed: [180, 1], jump_boost: [180, 1], strength: [180, 1], regeneration: [45, 1], fire_resistance: [180, 1], night_vision: [180, 1], invisibility: [180, 1], poison: [45, 1], weakness: [90, 1], slow_falling: [90, 1], water_breathing: [180, 1] };
+const FX_NAMES = { speed: 'Speed', jump_boost: 'Jump Boost', strength: 'Strength', regeneration: 'Regeneration', fire_resistance: 'Fire Resistance', night_vision: 'Night Vision', invisibility: 'Invisibility', poison: 'Poison', weakness: 'Weakness', slow_falling: 'Slow Falling', water_breathing: 'Water Breathing', haste: 'Haste', resistance: 'Resistance', absorption: 'Absorption' };
+G.applyPotion = (who, k, mult) => {
+  mult = mult || 1;
+  if (who === G.player) {
+    const P = G.player;
+    if (k === 'healing') { P.health = Math.min(20, P.health + 4 * mult); return; }
+    if (k === 'harming') { P.hurt(6 * mult, null, 0, true, 'A potion of harming hurt you.'); return; }
+    const fx = POTION_FX[k]; if (fx) P.addEffect(k, fx[1], fx[0] * mult);
+    if (k !== 'awkward') G.ui.message('You feel the ' + (FX_NAMES[k] || k) + ' potion working!', 'gold');
+    return;
+  }
+  if (who instanceof Mob) {
+    const undead = /zombie|skeleton|wither|drowned|husk|stray|phantom|bogged|zoglin/.test(who.type);
+    if (k === 'healing') { if (undead) who.hurt(6 * mult, null, 0, false); else who.hp = Math.min(who.T.hp, who.hp + 4 * mult); }
+    else if (k === 'harming') { if (undead) who.hp = Math.min(who.T.hp, who.hp + 4 * mult); else who.hurt(6 * mult, null, 0, false); }
+    else if (k === 'poison' && !undead) who.hurt(4 * mult, null, 0, false);
+  }
+};
+G.splashAt = (pos, k) => {
+  G.particles.burst(pos.x, pos.y, pos.z, [0xffffff, 0xd8ecf8, 0xc84a8a], 24, 3, 0.12);
+  G.sound.play('break', pos, ID.glass);
+  const P = G.player, d = P.pos.distanceTo(pos);
+  if (d < 4.5) G.applyPotion(P, k, d < 2 ? 1 : 0.6);
+  for (const m of G.mobs) if (!m.dead && m.pos.distanceTo(pos) < 4.5) G.applyPotion(m, k, 1);
+};
+
+/* what a held compass, clock or map shows */
+G.tickHeldHud = (k, dt) => {
+  let box = $('held-hud');
+  if (!box) { box = document.createElement('div'); box.id = 'held-hud'; box.style.cssText = 'position:fixed;right:12px;top:64px;z-index:5;pointer-events:none;color:#fff;font:bold 14px monospace;text-shadow:1px 1px 0 #000;text-align:center'; document.body.appendChild(box); }
+  const P = G.player, show = G.state === 'play' && (k === 'compass' || k === 'clock' || k === 'map' || (k === 'spyglass' && G.zoom));
+  if (!show) { if (!box.hidden) box.hidden = true; return; }
+  box.hidden = false;
+  if (box.dataset.k !== k) { box.dataset.k = k; box.innerHTML = k === 'map' ? '<canvas width="128" height="128" style="width:176px;height:176px;image-rendering:pixelated;border:4px solid #c8a870;background:#e8dcb8"></canvas>' : k === 'spyglass' ? '' : '<div class="hh-dial" style="width:72px;height:72px;border-radius:50%;border:4px solid #8a8a8a;background:#2a2a2a;position:relative;margin:auto"><div class="hh-needle" style="position:absolute;left:34px;top:6px;width:4px;height:30px;background:#e83030;transform-origin:2px 30px"></div></div><div class="hh-text" style="margin-top:4px"></div>'; G.mapAt = 0; }
+  if (k === 'spyglass') { box.style.inset = '0'; box.style.background = 'radial-gradient(circle, transparent 38%, #000 40%)'; box.style.right = '0'; box.style.top = '0'; return; }
+  box.style.inset = ''; box.style.background = ''; box.style.right = '12px'; box.style.top = '64px';
+  if (k === 'compass') {
+    // points to where you first came into the world
+    const sp = P.spawn, a = Math.atan2(sp.x - P.pos.x, sp.z - P.pos.z), rel = a - (P.yaw + Math.PI);
+    box.querySelector('.hh-needle').style.transform = 'rotate(' + (-rel) + 'rad)';
+    box.querySelector('.hh-text').textContent = G.dim === 'overworld' ? Math.round(Math.hypot(sp.x - P.pos.x, sp.z - P.pos.z)) + ' blocks to spawn' : 'The needle spins here!';
+    if (G.dim !== 'overworld') box.querySelector('.hh-needle').style.transform = 'rotate(' + (performance.now() / 150) + 'rad)';
+  } else if (k === 'clock') {
+    const t = (G.time + 0.25) % 1;
+    box.querySelector('.hh-needle').style.transform = 'rotate(' + (t * Math.PI * 2 + Math.PI) + 'rad)';
+    box.querySelector('.hh-dial').style.background = G.isNight() ? '#1a2a4a' : '#3a7ad8';
+    box.querySelector('.hh-text').textContent = String(Math.floor(t * 24)).padStart(2, '0') + ':' + String(Math.floor((t * 24 % 1) * 60)).padStart(2, '0') + (G.isNight() ? ' night' : ' day');
+  } else if (k === 'map' && performance.now() - (G.mapAt || 0) > 1200) {
+    G.mapAt = performance.now();
+    const c = box.querySelector('canvas'), ctx = c.getContext('2d'), img = ctx.createImageData(128, 128), W = G.world, px = Math.floor(P.pos.x), pz = Math.floor(P.pos.z);
+    for (let j = 0; j < 128; j++) for (let i = 0; i < 128; i++) {
+      const x = px - 64 + i, z = pz - 64 + j, o = (j * 128 + i) * 4;
+      if (!W.isLoaded(x, z)) { img.data[o] = 232; img.data[o + 1] = 220; img.data[o + 2] = 184; img.data[o + 3] = 255; continue; }
+      const y = G.dim === 'nether' ? Math.min(W.surfaceY(x, z), 90) : W.surfaceY(x, z), id = W.getBlock(x, y, z), col = (DEFS[id] && DEFS[id].color) || [0, 0, 0];
+      const shade = 0.75 + Math.max(-0.2, Math.min(0.25, (y - W.surfaceY(x, z - 1)) * 0.1));
+      img.data[o] = col[0] * shade; img.data[o + 1] = col[1] * shade; img.data[o + 2] = col[2] * shade; img.data[o + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+    ctx.save(); ctx.translate(64, 64); ctx.rotate(-P.yaw + Math.PI); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#000'; ctx.beginPath(); ctx.moveTo(0, -5); ctx.lineTo(4, 4); ctx.lineTo(-4, 4); ctx.closePath(); ctx.fill(); ctx.stroke(); ctx.restore();
   }
 };
 /* tap a lever to flip it; tap a button to press it for a moment */
@@ -1788,6 +2062,9 @@ function spawnTick() {
 }
 
 /* now and then a wandering trader comes by in the day, with two llamas */
+// music discs turn up in dungeons and mineshafts
+for (const [t, w] of [['dungeon', 3], ['mineshaft', 2], ['desert', 1], ['jungle', 1]]) for (const k of ['13', 'cat', 'blocks', 'chirp', 'far', 'mall', 'stal', 'pigstep']) if (LOOT_TABLES[t]) LOOT_TABLES[t][2].push(['disc_' + k, 1, 1, w]);
+DEFS[ID.nether_wart_block].drop = (r) => [['nether_wart', 1 + (r() * 3 | 0)]];
 function traderSpawn() {
   const P = G.player, W = G.world, now = performance.now();
   if (G.nextTrader === undefined) G.nextTrader = now + (4 + Math.random() * 6) * 60000;
@@ -2178,6 +2455,15 @@ G.throwEye = () => {
 };
 
 G.respawnPlayer = () => {
+  // a charged respawn anchor in the Nether brings you back there
+  const A = G.anchor;
+  if (A && G.worlds && G.worlds.nether) {
+    useDim('nether'); G.player.respawn(); G.player.pos.set(A.x + 0.5, A.y + 1, A.z + 0.5);
+    loadAround(A.x, A.z, 1);
+    const W = G.world, d = DEFS[W.getBlock(A.x, A.y, A.z)];
+    if (d && d.anchor > 0) { W.setBlock(A.x, A.y, A.z, ID['respawn_anchor_' + (d.anchor - 1)]); return; }
+    if (W.isLoaded(A.x, A.z)) { G.anchor = null; G.ui.message('Your respawn anchor had no charge left.', 'purple'); } else return;
+  }
   useDim('overworld');
   G.player.respawn();
   loadAround(G.player.pos.x, G.player.pos.z, 1);
@@ -2328,6 +2614,7 @@ G.continueSaved = async (id) => {
   G.difficulty = G.DIFFS[s.difficulty] ? s.difficulty : 'normal';
   G.chestVer = s.chestVer || {};
   G.furnaces = s.furnaces || {};
+  G.anchor = s.anchor || null;
   G.dimDrops = s.drops && typeof s.drops === 'object' ? s.drops : {};
   G.pets = Object.assign({}, s.pets || {});
   G.pendingPets = G.pets[G.dim] || [];
@@ -2388,7 +2675,7 @@ G.save = (opts) => {
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
     inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
-    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, enderChest: G.enderChest ? slotsJSON(G.enderChest) : null, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
+    dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, enderChest: G.enderChest ? slotsJSON(G.enderChest) : null, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, anchor: G.anchor || null, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
   let ok = true;
   G.lastSaveText = JSON.stringify(data);
@@ -2667,7 +2954,7 @@ function frame(now) {
   // powers from a beacon
   {
     const box = $('effects'), now = performance.now(), list = [];
-    for (const k in (P.effects || {})) { const e = P.effects[k]; if (e.until > now && BEACON_FX[k]) list.push(BEACON_FX[k][0] + (e.lvl > 1 ? ' II' : '')); }
+    for (const k in (P.effects || {})) { const e = P.effects[k]; if (e.until > now && (BEACON_FX[k] || FX_NAMES[k])) list.push((FX_NAMES[k] || BEACON_FX[k][0]) + (e.lvl > 1 ? ' II' : '')); }
     const t = list.join('  \u00b7  ');
     if (box.textContent !== t) box.textContent = t;
     if (box.hidden === !!t) box.hidden = !t;
@@ -2717,7 +3004,10 @@ function frame(now) {
     parts.legs[0].rotation.x = sw2; parts.legs[1].rotation.x = -sw2;
     parts.arms[0].rotation.x = -sw2; parts.arms[1].rotation.x = sw2 - Math.sin(P.swing * Math.PI) * 1.4;
   }
-  const fov = 75 + (P.sprinting ? 8 : 0) + (P.flying && hs > 8 ? 6 : 0);
+  const heldK = P.heldDef && P.heldDef() ? P.heldDef().key : '';
+  if (G.zoom && heldK !== 'spyglass') G.zoom = false;
+  const fov = G.zoom ? 16 : 75 + (P.sprinting ? 8 : 0) + (P.flying && hs > 8 ? 6 : 0);
+  G.tickHeldHud(heldK, dt);
   if (Math.abs(G.camera.fov - fov) > 0.1) { G.camera.fov += (fov - G.camera.fov) * Math.min(1, dt * 8); G.camera.updateProjectionMatrix(); }
 
   // held item
