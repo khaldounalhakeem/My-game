@@ -1246,6 +1246,8 @@ class World {
     if (bridgeZ) bridge(true);
     if (bridgeX) bridge(false);
     if (bridgeZ && bridgeX) for (let x = 5; x <= 10; x++) for (let z = 5; z <= 10; z++) { set(x, BY, z, ID.nether_bricks); for (let y = BY + 1; y <= BY + 4; y++) set(x, y, z, 0); }
+    // fortress crossings sometimes hold a blaze spawner
+    if (bridgeZ && bridgeX && mulberry32(hash3(cx, cz, this.seed + 4242))() < 0.35) set(8, BY + 1, 8, ID.spawner);
     if (!this.legacy) this.netherStructures(cx, cz, c, set);
 
     const m = this.edits.get(this.key(cx, cz));
@@ -1515,8 +1517,15 @@ class World {
       if (!id) continue;
       const def = DEFS[id];
       if (def.cross) { this.addCross(O, x, y, z, def); continue; }
+      if (def.wire) {
+        // redstone dust draws a line to whatever it joins up with, like Minecraft
+        const joins = (dx, dz) => { const n = DEFS[get(x + dx, y, z + dz)]; if (n && (n.wire || n.rsTorch || n.lever || n.button || n.plate || n.key === 'redstone_block' || n.repeater || n.comparator || n.observer || n.target || n.daylight)) return true; const up = DEFS[get(x + dx, y + 1, z + dz)], dn = DEFS[get(x + dx, y - 1, z + dz)]; return !!((up && up.wire && !(DEFS[get(x, y + 1, z)] || {}).opaque) || (dn && dn.wire && !(n && n.opaque))); };
+        const mask = (joins(0, -1) ? 1 : 0) | (joins(1, 0) ? 2 : 0) | (joins(0, 1) ? 4 : 0) | (joins(-1, 0) ? 8 : 0), t = TILES['rsd_' + (def.wire.on ? 'on' : 'off') + '_' + mask];
+        this.addBox(O, x, y, z, { box: def.box, faces: [t, t, t, t, t, t] });
+        continue;
+      }
+      if (def.boxes || def.fence || def.pane) { const bxs = this.shapeBoxes(def, (a, b, c) => get(a, b, c), x, y, z, true); for (let bi = 0; bi < bxs.length; bi++) this.addBox(def.translucent ? T : O, x, y, z, { box: bxs[bi], faces: (def.boxFaces && def.boxFaces[bi]) || def.faces }); continue; }
       if (def.box) { this.addBox(O, x, y, z, def); continue; }
-      if (def.boxes || def.fence || def.pane) { for (const bx of this.shapeBoxes(def, (a, b, c) => get(a, b, c), x, y, z, true)) this.addBox(def.translucent ? T : O, x, y, z, { box: bx, faces: def.faces }); continue; }
       const out = def.translucent ? T : O;
       // water and lava: full under more of the same, lower the further they have flowed
       const sameFluid = (n) => n && DEFS[n] && ((DEFS[n].fluid && DEFS[n].fluid === def.fluid) || (def.fluid === 'water' && DEFS[n].wlog));
@@ -1536,7 +1545,8 @@ class World {
           }
           if (def.liquid && nd.solid && !nd.cutout && f !== 2) continue;
         }
-        const uv = TILE_UV[def.faces[f]];
+        const uv = def.faces && TILE_UV[def.faces[f]];
+        if (!uv) { if (!window.__badMesh) { window.__badMesh = 1; console.warn('bad block in mesh', id, def.key || def.name); } break; }
         const base = out.pos.length / 3;
         const ao = [0, 0, 0, 0];
         for (let k = 0; k < 4; k++) {

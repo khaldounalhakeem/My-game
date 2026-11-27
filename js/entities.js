@@ -697,7 +697,7 @@ class Mob {
       // another player's device runs this mob: send them the hit, just show the flash here
       if (byPlayer) { Net.mobHit(this, dmg, kb); this.hitByMeAt = Date.now(); }
       this.hurtT = 0.35;
-      G.sound.play('hurtMob', this.pos);
+      G.sound.mobVoice(this.type, this.pos, 'hurt');
       return;
     }
     if (this.type === 'creaking') { this.hurtT = 0.35; G.particles.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0xff8a1a, 0x5a4a3a], 8, 1.5, 0.1); if (byPlayer && !this.toldHeart) { this.toldHeart = true; G.ui.message('The Creaking can\'t be hurt! Break its Creaking Heart (the glowing log in a pale oak tree).', 'purple'); } return; }
@@ -715,7 +715,7 @@ class Mob {
     if (this.type === 'squid' || this.type === 'glow_squid') G.particles.burst(this.pos.x, this.pos.y + 0.5, this.pos.z, this.type === 'squid' ? [0x111111, 0x222233] : [0x1a6a60, 0x3ad8c8], 24, 2.5, 0.2);
     if (this.type === 'armadillo') this.rolledT = 5;
     if (this.type === 'bee' && byPlayer) G.angerBees(this.pos.x, this.pos.y, this.pos.z, G.player);
-    G.sound.play('hurtMob', this.pos);
+    G.sound.mobVoice(this.type, this.pos, 'hurt');
     if (this.type === 'enderman' && Math.random() < 0.6 && this.hp > 0) this.teleport();
     if (this.hp <= 0) this.die(byPlayer);
   }
@@ -1524,6 +1524,7 @@ class Mob {
       if (this.dryT > 3) { this.dryT = 2; this.hurt(1, null); }
       moveX = moveZ = 0;
     } else this.dryT = 0;
+    if (W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y - 0.2), Math.floor(this.pos.z)) === ID.soul_sand) speed *= 0.5; // soul sand is slow
     if (DEFS[W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.3), Math.floor(this.pos.z))].web) { speed *= 0.15; this.vel.y = Math.max(this.vel.y, -1); } // stuck in a cobweb
     const accel = this.onGround || swimming ? 10 : 2;
     this.vel.x += (moveX * speed - this.vel.x) * Math.min(1, accel * dt);
@@ -1546,10 +1547,10 @@ class Mob {
     if (this.perched) { const a = P.yaw; this.pos.set(P.pos.x - Math.cos(a) * 0.45, P.pos.y + 1.45, P.pos.z + Math.sin(a) * 0.45); this.vel.set(0, 0, 0); this.yaw = a + Math.PI; }
     if (!T.fly && !swimming && this.hitH && wantMove && (this.onGround || inLiquid)) this.vel.y = 7.6;
     if (this.parts.ring) this.parts.ring.rotation.y += dt * 3;
-    if (inLiquid === ID.lava && !T.fireproof && Math.random() < dt * 2) this.hurt(4, null);
+    if (inLiquid === ID.lava && !T.fireproof) { this.onFire = Math.max(this.onFire || 0, 8); this.burnedAt = Date.now(); if (Math.random() < dt * 2) this.hurt(4, null); } // lava sets it on fire too
     if (W.touching(this, ID.cactus, 0.05) && Math.random() < dt * 2) this.hurt(1, null);
     // fire: an animal or monster that walks into it burns for a while (water puts it out)
-    if (!T.fireproof && W.touching(this, ID.fire, 0.02)) this.onFire = Math.max(this.onFire || 0, 6);
+    if (!T.fireproof && (W.touching(this, ID.fire, 0.02) || W.touching(this, ID.soul_fire, 0.02))) { this.onFire = Math.max(this.onFire || 0, 6); this.fireDmgT = Math.min(this.fireDmgT || 0, 0.5); }
     if (inLiquid === ID.water) this.onFire = 0;
     if (this.onFire > 0) {
       this.onFire -= dt; this.fireDmgT = (this.fireDmgT || 0) - dt;
@@ -1604,7 +1605,7 @@ class Mob {
   puppetUpdate(dt) {
     if (this.netDead && !this.dead) {
       this.dead = true; this.deathT = 0;
-      G.sound.play('deathMob', this.pos);
+      G.sound.mobVoice(this.type, this.pos, 'death');
       if (this.hitByMeAt && Date.now() - this.hitByMeAt < 4000) G.player.addXp(this.T.xp);
     }
     if (this.dead) {
@@ -1979,6 +1980,8 @@ class Projectile {
         if (t !== null && t < bestT) { best = dr; bestT = t; }
       }
       if (best && this.kind === 'potion') { G.splashAt(this.pos, this.potion); return this.finish(); }
+      // a fireball you hit back: one hit kills the ghast that threw it (Return to Sender!)
+      if (best && this.kind === 'fireball') { if (best instanceof Mob) { best.hurt(best.type === 'ghast' ? 1000 : 8, this.pos, 6, true); if (best.type === 'ghast') G.ui.message('Return to Sender! You beat the ghast with its own fireball.', 'gold'); } else if (best.hurt) best.hurt(8); this.pos.copy(best.pos); return this.explodeHere(); }
       if (best && (this.kind === 'snowball' || this.kind === 'wind_charge')) {
         if (this.kind === 'wind_charge') { this.pos.copy(best.pos); return this.windBurst(); }
         if (best instanceof Mob) best.hurt(best.type === 'blaze' ? 3 : 0.01, this.pos, 3, fromPlayer);

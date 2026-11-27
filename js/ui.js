@@ -610,6 +610,11 @@ const UI = {
   },
   updateFlagArrow() {
     const btn = $('btn-flag'), box = $('flag-arrow'), playing = G.state === 'play';
+    // the flag was broken (an explosion, lava, a friend...): forget it, so a new one can go up
+    const mf = G.myFlag;
+    if (mf && mf.dim === G.dim && G.world.isLoaded(mf.x, mf.z) && G.world.getBlock(mf.x, mf.y, mf.z) !== ID.flag) {
+      G.myFlag = null; G.showFlag = false; this.message('Your flag is gone: something broke it. Place a new one.', 'purple'); G.save();
+    }
     const showBtn = playing && !!G.myFlag;
     if (btn.hidden === showBtn) btn.hidden = !showBtn;
     btn.textContent = G.showFlag ? 'Hide flag' : 'Show flag';
@@ -620,7 +625,7 @@ const UI = {
     const rel = Math.atan2(-(fx - P.pos.x), -(fz - P.pos.z)) - P.yaw;
     box.firstElementChild.style.transform = 'rotate(' + (-rel * 180 / Math.PI).toFixed(1) + 'deg)';
     const up = f.y - P.pos.y, ud = Math.abs(up) > 4 ? (up > 0 ? ' up' : ' down') : '';
-    const text = d < 2 ? 'You are at your flag!' : 'Your flag · ' + Math.round(d) + ' blocks' + ud;
+    const text = d < 2 && Math.abs(up) < 3 ? 'You are at your flag!' : d < 2 ? 'Your flag is right ' + (up > 0 ? 'above' : 'below') + ' you · ' + Math.round(Math.abs(up)) + ' blocks' : 'Your flag · ' + Math.round(d) + ' blocks' + ud;
     if (this.flagText !== text) { this.flagText = text; $('flag-label').textContent = text; }
   },
 

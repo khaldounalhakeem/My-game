@@ -683,6 +683,20 @@ for (const [k, c, hi] of [['off', 0x5a0c0c, 0x7a1a14], ['on', 0xe81e10, 0xff8a6a
   makeTile('rs_torch_' + k, P => { P.clear(); P.rect(7, 9, 2, 7, 0x8a6a3a); P.put(7, 9, 0x6a4a24); P.rect(7, 6, 2, 3, c); P.put(7, 6, hi); P.put(8, 8, hi); });
   makeTile('rs_torch_top_' + k, P => { P.fill(c, 10); P.disc(7.5, 7.5, 2, hi); });
 }
+for (const [k, c, hi, lo] of [['off', 0x4a0606, 0x6a1010, 0x3a0404], ['on', 0xd8160c, 0xff5a3a, 0xa80e08]]) for (let m = 0; m < 16; m++) makeTile('rsd_' + k + '_' + m, P => {
+  P.clear();
+  let mm = m; if (mm === 1 || mm === 4) mm = 5; if (mm === 2 || mm === 8) mm = 10; // one link: a straight line through
+  const dot = (x, y) => P.put(x, y, P.rng() < 0.25 ? hi : P.rng() < 0.2 ? lo : c);
+  if (mm === 0) mm = 15; // nothing next to it: a little cross, like Minecraft
+  for (let y = 5; y <= 10; y++) for (let x = 5; x <= 10; x++) if (Math.abs(x - 7.5) + Math.abs(y - 7.5) < 5) dot(x, y);
+  for (let i = 0; i < 8; i++) {
+    if (mm & 1) for (let x = 6; x <= 9; x++) dot(x, i);
+    if (mm & 4) for (let x = 6; x <= 9; x++) dot(x, 15 - i);
+    if (mm & 2) for (let y = 6; y <= 9; y++) dot(15 - i, y);
+    if (mm & 8) for (let y = 6; y <= 9; y++) dot(i, y);
+  }
+});
+makeTile('lever_handle', P => { P.fill(0x8a6a3a, 8); P.rect(0, 0, 16, 3, 0x6a4a24); P.speck(0x6a4a24, 0.15, 6); });
 makeTile('i_redstone_torch', pPlant(P => { P.rect(7, 6, 2, 9, 0x8a6a3a); P.rect(6, 2, 4, 4, 0xe81e10); P.rect(7, 3, 2, 2, 0xff8a6a); }));
 makeTile('powder_snow', P => { P.fill(0xf6f9fc, 3); P.speck(0xe4ecf4, 0.2, 3); P.speck(0xffffff, 0.15, 2); });
 makeTile('i_powder_snow_bucket', pPlant(P => { P.rect(3, 4, 10, 10, 0x9a9a9a); P.rect(4, 4, 8, 3, 0xf6f9fc); P.rect(3, 4, 10, 1, 0xbdbdbd); P.rect(4, 13, 8, 1, 0x6a6a6a); P.line(3, 4, 8, 1, 0x7a7a7a); P.line(12, 4, 8, 1, 0x7a7a7a); }));
@@ -691,11 +705,10 @@ makeTile('rs_lamp_off', P => { P.fill(0x5a3a22, 6); for (let i = 2; i < 14; i +=
 makeTile('rs_lamp_on', P => { P.fill(0xf0c060, 8); for (let i = 2; i < 14; i += 4) { P.rect(i, 1, 2, 14, 0xfff0b0, 6); P.rect(1, i, 14, 2, 0xfff0b0, 6); } P.rect(0, 0, 16, 1, 0x9a6a30); P.rect(0, 15, 16, 1, 0x9a6a30); P.rect(0, 0, 1, 16, 0x9a6a30); P.rect(15, 0, 1, 16, 0x9a6a30); });
 for (const [k, c, hi] of [['off', 0x5a0c0c, 0x7a1a14], ['on', 0xe81e10, 0xff8a6a]]) {
   makeTile('rep_side_' + k, P => { P.clear(); P.rect(0, 0, 16, 16, c); P.rect(0, 5, 16, 1, hi); P.rect(0, 10, 16, 1, hi); P.rect(0, 0, 16, 2, 0x8a8a8a); P.rect(0, 14, 16, 2, 0x8a8a8a); });
-  // the top, with an arrow pointing to where the power comes out (one picture for each way it faces)
+  // the top: a smooth stone slab with a line of redstone running the way it faces, like Minecraft
   for (const dir of ['n', 's', 'w', 'e']) makeTile('rep_top_' + dir + '_' + k, P => {
-    P.fill(0x9a9a9a, 4); P.rect(0, 0, 16, 1, 0x7a7a7a); P.rect(0, 15, 16, 1, 0x7a7a7a); P.rect(0, 0, 1, 16, 0x7a7a7a); P.rect(15, 0, 1, 16, 0x7a7a7a);
-    const pts = []; for (let i = 0; i < 10; i++) pts.push([7, 3 + i], [8, 3 + i]); for (let i = 0; i < 4; i++) { pts.push([7 - i, 3 + i], [8 + i, 3 + i]); }
-    for (const [x, y] of pts) { const [u, v] = dir === 'n' ? [x, y] : dir === 's' ? [15 - x, 15 - y] : dir === 'w' ? [y, 15 - x] : [15 - y, x]; P.put(u, v, c); }
+    P.fill(0xa8a8a8, 3); P.rect(0, 0, 16, 1, 0x8a8a8a); P.rect(0, 15, 16, 1, 0x8a8a8a); P.rect(0, 0, 1, 16, 0x8a8a8a); P.rect(15, 0, 1, 16, 0x8a8a8a);
+    for (let i = 1; i < 15; i++) { const [u, v] = dir === 'n' || dir === 's' ? [7, i] : [i, 7]; P.put(u, v, P.rng() < 0.3 ? hi : c); P.put(u + (dir === 'n' || dir === 's' ? 1 : 0), v + (dir === 'n' || dir === 's' ? 0 : 1), c); }
   });
 }
 makeTile('i_redstone_lamp', P => { P.fill(0xf0c060, 8); for (let i = 2; i < 14; i += 4) { P.rect(i, 1, 2, 14, 0xfff0b0, 6); P.rect(1, i, 14, 2, 0xfff0b0, 6); } });
@@ -1052,6 +1065,22 @@ makeTile('i_detector_rail', pRail('ns', 0x6a6a6a, 0x9a9a9a, 0x8a2a2a));
 makeTile('i_minecart', pPlant(P => { P.rect(2, 6, 12, 6, 0x6a6a70); P.rect(3, 7, 10, 3, 0x3a3a40); P.disc(5, 13, 1.6, 0x2a2a2a); P.disc(11, 13, 1.6, 0x2a2a2a); }));
 makeTile('i_chest_minecart', pPlant(P => { P.rect(2, 7, 12, 5, 0x6a6a70); P.rect(4, 3, 8, 5, 0x9a6a32); P.rect(7, 5, 2, 2, 0x3a3a3a); P.disc(5, 13, 1.6, 0x2a2a2a); P.disc(11, 13, 1.6, 0x2a2a2a); }));
 
+makeTile('soul_fire', pPlant(P => { for (let x = 0; x < 16; x++) { const h = 6 + ((Math.sin(x * 1.7) + 1) * 4 + P.rng() * 3 | 0); for (let j = 0; j < h; j++) { const t = j / h; P.put(x, 15 - j, t < 0.35 ? 0xc8ffff : t < 0.7 ? 0x3ad8e8 : 0x1a7a9a); } } }));
+
+/* spawn eggs: one for every mob (in creative); use one on a spawner to change what it spawns */
+const EGG_MOBS = [['zombie', 0x00afaf, 0x799c65], ['skeleton', 0xc1c1c1, 0x494949], ['creeper', 0x0da70b, 0x000000], ['spider', 0x342d27, 0xa80e0e], ['enderman', 0x161616, 0x000000], ['zombified_piglin', 0xea9393, 0x4c7129], ['wither_skeleton', 0x141414, 0x474d4d], ['blaze', 0xf6b201, 0xfff87e], ['ghast', 0xf9f9f9, 0xbcbcbc],
+  ['iron_golem', 0xdbcdc1, 0x74a332], ['wolf', 0xd7d3d3, 0xceaf96], ['horse', 0xc09e7d, 0xeee500], ['donkey', 0x534539, 0x867566], ['pillager', 0x532f36, 0x959b9b], ['villager', 0x563c33, 0xbd8b72], ['pig', 0xf0a5a2, 0xdb635f], ['cow', 0x443626, 0xa1a1a1], ['sheep', 0xe7e7e7, 0xffb5b5], ['panda', 0xe7e7e7, 0x1b1b22], ['cat', 0xefc88e, 0x957256], ['chicken', 0xa1a1a1, 0xff0000],
+  ['bee', 0xedc343, 0x43241b], ['fox', 0xd5b69f, 0xcc6920], ['rabbit', 0x995f40, 0x734831], ['goat', 0xa5947c, 0x55493e], ['frog', 0xd07444, 0xffc77c], ['turtle', 0xe7e7e7, 0x00afaf], ['llama', 0xc09e7d, 0x995f40], ['camel', 0xfcc369, 0xcb9337], ['polar_bear', 0xf2f2f2, 0x959590], ['mooshroom', 0xa00f10, 0xb7b7b7], ['sniffer', 0x871e09, 0x24a678], ['armadillo', 0xad716d, 0x824848], ['parrot', 0x0da70b, 0xff0000], ['ocelot', 0xefde7d, 0x564434],
+  ['squid', 0x223b4d, 0x708899], ['glow_squid', 0x095656, 0x85f1bc], ['dolphin', 0x223b4d, 0xf9f9f9], ['axolotl', 0xfbc1e3, 0xa62d74], ['cod', 0xc1a76a, 0xe5c48b], ['salmon', 0xa00f10, 0x0e8474], ['tropical_fish', 0xef6915, 0xfff9ef], ['slime', 0x51a03e, 0x7ebf6e], ['magma_cube', 0x340000, 0xfcfc00], ['phantom', 0x43518a, 0x88ff00],
+  ['trader_llama', 0xeaa430, 0x456296], ['strider', 0x9c3436, 0x4d494d], ['bat', 0x4c3e30, 0x0f0f0f], ['snow_golem', 0xd9f2f2, 0x81a4a4], ['allay', 0x00daff, 0x00ade6], ['silverfish', 0x6e6e6e, 0x303030], ['endermite', 0x161616, 0x6e6e6e], ['guardian', 0x5a8272, 0xf17d30], ['breeze', 0xaf94df, 0x9166df], ['ravager', 0x757470, 0x5b5049], ['vex', 0x7a90a4, 0xe8edf1],
+  ['elder_guardian', 0xceccba, 0x747693], ['shulker', 0x946794, 0x4d3852], ['creaking', 0x5f5f5f, 0xfc7812], ['warden', 0x0f4649, 0x39d6e0], ['hoglin', 0xc66e55, 0x5f6464], ['husk', 0x797061, 0xe6cc94], ['stray', 0x617677, 0xdde4e4], ['drowned', 0x8ff1d7, 0x799c65], ['witch', 0x340000, 0x51a03e], ['wandering_trader', 0x456296, 0xeaa430], ['vindicator', 0x959b9b, 0x275e61],
+  ['evoker', 0x959b9b, 0x1e1c1a], ['zombie_villager', 0x563c33, 0x799c65], ['piglin_brute', 0x592a10, 0xf9f3a4], ['bogged', 0x8a9a6a, 0x3a4a2a], ['piglin', 0x995f40, 0xf9f3a4], ['mule', 0x1b0200, 0x51331d], ['skeleton_horse', 0x68684f, 0xe5e5d8], ['cave_spider', 0x0c424e, 0xa80e0e]];
+for (const [k, base, spots] of EGG_MOBS) makeTile('i_egg_' + k, pPlant(P => {
+  for (let y = 1; y < 16; y++) for (let x = 2; x < 14; x++) { const dx = (x - 7.5) / 5.5, dy = (y - 9) / (y < 9 ? 7.5 : 6.5); if (dx * dx + dy * dy <= 1) P.put(x, y, base); }
+  for (const [x, y] of [[5, 5], [9, 4], [10, 9], [6, 11], [8, 13], [4, 9], [11, 12]]) if (P.get(x, y)[3]) { P.put(x, y, spots); P.put(x + 1, y, spots); }
+  P.put(5, 3, shadeC(rgb(base), 1.3));
+}));
+
 /* the animations themselves */
 const waveRows = [[2, 3], [5, 9], [8, 1], [11, 6], [14, 11], [0, 12]];
 animTile('water', 16, 140, (P, f) => {
@@ -1073,6 +1102,10 @@ animTile('fire', 8, 70, (P, f) => {
     const h = 6 + ((Math.sin(x * 1.7 + f * 0.9) + 1) * 3.5 + P.rng() * 4 | 0);
     for (let j = 0; j < h; j++) { const t = j / h; P.put(x, 15 - j, t < 0.35 ? 0xffe36a : t < 0.7 ? 0xff9a1a : 0xe0441a); }
   }
+});
+animTile('soul_fire', 8, 70, (P, f) => {
+  P.clear();
+  for (let x = 0; x < 16; x++) { const h = 6 + ((Math.sin(x * 1.7 + f * 0.9) + 1) * 3.5 + P.rng() * 4 | 0); for (let j = 0; j < h; j++) { const t = j / h; P.put(x, 15 - j, t < 0.35 ? 0xc8ffff : t < 0.7 ? 0x3ad8e8 : 0x1a7a9a); } }
 });
 animTile('portal', 16, 90, (P, f) => {
   const a = f / 16 * Math.PI * 2;
@@ -1131,6 +1164,7 @@ let nextBlockId = 1;
 
 function block(key, name, tex, o = {}) {
   const id = nextBlockId++;
+  if (id >= 4096) throw new Error('too many blocks');
   if (nextBlockId === 128) nextBlockId = 512; // 128-511 belong to items, so later blocks start at 512
   const t = typeof tex === 'string' ? { all: tex } : tex;
   const side = t.side || t.all, top = t.top || t.all || side, bottom = t.bottom || top;
@@ -1405,8 +1439,9 @@ const SWITCH_ROT = (b, d) => d === 's' ? [b[0], b[1], 1 - b[5], b[3], b[4], 1 - 
 for (const d of ['d', 'n', 's', 'w', 'e']) for (const on of [0, 1]) {
   const fl = d === 'd';
   const base = fl ? [0.25, 0, 0.3125, 0.75, 0.1875, 0.6875] : SWITCH_ROT([0.3125, 0.25, 0, 0.6875, 0.75, 0.1875], d);
-  const handle = fl ? (on ? [0.55, 0.1875, 0.4375, 0.8, 0.55, 0.5625] : [0.2, 0.1875, 0.4375, 0.45, 0.55, 0.5625]) : SWITCH_ROT(on ? [0.4375, 0.55, 0.1875, 0.5625, 0.8, 0.55] : [0.4375, 0.2, 0.1875, 0.5625, 0.45, 0.55], d);
-  block('lever_' + d + '_' + on, 'Lever', 'lever', { hardness: 0.5, solid: false, opaque: false, cutout: true, box: [Math.min(base[0], handle[0]), Math.min(base[1], handle[1]), Math.min(base[2], handle[2]), Math.max(base[3], handle[3]), Math.max(base[4], handle[4]), Math.max(base[5], handle[5])], boxes: [base, handle], drop: 'lever', lever: { d, on: !!on }, iconTile: 'i_lever' });
+  const handle = fl ? (on ? [0.58, 0.1875, 0.4375, 0.705, 0.75, 0.5625] : [0.295, 0.1875, 0.4375, 0.42, 0.75, 0.5625]) : SWITCH_ROT(on ? [0.4375, 0.58, 0.1875, 0.5625, 0.705, 0.75] : [0.4375, 0.295, 0.1875, 0.5625, 0.42, 0.75], d);
+  const lv = block('lever_' + d + '_' + on, 'Lever', 'lever', { hardness: 0.5, solid: false, opaque: false, cutout: true, box: [Math.min(base[0], handle[0]), Math.min(base[1], handle[1]), Math.min(base[2], handle[2]), Math.max(base[3], handle[3]), Math.max(base[4], handle[4]), Math.max(base[5], handle[5])], boxes: [base, handle], drop: 'lever', lever: { d, on: !!on }, iconTile: 'i_lever' });
+  lv.boxFaces = [new Array(6).fill(TILES.cobblestone), new Array(6).fill(TILES.lever_handle)];
 }
 for (const [k, n, tile] of [['stone', 'Stone', 'stone'], ['oak', 'Oak', 'planks_oak']]) for (const d of ['d', 'n', 's', 'w', 'e']) for (const on of [0, 1]) {
   const dep = on ? 0.0625 : 0.125, bx = d === 'd' ? [0.3125, 0, 0.375, 0.6875, dep, 0.625] : SWITCH_ROT([0.3125, 0.375, 0, 0.6875, 0.625, dep], d);
@@ -1441,7 +1476,8 @@ for (const dir of ['n', 's', 'w', 'e']) for (let delay = 1; delay <= 4; delay++)
   const back = [[0.5, 0.625], [0.625, 0.75], [0.75, 0.875], [0.8125, 0.9375]][delay - 1];
   const bxs = [[0, 0, 0, 1, 0.125, 1], [0.4375, 0.125, 0.1875, 0.5625, 0.4375, 0.3125], [0.4375, 0.125, back[0], 0.5625, 0.4375, back[1]]].map(b => SWITCH_ROT(b, dir));
   const k = on ? 'on' : 'off';
-  block('repeater_' + dir + '_' + delay + '_' + on, 'Redstone Repeater', { side: 'rep_side_' + k, top: 'rep_top_' + dir + '_' + k, bottom: 'stone' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0, 0, 0, 1, 0.4375, 1], boxes: bxs, drop: 'repeater', repeater: { dir, delay, on: !!on }, iconTile: 'i_repeater' });
+  const rp = block('repeater_' + dir + '_' + delay + '_' + on, 'Redstone Repeater', { side: 'rep_side_' + k, top: 'rep_top_' + dir + '_' + k, bottom: 'stone' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0, 0, 0, 1, 0.4375, 1], boxes: bxs, drop: 'repeater', repeater: { dir, delay, on: !!on }, iconTile: 'i_repeater' });
+  rp.boxFaces = [rp.faces, new Array(6).fill(TILES['rs_torch_top_' + k]), new Array(6).fill(TILES['rs_torch_top_' + k])];
 }
 /* blocks with a front (furnace, crafting table, jack o'lantern, smoker, blast furnace) turned the other three
    ways, so the front faces you when you place it. The plain block faces south (+z). */
@@ -1615,7 +1651,14 @@ for (const sticky of [false, true]) for (const d of ['n', 's', 'e', 'w', 'u', 'd
 for (const d of ['n', 's', 'e', 'w', 'u', 'd']) for (const on of [0, 1]) { const b = block('observer_' + d + '_' + on, 'Observer', 'stone', PK(3, { observer: { d, on: !!on }, drop: 'observer_n_0', hide: !(d === 'n' && !on), facePlace: 'observer' })); b.faces = faces6(d, 'observer_face', on ? 'observer_back_on' : 'observer_back', TILES.observer_side); b.color = TILES_AVG_OF('observer_side'); }
 for (const on of [0, 1]) block('daylight_detector_' + on, 'Daylight Detector', { top: 'daylight_top', side: 'barrel_top', bottom: 'barrel_top' }, { tool: 'axe', hardness: 0.2, opaque: false, box: [0, 0, 0, 1, 0.375, 1], boxes: [[0, 0, 0, 1, 0.375, 1]], daylight: { on: !!on }, drop: 'daylight_detector_0', hide: !!on });
 for (const on of [0, 1]) block('target_' + on, 'Target', { top: 'target_top', side: 'target_side' }, { hardness: 0.5, target: { on: !!on }, drop: 'target_0', hide: !!on });
-for (const d of ['n', 's', 'w', 'e']) for (const on of [0, 1]) block('comparator_' + d + '_' + on, 'Redstone Comparator', { top: 'comparator_top' + (on ? '_on' : ''), side: 'stone', bottom: 'stone' }, { hardness: 0, solid: false, opaque: false, box: [0, 0, 0, 1, 0.125, 1], boxes: [[0, 0, 0, 1, 0.125, 1]], comparator: { dir: d, on: !!on }, drop: 'comparator', iconTile: 'i_comparator', hide: true });
+// like Minecraft: a smooth stone slab with two redstone torches at the back and a small one at the front
+for (const d of ['n', 's', 'w', 'e']) for (const on of [0, 1]) {
+  const k = on ? 'on' : 'off';
+  const bxs = [[0, 0, 0, 1, 0.125, 1], [0.1875, 0.125, 0.6875, 0.3125, 0.4375, 0.8125], [0.6875, 0.125, 0.6875, 0.8125, 0.4375, 0.8125], [0.4375, 0.125, 0.125, 0.5625, 0.3125, 0.25]].map(b => SWITCH_ROT(b, d));
+  const cp = block('comparator_' + d + '_' + on, 'Redstone Comparator', { top: 'rep_top_' + d + '_' + k, side: 'rep_side_' + k, bottom: 'stone' }, { hardness: 0, solid: false, opaque: false, cutout: true, box: [0, 0, 0, 1, 0.4375, 1], boxes: bxs, comparator: { dir: d, on: !!on }, drop: 'comparator', iconTile: 'i_comparator', hide: true });
+  const tt = new Array(6).fill(TILES['rs_torch_top_' + k]);
+  cp.boxFaces = [cp.faces, tt, tt, tt];
+}
 block('scaffolding', 'Scaffolding', { top: 'scaffolding_top', side: 'scaffolding_side' }, { hardness: 0, opaque: false, cutout: true, boxes: [[0, 0.875, 0, 1, 1, 1]], ladder: 'u', scaffold: true, iconTile: 'i_scaffolding' });
 for (const d of ['n', 's', 'w', 'e']) block('item_frame_' + d, 'Item Frame', 'item_frame', { hardness: 0.3, opaque: false, solid: false, box: { w: [0, 0.125, 0.125, 0.0625, 0.875, 0.875], e: [0.9375, 0.125, 0.125, 1, 0.875, 0.875], n: [0.125, 0.125, 0, 0.875, 0.875, 0.0625], s: [0.125, 0.125, 0.9375, 0.875, 0.875, 1] }[d], frame: d, drop: 'item_frame', iconTile: 'i_item_frame', hide: true });
 for (const lit of [0, 1]) block('candle' + (lit ? '_lit' : ''), 'Candle', lit ? 'candle_lit' : 'candle', { hardness: 0.1, opaque: false, cutout: true, solid: false, box: [0.375, 0, 0.375, 0.625, 0.5, 0.625], candle: !!lit, light: !!lit, emit: lit ? 6 : undefined, drop: 'candle', iconTile: 'i_candle', hide: !!lit });
@@ -1649,8 +1692,10 @@ for (const sh of ['ns', 'ew']) for (const on of [0, 1]) block('drail_' + sh + '_
 /* flowing water and lava: level 1 is next to the source, 7 the furthest; 'fall' pours straight down */
 for (const F of ['water', 'lava']) for (const lv of [1, 2, 3, 4, 5, 6, 7, 8]) block(F + '_' + (lv === 8 ? 'fall' : lv), F === 'water' ? 'Water' : 'Lava', F, F === 'water' ? { solid: false, opaque: false, translucent: true, liquid: true, hardness: Infinity, fluid: F, level: lv, drop: null, hide: true } : { solid: false, opaque: false, liquid: true, hardness: Infinity, light: true, fluid: F, level: lv, drop: null, hide: true });
 Object.assign(DEFS[ID.water], { fluid: 'water', level: 0 }); Object.assign(DEFS[ID.lava], { fluid: 'lava', level: 0 });
+block('soul_fire', 'Soul Fire', 'soul_fire', { solid: false, opaque: false, cutout: true, cross: true, hardness: 0, drop: null, replaceable: true, light: true, emit: 10, burns: true, hide: true });
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
+  if (nextItemId === 512) nextItemId = 4096; // 512 and up are blocks, so more items go to 4096 and up
   const id = nextItemId++;
   const def = Object.assign({ id, key, name, isBlock: false, tile: TILES['i_' + tile], stack: 64 }, o);
   if (def.tile === undefined) throw new Error('missing item tile ' + tile);
@@ -1866,6 +1911,7 @@ item('powered_rail', 'Powered Rail', 'powered_rail', { placesRail: 'powered' });
 item('detector_rail', 'Detector Rail', 'detector_rail', { placesRail: 'detector' });
 item('minecart', 'Minecart', 'minecart', { stack: 1, cart: 'minecart' });
 item('chest_minecart', 'Minecart with Chest', 'chest_minecart', { stack: 1, cart: 'chest_minecart' });
+for (const [k] of EGG_MOBS) item('egg_' + k, k.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') + ' Spawn Egg', 'egg_' + k, { stack: 64, egg: k });
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire

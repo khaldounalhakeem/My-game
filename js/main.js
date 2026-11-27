@@ -25,8 +25,10 @@ const Sound = {
       for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     } catch (e) { this.ctx = null; }
   },
+  pitch: 1,
   tone(f, dur, type, v, f2, delay = 0) {
     const c = this.ctx, t = c.currentTime + delay;
+    f *= this.pitch; if (f2) f2 *= this.pitch;
     const o = c.createOscillator(), g = c.createGain();
     o.type = type; o.frequency.setValueAtTime(f, t);
     if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
@@ -35,6 +37,7 @@ const Sound = {
   },
   noise(dur, v, freq, type = 'lowpass', delay = 0, f2) {
     const c = this.ctx, t = c.currentTime + delay;
+    freq *= this.pitch; if (f2) f2 *= this.pitch;
     const s = c.createBufferSource(); s.buffer = this.noiseBuf;
     const fl = c.createBiquadFilter(); fl.type = type; fl.frequency.setValueAtTime(freq, t);
     if (f2) fl.frequency.exponentialRampToValueAtTime(f2, t + dur);
@@ -42,6 +45,54 @@ const Sound = {
     g.gain.setValueAtTime(v, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     s.connect(fl); fl.connect(g); g.connect(this.master);
     s.start(t, Math.random() * 0.5); s.stop(t + dur + 0.05);
+  },
+  /* which sound a block makes, like Minecraft's sound groups */
+  group(def) {
+    if (!def) return 'stone';
+    const k = def.key || '';
+    if (def.glassy || /glass|ice|sea_lantern|beacon/.test(k)) return 'glass';
+    if (/wool|carpet|bed|dog_bed/.test(k)) return 'wool';
+    if (/^snow|powder_snow/.test(k)) return 'snow';
+    if (/sand|concrete_powder|suspicious_sand/.test(k) && !/sandstone/.test(k)) return /soul/.test(k) ? 'soul' : 'sand';
+    if (/gravel|dirt|farmland|clay|mud$|mycelium|path|podzol|suspicious_gravel/.test(k)) return k === 'clay' || k === 'mud' ? 'mud' : 'gravel';
+    if (/soul/.test(k)) return 'soul';
+    if (/grass|leaves|moss|azalea|vine|hay|sapling|flower|tulip|rose|dandelion|orchid|allium|daisy|cornflower|lily|bush|fern|kelp|seagrass|wart_block|roots|sugar_cane|bamboo$|chorus|sculk|crop|sprout|berry|pitcher|torchflower|lichen/.test(k) || def.leaves || (def.cross && !/fire|torch|pointed|cluster|cobweb/.test(k))) return /sculk/.test(k) ? 'sculk' : 'grass';
+    if (/iron|gold_block|diamond_block|emerald_block|netherite_block|copper|anvil|cauldron|hopper|chain|rail|bars|lantern|bell|heavy_core|vault|trial_spawner|spawner/.test(k)) return 'metal';
+    if (/amethyst|calcite/.test(k)) return 'amethyst';
+    if (/netherrack|nylium|nether_bricks|quartz_ore|nether_gold/.test(k)) return 'nether';
+    if (/honey|slime/.test(k)) return 'slime';
+    if (def.tool === 'axe' || /planks|log|wood|stem|table|bookshelf|chest|barrel|door|trapdoor|fence|sign|ladder|scaffolding|composter|lectern|jukebox|note_block|beehive|nest|campfire|loom|fletching/.test(k)) return 'wood';
+    return 'stone';
+  },
+  /* the sound of a block: 'break' when it breaks, 'hit' while you dig at it, 'place' and 'step' */
+  blockSound(g, kind, v) {
+    const L = kind === 'break' ? 1 : kind === 'place' ? 0.8 : kind === 'hit' ? 0.4 : 0.22, r = Math.random;
+    const vv = v * L;
+    switch (g) {
+      case 'stone': this.noise(kind === 'break' ? 0.14 : 0.06, 0.55 * vv, 1600 + r() * 400, 'bandpass'); this.tone(140, 0.05, 'triangle', 0.08 * vv, 90); break;
+      case 'wood': this.tone(220 + r() * 40, kind === 'break' ? 0.12 : 0.07, 'triangle', 0.18 * vv, 140); this.noise(0.08, 0.3 * vv, 800, 'bandpass'); break;
+      case 'gravel': for (let i = 0; i < (kind === 'break' ? 4 : 2); i++) this.noise(0.05, 0.4 * vv, 1400 + r() * 1400, 'bandpass', i * 0.03); break;
+      case 'mud': this.noise(0.12, 0.45 * vv, 400, 'lowpass'); this.tone(110, 0.08, 'sine', 0.08 * vv, 70); break;
+      case 'grass': this.noise(kind === 'break' ? 0.16 : 0.09, 0.35 * vv, 2600, 'lowpass', 0, 900); if (kind !== 'step') this.noise(0.07, 0.2 * vv, 3200, 'highpass', 0.04); break;
+      case 'sand': this.noise(kind === 'break' ? 0.22 : 0.12, 0.35 * vv, 1800, 'lowpass', 0, 600); break;
+      case 'soul': this.noise(0.2, 0.35 * vv, 700, 'lowpass', 0, 200); this.tone(180, 0.15, 'sine', 0.05 * vv, 120); break;
+      case 'glass': if (kind === 'break') { for (let i = 0; i < 6; i++) this.tone(2200 + r() * 3000, 0.12 + r() * 0.1, 'triangle', 0.07 * v, 1500, i * 0.025); this.noise(0.25, 0.4 * v, 4000, 'highpass'); } else this.tone(2600, 0.05, 'triangle', 0.1 * vv); break;
+      case 'wool': this.noise(0.1, 0.4 * vv, 500, 'lowpass'); break;
+      case 'snow': for (let i = 0; i < 2; i++) this.noise(0.08, 0.3 * vv, 2000 + r() * 800, 'lowpass', i * 0.05); break;
+      case 'metal': this.tone(700 + r() * 200, kind === 'break' ? 0.35 : 0.15, 'square', 0.05 * vv, 600); this.tone(1400, 0.2, 'sine', 0.06 * vv, 1300); this.noise(0.05, 0.3 * vv, 3000, 'bandpass'); break;
+      case 'amethyst': this.tone(1500 + r() * 900, 0.4, 'sine', 0.1 * vv); this.tone(2400 + r() * 900, 0.3, 'sine', 0.06 * vv, null, 0.04); break;
+      case 'nether': this.noise(0.1, 0.5 * vv, 900, 'bandpass'); this.tone(100, 0.06, 'triangle', 0.08 * vv, 70); break;
+      case 'slime': this.noise(0.15, 0.4 * vv, 500, 'lowpass', 0, 150); this.tone(200, 0.12, 'sine', 0.1 * vv, 120); break;
+      case 'sculk': this.noise(0.15, 0.35 * vv, 600, 'lowpass'); this.tone(300, 0.1, 'sine', 0.05 * vv, 500); break;
+    }
+  },
+  /* a mob that gets hit makes its own noise, higher and sharper, like a cry of pain; dying, lower and longer */
+  mobVoice(type, pos, kind) {
+    const was = this.pitch;
+    this.pitch = kind === 'death' ? 0.7 : 1.35;
+    this.play('mob_' + type, pos);
+    this.pitch = was;
+    if (kind === 'hurt') this.play('hurtMob', pos);
   },
   play(name, pos, id) {
     if (!this.ctx || this.ctx.state !== 'running') return;
@@ -51,13 +102,13 @@ const Sound = {
     const mat = id ? DEFS[id] : null;
     const pitch = mat ? (mat.tool === 'pick' ? 1400 : /log|planks|table|bookshelf|chest/.test(mat.key) ? 700 : mat.key === 'glass' ? 3000 : 450) : 600;
     switch (name) {
-      case 'break': this.noise(0.18, 0.5 * v, pitch, 'lowpass'); if (mat && mat.key === 'glass') this.tone(2200, 0.15, 'triangle', 0.1, 900); break;
-      case 'dig': this.noise(0.06, 0.25 * v, pitch); break;
-      case 'place': this.noise(0.08, 0.4 * v, pitch * 0.8); break;
-      case 'step': this.noise(0.05, 0.06, 500); break;
+      case 'break': this.blockSound(this.group(mat), 'break', v); break;
+      case 'dig': this.blockSound(this.group(mat), 'hit', v); break;
+      case 'place': this.blockSound(this.group(mat || (G.player && G.player.heldDef && G.player.heldDef()) || null), 'place', v); break;
+      case 'step': this.blockSound(this.group(mat), 'step', v); break;
       case 'land': this.noise(0.1, 0.25, 300); break;
       case 'hurt': this.tone(240, 0.2, 'square', 0.12, 130); break;
-      case 'hurtMob': this.tone(320, 0.15, 'square', 0.08 * v, 180); break;
+      case 'hurtMob': this.noise(0.08, 0.45 * v, 420, 'lowpass'); this.tone(120, 0.07, 'sine', 0.12 * v, 70); break; // the thump of a hit
       case 'deathMob': this.tone(260, 0.4, 'sawtooth', 0.08 * v, 70); break;
       case 'pickup': this.tone(1100, 0.06, 'triangle', 0.08, 1700); break;
       case 'click': this.tone(900, 0.03, 'square', 0.04); break;
@@ -467,7 +518,7 @@ G.tickAmbient = (dt) => {
       if (isTorch(d)) kind = 'torch';
       else if (d.rsTorch && d.rsTorch.on) kind = 'rstorch';
       else if (id === ID.campfire) kind = 'campfire';
-      else if (id === ID.fire) kind = 'fire';
+      else if (id === ID.fire || id === ID.soul_fire) kind = 'fire';
       else if (id === ID.nether_portal) kind = 'portal';
       else if (id === ID.enchanting_table) kind = 'ench';
       else if (d.base === 'furnace' || d.base === 'smoker' || d.base === 'blast_furnace') kind = 'furnace';
@@ -478,6 +529,7 @@ G.tickAmbient = (dt) => {
       else if (d.copper !== undefined && d.copper < 3 && Math.random() < 0.0004) { W.setBlock(x, y, z, ID[['', 'exposed_', 'weathered_', 'oxidized_'][d.copper + 1] + d.copperKind]); continue; }
       else if (id === ID.end_rod) kind = 'endrod';
       else if (id === ID.end_gateway) kind = 'portal';
+      else if (id === ID.spawner) kind = 'spawner';
       else if (id === ID.sculk_shrieker) kind = 'shrieker';
       else if (d.hopper) kind = 'hopper';
       else if (d.jukebox) kind = 'juke';
@@ -488,7 +540,7 @@ G.tickAmbient = (dt) => {
     }
   }
   const r = Math.random;
-  const books = new Set(), glows = new Set(), frames = new Set();
+  const books = new Set(), glows = new Set(), frames = new Set(), spawners = new Set();
   A.hopT = (A.hopT || 0) - dt; const hopNow = A.hopT <= 0; if (hopNow) A.hopT = 0.5;
   for (const [kind, x, y, z, d] of A.list) {
     switch (kind) {
@@ -505,6 +557,7 @@ G.tickAmbient = (dt) => {
       case 'lavatop': if (r() < dt * 0.15) { PT.burst(x + 0.5, y + 1, z + 0.5, [0xff8a1a, 0xffd04a, 0x333333], 4, 1.5, 0.08); if (P.pos.distanceTo(new THREE.Vector3(x, y, z)) < 10 && r() < 0.3) Sound.play('dig', new THREE.Vector3(x, y, z), ID.lava); } break;
       case 'dripw': case 'dripl': if (r() < dt * 0.25) PT.spawn(x + 0.2 + r() * 0.6, y - 0.05, z + 0.2 + r() * 0.6, kind === 'dripw' ? 0x3a6ad8 : 0xff7a1a, 0, 0, 0, 0.06, 1.2, 9); break;
       case 'hopper': if (hopNow) G.tickHopper(x, y, z, d); break;
+      case 'spawner': G.tickSpawner(x, y, z, dt, spawners); break;
       case 'shrieker': {
         // a shrieker hears you walking nearby: it screams, it goes dark, and after a few warnings the warden comes
         const moving = !P.sneaking && Math.hypot(P.vel.x, P.vel.z) > 0.6, near = Math.hypot(P.pos.x - x - 0.5, P.pos.y - y, P.pos.z - z - 0.5) < 8;
@@ -570,6 +623,7 @@ G.tickAmbient = (dt) => {
     g.userData.R.rotation.z = (1 - o) * 1.45 - Math.sin(t * 5 + 1) * 0.06 * o;
   }
   for (const [k, F] of G.frameMeshes) if (!frames.has(k) && (A.scanT > 0.5)) { const [fx, fy, fz] = k.split(',').map(Number); if (!DEFS[W.getBlock(fx, fy, fz)].frame || Math.hypot(fx - P.pos.x, fz - P.pos.z) > 14) { G.scene.remove(F.mesh); G.frameMeshes.delete(k); } }
+  for (const [k, S] of G.spawnerMobs) if (!spawners.has(k)) { G.scene.remove(S.mesh); G.spawnerMobs.delete(k); }
   // a cooking furnace: its door glows and flickers
   for (const k of glows) if (!A.glows.has(k)) {
     const [x, y, z] = k.split(','), d = DEFS[W.getBlock(+x, +y, +z)], [fx, fz] = { s: [0, 1], n: [0, -1], e: [1, 0], w: [-1, 0] }[d.facing || 's'];
@@ -1475,6 +1529,9 @@ G.lightFire = (b) => {
   const clicked = W.getBlock(b.x, b.y, b.z), onSolid = clicked && DEFS[clicked].solid;
   if (!(free(x, y, z) && (solidBelow(x, y, z) || onSolid))) { x = b.x; y = b.y + 1; z = b.z; }
   if (!(free(x, y, z) && (solidBelow(x, y, z) || onSolid))) return false;
+  // on soul sand or soul soil the fire burns blue, and never goes out
+  const under = W.getBlock(x, y - 1, z);
+  if (under === ID.soul_sand || under === ID.soul_soil) { W.setBlock(x, y, z, ID.soul_fire); G.sound.play('fuse', new THREE.Vector3(x, y, z)); return true; }
   W.setBlock(x, y, z, ID.fire);
   G.sound.play('fuse', new THREE.Vector3(x, y, z));
   G.fires = G.fires || {};
@@ -1731,6 +1788,7 @@ G.openEnderChest = (x, y, z) => {
   G.ui.openInventory('chest', { slots: G.enderChest, ender: true, x, y, z });
 };
 G.openChest = (x, y, z) => {
+  if (G.dim === 'nether' && G.player.mode === 'survival') for (const m of G.mobs) if (m.type === 'piglin' && !m.dead && m.pos.distanceTo(G.player.pos) < 16) m.angry = true; // piglins guard their chests
   const W = G.world, id = W.getBlock(x, y, z), key = chestKey(x, y, z);
   // one player at a time, so nobody can take the same item twice
   const busy = Net.chestUser(key);
@@ -2407,16 +2465,6 @@ function structureSpawns() {
         if (Math.random() < 0.15 && !G.mobs.some(m => m.type === 'allay' && !m.dead && Math.hypot(m.pos.x - o.x, m.pos.z - o.z) < 40)) { const y = W.surfaceY(o.x, o.z); spawnMob('allay', o.x + 2, y + 2, o.z + 2); }
       }
     }
-    for (const [sx, sy, sz] of c.spawners || []) {
-      if (W.getBlock(sx, sy, sz) !== ID.spawner) continue;
-      if (Math.hypot(P.pos.x - sx, P.pos.y - sy, P.pos.z - sz) > 16 || P.mode !== 'survival') continue;
-      G.particles.burst(sx + 0.5, sy + 0.8, sz + 0.5, [0xff7a20, 0x553322], 3, 0.8, 0.1, -1);
-      const near = G.mobs.filter(m => !m.dead && Math.hypot(m.pos.x - sx, m.pos.z - sz) < 8).length;
-      if (near >= 4 || Math.random() > 0.3) continue;
-      const x = sx + (Math.random() < 0.5 ? -2 : 2) + 0.5, z = sz + Math.round((Math.random() - 0.5) * 4) + 0.5;
-      if (!W.getBlock(Math.floor(x), sy, Math.floor(z)) && !W.getBlock(Math.floor(x), sy + 1, Math.floor(z)))
-        spawnMob(['zombie', 'skeleton', 'spider'][Math.random() * 3 | 0], x, sy, z);
-    }
   }
 }
 
@@ -2802,6 +2850,43 @@ G.fluidPush = (x, y, z) => {
   for (const [a, c] of NB4) { const nid = W.getBlock(Math.floor(x) + a, Math.floor(y), Math.floor(z) + c); if (fluidOf(nid) === d.fluid) { const st = strengthOf(nid); fx += a * (st - me); fz += c * (st - me); } else if (!nid) { fx += a * 2; fz += c * 2; } }
   const l = Math.hypot(fx, fz);
   return l ? [fx / l, fz / l, d.fluid] : null;
+};
+/* monster spawners: a little mob spins inside; when you're near, they send out a few now and then.
+   A spawner found in the world picks its mob from where it is (dungeons: zombies, skeletons or spiders,
+   fortresses: blazes, deep mineshafts: cave spiders); a spawn egg used on it changes it. */
+G.spawnerMobs = new Map();
+G.spawnerType = (x, y, z) => {
+  const sl = G.chestSlots(x, y, z, false), egg = sl && sl[0] && DEFS[sl[0].id] && DEFS[sl[0].id].egg;
+  if (egg && MOB_TYPES[egg]) return egg;
+  if (G.dim === 'nether') return 'blaze';
+  if (y < 30 && G.world.mineshaftAt && G.world.mineshaftAt(Math.floor(x / 16), Math.floor(z / 16))) return 'cave_spider';
+  return ['zombie', 'skeleton', 'spider'][hash3(x, y, z) % 3];
+};
+G.tickSpawner = (x, y, z, dt, seen) => {
+  const k = x + ',' + y + ',' + z, type = G.spawnerType(x, y, z), P = G.player;
+  seen.add(k);
+  let S = G.spawnerMobs.get(k);
+  if (S && S.type !== type) { G.scene.remove(S.mesh); G.spawnerMobs.delete(k); S = null; }
+  if (!S) {
+    const m = buildMobModel(type), big = Math.max(MOB_TYPES[type].h, MOB_TYPES[type].w);
+    m.group.scale.setScalar(Math.min(0.45, 0.8 / big)); m.group.position.set(x + 0.5, y + 0.25, z + 0.5);
+    G.scene.add(m.group); S = { mesh: m.group, type, t: 2 + Math.random() * 4 }; G.spawnerMobs.set(k, S);
+  }
+  S.mesh.rotation.y += dt * 2.5;
+  if (Math.random() < dt * 3) G.particles.spawn(x + Math.random(), y + Math.random(), z + Math.random(), Math.random() < 0.5 ? 0xff7a20 : 0x553322, 0, 0.4, 0, 0.06, 0.6, 0);
+  if (P.mode === 'spectator' || Math.hypot(P.pos.x - x - 0.5, P.pos.y - y, P.pos.z - z - 0.5) > 16) return;
+  if (MOB_TYPES[type].hostile && G.diff().mobs === 0) return;
+  S.t -= dt;
+  if (S.t > 0) return;
+  S.t = 5 + Math.random() * 12;
+  const W = G.world, near = G.mobs.filter(m => !m.dead && m.type === type && Math.hypot(m.pos.x - x, m.pos.z - z) < 9).length;
+  if (near >= 6) return;
+  for (let n = 0, made = 0; n < 8 && made < 2 + (Math.random() * 3 | 0); n++) {
+    const mx = x + (Math.random() * 9 | 0) - 4, mz = z + (Math.random() * 9 | 0) - 4, my = y + (Math.random() * 3 | 0) - 1;
+    if (W.getBlock(mx, my, mz) || W.getBlock(mx, my + 1, mz) || !W.getBlock(mx, my - 1, mz)) continue;
+    spawnMob(type, mx + 0.5, my, mz + 0.5); made++;
+    G.particles.burst(mx + 0.5, my + 0.8, mz + 0.5, [0x777777, 0xffffff], 10, 1.5, 0.1, -1);
+  }
 };
 /* the end gateway: a floating portal beside the main island that leads out to the outer islands (and back) */
 G.placeGateway = () => {

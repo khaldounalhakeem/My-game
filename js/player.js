@@ -249,6 +249,7 @@ class Player {
     const under = this.onGround ? G.world.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y - 0.1), Math.floor(this.pos.z)) : 0;
     this.onHoney = under === ID.honey_block;
     if (this.onHoney && !this.flying) speed *= 0.4;
+    if ((under === ID.soul_sand || W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.05), Math.floor(this.pos.z)) === ID.soul_sand) && !this.flying) speed *= 0.45; // soul sand pulls at your feet
     const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
     const wx = (-s * mz + c * mx) * speed, wz = (-c * mz - s * mx) * speed;
     const accel = this.flying ? 8 : this.onGround ? 16 : swimming ? 6 : 3.5;
@@ -306,7 +307,7 @@ class Player {
     // footsteps
     if (this.onGround && Math.hypot(this.vel.x, this.vel.z) > 1) {
       this.stepT = (this.stepT || 0) - dt * Math.hypot(this.vel.x, this.vel.z);
-      if (this.stepT <= 0) { this.stepT = 2.2; G.sound.play('step'); }
+      if (this.stepT <= 0) { this.stepT = 2.2; G.sound.play('step', null, G.world.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y - 0.2), Math.floor(this.pos.z))); }
     }
   }
 
@@ -390,7 +391,7 @@ class Player {
       this.lavaT -= dt;
       if (this.lavaT <= 0) { this.lavaT = 0.5; this.hurt(4, null, 0, true, 'You fell into lava.'); }
     }
-    if (W.touching(this, ID.fire, 0.02) && !this.inWater) this.fire = Math.max(this.fire || 0, 6);
+    if ((W.touching(this, ID.fire, 0.02) || W.touching(this, ID.soul_fire, 0.02)) && !this.inWater) this.fire = Math.max(this.fire || 0, 6);
     if (this.inWater) this.fire = 0;
     if (this.fire > 0) {
       this.fire -= dt; this.fireT -= dt;
@@ -502,6 +503,7 @@ class Player {
     if (ad && (ad.cross || ad.rail || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.repeater || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
     if (DEFS[id].hive) G.angerBees(x, y, z, this);
+    if (G.dim === 'nether' && (id === ID.gold_block || id === ID.gilded_blackstone || id === ID.nether_gold_ore || id === ID.chest || id === ID.chest_loot)) { let any = false; for (const m of G.mobs) if (m.type === 'piglin' && !m.dead && m.pos.distanceTo(this.pos) < 16 && this.mode === 'survival') { m.angry = true; any = true; } if (any) G.ui.message('The piglins saw you take their gold!', 'purple'); }
     { const bd = DEFS[id];
       if (bd.container || bd.jukebox || bd.frame) G.breakChest(x, y, z, false);
       if (bd.piston && bd.piston.ext) { const v = DIR6[bd.piston.d]; if (DEFS[W.getBlock(x + v[0], y + v[1], z + v[2])].pistonHead) W.setBlock(x + v[0], y + v[1], z + v[2], 0); }
@@ -541,9 +543,26 @@ class Player {
   }
 
   /* left button held */
+  tryDeflect() {
+    const o = this.eyePos(), d = this.lookDir();
+    for (const pr of G.projectiles) {
+      if (pr.done || pr.kind !== 'fireball' || pr.owner === this) continue;
+      const rel = pr.pos.clone().sub(o), along = rel.dot(d);
+      if (along < 0 || along > 5.5) continue;
+      if (rel.clone().addScaledVector(d, -along).length() > 1.3) continue;
+      pr.vel.copy(d).multiplyScalar(22); pr.owner = this; pr.life = 8; pr.deflected = true;
+      this.swing = 1; this.attackCd = 0.3; this.useCd = 0.3;
+      G.sound.play('hurtMob', pr.pos); G.particles.burst(pr.pos.x, pr.pos.y, pr.pos.z, [0xffffff, 0xff9a2a], 10, 2, 0.12);
+      G.ui.message('You hit the fireball back!', 'gold');
+      return true;
+    }
+    return false;
+  }
   primary(dt, pressed, tgt) {
     if (this.mode === 'spectator') { this.breaking = null; return; }
     if (this.adventure && !tgt.mob) { this.breaking = null; return; } // adventure: you can't break blocks
+    // hit a ghast's fireball and it flies back the way you're looking
+    if (pressed && this.tryDeflect()) return;
     const creative = this.mode === 'creative';
     if (tgt.mob) {
       this.breaking = null;
@@ -552,7 +571,7 @@ class Player {
     }
     const b = tgt.block;
     if (!b) { this.breaking = null; if (pressed) this.swing = 1; return; }
-    if (b.id === ID.fire) { if (pressed) this.putOutFire(b.x, b.y, b.z); this.breaking = null; return; }
+    if (b.id === ID.fire || b.id === ID.soul_fire) { if (pressed) this.putOutFire(b.x, b.y, b.z); this.breaking = null; return; }
     const def = DEFS[b.id];
     if (def.hardness === Infinity) { this.breaking = null; return; }
     if (creative) {
@@ -875,10 +894,11 @@ class Player {
 
   use(tgt) {
     if (this.useCd > 0 || this.mode === 'spectator') return;
+    if (this.tryDeflect()) return;
     const W = G.world, held = this.heldSlot(), hd = held ? DEFS[held.id] : null;
     const b = tgt.block;
     // one tap on fire puts it out
-    if (b && b.id === ID.fire) { this.putOutFire(b.x, b.y, b.z); return; }
+    if (b && (b.id === ID.fire || b.id === ID.soul_fire)) { this.putOutFire(b.x, b.y, b.z); return; }
     // a bucket on a cow: milk
     if (tgt.mob && tgt.mob.type === 'mooshroom' && !tgt.mob.dead && hd && hd.key === 'bowl') { this.useCd = 0.4; this.swing = 1; this.swapHeld(ID.mushroom_stew); G.sound.play('pickup'); return; }
     if (tgt.mob && ['cod', 'salmon', 'tropical_fish', 'axolotl'].includes(tgt.mob.type) && !tgt.mob.dead && !tgt.mob.remoteCtl && hd && hd.key === 'water_bucket') {
@@ -1035,6 +1055,15 @@ class Player {
       { const pr = G.projectiles[G.projectiles.length - 1], bs = this.heldSlot(); if (pr) { pr.power = enchLv(bs, 'power'); pr.flame = enchLv(bs, 'flame'); } }
       G.sound.play('bow');
       this.useCd = 0.45; this.swing = 1;
+      return;
+    }
+    if (hd.egg) {
+      // a spawn egg: on a spawner it changes what comes out; anywhere else the mob appears
+      if (b && b.id === ID.spawner) { const sl = G.chestSlots(b.x, b.y, b.z, true); sl[0] = { id: hd.id, count: 1 }; G.chestChanged(chestKey(b.x, b.y, b.z)); G.ui.message('This spawner now makes ' + MOB_TYPES[hd.egg].name + 's.', 'gold'); }
+      else if (b) { const px = b.x + b.nx + 0.5, py = b.y + b.ny, pz = b.z + b.nz + 0.5; if (MOB_TYPES[hd.egg]) spawnMob(hd.egg, px, py + (b.ny < 0 ? -1 : 0), pz); }
+      else return;
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      this.useCd = 0.3; this.swing = 1; G.sound.play('place');
       return;
     }
     if (hd.potion) {
