@@ -146,7 +146,7 @@ function buildPlayerModel(skinIdx) {
 }
 
 /* ---------- armor on a player model ---------- */
-const ARMOR_COLORS = { leather: 0x8a4f2a, golden: 0xf5cc2e, iron: 0xdcdcdc, diamond: 0x5decf5, netherite: 0x4a4446 };
+const ARMOR_COLORS = { turtle: 0x4a9a3a, leather: 0x8a4f2a, golden: 0xf5cc2e, iron: 0xdcdcdc, diamond: 0x5decf5, netherite: 0x4a4446 };
 const armorMats = {};
 /* enchanted armor shimmers purple (the glow pulses: see GLINT_MATS in the game loop) */
 const GLINT_MATS = [];
@@ -619,8 +619,14 @@ class Mob {
       if (mate) {
         if (md < 1.3) {
           // a baby is born between them
-          const baby = new Mob(this.type, (this.pos.x + mate.pos.x) / 2, Math.max(this.pos.y, mate.pos.y), (this.pos.z + mate.pos.z) / 2);
-          baby.makeBaby(); G.mobs.push(baby);
+          if (this.type === 'turtle') {
+            // turtles lay eggs on the sand instead; they hatch a few minutes later
+            const s = G.findNear(this.pos, 8, 3, id => id === ID.sand);
+            if (s && !G.world.getBlock(s.x, s.y + 1, s.z)) { G.world.setBlock(s.x, s.y + 1, s.z, ID.turtle_egg); G.crops[chestKey(s.x, s.y + 1, s.z)] = 150 + Math.random() * 90; }
+          } else {
+            const baby = new Mob(this.type, (this.pos.x + mate.pos.x) / 2, Math.max(this.pos.y, mate.pos.y), (this.pos.z + mate.pos.z) / 2);
+            baby.makeBaby(); G.mobs.push(baby);
+          }
           this.loveT = mate.loveT = 0; this.breedCd = mate.breedCd = 300;
           this.hearts(); mate.hearts();
           if (G.player.pos.distanceTo(this.pos) < 16) G.player.addXp(1 + (Math.random() * 7 | 0));
@@ -651,7 +657,7 @@ class Mob {
     this.mesh.scale.setScalar(0.55);
   }
   makeSmall() { this.small = true; this.hp = 4; this.w = this.T.w * 0.5; this.h = this.T.h * 0.5; this.mesh.scale.setScalar(0.5); return this; }
-  growUp() { this.baby = false; this.w = this.T.w; this.h = this.T.h; this.mesh.scale.setScalar(1); }
+  growUp() { if (this.type === 'turtle' && this.baby && !this.remoteCtl) G.spawnDrop(ID.turtle_scute, 1, this.pos.x, this.pos.y + 0.3, this.pos.z); this.baby = false; this.w = this.T.w; this.h = this.T.h; this.mesh.scale.setScalar(1); }
 
   /* fed the food it loves: a baby grows faster, a grown-up is ready to make a baby */
   feed() {
@@ -739,6 +745,9 @@ class Mob {
       case 'creaking':
         if (!G.isNight() || (this.heart && G.world.isLoaded(this.heart[0], this.heart[2]) && !DEFS[G.world.getBlock(...this.heart)].creakingHeart)) { G.particles.burst(this.pos.x, this.pos.y + 1.3, this.pos.z, [0x5a4a3a, 0x9aa094], 20, 2, 0.15); this.removeSilently(); return 'gone'; } // it crumbles at sunrise, or when its heart is broken
         if (this.frozen) { this.vel.x = this.vel.z = 0; return { x: 0, z: 0 }; }
+        break;
+      case 'polar_bear':
+        if (!this.baby && !this.angry && canTarget && dist < 6 && G.mobs.some(m => m.type === 'polar_bear' && m.baby && !m.dead && m.pos.distanceTo(P.pos) < 5)) { this.angry = true; G.sound.play('mob_polar_bear', this.pos); }
         break;
       case 'trader_llama': {
         // trader llamas follow their trader, and spit at anyone who hurts him

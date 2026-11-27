@@ -387,6 +387,48 @@ G.explode = (x, y, z, power, breakBlocks, harmless, colors, cause, opts) => {
 };
 
 
+/* a chest's lid swings open while you look inside (and an ender chest's, and a shulker box's shell lifts) */
+G.lids = new Map();
+G.chestLid = (x, y, z, open) => {
+  const k = x + ',' + y + ',' + z, id = G.world.getBlock(x, y, z), d = DEFS[id];
+  if (!d || !(id === ID.chest || id === ID.chest_loot || id === ID.ender_chest || d.shulker)) return;
+  let L = G.lids.get(k);
+  if (!L) {
+    const shell = !!d.shulker, h = shell ? 0.5 : 0.3;
+    const geo = new THREE.BoxGeometry(1.004, h, 1.004), uv = geo.attributes.uv, T = TILE_UV[d.faces[2]], S = TILE_UV[d.faces[0]];
+    // faces: +x, -x, +y, -y, +z, -z (4 corners each); sides use the top part of the side picture
+    for (let f = 0; f < 6; f++) for (let c = 0; c < 4; c++) {
+      const i = f * 4 + c, u = uv.getX(i), v = uv.getY(i), tt = f === 2 || f === 3 ? T : S;
+      uv.setXY(i, tt[0] + u * (tt[2] - tt[0]), f === 2 || f === 3 ? tt[1] + v * (tt[3] - tt[1]) : tt[3] - (1 - v) * h * (tt[3] - tt[1]));
+    }
+    const lid = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: G.atlasTex, alphaTest: 0.5 }));
+    const P = G.player, away = Math.abs(P.pos.x - x - 0.5) > Math.abs(P.pos.z - z - 0.5) ? (P.pos.x > x + 0.5 ? [-1, 0] : [1, 0]) : (P.pos.z > z + 0.5 ? [0, -1] : [0, 1]);
+    const hinge = new THREE.Group();
+    hinge.position.set(x + 0.5 + away[0] * 0.5, y + 1 - h, z + 0.5 + away[1] * 0.5);
+    lid.position.set(-away[0] * 0.5, h / 2, -away[1] * 0.5);
+    hinge.add(lid);
+    // the dark inside, seen when the lid is up
+    const inside = new THREE.Mesh(new THREE.PlaneGeometry(0.86, 0.86), new THREE.MeshBasicMaterial({ color: shell ? 0x3a1a4a : 0x2a1a0a }));
+    inside.rotation.x = -Math.PI / 2; inside.position.set(x + 0.5, y + 1.003, z + 0.5);
+    G.scene.add(hinge); G.scene.add(inside);
+    L = { hinge, inside, away, a: 0, shell, h };
+    G.lids.set(k, L);
+  }
+  L.open = open;
+  if (open) Sound.play('click', new THREE.Vector3(x, y, z));
+};
+G.tickLids = (dt) => {
+  for (const [k, L] of G.lids) {
+    const [x, y, z] = k.split(',').map(Number), d = DEFS[G.world.getBlock(x, y, z)];
+    const gone = !d || !(d.key === 'chest' || d.key === 'chest_loot' || d.key === 'ender_chest' || d.shulker);
+    L.a += ((L.open && !gone ? 1 : 0) - L.a) * Math.min(1, dt * 9);
+    if (L.shell) L.hinge.position.y = y + 1 - L.h + L.a * 0.45, L.hinge.rotation.y = L.a * 1.5;
+    else { const ang = L.a * 1.25; if (L.away[0]) L.hinge.rotation.z = -L.away[0] * ang; else L.hinge.rotation.x = L.away[1] * ang; }
+    L.inside.visible = L.a > 0.05;
+    if ((!L.open || gone) && L.a < 0.02) { G.scene.remove(L.hinge); G.scene.remove(L.inside); G.lids.delete(k); }
+  }
+};
+
 /* ---------- animations, like Minecraft ----------
    moving pictures (water, lava, fire, portals...), smoke and flames from torches, campfires and furnaces,
    lava pops, drips under water and lava, portal sparkles, the floating book over an enchanting table,
@@ -1115,6 +1157,14 @@ G.tickCrops = () => {
     if (!G.world.isLoaded(x, z)) continue;
     const here = G.world.getBlock(x, y, z), sap = DEFS[here].sapling, ripe = RIPE()[here];
     // planted bamboo grows one block every minute or so, up to 12 tall; sugar cane up to 3
+    if (here === ID.turtle_egg) {
+      let t = typeof G.crops[k] === 'number' ? G.crops[k] : 180;
+      if (--t > 0) { G.crops[k] = t; continue; }
+      delete G.crops[k]; G.world.setBlock(x, y, z, 0);
+      G.particles.blockBreak(x, y, z, ID.turtle_egg);
+      for (let i = 0; i < 1 + (Math.random() * 3 | 0); i++) { const b = spawnMob('turtle', x + 0.5 + (Math.random() - 0.5) * 0.5, y, z + 0.5 + (Math.random() - 0.5) * 0.5); b.makeBaby(600); }
+      continue;
+    }
     if (here === ID.bamboo || here === ID.sugar_cane) {
       let t = typeof G.crops[k] === 'number' && G.crops[k] <= 90 ? G.crops[k] : 40 + Math.random() * 40;
       if (--t > 0) { G.crops[k] = t; continue; }
@@ -1662,7 +1712,12 @@ function spawnTick() {
         if (b === BIOME.MUSHROOM && extra !== 'mooshroom') type = null; // only mooshrooms on mushroom islands
         if (extra) { type = extra; n = { bee: 2 + (Math.random() * 2 | 0), polar_bear: 1, sniffer: 1, camel: 1, turtle: 2, goat: 2, llama: 3 }[extra] || 1 + (Math.random() * 2 | 0); }
       }
-      if (type && ground !== ID.water) for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y + 1, z + (Math.random() - 0.5) * 2);
+      if (type && ground !== ID.water) for (let i = 0; i < n; i++) {
+        const m = spawnMob(type, x + (Math.random() - 0.5) * 2, y + 1, z + (Math.random() - 0.5) * 2);
+        // some animals come with babies (a polar bear mother with her cub)
+        if (i > 0 && Math.random() < 0.2 && m.makeBaby && !m.T.horsey) m.makeBaby();
+        if (type === 'polar_bear' && Math.random() < 0.6) spawnMob('polar_bear', m.pos.x + 1, m.pos.y, m.pos.z).makeBaby();
+      }
     }
   }
   const night = G.isNight();
@@ -2613,6 +2668,7 @@ function frame(now) {
   Input.lookDX = Input.lookDY = 0;
   G.particles.update(running ? dt : 0);
   G.tickAnim(dt);
+  G.tickLids(dt);
   if (running) G.tickAmbient(dt);
   G.world.update(P.pos.x, P.pos.z, running ? 6 : 12);
   Net.tick(dt);

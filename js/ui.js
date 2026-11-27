@@ -437,6 +437,7 @@ const UI = {
     this.station = station === 'chest' ? null : station || null;
     this.chest = chest || null;
     this.furnace = furnace || null;
+    if (this.chest && this.chest.x !== undefined) G.chestLid(this.chest.x, this.chest.y, this.chest.z, true);
     $('chest-box').hidden = !this.chest;
     $('chest-box').querySelector('.label').textContent = this.chest && this.chest.mob ? 'Chest on your ' + this.chest.mob.T.name.toLowerCase() : this.chest && this.chest.ender ? 'Ender Chest (only yours)' : this.chest && this.chest.shulker ? 'Shulker Box' : 'Chest';
     $('furnace-box').hidden = !this.furnace;
@@ -456,6 +457,7 @@ const UI = {
       this.cursor = null; this.moveCursor();
     }
     this.tip('');
+    if (this.chest && this.chest.x !== undefined) G.chestLid(this.chest.x, this.chest.y, this.chest.z, false);
     this.chest = null; this.furnace = null;
     $('menu-inv').hidden = true;
     G.setState('play');

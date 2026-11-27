@@ -337,14 +337,17 @@ class Player {
       this.starveT += dt;
       if (this.starveT > 4) { this.starveT = 0; if (this.health > G.diff().starve) this.hurt(1, null, 0, true, 'You starved. Eat food when your hunger bar gets low.'); }
     }
-    if (this.headInWater) {
+    // a turtle shell lets you breathe a little longer under water
+    const turtle = this.inv.slots[36] && DEFS[this.inv.slots[36].id].key === 'turtle_helmet';
+    if (this.headInWater && turtle && (this.turtleT = (this.turtleT || 0) + dt) < 12) { /* still breathing */ }
+    else if (this.headInWater) {
       this.air -= dt;
       if (this.air < 5 && !this.airWarned) { this.airWarned = true; G.ui.message('You are running out of air! Swim up to the surface!', 'purple'); }
       if (this.air < 0) {
         this.drownT += dt;
         if (this.drownT > 1) { this.drownT = 0; this.hurt(2, null, 0, true, 'You drowned. Under water, watch the bubbles above your hearts and swim up before they run out.'); }
       }
-    } else { this.air = Math.min(15, this.air + dt * 5); if (this.air > 8) this.airWarned = false; }
+    } else { this.turtleT = 0; this.air = Math.min(15, this.air + dt * 5); if (this.air > 8) this.airWarned = false; }
     if (this.inLava) {
       this.fire = 6;
       this.lavaT -= dt;

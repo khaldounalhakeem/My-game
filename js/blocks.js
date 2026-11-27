@@ -813,6 +813,10 @@ makeTile('leaves_pale_oak', pLeaves(0x9aa094));
 makeTile('planks_pale_oak', pPlanks(0xe8e0d8));
 makeTile('pale_moss', P => { P.fill(0x9aa094, 10); P.speck(0xb8bcb0, 0.2, 6); P.speck(0x7a8074, 0.15, 6); });
 makeTile('creaking_heart', P => { pLogSide(0x6a625a, 0x524a44)(P); P.rect(4, 4, 8, 8, 0x3a2a1a); P.rect(5, 6, 2, 3, 0xff8a1a); P.rect(9, 6, 2, 3, 0xff8a1a); P.rect(6, 7, 1, 1, 0xffd060); P.rect(10, 7, 1, 1, 0xffd060); });
+makeTile('turtle_egg', P => { P.fill(0xe8e4c8, 8); P.speck(0x8ab86a, 0.18, 6); });
+makeTile('i_turtle_egg', pPlant(P => { P.disc(6, 10, 3, 0xe8e4c8); P.disc(11, 9, 2.6, 0xe8e4c8); P.pts([[5, 9], [7, 11], [11, 8], [10, 10]], 0x8ab86a); }));
+makeTile('i_turtle_scute', pPlant(P => { P.disc(8, 8, 5, 0x4a9a3a, 8); P.line(4, 8, 12, 8, 0x3a7a2a); P.line(8, 4, 8, 12, 0x3a7a2a); }));
+makeTile('i_turtle_helmet', pArmor('helmet', 0x4a9a3a));
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -1307,6 +1311,7 @@ block('pale_oak_leaves', 'Pale Oak Leaves', 'leaves_pale_oak', Object.assign({ d
 block('pale_oak_planks', 'Pale Oak Planks', 'planks_pale_oak', { tool: 'axe', hardness: 2 });
 block('pale_moss_block', 'Pale Moss Block', 'pale_moss', { tool: 'hoe', hardness: 0.1 });
 block('creaking_heart', 'Creaking Heart', { top: 'log_pale_oak_top', side: 'log_pale_oak', front: 'creaking_heart' }, { tool: 'axe', hardness: 10, light: true, emit: 6, creakingHeart: true });
+block('turtle_egg', 'Turtle Egg', 'turtle_egg', { hardness: 0.5, opaque: false, solid: false, box: [0.25, 0, 0.25, 0.75, 0.45, 0.75], boxes: [[0.2, 0, 0.3, 0.5, 0.4, 0.6], [0.55, 0, 0.45, 0.8, 0.35, 0.75]], iconTile: 'i_turtle_egg', drop: null });
 block('campfire', 'Campfire', { top: 'campfire_top', side: 'campfire_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 2, opaque: false, cutout: true, solid: false, light: true, emit: 15, box: [0, 0, 0, 1, 0.4375, 1], boxes: [[0, 0, 0, 1, 0.4375, 1]], iconTile: 'i_campfire', drop: (r) => [['coal', 2]] });
 
 let nextItemId = 128;
@@ -1471,6 +1476,8 @@ item('wolf_armor', 'Wolf Armor', 'wolf_armor', { stack: 1 });
 item('totem_of_undying', 'Totem of Undying', 'totem_of_undying', { stack: 1 });
 item('snowball', 'Snowball', 'snowball', { stack: 16 });
 item('breeze_rod', 'Breeze Rod', 'breeze_rod');
+item('turtle_scute', 'Turtle Scute', 'turtle_scute');
+item('turtle_helmet', 'Turtle Shell', 'turtle_helmet', { stack: 1, armor: { slot: 0, points: 2 } });
 item('wind_charge', 'Wind Charge', 'wind_charge', { stack: 64 });
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
@@ -1689,7 +1696,7 @@ const RECIPES = [
   ['terracotta', 1, { clay: 1 }, 'furnace'],
   ['cooked_porkchop', 1, { porkchop: 1 }, 'furnace'],
   ['steak', 1, { beef: 1 }, 'furnace'],
-  ['bowl', 4, { '#planks': 3 }, 'table'], ['mushroom_stew', 1, { red_mushroom: 1, brown_mushroom: 1, bowl: 1 }], ['wolf_armor', 1, { armadillo_scute: 6 }, 'table'], ['snow', 1, { snowball: 4 }], ['wind_charge', 4, { breeze_rod: 1 }], ['pale_oak_planks', 4, { pale_oak_log: 1 }],
+  ['bowl', 4, { '#planks': 3 }, 'table'], ['mushroom_stew', 1, { red_mushroom: 1, brown_mushroom: 1, bowl: 1 }], ['wolf_armor', 1, { armadillo_scute: 6 }, 'table'], ['snow', 1, { snowball: 4 }], ['wind_charge', 4, { breeze_rod: 1 }], ['turtle_helmet', 1, { turtle_scute: 5 }, 'table'], ['pale_oak_planks', 4, { pale_oak_log: 1 }],
   ['beehive', 1, { '#planks': 6, honeycomb: 3 }, 'table'], ['campfire', 1, { stick: 3, coal: 1, '#log': 3 }, 'table'], ['glass_bottle', 3, { glass: 3 }, 'table'], ['shears', 1, { iron_ingot: 2 }], ['honey_block', 1, { honey_bottle: 4 }], ['honeycomb_block', 1, { honeycomb: 4 }],
   ['cooked_rabbit', 1, { rabbit: 1 }, 'furnace'], ['cooked_cod', 1, { cod: 1 }, 'furnace'], ['cooked_salmon', 1, { salmon: 1 }, 'furnace'], ['fishing_rod', 1, { stick: 3, string: 2 }],
   ['cooked_chicken', 1, { chicken: 1 }, 'furnace'],
