@@ -1357,8 +1357,9 @@ G.applyMenuSet = () => {
 G.castleSetup = () => {
   const ow = G.worlds && G.worlds.overworld;
   if (!ow || ow.seed !== CASTLE.seed || typeof castleData !== 'function') return;
-  const K = castleData(), C = CASTLE;
+  if (!G.castleAnimalT) G.castleAnimalT = setInterval(() => { try { castleAnimals(); } catch (e) { /* never stops the game */ } }, 3000);
   G.chests = G.chests || {};
+  for (const [C, K] of [[CASTLE, castleData()], [CASTLE_FARM, farmData()]]) {
   for (const [x, y, z, items] of K.chests) {
     const k = 'overworld:' + (C.x + x) + ',' + (C.y + y) + ',' + (C.z + z);
     if (G.chests[k] !== undefined) continue;
@@ -1371,6 +1372,8 @@ G.castleSetup = () => {
     const k = 'overworld:' + (C.x + x) + ',' + (C.y + y) + ',' + (C.z + z);
     if (G.signs[k] === undefined) { G.signs[k] = G.cleanSignText(lines); if (G.dim === 'overworld') G.drawSign(k); }
   }
+  }
+  const C = CASTLE;
   try {
     if (localStorage.getItem('blockrealm-castle-told') !== '1') {
       localStorage.setItem('blockrealm-castle-told', '1');

@@ -545,23 +545,115 @@ function castleData() {
   put(-17, -2, 15, 'chain'); put(-17, -3, 15, 'soul_lantern');
   sign(-13, -5, 15, 'w', ['SECRET ROOM', '', "Don't tell", 'anyone! ;)']);
   post(-21, -7, 13, 'e', ['Built for', 'King Nabil', 'and King Omar', '']);
+
+  /* a gate in the west wall to the farm next door */
+  box(-WALL, 1, 4, -WALL + 1, 3, 5, 0);
+  box(-R, 0, 4, -WALL + 1, 0, 5, 'polished_andesite');
+  box(-30, 0, 4, -25, 0, 5, 'polished_andesite');
+  sign(-WALL + 2, 3, 6, 'e', ['TO THE FARM', '<-- animals', 'and crops', '']);
+  lampPost(-30, 7);
   CASTLE_DATA = { d, S, KEEP, signs, chests };
   return CASTLE_DATA;
 }
 
+/* the farm next to the castle (west of it): crop fields with water channels, six animal paddocks and a barn */
+const CASTLE_FARM = { seed: 1310457622, x: -376, y: 39, z: 108, R: 30, H: 40, DEPTH: 8 };
+let FARM_DATA = null;
+function farmData() {
+  if (FARM_DATA) return FARM_DATA;
+  const { R, H, DEPTH } = CASTLE_FARM, S = 2 * R + 1, NY = H + DEPTH + 1, KEEP = 0xFFFF;
+  const d = new Uint16Array(S * S * NY).fill(KEEP);
+  const signs = [], chests = [];
+  const B = k => { const id = ID[k]; if (id === undefined) throw new Error('farm: no block ' + k); return id; };
+  const inb = (x, y, z) => x >= -R && x <= R && z >= -R && z <= R && y >= -DEPTH && y <= H;
+  const put = (x, y, z, k) => { if (inb(x, y, z)) d[((y + DEPTH) * S + (z + R)) * S + (x + R)] = typeof k === 'number' ? k : B(k); };
+  const box = (x0, y0, z0, x1, y1, z1, k) => { for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) put(x, y, z, k); };
+  const post = (x, y, z, dir, lines) => { put(x, y, z, 'sign_' + dir); signs.push([x, y, z, lines]); };
+  const chest = (x, y, z, items) => { put(x, y, z, 'chest'); chests.push([x, y, z, items]); };
+  const lampPost = (x, z) => { put(x, 1, z, 'oak_fence'); put(x, 2, z, 'oak_fence'); put(x, 3, z, 'lantern'); };
+  // flat grass, cleared of trees
+  for (let z = -R; z <= R; z++) for (let x = -R; x <= R; x++) {
+    for (let y = 1; y <= H; y++) put(x, y, z, 0);
+    put(x, 0, z, 'grass');
+    const deep = Math.max(Math.abs(x), Math.abs(z)) > R - 2 ? 3 : DEPTH;
+    for (let y = -1; y >= -deep; y--) put(x, y, z, y > -4 ? 'dirt' : 'stone');
+  }
+  // a fence all round, a gate on the castle side, a path through the middle
+  for (let i = -28; i <= 28; i++) { put(i, 1, -28, 'oak_fence'); put(i, 1, 28, 'oak_fence'); put(-28, 1, i, 'oak_fence'); put(28, 1, i, 'oak_fence'); }
+  box(28, 1, 4, 28, 1, 5, 0); box(-27, 0, 4, R, 0, 5, 'polished_andesite');
+  post(26, 1, 3, 'e', ['THE FARM', 'Animals: north', 'Crops: south', '']);
+  for (let x = -24; x <= 24; x += 8) { lampPost(x, 3); lampPost(x, 6); }
+
+  /* the crop fields (south): eight sections, each with a water channel in the middle to keep it wet */
+  const CROPS = ['wheat_crop', 'carrot_crop', 'potato_crop', 'pumpkin', 'melon', 'wheat_crop', 'sugar_cane', 'sweet_berry_bush_ripe'];
+  for (let z = 8; z <= 27; z++) for (let x = -27; x <= 27; x++) {
+    const sec = Math.floor((x + 27) / 7), mid = (x + 27) % 7 === 3, kind = CROPS[Math.min(sec, CROPS.length - 1)];
+    if (mid) { put(x, 0, z, 'water'); continue; }
+    if (kind === 'pumpkin' || kind === 'melon') { put(x, 0, z, 'farmland'); if ((x * 3 + z * 5) % 4 === 0) put(x, 1, z, kind); else if ((x + z) % 4 === 1) put(x, 1, z, 'pumpkin_stem'); continue; }
+    if (kind === 'sugar_cane') { put(x, 0, z, 'sand'); if (Math.abs((x + 27) % 7 - 3) === 1) { put(x, 1, z, 'sugar_cane'); put(x, 2, z, 'sugar_cane'); if (z % 3 === 0) put(x, 3, z, 'sugar_cane'); } continue; }
+    if (kind === 'sweet_berry_bush_ripe') { put(x, 0, z, 'grass'); if ((x + z) % 2 === 0) put(x, 1, z, 'sweet_berry_bush_ripe'); continue; }
+    put(x, 0, z, 'farmland'); put(x, 1, z, kind);
+  }
+  for (let z = 10; z <= 26; z += 8) for (let x = -24; x <= 24; x += 7) { put(x, 0, z, 'stone_bricks'); lampPost(x, z); }
+  const CROP_NAMES = ['Wheat', 'Carrots', 'Potatoes', 'Pumpkins', 'Melons', 'Wheat', 'Sugar cane', 'Berries'];
+  CROP_NAMES.forEach((n, i) => post(-27 + i * 7 + 3, 1, 7, 's', ['', n.toUpperCase(), '', '']));
+  put(0, 0, 7, 'grass');
+  put(-26, 1, 27, 'composter'); put(-25, 1, 27, 'composter');
+  chest(-24, 1, 27, [['wheat_seeds', 64], ['carrot', 32], ['potato', 32], ['bone_meal', 64], ['diamond_hoe', 1], ['pumpkin_seeds', 16]]);
+
+  /* the animal paddocks (north): cows, pigs, sheep, chickens, horses and goats, each with water and hay */
+  const PENS = CASTLE_FARM.pens = [['cow', 'COWS', -27, -19], ['pig', 'PIGS', -18, -10], ['sheep', 'SHEEP', -9, -1], ['chicken', 'CHICKENS', 0, 8], ['horse', 'HORSES', 9, 17], ['goat', 'GOATS', 18, 27]];
+  for (const [type, name, x0, x1] of PENS) {
+    for (let x = x0; x <= x1; x++) { put(x, 1, -27, 'oak_fence'); put(x, 1, 1, 'oak_fence'); }
+    for (let z = -27; z <= 1; z++) { put(x0, 1, z, 'oak_fence'); put(x1, 1, z, 'oak_fence'); }
+    const gx = Math.floor((x0 + x1) / 2); put(gx, 1, 1, 'gate_xc');
+    put(x0 + 1, 1, -26, 'water_cauldron'); put(x0 + 2, 1, -26, 'water_cauldron');
+    put(x1 - 1, 1, -26, 'hay_bale'); put(x1 - 2, 1, -26, 'hay_bale'); put(x1 - 1, 2, -26, 'hay_bale');
+    put(gx, 1, -13, 'oak_fence'); put(gx, 2, -13, 'oak_fence'); put(gx, 3, -13, 'lantern');
+    post(gx + 1, 1, 2, 's', ['', name, '', '']);
+    if (type === 'chicken') { box(x0 + 1, 3, -26, x1 - 1, 3, -21, 'spruce_slab_b'); for (const x of [x0 + 1, x1 - 1]) for (const z of [-21]) box(x, 1, z, x, 2, z, 'spruce_fence'); } // a coop roof
+    if (type === 'horse') { box(x0 + 1, 3, -26, x1 - 1, 3, -21, 'spruce_slab_b'); for (const x of [x0 + 1, x1 - 1]) box(x, 1, -21, x, 2, -21, 'spruce_fence'); } // a stable roof
+  }
+  /* the farmer's corner by the gate: everything for the animals */
+  chest(-1, 1, 3, [['wheat', 64], ['carrot', 32], ['wheat_seeds', 64], ['lead', 8], ['shears', 2], ['bucket', 4]]);
+  chest(1, 1, 3, [['saddle', 3], ['name_tag', 4], ['hay_bale', 16], ['bone_meal', 32], ['feather', 16]]);
+  put(0, 1, 3, 'crafting_table');
+  FARM_DATA = { d, S, KEEP, signs, chests };
+  return FARM_DATA;
+}
+
+/* keeps the paddocks full of animals while someone is nearby (in a shared world only the first player's game does it) */
+function castleAnimals() {
+  const F = CASTLE_FARM, P = G.player;
+  if (G.state !== 'play' || G.dim !== 'overworld' || !G.worlds.overworld || G.worlds.overworld.seed !== F.seed || !F.pens) return;
+  if (Net.inShared() && !Net.isHost()) return;
+  if (Math.hypot(P.pos.x - F.x, P.pos.z - F.z) > 90) return;
+  const now = Date.now(); F.lastFill = F.lastFill || {};
+  for (const [type, , x0, x1] of F.pens) {
+    const ax = F.x + x0 + 1, bx = F.x + x1, az = F.z - 26, bz = F.z + 1;
+    const n = G.mobs.filter(m => !m.dead && m.type === type && m.pos.x > ax && m.pos.x < bx && m.pos.z > az && m.pos.z < bz).length;
+    const want = type === 'chicken' ? 6 : 4;
+    if (n >= want || !G.world.isLoaded(ax, az) || (F.lastFill[type] && n > 0 && now - F.lastFill[type] < 60000)) continue;
+    F.lastFill[type] = now;
+    for (let i = n; i < want; i++) spawnMob(type, ax + 1 + Math.random() * (bx - ax - 2), F.y + 1, az + 2 + Math.random() * (bz - az - 4));
+  }
+}
+
 /* the part of the castle inside one chunk, laid over the land */
 function castleChunk(world, cx, cz, d) {
-  const C = CASTLE, x0 = cx * 16, z0 = cz * 16;
-  if (world.dim !== 'overworld' || world.seed !== C.seed) return;
-  if (x0 + 15 < C.x - C.R || x0 > C.x + C.R || z0 + 15 < C.z - C.R || z0 > C.z + C.R) return;
-  const K = castleData(), S = K.S;
-  for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
-    const rx = x0 + lx - C.x, rz = z0 + lz - C.z;
-    if (Math.abs(rx) > C.R || Math.abs(rz) > C.R) continue;
-    for (let ry = -C.DEPTH; ry <= C.H; ry++) {
-      const v = K.d[((ry + C.DEPTH) * S + (rz + C.R)) * S + (rx + C.R)];
-      const y = C.y + ry;
-      if (v !== K.KEEP && y > 0 && y < WH) d[lx + (lz << 4) + (y << 8)] = v;
+  if (world.dim !== 'overworld' || world.seed !== CASTLE.seed) return;
+  for (const [C, data] of [[CASTLE, castleData], [CASTLE_FARM, farmData]]) {
+    const x0 = cx * 16, z0 = cz * 16;
+    if (x0 + 15 < C.x - C.R || x0 > C.x + C.R || z0 + 15 < C.z - C.R || z0 > C.z + C.R) continue;
+    const K = data(), S = K.S;
+    for (let lz = 0; lz < 16; lz++) for (let lx = 0; lx < 16; lx++) {
+      const rx = x0 + lx - C.x, rz = z0 + lz - C.z;
+      if (Math.abs(rx) > C.R || Math.abs(rz) > C.R) continue;
+      for (let ry = -C.DEPTH; ry <= C.H; ry++) {
+        const v = K.d[((ry + C.DEPTH) * S + (rz + C.R)) * S + (rx + C.R)];
+        const y = C.y + ry;
+        if (v !== K.KEEP && y > 0 && y < WH) d[lx + (lz << 4) + (y << 8)] = v;
+      }
     }
   }
 }
