@@ -1785,6 +1785,8 @@ class World {
     const stepUp = () => {
       // only from the ground (or standing just above it on a step), never in the middle of a jump
       if (!nearGround || b.vel.y > 0.5 || b.noStep || this.collides(b.pos.x, b.pos.y + 0.6, b.pos.z, b.w, b.h)) return false;
+      // only as high as needed: onto a carpet is a tiny step, onto a slab half a block (no little hop)
+      for (let h = 0.0625; h < 0.6; h += 0.0625) if (!this.collides(b.pos.x, b.pos.y + h + 0.001, b.pos.z, b.w, b.h)) { b.pos.y += h + 0.001; return true; }
       b.pos.y += 0.6; return true;
     };
     for (let s = 0; s < steps; s++) {
