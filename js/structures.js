@@ -7,7 +7,7 @@
    most one structure of a kind, somewhere inside it, leaving a gap to the next square. */
 const VILLAGE_CELL = 22, VILLAGE_GAP = 6, MINESHAFT_CELL = 14;
 const SPACING = {
-  pyramid: [32, 8, 303], igloo: [32, 8, 304], shipwreck: [24, 4, 305], ruinedPortal: [40, 15, 306], library: [40, 12, 307],
+  pyramid: [32, 8, 303], igloo: [32, 8, 304], shipwreck: [24, 4, 305], ruinedPortal: [40, 15, 306], library: [40, 12, 307], witchHut: [20, 5, 308],
 };
 
 /* is this chunk the one picked for this kind of structure in its square? */
@@ -118,6 +118,7 @@ World.prototype.buildStructures = function (c, set, get, heights, biomes, rng) {
   if (this.spotPick(cx, cz, 'ruins')) this.buildRuins(S);
   if (center === BIOME.DESERT && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(cx, cz))) && mulberry32(hash3(cx, cz, this.seed + 923))() < 0.025) this.buildDesertWell(S);
 
+  if (biomes[136] === BIOME.SWAMP && this.witchHutChunk(cx, cz)) { this.buildWitchHut(S); return; }
   if (center === BIOME.SNOWY && this.regionPick(cx, cz, 'igloo')) this.buildIgloo(S);
   else if (center === BIOME.OCEAN && this.regionPick(cx, cz, 'shipwreck')) this.buildShipwreck(S);
   else if (center !== BIOME.OCEAN && center !== BIOME.BEACH && this.regionPick(cx, cz, 'ruinedPortal')) this.buildRuinedPortal(S);
@@ -522,6 +523,39 @@ World.prototype.buildDesertWell = function (S) {
   set(8, h, 8, ID.water); set(8, h - 1, 8, ID.water); set(8, h - 2, 8, ID.sandstone);
   for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) for (let y = h + 1; y <= h + 2; y++) set(8 + dx, y, 8 + dz, ID.sandstone);
   for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) set(8 + dx, h + 3, 8 + dz, ID.sandstone_slab_b);
+};
+
+/* each square of 12 x 12 chunks tries a few spots for a witch hut and keeps the first one in a swamp */
+World.prototype.witchHutChunk = function (cx, cz) {
+  const CELL = 12, gx = Math.floor(cx / CELL), gz = Math.floor(cz / CELL), key = 'hut' + gx + ',' + gz;
+  this.spotCache = this.spotCache || new Map();
+  if (!this.spotCache.has(key)) {
+    const r = mulberry32(hash3(gx, gz, this.seed + 308));
+    let spot = null;
+    for (let t = 0; t < 24 && !spot; t++) {
+      const px = gx * CELL + 1 + (r() * (CELL - 2) | 0), pz = gz * CELL + 1 + (r() * (CELL - 2) | 0), wx = px * 16 + 8, wz = pz * 16 + 8;
+      if (this.biomeAt(wx, wz, this.heightAt(wx, wz)) === BIOME.SWAMP) spot = [px, pz];
+    }
+    this.spotCache.set(key, spot);
+  }
+  const s = this.spotCache.get(key);
+  return !!s && s[0] === cx && s[1] === cz;
+};
+/* a witch's hut on stilts in the swamp, like Minecraft */
+World.prototype.buildWitchHut = function (S) {
+  const { set, H, c } = S;
+  const x0 = 5, z0 = 5, base = Math.max(H(8, 8), SEA) + 3;
+  for (const [px, pz] of [[x0, z0], [x0 + 5, z0], [x0, z0 + 6], [x0 + 5, z0 + 6]]) for (let y = base - 1; y > H(px, pz) - 1 && y > base - 9; y--) set(px, y, pz, ID.oak_log);
+  for (let dx = 0; dx <= 5; dx++) for (let dz = 0; dz <= 6; dz++) set(x0 + dx, base, z0 + dz, ID.spruce_planks);
+  for (let dx = 0; dx <= 5; dx++) for (let dz = 1; dz <= 6; dz++) for (let dy = 1; dy <= 3; dy++) {
+    const wall = dx === 0 || dx === 5 || dz === 1 || dz === 6;
+    set(x0 + dx, base + dy, z0 + dz, wall ? ((dx === 0 || dx === 5) && (dz === 1 || dz === 6) ? ID.oak_log : ID.spruce_planks) : 0);
+  }
+  set(x0 + 2, base + 1, z0 + 1, 0); set(x0 + 2, base + 2, z0 + 1, 0); // the door
+  set(x0, base + 2, z0 + 3, ID.glass); set(x0 + 5, base + 2, z0 + 4, ID.glass);
+  for (let dx = -1; dx <= 6; dx++) for (let dz = 0; dz <= 7; dz++) set(x0 + dx, base + 4, z0 + dz, ID.spruce_planks);
+  set(x0 + 4, base + 1, z0 + 5, ID.crafting_table); set(x0 + 1, base + 1, z0 + 5, ID.chest_loot); set(x0 + 3, base + 1, z0 + 5, ID.red_mushroom);
+  c.witchHut = { x: c.cx * 16 + x0 + 2.5, y: base + 1, z: c.cz * 16 + z0 + 3.5 };
 };
 
 World.prototype.buildIgloo = function (S) {

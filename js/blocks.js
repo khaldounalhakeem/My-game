@@ -756,6 +756,45 @@ makeTile('pointed_dripstone', pPlant(P => { for (let y = 0; y < 16; y++) { const
 makeTile('sculk', P => { P.fill(0x0a2030, 6); P.speck(0x0e3a4a, 0.25, 6); for (let i = 0; i < 6; i++) P.put(P.rng() * 16, P.rng() * 16, 0x2ad8e8); });
 makeTile('sculk_sensor_top', P => { P.fill(0x0a2a38, 6); for (const x of [3, 7, 11]) P.rect(x, 3, 2, 10, 0x2ad8e8, 20); });
 makeTile('sculk_sensor_side', P => { P.fill(0x0a2030, 6); P.rect(0, 0, 16, 4, 0x1a5a6a, 8); P.speck(0x2ad8e8, 0.05, 4); });
+
+/* ---------- bees' homes and honey ---------- */
+makeTile('nest_top', P => { P.fill(0xd8b040, 8); for (let y = 2; y < 16; y += 4) P.rect(0, y, 16, 1, 0xa87a20); P.disc(8, 8, 3, 0xe8c860, 6); });
+makeTile('nest_side', P => { P.fill(0xd8b040, 8); for (let y = 3; y < 16; y += 4) P.rect(0, y, 16, 1, 0xa87a20); });
+makeTile('nest_front', P => { P.fill(0xd8b040, 8); for (let y = 3; y < 16; y += 4) P.rect(0, y, 16, 1, 0xa87a20); P.rect(5, 6, 6, 4, 0x3a2410); });
+makeTile('nest_front_full', P => { P.fill(0xd8b040, 8); for (let y = 3; y < 16; y += 4) P.rect(0, y, 16, 1, 0xa87a20); P.rect(5, 6, 6, 4, 0x3a2410); P.rect(4, 10, 8, 2, 0xf8a820); P.rect(6, 12, 2, 3, 0xf8a820); P.rect(10, 12, 1, 2, 0xf8a820); });
+makeTile('hive_top', P => { pPlanks(0xb88a4a)(P); P.rect(0, 0, 16, 2, 0x8a6030); P.rect(0, 14, 16, 2, 0x8a6030); });
+makeTile('hive_side', P => { pPlanks(0xc89a5a)(P); P.rect(0, 0, 16, 2, 0x8a6030); P.rect(0, 14, 16, 2, 0x8a6030); });
+makeTile('hive_front', P => { pPlanks(0xc89a5a)(P); P.rect(0, 0, 16, 2, 0x8a6030); P.rect(0, 14, 16, 2, 0x8a6030); P.rect(5, 7, 6, 3, 0x3a2410); });
+makeTile('hive_front_full', P => { pPlanks(0xc89a5a)(P); P.rect(0, 0, 16, 2, 0x8a6030); P.rect(0, 14, 16, 2, 0x8a6030); P.rect(5, 7, 6, 3, 0x3a2410); P.rect(4, 10, 8, 2, 0xf8a820); P.rect(6, 12, 2, 2, 0xf8a820); });
+makeTile('honey_block', P => { P.fill(0xf8b830, 6); P.rect(2, 2, 12, 12, 0xfccc50, 5); P.rect(4, 4, 8, 8, 0xf8b830, 4); });
+makeTile('honeycomb_block', P => { P.fill(0xe8a020, 8); for (let y = 0; y < 16; y += 4) for (let x = (y & 4) ? 2 : 0; x < 16; x += 4) P.rect(x, y, 3, 3, 0xf8c040, 6); });
+makeTile('i_honeycomb', pPlant(P => { for (const [x, y] of [[4, 5], [9, 5], [6, 9], [11, 9], [4, 13]]) { P.rect(x - 2, y - 2, 4, 4, 0xe8a020); P.rect(x - 1, y - 1, 2, 2, 0xf8c850); } }));
+makeTile('i_glass_bottle', pPlant(P => { P.rect(7, 2, 2, 3, 0xc8e0f0); P.rect(4, 5, 8, 9, 0xd8ecf8); P.rect(5, 6, 6, 7, 0xeaf6ff); P.rect(6, 1, 4, 1, 0x8a6030); }));
+makeTile('i_honey_bottle', pPlant(P => { P.rect(7, 2, 2, 3, 0xc8e0f0); P.rect(4, 5, 8, 9, 0xd8ecf8); P.rect(5, 7, 6, 6, 0xf8b030); P.rect(6, 1, 4, 1, 0x8a6030); }));
+makeTile('i_shears', pPlant(P => { P.line(3, 3, 10, 10, 0xd8d8d8); P.line(4, 3, 11, 10, 0xb0b0b0); P.line(12, 3, 5, 10, 0xd8d8d8); P.line(12, 4, 6, 10, 0xb0b0b0); P.disc(4, 12, 2, 0x7a5a32); P.disc(12, 12, 2, 0x7a5a32); }));
+makeTile('campfire_top', P => { P.clear(); P.rect(0, 3, 16, 3, 0x6b4a28); P.rect(0, 10, 16, 3, 0x6b4a28); P.rect(3, 0, 3, 16, 0x5a3e20); P.rect(10, 0, 3, 16, 0x5a3e20); P.disc(8, 8, 3, 0xffa020); P.disc(8, 8, 1.5, 0xfff060); });
+makeTile('campfire_side', P => { P.clear(); P.rect(0, 12, 16, 4, 0x6b4a28); P.rect(0, 12, 16, 1, 0x8a6a3a); for (let x = 3; x < 13; x++) { const h = 3 + ((x * 7) % 5); P.rect(x, 12 - h, 1, h, x % 2 ? 0xffa020 : 0xffd040); } });
+makeTile('i_campfire', pPlant(P => { P.rect(1, 12, 14, 3, 0x6b4a28); P.line(2, 14, 13, 10, 0x5a3e20); P.line(2, 10, 13, 14, 0x5a3e20); for (let x = 5; x < 11; x++) P.rect(x, 4 + ((x * 3) % 4), 1, 6, x % 2 ? 0xffa020 : 0xffd040); }));
+/* ---------- the animals' things ---------- */
+makeTile('i_bowl', pPlant(P => { for (let y = 8; y < 13; y++) { const w = 6 - (y - 8); P.rect(8 - w, y, w * 2, 1, 0x8a5a2a); } P.rect(2, 7, 12, 1, 0xa87038); }));
+makeTile('i_mushroom_stew', pPlant(P => { for (let y = 8; y < 13; y++) { const w = 6 - (y - 8); P.rect(8 - w, y, w * 2, 1, 0x8a5a2a); } P.rect(3, 6, 10, 2, 0xc89a6a); P.pts([[5, 6], [9, 7], [11, 6]], 0xc8221c); }));
+makeTile('i_bucket_of_cod', pBucket(0x3a6ad8)); makeTile('i_bucket_of_salmon', pBucket(0x3a6ad8)); makeTile('i_bucket_of_tropical_fish', pBucket(0x3a6ad8)); makeTile('i_bucket_of_axolotl', pBucket(0x3a6ad8));
+makeTile('i_armadillo_scute', pPlant(P => { P.disc(8, 9, 5, 0xa86a5a, 6); P.rect(4, 8, 8, 1, 0xc88a7a); P.rect(5, 11, 6, 1, 0x8a5a4a); }));
+makeTile('i_wolf_armor', pPlant(P => { P.rect(3, 5, 10, 6, 0xa86a5a); P.rect(4, 6, 8, 4, 0xc88a7a); P.rect(2, 11, 3, 3, 0x8a5a4a); P.rect(11, 11, 3, 3, 0x8a5a4a); }));
+makeTile('i_totem_of_undying', pPlant(P => { P.rect(5, 2, 6, 5, 0xf0d040); P.rect(6, 3, 1, 1, 0x2a8a3a); P.rect(9, 3, 1, 1, 0x2a8a3a); P.rect(4, 7, 8, 5, 0xe8c030); P.rect(2, 8, 2, 3, 0xe8c030); P.rect(12, 8, 2, 3, 0xe8c030); P.rect(6, 12, 4, 3, 0xd8a820); P.rect(7, 9, 2, 1, 0x2a8a3a); }));
+makeTile('i_snowball', pBlob(0xf4f8fc, 4, 0xd8e4f0));
+makeTile('torchflower', pPlant(P => { P.line(8, 15, 8, 8, 0x4a8a2a); P.rect(6, 4, 5, 4, 0xf08a1a); P.rect(7, 2, 3, 2, 0xffc040); P.pts([[5, 5], [11, 5]], 0xd86a10); }));
+makeTile('pitcher_plant', pPlant(P => { P.line(8, 15, 8, 6, 0x4a8a6a); P.rect(5, 2, 7, 7, 0x4a7ab8); P.rect(6, 1, 5, 2, 0x8ab0e8); P.pts([[4, 9], [12, 9], [5, 11], [11, 11]], 0x4a8a6a); }));
+makeTile('froglight', P => { P.fill(0xf8e8a0, 6); P.rect(1, 1, 14, 14, 0xf8d878, 6); P.rect(3, 3, 10, 10, 0xfff0b8, 5); });
+makeTile('i_breeze_rod', pPlant(P => { for (let i = 0; i < 11; i++) { P.put(3 + i, 13 - i, 0x8ac8e8); P.put(4 + i, 13 - i, 0x5a98c8); } P.pts([[5, 9], [9, 5], [12, 2]], 0xd8f0ff); }));
+makeTile('i_wind_charge', pPlant(P => { P.disc(8, 8, 5, 0xc8e8f8, 8); P.disc(8, 8, 3, 0x8ac8e8); P.line(4, 8, 12, 8, 0xffffff); P.line(8, 4, 8, 12, 0xffffff); }));
+/* the pale garden */
+makeTile('log_pale_oak', pLogSide(0x6a625a, 0x524a44));
+makeTile('log_pale_oak_top', pLogTop(0x524a44, 0xe8e0d8, 0xc8c0b8));
+makeTile('leaves_pale_oak', pLeaves(0x9aa094));
+makeTile('planks_pale_oak', pPlanks(0xe8e0d8));
+makeTile('pale_moss', P => { P.fill(0x9aa094, 10); P.speck(0xb8bcb0, 0.2, 6); P.speck(0x7a8074, 0.15, 6); });
+makeTile('creaking_heart', P => { pLogSide(0x6a625a, 0x524a44)(P); P.rect(4, 4, 8, 8, 0x3a2a1a); P.rect(5, 6, 2, 3, 0xff8a1a); P.rect(9, 6, 2, 3, 0xff8a1a); P.rect(6, 7, 1, 1, 0xffd060); P.rect(10, 7, 1, 1, 0xffd060); });
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -1139,7 +1178,7 @@ for (const [k, n] of [['white', 'White'], ['orange', 'Orange'], ['yellow', 'Yell
 block('packed_ice', 'Packed Ice', 'packed_ice', { hardness: 0.5, drop: null });
 block('blue_ice', 'Blue Ice', 'blue_ice', { hardness: 2.8, drop: null });
 for (const [k, n] of [['blue_orchid', 'Blue Orchid'], ['allium', 'Allium'], ['tulip_red', 'Red Tulip'], ['tulip_orange', 'Orange Tulip'], ['tulip_pink', 'Pink Tulip'], ['tulip_white', 'White Tulip'], ['oxeye_daisy', 'Oxeye Daisy'], ['cornflower', 'Cornflower'], ['lily_of_the_valley', 'Lily of the Valley'], ['sunflower', 'Sunflower']]) block(k, n, k, CROSS);
-block('lily_pad', 'Lily Pad', 'lily_pad', { hardness: 0, opaque: false, cutout: true, box: [0, 0, 0, 1, 0.0625, 1], boxes: [[0, 0, 0, 1, 0.0625, 1]], iconTile: 'i_lily_pad' });
+block('lily_pad', 'Lily Pad', 'lily_pad', { hardness: 0, solid: true, opaque: false, cutout: true, box: [0, 0, 0, 1, 0.0625, 1], boxes: [[0, 0, 0, 1, 0.0625, 1]], iconTile: 'i_lily_pad' });
 for (const [k, n] of [['tube', 'Tube'], ['brain', 'Brain'], ['bubble', 'Bubble'], ['fire', 'Fire'], ['horn', 'Horn']]) block('coral_block_' + k, n + ' Coral Block', 'coral_' + k, PICK(0, 1.5));
 block('moss_block', 'Moss Block', 'moss', { tool: 'hoe', hardness: 0.1 });
 block('azalea', 'Azalea', 'azalea', CROSS);
@@ -1149,6 +1188,32 @@ block('dripstone_block', 'Dripstone Block', 'dripstone', PICK(0, 1.5));
 block('pointed_dripstone', 'Pointed Dripstone', 'pointed_dripstone', Object.assign({}, CROSS, { tool: 'pick', hardness: 1.5 }));
 block('sculk', 'Sculk', 'sculk', { tool: 'hoe', hardness: 0.2, drop: null, xp: 1 });
 block('sculk_sensor', 'Sculk Sensor', { top: 'sculk_sensor_top', side: 'sculk_sensor_side', bottom: 'sculk' }, { tool: 'hoe', hardness: 1.5, opaque: false, light: true, emit: 3, box: [0, 0, 0, 1, 0.5, 1], boxes: [[0, 0, 0, 1, 0.5, 1]] });
+
+/* bees' homes: a wild bee nest on a tree, or a beehive you make. Bees bring honey; when it drips out, use
+   shears for honeycomb or a glass bottle for honey. (Each can face four ways, like a furnace.) */
+block('bee_nest', 'Bee Nest', { top: 'nest_top', side: 'nest_side', front: 'nest_front' }, { tool: 'axe', hardness: 0.3, drop: null, hive: 'empty' });
+block('bee_nest_full', 'Bee Nest', { top: 'nest_top', side: 'nest_side', front: 'nest_front_full' }, { tool: 'axe', hardness: 0.3, drop: null, hive: 'full' });
+block('beehive', 'Beehive', { top: 'hive_top', side: 'hive_side', front: 'hive_front' }, { tool: 'axe', hardness: 0.6, drop: 'beehive', hive: 'empty' });
+block('beehive_full', 'Beehive', { top: 'hive_top', side: 'hive_side', front: 'hive_front_full' }, { tool: 'axe', hardness: 0.6, drop: 'beehive', hive: 'full' });
+for (const k of ['bee_nest', 'bee_nest_full', 'beehive', 'beehive_full']) {
+  const b = DEFS[ID[k]]; b.base = k; b.facing = 's';
+  for (const [dir, fi] of [['n', 5], ['e', 0], ['w', 1]]) {
+    const v = Object.assign({}, b); delete v.id; delete v.key; delete v.faces; delete v.color;
+    const d = block(k + '_' + dir, b.name, 'stone', Object.assign(v, { base: k, facing: dir }));
+    d.faces = b.faces.slice(); d.faces[4] = b.faces[0]; d.faces[fi] = b.faces[4]; d.color = b.color;
+  }
+}
+block('honey_block', 'Honey Block', 'honey_block', { hardness: 0, opaque: false, translucent: true, sticky: true });
+block('honeycomb_block', 'Honeycomb Block', 'honeycomb_block', { hardness: 0.6 });
+block('torchflower', 'Torchflower', 'torchflower', CROSS);
+block('pitcher_plant', 'Pitcher Plant', 'pitcher_plant', CROSS);
+block('froglight', 'Froglight', 'froglight', { hardness: 0.3, light: true, emit: 15 });
+block('pale_oak_log', 'Pale Oak Log', { top: 'log_pale_oak_top', side: 'log_pale_oak' }, { tool: 'axe', hardness: 2 });
+block('pale_oak_leaves', 'Pale Oak Leaves', 'leaves_pale_oak', Object.assign({ drop: (r) => (r() < 0.08 ? [['stick', 1]] : []) }, LEAVES));
+block('pale_oak_planks', 'Pale Oak Planks', 'planks_pale_oak', { tool: 'axe', hardness: 2 });
+block('pale_moss_block', 'Pale Moss Block', 'pale_moss', { tool: 'hoe', hardness: 0.1 });
+block('creaking_heart', 'Creaking Heart', { top: 'log_pale_oak_top', side: 'log_pale_oak', front: 'creaking_heart' }, { tool: 'axe', hardness: 10, light: true, emit: 6, creakingHeart: true });
+block('campfire', 'Campfire', { top: 'campfire_top', side: 'campfire_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 2, opaque: false, cutout: true, solid: false, light: true, emit: 15, box: [0, 0, 0, 1, 0.4375, 1], boxes: [[0, 0, 0, 1, 0.4375, 1]], iconTile: 'i_campfire', drop: (r) => [['coal', 2]] });
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1300,6 +1365,21 @@ item('cooked_rabbit', 'Cooked Rabbit', 'cooked_rabbit', { food: 5 });
 item('slime_ball', 'Slimeball', 'slime_ball');
 item('phantom_membrane', 'Phantom Membrane', 'phantom_membrane');
 item('glow_berries', 'Glow Berries', 'glow_berries', { food: 2 });
+item('honeycomb', 'Honeycomb', 'honeycomb');
+item('glass_bottle', 'Glass Bottle', 'glass_bottle');
+item('honey_bottle', 'Honey Bottle', 'honey_bottle', { food: 6, stack: 16, leaves: 'glass_bottle' });
+item('shears', 'Shears', 'shears', { stack: 1 });
+item('bowl', 'Bowl', 'bowl');
+item('mushroom_stew', 'Mushroom Stew', 'mushroom_stew', { food: 6, stack: 1, leaves: 'bowl' });
+for (const [k, n] of [['cod', 'Cod'], ['salmon', 'Salmon'], ['tropical_fish', 'Tropical Fish'], ['axolotl', 'Axolotl']]) item('bucket_of_' + k, 'Bucket of ' + n, 'bucket_of_' + k, { stack: 1, fishBucket: k });
+item('armadillo_scute', 'Armadillo Scute', 'armadillo_scute');
+item('wolf_armor', 'Wolf Armor', 'wolf_armor', { stack: 1 });
+item('totem_of_undying', 'Totem of Undying', 'totem_of_undying', { stack: 1 });
+item('snowball', 'Snowball', 'snowball', { stack: 16 });
+item('breeze_rod', 'Breeze Rod', 'breeze_rod');
+item('wind_charge', 'Wind Charge', 'wind_charge', { stack: 64 });
+HORSE_ARMOR_KEYS.push('wolf_armor');
+HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
 
 function getDrops(def, rng) {
@@ -1367,8 +1447,8 @@ function cleanEnch(e) {
 // [output, count, {input: count}, station]   '#planks' / '#log' match any wood type
 const GROUPS = {
   '#cobble': ['cobblestone', 'cobbled_deepslate', 'blackstone'],
-  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks', 'jungle_planks', 'dark_oak_planks', 'acacia_planks', 'mangrove_planks', 'cherry_planks', 'bamboo_planks'],
-  '#log': ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'dark_oak_log', 'acacia_log', 'mangrove_log', 'cherry_log'],
+  '#planks': ['oak_planks', 'birch_planks', 'spruce_planks', 'crimson_planks', 'warped_planks', 'jungle_planks', 'dark_oak_planks', 'acacia_planks', 'mangrove_planks', 'cherry_planks', 'bamboo_planks', 'pale_oak_planks'],
+  '#log': ['oak_log', 'birch_log', 'spruce_log', 'jungle_log', 'dark_oak_log', 'acacia_log', 'mangrove_log', 'cherry_log', 'pale_oak_log'],
   '#wool': ['wool_white', 'wool_red', 'wool_blue', 'wool_green', 'wool_yellow', 'wool_black', 'wool_orange', 'wool_purple'],
 };
 const RECIPES = [
@@ -1515,6 +1595,8 @@ const RECIPES = [
   ['terracotta', 1, { clay: 1 }, 'furnace'],
   ['cooked_porkchop', 1, { porkchop: 1 }, 'furnace'],
   ['steak', 1, { beef: 1 }, 'furnace'],
+  ['bowl', 4, { '#planks': 3 }, 'table'], ['mushroom_stew', 1, { red_mushroom: 1, brown_mushroom: 1, bowl: 1 }], ['wolf_armor', 1, { armadillo_scute: 6 }, 'table'], ['snow', 1, { snowball: 4 }], ['wind_charge', 4, { breeze_rod: 1 }], ['pale_oak_planks', 4, { pale_oak_log: 1 }],
+  ['beehive', 1, { '#planks': 6, honeycomb: 3 }, 'table'], ['campfire', 1, { stick: 3, coal: 1, '#log': 3 }, 'table'], ['glass_bottle', 3, { glass: 3 }, 'table'], ['shears', 1, { iron_ingot: 2 }], ['honey_block', 1, { honey_bottle: 4 }], ['honeycomb_block', 1, { honeycomb: 4 }],
   ['cooked_rabbit', 1, { rabbit: 1 }, 'furnace'], ['cooked_cod', 1, { cod: 1 }, 'furnace'], ['cooked_salmon', 1, { salmon: 1 }, 'furnace'], ['fishing_rod', 1, { stick: 3, string: 2 }],
   ['cooked_chicken', 1, { chicken: 1 }, 'furnace'],
 ];

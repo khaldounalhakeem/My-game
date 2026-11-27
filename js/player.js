@@ -74,6 +74,7 @@ class Player {
   heldSlot() { return this.inv.slots[this.sel]; }
   /* a power from a beacon: its level, or 0 */
   fx(k) { const e = this.effects && this.effects[k]; return e && e.until > performance.now() ? e.lvl : 0; }
+  addEffect(k, lvl, secs) { this.effects = this.effects || {}; this.effects[k] = { lvl, until: performance.now() + secs * 1000 }; }
   heldDef() { const s = this.heldSlot(); return s ? DEFS[s.id] : null; }
   eyePos() { return new THREE.Vector3(this.pos.x, this.pos.y + (this.sleeping ? 0.3 : this.eye - (this.sneaking ? 0.15 : 0)), this.pos.z); }
   lookDir() {
@@ -115,6 +116,17 @@ class Player {
   }
 
   die() {
+    // holding a Totem of Undying: it saves you instead, like Minecraft
+    const held = this.heldSlot();
+    if (held && DEFS[held.id].key === 'totem_of_undying') {
+      this.inv.takeFrom(this.sel, 1); this.inv.changed();
+      this.health = 2; this.fire = 0; this.fireT = 0; this.effects = {};
+      this.addEffect('regeneration', 2, 40); this.addEffect('absorption', 2, 5);
+      G.particles.burst(this.pos.x, this.pos.y + 1, this.pos.z, [0xf0d040, 0x3ac83a, 0xffffff], 40, 4, 0.18);
+      G.sound.play('levelup');
+      G.ui.message('The Totem of Undying saved your life!', 'gold');
+      return;
+    }
     if (this.riding) this.dismount();
     this.health = 0; this.dead = true; this.effects = {};
     if (G.keepInventory) { G.ui.showDeath(); return; } // keep inventory: items and XP stay with you
@@ -163,7 +175,7 @@ class Player {
         this.pos.set(h.pos.x + Math.sin(by) * off, h.pos.y + 0.05, h.pos.z + Math.cos(by) * off);
       } else {
         h.drive = { x: wx, z: wz, jump: input.jump, yaw: Math.atan2(-s, -c) };
-        this.pos.set(h.pos.x, h.pos.y + (h.type === 'donkey' ? 0.75 : 0.95), h.pos.z);
+        this.pos.set(h.pos.x, h.pos.y + (h.T.seat !== undefined ? h.T.seat : h.type === 'donkey' ? 0.75 : 0.95), h.pos.z);
       }
       this.vel.set(0, 0, 0); this.onGround = true; this.fallStart = null; this.flying = false;
       // riding doesn't let you breathe under water: your head is still where it is
@@ -197,8 +209,14 @@ class Player {
     this.sprinting = input.sprint && mz > 0.3 && !this.sneaking && (creative || this.hunger > 6);
     let speed = this.flying ? (input.sprint ? 20 : 11) : this.sprinting ? 5.7 : this.sneaking ? 1.4 : 4.3;
     if (swimming && !this.flying) speed *= this.inLava ? 0.4 : 0.55;
+    // swimming next to a dolphin makes you fast (Dolphin's Grace)
+    if (swimming && !this.inLava && G.mobs.some(m => m.type === 'dolphin' && !m.dead && m.pos.distanceTo(this.pos) < 7)) speed *= 2.2;
     if (!this.flying && this.fx('speed')) speed *= 1 + 0.2 * this.fx('speed');
     if (this.inSnow && !this.flying) speed *= 0.45;
+    // honey blocks are sticky: slow to walk on and hard to jump from
+    const under = this.onGround ? G.world.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y - 0.1), Math.floor(this.pos.z)) : 0;
+    this.onHoney = under === ID.honey_block;
+    if (this.onHoney && !this.flying) speed *= 0.4;
     const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
     const wx = (-s * mz + c * mx) * speed, wz = (-c * mz - s * mx) * speed;
     const accel = this.flying ? 8 : this.onGround ? 16 : swimming ? 6 : 3.5;
@@ -221,7 +239,7 @@ class Player {
     } else {
       this.vel.y -= 28 * dt;
       if (this.vel.y < -55) this.vel.y = -55;
-      if (input.jump && this.onGround) { this.vel.y = 8.7 + 1.7 * this.fx('jump_boost'); this.hungerDrain(this.sprinting ? 0.05 : 0.0125); }
+      if (input.jump && this.onGround) { this.vel.y = (this.onHoney ? 5 : 8.7) + 1.7 * this.fx('jump_boost'); this.hungerDrain(this.sprinting ? 0.05 : 0.0125); }
       if (this.inSnow) { this.vel.y = Math.max(this.vel.y, -1.2); if (input.jump) this.vel.y = Math.max(this.vel.y, 2.2); this.fallStart = null; }
     }
     const wasGround = this.onGround;
@@ -312,6 +330,8 @@ class Player {
       if (this.regenT > D.regen) { this.regenT = 0; this.health = Math.min(20, this.health + 1); this.hungerDrain(0.25); }
     } else this.regenT = 0;
     // Regeneration from a beacon heals you even when you're hungry
+    // poison (from a cave spider): it hurts, but never takes your last heart
+    if (this.fx('poison') && this.health > 1) { this.fxPoisonT = (this.fxPoisonT || 0) + dt; if (this.fxPoisonT >= 1.25) { this.fxPoisonT = 0; this.health -= 1; G.ui.hurtFlash(); } }
     if (this.fx('regeneration') && this.health < 20) { this.fxRegenT = (this.fxRegenT || 0) + dt; if (this.fxRegenT >= 2.5) { this.fxRegenT = 0; this.health = Math.min(20, this.health + 1); } }
     if (this.hunger <= 0) {
       this.starveT += dt;
@@ -432,6 +452,10 @@ class Player {
     const ad = above && DEFS[above];
     if (ad && (ad.cross || above === ID.cactus || above === ID.bamboo || above === ID.sugar_cane || ad.wire || ad.repeater || ad.plate || (ad.rsTorch && ad.rsTorch.d === 'd') || (ad.lever && ad.lever.d === 'd') || (ad.button && ad.button.d === 'd'))) this.breakBlock(x, y + 1, z, above);
     if (id === ID.chest_loot || id === ID.chest) G.breakChest(x, y, z, id === ID.chest_loot);
+    if (DEFS[id].hive) G.angerBees(x, y, z, this);
+    if (DEFS[id].creakingHeart) { for (const m of G.mobs) if (m.type === 'creaking' && m.heart && m.heart[0] === x && m.heart[1] === y && m.heart[2] === z) m.hurt(0, null); G.ui.message('You broke the Creaking Heart!', 'gold'); }
+    // stone in the mountains sometimes hides a silverfish
+    if ((id === ID.stone || id === ID.deepslate) && this.mode === 'survival' && G.dim === 'overworld' && Math.random() < (G.world.biomeAt(x, z, G.world.heightAt(x, z)) === BIOME.MOUNTAIN ? 0.03 : 0.004)) spawnMob('silverfish', x + 0.5, y, z + 0.5);
     if (def.shulker) { G.shulkerId = id; G.breakShulker(x, y, z); }
     if (DEFS[id].base === 'furnace') G.breakFurnace(x, y, z);
     if (DEFS[id].sign) G.setSign(x, y, z, null);
@@ -687,7 +711,7 @@ class Player {
       this.useCd = 0.4; this.swing = 1; G.sound.play('place');
       return true;
     }
-    if (k === 'water_bucket' || k === 'lava_bucket') {
+    if (k === 'water_bucket' || k === 'lava_bucket' || (hd && hd.fishBucket)) {
       if (!b) return false;
       let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
       if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
@@ -697,7 +721,8 @@ class Player {
       if (k === 'water_bucket' && G.dim === 'nether') {
         G.particles.burst(px + 0.5, py + 0.5, pz + 0.5, [0xdddddd, 0xffffff], 14, 1.5, 0.15, 2);
         G.ui.message('The water boils away in the heat of the Nether.', 'purple');
-      } else W.setBlock(px, py, pz, k === 'water_bucket' ? ID.water : ID.lava);
+      } else W.setBlock(px, py, pz, k === 'lava_bucket' ? ID.lava : ID.water);
+      if (hd && hd.fishBucket && G.dim !== 'nether') spawnMob(hd.fishBucket, px + 0.5, py + 0.1, pz + 0.5);
       this.swapHeld(ID.bucket);
       G.sound.play('place');
       return true;
@@ -739,8 +764,16 @@ class Player {
     // one tap on fire puts it out
     if (b && b.id === ID.fire) { this.putOutFire(b.x, b.y, b.z); return; }
     // a bucket on a cow: milk
-    if (tgt.mob && tgt.mob.type === 'cow' && !tgt.mob.dead && hd && hd.key === 'bucket') { this.useCd = 0.4; this.swing = 1; this.swapHeld(ID.milk_bucket); G.sound.play('pickup'); return; }
+    if (tgt.mob && tgt.mob.type === 'mooshroom' && !tgt.mob.dead && hd && hd.key === 'bowl') { this.useCd = 0.4; this.swing = 1; this.swapHeld(ID.mushroom_stew); G.sound.play('pickup'); return; }
+    if (tgt.mob && ['cod', 'salmon', 'tropical_fish', 'axolotl'].includes(tgt.mob.type) && !tgt.mob.dead && !tgt.mob.remoteCtl && hd && hd.key === 'water_bucket') {
+      this.useCd = 0.4; this.swing = 1; const t = tgt.mob.type; tgt.mob.removeSilently(); this.swapHeld(ID['bucket_of_' + t]); G.sound.play('pickup');
+      G.ui.message('You caught the ' + MOB_TYPES[t].name.toLowerCase() + ' in your bucket! Use the bucket to let it out again.');
+      return;
+    }
+    if (tgt.mob && (tgt.mob.type === 'cow' || tgt.mob.type === 'goat') && !tgt.mob.dead && hd && hd.key === 'bucket') { this.useCd = 0.4; this.swing = 1; this.swapHeld(ID.milk_bucket); G.sound.play('pickup'); return; }
     if (tgt.mob && tgt.mob.interact && tgt.mob.interact(this, hd)) { this.useCd = 0.35; this.swing = 1; return; }
+    // honey dripping out of a bee nest or beehive: shears for honeycomb, a glass bottle for honey
+    if (b && DEFS[b.id].hive === 'full' && hd && (hd.key === 'shears' || hd.key === 'glass_bottle')) { this.useCd = 0.5; this.swing = 1; G.harvestHive(b.x, b.y, b.z, hd.key, this); return; }
     // tie the animals on your rope to a fence
     if (b && DEFS[b.id].fence) {
       const mine = G.mobs.filter(m => m.leash === 'player' && !m.remoteCtl && !m.dead && m.pos.distanceTo(this.pos) < 16);
@@ -823,7 +856,7 @@ class Player {
       this.saturation = Math.min(this.hunger, (this.saturation || 0) + hd.food * 1.2);
       if (hd.heal) this.health = Math.min(20, this.health + hd.heal);
       if (hd.key === 'rotten_flesh' && Math.random() < 0.5) this.hungerDrain(2);
-      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      if (this.mode === 'survival') { this.inv.takeFrom(this.sel, 1); if (hd.leaves) this.inv.add(ID[hd.leaves], 1); }
       G.sound.play('eat');
       this.useCd = 0.5; this.swing = 1;
       return;
@@ -846,6 +879,13 @@ class Player {
       this.useCd = 0.45; this.swing = 1;
       return;
     }
+    if (hd.key === 'snowball' || hd.key === 'wind_charge') {
+      const o = this.eyePos(), d = this.lookDir();
+      G.spawnProjectile(hd.key, o.addScaledVector(d, 0.5), d.multiplyScalar(hd.key === 'snowball' ? 24 : 20), this);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      this.useCd = 0.35; this.swing = 1; G.sound.play('bow');
+      return;
+    }
     if (hd.key === 'ender_pearl') {
       const o = this.eyePos(), d = this.lookDir();
       G.spawnProjectile('ender_pearl', o.addScaledVector(d, 0.5), d.multiplyScalar(26), this);
@@ -856,7 +896,8 @@ class Player {
     if (!hd.isBlock || !b) return;
     let px = b.x + b.nx, py = b.y + b.ny, pz = b.z + b.nz;
     if (DEFS[b.id].replaceable) { px = b.x; py = b.y; pz = b.z; }
-    if (py < 0 || py >= WH) return;
+    if (py >= WH) { G.ui.message('Height limit for building is ' + WH + ' blocks. You can\'t build any higher!'); this.useCd = 0.5; return; }
+    if (py < 0) return;
     const cur = W.getBlock(px, py, pz);
     if (cur && !DEFS[cur].liquid && !DEFS[cur].replaceable) return;
     if (hd.cross) {

@@ -85,6 +85,44 @@ const Sound = {
       case 'mob_cow': this.tone(170, 0.9, 'sawtooth', 0.08 * v, 120); break;
       case 'mob_sheep': this.tone(420, 0.5, 'square', 0.05 * v, 380); break;
       case 'mob_chicken': this.tone(1000, 0.06, 'triangle', 0.06 * v, 1300); this.tone(1100, 0.06, 'triangle', 0.06 * v, 1400, 0.1); break;
+      // every other mob's own voice
+      case 'mob_bee': this.tone(220, 0.9, 'sawtooth', 0.05 * v, 235); this.tone(440, 0.9, 'square', 0.015 * v, 470); break;
+      case 'mob_wolf': this.tone(600, 0.12, 'square', 0.06 * v, 400); this.tone(560, 0.14, 'square', 0.06 * v, 380, 0.2); break;
+      case 'mob_cat': this.tone(700, 0.45, 'triangle', 0.07 * v, 1000); break;
+      case 'mob_ocelot': this.tone(800, 0.3, 'triangle', 0.05 * v, 1100); break;
+      case 'mob_horse': case 'mob_donkey': for (let i = 0; i < 5; i++) this.tone(500 - i * 50, 0.08, 'sawtooth', 0.06 * v, 650 - i * 60, i * 0.07); break;
+      case 'mob_panda': this.tone(300, 0.3, 'triangle', 0.06 * v, 260); break;
+      case 'mob_fox': this.tone(900, 0.15, 'sawtooth', 0.05 * v, 600); this.tone(950, 0.12, 'sawtooth', 0.04 * v, 700, 0.2); break;
+      case 'mob_rabbit': this.noise(0.08, 0.15 * v, 3000, 'bandpass'); break;
+      case 'mob_goat': this.tone(480, 0.6, 'sawtooth', 0.06 * v, 430); break;
+      case 'mob_frog': this.tone(150, 0.12, 'square', 0.09 * v, 110); this.tone(180, 0.12, 'square', 0.08 * v, 120, 0.18); break;
+      case 'mob_turtle': this.noise(0.3, 0.1 * v, 400, 'lowpass'); break;
+      case 'mob_llama': this.tone(380, 0.35, 'sawtooth', 0.05 * v, 520); break;
+      case 'mob_camel': this.tone(160, 0.6, 'sawtooth', 0.07 * v, 120); this.noise(0.4, 0.1 * v, 600, 'lowpass', 0.1); break;
+      case 'mob_polar_bear': this.tone(110, 0.7, 'sawtooth', 0.1 * v, 80); this.noise(0.6, 0.15 * v, 300, 'lowpass'); break;
+      case 'mob_mooshroom': this.tone(170, 0.9, 'sawtooth', 0.08 * v, 120); break;
+      case 'mob_sniffer': for (let i = 0; i < 3; i++) this.noise(0.12, 0.25 * v, 500, 'bandpass', i * 0.16); break;
+      case 'mob_armadillo': this.noise(0.15, 0.15 * v, 1800, 'bandpass'); break;
+      case 'mob_parrot': this.tone(1800, 0.08, 'square', 0.04 * v, 2400); this.tone(2000, 0.08, 'square', 0.04 * v, 1500, 0.12); break;
+      case 'mob_squid': case 'mob_glow_squid': this.noise(0.5, 0.12 * v, 500, 'lowpass', 0, 200); break;
+      case 'mob_dolphin': for (let i = 0; i < 6; i++) this.tone(2500 + i * 150, 0.04, 'sine', 0.05 * v, 3200, i * 0.06); break;
+      case 'mob_axolotl': this.tone(1300, 0.15, 'sine', 0.05 * v, 1700); break;
+      case 'mob_cod': case 'mob_salmon': case 'mob_tropical_fish': for (let i = 0; i < 3; i++) this.tone(600 + i * 200, 0.05, 'sine', 0.03 * v, 1200, i * 0.08); break;
+      case 'mob_slime': case 'mob_magma_cube': this.noise(0.2, 0.3 * v, 500, 'lowpass', 0, 150); this.tone(140, 0.15, 'sine', 0.08 * v, 90); break;
+      case 'mob_phantom': this.tone(1600, 0.8, 'sawtooth', 0.05 * v, 700); this.tone(1700, 0.8, 'square', 0.02 * v, 750); break;
+      case 'mob_hoglin': this.tone(120, 0.4, 'sawtooth', 0.1 * v, 90); this.noise(0.3, 0.15 * v, 400, 'lowpass'); break;
+      case 'mob_piglin': case 'mob_zombified_piglin': this.tone(260, 0.15, 'sawtooth', 0.07 * v, 180); this.tone(240, 0.2, 'sawtooth', 0.06 * v, 150, 0.18); break;
+      case 'mob_warden': this.tone(55, 0.18, 'sine', 0.3 * v, 45); this.tone(55, 0.18, 'sine', 0.25 * v, 45, 0.3); break;
+      case 'wardenRoar': this.tone(70, 1.5, 'sawtooth', 0.3 * v, 40); this.noise(1.5, 0.35 * v, 300, 'lowpass', 0, 80); break;
+      case 'mob_husk': case 'mob_drowned': this.tone(100, 0.8, 'sawtooth', 0.09 * v, 70); if (name === 'mob_drowned') this.noise(0.5, 0.1 * v, 500, 'lowpass'); break;
+      case 'mob_stray': case 'mob_wither_skeleton': for (let i = 0; i < 4; i++) this.noise(0.04, 0.2 * v, name === 'mob_stray' ? 2000 : 1500, 'bandpass', i * 0.08); break;
+      case 'mob_witch': for (let i = 0; i < 4; i++) this.tone(700 - i * 30, 0.07, 'square', 0.04 * v, 900, i * 0.09); break;
+      case 'mob_pillager': this.tone(200, 0.3, 'square', 0.05 * v, 150); break;
+      case 'mob_blaze': this.noise(0.8, 0.2 * v, 900, 'bandpass', 0, 300); break;
+      case 'mob_ghast': this.tone(600, 1.2, 'sine', 0.1 * v, 350); this.tone(640, 1.2, 'triangle', 0.05 * v, 380); break;
+      case 'mob_wither': this.tone(90, 1.0, 'sawtooth', 0.15 * v, 60); break;
+      case 'llamaSpit': this.noise(0.15, 0.4 * v, 2000, 'bandpass', 0, 600); break;
+      case 'honey': this.noise(0.25, 0.25 * v, 800, 'lowpass'); break;
       default: break;
     }
   },
@@ -273,7 +311,7 @@ function updateSky(dt) {
   G.sun.visible = sh > -0.2; G.moon.visible = sh < 0.2;
   G.stars.material.opacity = clamp(-sh * 3, 0, 1) * (1 - ug);
   G.stars.rotation.y = a * 0.2;
-  G.clouds.position.set(cam.x, WH + 14, cam.z);
+  G.clouds.position.set(cam.x, GEN_H + 46, cam.z);
   G.clouds.material.map.offset.set((cam.x / 1600 * 3 + performance.now() / 600000) % 1, (-cam.z / 1600 * 3) % 1);
   G.clouds.material.color.setScalar(0.35 + 0.65 * dl);
 }
@@ -494,6 +532,13 @@ G.tryBuildWither = (x, y, z) => {
 };
 G.tryBuildGolem = (x, y, z) => {
   const W = G.world;
+  // a pumpkin on two snow blocks: a Snow Golem
+  if (W.getBlock(x, y - 1, z) === ID.snow && W.getBlock(x, y - 2, z) === ID.snow) {
+    for (const [bx, by, bz] of [[x, y, z], [x, y - 1, z], [x, y - 2, z]]) { W.setBlock(bx, by, bz, 0); G.particles.blockBreak(bx, by, bz, ID.snow); }
+    spawnMob('snow_golem', x + 0.5, y - 2, z + 0.5);
+    G.ui.message('You built a Snow Golem! It throws snowballs at monsters.', 'gold');
+    return true;
+  }
   if (W.getBlock(x, y - 1, z) !== ID.iron_block || W.getBlock(x, y - 2, z) !== ID.iron_block) return false;
   for (const [ax, az] of [[1, 0], [0, 1]]) {
     if (W.getBlock(x + ax, y - 1, z + az) === ID.iron_block && W.getBlock(x - ax, y - 1, z - az) === ID.iron_block) {
@@ -1210,6 +1255,67 @@ G.tickBobber = (dt) => {
   pts.setXYZ(0, o.x + d.x * 0.6 + Math.cos(P.yaw) * 0.25, o.y - 0.2, o.z + d.z * 0.6 - Math.sin(P.yaw) * 0.25); pts.setXYZ(1, b.x, b.y + 0.15, b.z); pts.needsUpdate = true;
 };
 /* the nearest dog bed to where you sleep (or nothing) */
+/* ---------- bees ----------
+   A bee finds a nest or hive nearby, flies to flowers in the day, and brings the nectar home. After a few
+   trips honey drips out of the front. At night and in the rain the bees stay around their home. */
+G.hiveId = (id, full) => { const d = DEFS[id], base = d.base.replace('_full', ''); return ID[base + (full ? '_full' : '') + (d.facing === 's' ? '' : '_' + d.facing)]; };
+G.honey = {};
+const isFlower = id => { const d = DEFS[id]; return d && d.cross && /rose|dandelion|tulip|allium|orchid|daisy|cornflower|lily_of|sunflower|azalea/.test(d.key); };
+G.findNear = (p, r, ry, test) => {
+  const W = G.world, x0 = Math.floor(p.x), y0 = Math.floor(p.y), z0 = Math.floor(p.z);
+  let best = null, bd = Infinity;
+  for (let dy = -ry; dy <= ry; dy++) for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+    const d = dx * dx + dy * dy + dz * dz; if (d >= bd) continue;
+    if (test(W.getBlock(x0 + dx, y0 + dy, z0 + dz))) { bd = d; best = { x: x0 + dx, y: y0 + dy, z: z0 + dz }; }
+  }
+  return best;
+};
+G.beeGoal = (b, dt) => {
+  const W = G.world, now = performance.now();
+  if (now > (b.hiveCheck || 0)) {
+    b.hiveCheck = now + 6000 + Math.random() * 2000;
+    if (b.hive && !(DEFS[W.getBlock(b.hive.x, b.hive.y, b.hive.z)] || {}).hive) b.hive = null;
+    if (!b.hive) b.hive = G.findNear(b.pos, 14, 6, id => DEFS[id] && DEFS[id].hive);
+  }
+  const atHome = G.isNight();
+  if (b.hive && (atHome || b.nectar)) {
+    const h = b.hive, dx = h.x + 0.5 - b.pos.x, dz = h.z + 0.5 - b.pos.z, dy = h.y + 0.3 - b.pos.y;
+    if (b.nectar && dx * dx + dz * dz + dy * dy < 3.2) {
+      b.nectar = false;
+      const k = h.x + ',' + h.y + ',' + h.z, id = W.getBlock(h.x, h.y, h.z);
+      G.honey[k] = (G.honey[k] || 0) + 1;
+      if (G.honey[k] >= 3 && DEFS[id].hive === 'empty') { W.setBlock(h.x, h.y, h.z, G.hiveId(id, true)); G.honey[k] = 0; G.sound.play('honey', new THREE.Vector3(h.x, h.y, h.z)); }
+    }
+    const ph = b.phase || (b.phase = Math.random() * 6.28);
+    return { x: h.x + 0.5 + Math.sin(now / 900 + ph) * (atHome ? 1.2 : 0), y: h.y + 0.2, z: h.z + 0.5 + Math.cos(now / 900 + ph) * (atHome ? 1.2 : 0) };
+  }
+  if (!b.nectar) {
+    if (now > (b.flowerCheck || 0)) { b.flowerCheck = now + 4000 + Math.random() * 3000; if (!b.flower || !isFlower(W.getBlock(b.flower.x, b.flower.y, b.flower.z))) b.flower = G.findNear(b.pos, 8, 4, isFlower); }
+    const f = b.flower;
+    if (f) {
+      const dx = f.x + 0.5 - b.pos.x, dz = f.z + 0.5 - b.pos.z;
+      if (dx * dx + dz * dz < 1.2) {
+        b.pollT = (b.pollT || 0) + dt;
+        if (Math.random() < dt * 3) G.particles.burst(b.pos.x, b.pos.y, b.pos.z, [0xf8d040], 1, 0.3, 0.06);
+        if (b.pollT > 2.5) { b.pollT = 0; b.nectar = true; b.flower = null; b.flowerCheck = now + 15000; }
+      }
+      return { x: f.x + 0.5, y: f.y + 0.7, z: f.z + 0.5 };
+    }
+  }
+  return null;
+};
+/* shears or a glass bottle on a dripping nest; the bees get angry if you take their honey (or break their home) */
+G.angerBees = (x, y, z, who) => { for (const m of G.mobs) if (m.type === 'bee' && !m.dead && !m.remoteCtl && Math.hypot(m.pos.x - x, m.pos.y - y, m.pos.z - z) < 14) { m.angry = true; m.angryAt = who; } };
+G.harvestHive = (x, y, z, tool, P) => {
+  const W = G.world, id = W.getBlock(x, y, z);
+  W.setBlock(x, y, z, G.hiveId(id, false));
+  if (tool === 'shears') G.spawnDrop(ID.honeycomb, 3, x + 0.5, y + 1, z + 0.5);
+  else if (P.mode === 'survival') P.swapHeld(ID.honey_bottle); else P.inv.add(ID.honey_bottle, 1);
+  G.sound.play('honey', new THREE.Vector3(x, y, z));
+  // a campfire under the nest keeps them calm, like Minecraft
+  let smoke = false; for (let d = 1; d <= 5; d++) if (W.getBlock(x, y - d, z) === ID.campfire) smoke = true;
+  if (!smoke) { G.angerBees(x, y, z, P); G.ui.message('The bees are angry! Put a campfire under the nest to keep them calm.'); }
+};
 G.findDogBed = (x, y, z) => {
   const W = G.world;
   let best = null, bd = Infinity;
@@ -1388,6 +1494,7 @@ function spawnTick() {
   if (G.dim === 'nether') { netherSpawn(hostile); return; }
   if (G.dim === 'end') { endSpawn(hostile); return; }
   structureSpawns();
+  traderSpawn();
   // farm animals, horses and wolves: plenty of them around (monsters are counted separately)
   if (passive < 30 && Math.random() < 0.5) {
     const a = Math.random() * Math.PI * 2, r = 22 + Math.random() * 34;
@@ -1454,6 +1561,10 @@ function spawnTick() {
       let type = pick(HOSTILE_POOL);
       const hb = W.biomeAt(x, z, W.heightAt(x, z)), outside = y > top;
       if (type === 'zombie' && hb === BIOME.DESERT && outside) type = 'husk';
+      if (type === 'zombie' && Math.random() < 0.06) type = 'zombie_villager';
+      if (type === 'skeleton' && (hb === BIOME.SWAMP || hb === BIOME.MANGROVE) && outside) type = 'bogged';
+      // deep in the caves: cave spiders, bats and (rarely) a breeze
+      if (!outside && y < 40) { const q = Math.random(); if (q < 0.12) type = 'cave_spider'; else if (q < 0.25) type = 'bat'; else if (q < 0.28) type = 'breeze'; }
       if (type === 'skeleton' && (hb === BIOME.SNOWY || hb === BIOME.TAIGA) && outside) type = 'stray';
       if (Math.random() < (hb === BIOME.SWAMP ? 0.2 : 0.06)) type = 'witch';
       if (outside && Math.random() < (hb === BIOME.MANGROVE || hb === BIOME.SWAMP ? 0.35 : 0.06)) type = 'slime';
@@ -1471,13 +1582,34 @@ function spawnTick() {
     const x = Math.floor(P.pos.x + Math.cos(a) * r), z = Math.floor(P.pos.z + Math.sin(a) * r);
     if (W.isLoaded(x, z)) {
       const top = W.surfaceY(x, z);
-      if (W.getBlock(x, top, z) === ID.water && Math.random() < 0.25) spawnMob('drowned', x + 0.5, top - 1, z + 0.5);
+      const sb = W.biomeAt(x, z, W.heightAt(x, z));
+      if (W.getBlock(x, top, z) === ID.water && W.getBlock(x, top - 6, z) === ID.water && (sb === BIOME.OCEAN || sb === BIOME.WARM_OCEAN || sb === BIOME.FROZEN_OCEAN) && Math.random() < 0.12) spawnMob('guardian', x + 0.5, top - 4, z + 0.5);
+      else if (W.getBlock(x, top, z) === ID.water && Math.random() < 0.25) spawnMob('drowned', x + 0.5, top - 1, z + 0.5);
       else if (night && P.pos.y > 50 && Math.random() < 0.08 && !G.mobs.some(m => m.type === 'phantom' && !m.dead)) spawnMob('phantom', x + 0.5, Math.max(top, P.pos.y) + 18, z + 0.5);
     }
   }
 }
 
-const NETHER_POOL = [['zombified_piglin', 34], ['piglin', 16], ['hoglin', 10], ['magma_cube', 10], ['wither_skeleton', 14], ['blaze', 16], ['ghast', 7]];
+/* now and then a wandering trader comes by in the day, with two llamas */
+function traderSpawn() {
+  const P = G.player, W = G.world, now = performance.now();
+  if (G.nextTrader === undefined) G.nextTrader = now + (4 + Math.random() * 6) * 60000;
+  if (now < G.nextTrader || G.isNight() || P.dead) return;
+  G.nextTrader = now + (12 + Math.random() * 12) * 60000;
+  if (G.mobs.some(m => m.type === 'wandering_trader' && !m.dead)) return;
+  for (let t = 0; t < 8; t++) {
+    const a = Math.random() * Math.PI * 2, r = 14 + Math.random() * 10;
+    const x = Math.floor(P.pos.x + Math.cos(a) * r) + 0.5, z = Math.floor(P.pos.z + Math.sin(a) * r) + 0.5;
+    if (!W.isLoaded(x, z)) continue;
+    const y = W.surfaceY(x, z), g = W.getBlock(Math.floor(x), y, Math.floor(z));
+    if (!g || !DEFS[g].solid || DEFS[g].leaves || W.getBlock(Math.floor(x), y + 1, Math.floor(z)) || W.getBlock(Math.floor(x), y + 2, Math.floor(z))) continue;
+    const tr = spawnMob('wandering_trader', x, y + 1, z);
+    for (let i = 0; i < 2; i++) { const l = spawnMob('trader_llama', x + (i ? 1.5 : -1.5), y + 1, z + 1); l.trader = tr; }
+    G.ui.message('A Wandering Trader has come by with his llamas!', 'gold');
+    return;
+  }
+}
+const NETHER_POOL = [['zombified_piglin', 34], ['piglin', 16], ['piglin_brute', 2], ['hoglin', 10], ['magma_cube', 10], ['strider', 12], ['wither_skeleton', 14], ['blaze', 16], ['ghast', 7]];
 /* the End: endermen wander the island, and the dragon guards it until it is beaten */
 function endSpawn(hostile) {
   const P = G.player, W = G.world;
@@ -1512,7 +1644,11 @@ function netherSpawn(hostile) {
     if (dm === 0 && MOB_TYPES[type].hostile) type = 'zombified_piglin'; // peaceful: only the piglins that leave you alone
     const T = MOB_TYPES[type];
     let y = -1;
-    if (T.fly) {
+    if (type === 'strider') {
+      // striders walk on the lava seas
+      for (let yy = 20; yy < 60 && y < 0; yy++) if (W.getBlock(x, yy, z) === ID.lava && !W.getBlock(x, yy + 1, z) && !W.getBlock(x, yy + 2, z)) y = yy + 1;
+      if (y < 0) continue;
+    } else if (T.fly) {
       const need = type === 'ghast' ? 6 : 3;
       for (let yy = 34; yy < 70 && y < 0; yy++) {
         let ok = true;
@@ -1561,12 +1697,23 @@ function structureSpawns() {
         }
       }
     }
+    // a witch lives in the swamp hut
+    if (c.witchHut && G.diff().mobs > 0 && Math.random() < 0.2 && Math.hypot(P.pos.x - c.witchHut.x, P.pos.z - c.witchHut.z) < 48 && Math.hypot(P.pos.x - c.witchHut.x, P.pos.z - c.witchHut.z) > 6 && !G.mobs.some(m => m.type === 'witch' && !m.dead && Math.hypot(m.pos.x - c.witchHut.x, m.pos.z - c.witchHut.z) < 12)) spawnMob('witch', c.witchHut.x, c.witchHut.y, c.witchHut.z);
+    // a creaking comes out of each creaking heart at night
+    if (c.hearts && G.isNight() && G.diff().mobs > 0) for (const h of c.hearts) {
+      if (!DEFS[W.getBlock(h[0], h[1], h[2])].creakingHeart || Math.hypot(P.pos.x - h[0], P.pos.z - h[2]) > 40 || Math.random() > 0.1) continue;
+      if (G.mobs.some(m => m.type === 'creaking' && !m.dead && m.heart && m.heart[0] === h[0] && m.heart[2] === h[2])) continue;
+      const x = h[0] + 0.5 + (Math.random() - 0.5) * 6, z = h[2] + 0.5 + (Math.random() - 0.5) * 6, y = W.surfaceY(x, z);
+      if (!W.getBlock(Math.floor(x), y + 1, Math.floor(z)) && !W.getBlock(Math.floor(x), y + 2, Math.floor(z)) && !W.getBlock(Math.floor(x), y + 3, Math.floor(z))) { const m = spawnMob('creaking', x, y + 1, z); m.heart = h; }
+    }
     // pillagers guard their outposts
     if (c.outpost && G.diff().mobs > 0) {
       const o = c.outpost, near = G.mobs.filter(m => !m.dead && m.type === 'pillager' && Math.hypot(m.pos.x - o.x, m.pos.z - o.z) < 40).length;
       if (near < 4 && Math.random() < 0.3 && Math.hypot(P.pos.x - o.x, P.pos.z - o.z) > 10) {
         const a = Math.random() * Math.PI * 2, x = o.x + Math.cos(a) * (6 + Math.random() * 6), z = o.z + Math.sin(a) * (6 + Math.random() * 6);
-        if (W.isLoaded(x, z)) { const y = W.surfaceY(x, z); if (y > SEA && !W.getBlock(Math.floor(x), y + 1, Math.floor(z)) && !W.getBlock(Math.floor(x), y + 2, Math.floor(z))) spawnMob('pillager', x, y + 1, z); }
+        if (W.isLoaded(x, z)) { const y = W.surfaceY(x, z); if (y > SEA && !W.getBlock(Math.floor(x), y + 1, Math.floor(z)) && !W.getBlock(Math.floor(x), y + 2, Math.floor(z))) { const q = Math.random(); spawnMob(q < 0.6 ? 'pillager' : q < 0.85 ? 'vindicator' : q < 0.93 ? 'evoker' : 'ravager', x, y + 1, z); } }
+        // an allay or two hangs around the outpost
+        if (Math.random() < 0.15 && !G.mobs.some(m => m.type === 'allay' && !m.dead && Math.hypot(m.pos.x - o.x, m.pos.z - o.z) < 40)) { const y = W.surfaceY(o.x, o.z); spawnMob('allay', o.x + 2, y + 2, o.z + 2); }
       }
     }
     for (const [sx, sy, sz] of c.spawners || []) {

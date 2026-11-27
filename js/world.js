@@ -3,11 +3,11 @@
 
 // WH: how high you can build. GEN_H: the height the land was made for (kept at 96, so raising the
 // build limit never changes the land, trees or the Nether's ceiling in worlds made before)
-const CS = 16, WH = 128, GEN_H = 96, SEA = 32;
-const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14, SWAMP: 15, MUSHROOM: 16, BADLANDS: 17, ICE_SPIKES: 18, FLOWER_FOREST: 19, MEADOW: 20, FROZEN_OCEAN: 21, WARM_OCEAN: 22, SUNFLOWER_PLAINS: 23, LUSH_CAVES: 24, DRIPSTONE_CAVES: 25, DEEP_DARK: 26 };
-const GEN_VER = 7;
+const CS = 16, WH = 320, GEN_H = 96, SEA = 32; // you can build up to y 319, like Minecraft
+const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14, SWAMP: 15, MUSHROOM: 16, BADLANDS: 17, ICE_SPIKES: 18, FLOWER_FOREST: 19, MEADOW: 20, FROZEN_OCEAN: 21, WARM_OCEAN: 22, SUNFLOWER_PLAINS: 23, LUSH_CAVES: 24, DRIPSTONE_CAVES: 25, DEEP_DARK: 26, PALE_GARDEN: 27 };
+const GEN_VER = 8;
 const BASE_BIOME = { 15: -1, 16: -1, 17: 4, 18: 5, 19: 3, 20: 6, 21: 0, 22: 0, 23: 2 }; // swamp & mushroom: no villages // which newer biomes exist (see genVerAt)
-const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle', 'Swamp', 'Mushroom Fields', 'Badlands', 'Ice Spikes', 'Flower Forest', 'Meadow', 'Frozen Ocean', 'Warm Ocean', 'Sunflower Plains', 'Lush Caves', 'Dripstone Caves', 'Deep Dark'];
+const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle', 'Swamp', 'Mushroom Fields', 'Badlands', 'Ice Spikes', 'Flower Forest', 'Meadow', 'Frozen Ocean', 'Warm Ocean', 'Sunflower Plains', 'Lush Caves', 'Dripstone Caves', 'Deep Dark', 'Pale Garden'];
 
 const FACES = [
   { n: [1, 0, 0], c: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], shade: 0.8 },
@@ -125,7 +125,7 @@ class World {
     // hot and wet: jungle (only on fresh ground, so places you built in keep their forest)
     if (moist > 0.1 && temp > 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return this.noiseB.fbm2(x / 160 - 900, z / 160 + 400, 2) > 0.18 && this.genVerAt(x, z) >= 3 ? BIOME.BAMBOO : BIOME.JUNGLE;
     // very wet but not hot: a dark forest of big dark oaks (fresh ground only, like the jungle)
-    if (moist > 0.17 && temp > -0.02 && temp <= 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.DARK_FOREST;
+    if (moist > 0.17 && temp > -0.02 && temp <= 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return this.noiseB.fbm2(sx / 160 + 2700, sz / 160 - 2700, 2) > 0.2 && this.fresh7(x, z) && this.genVerAt(x, z) >= 8 ? BIOME.PALE_GARDEN : BIOME.DARK_FOREST;
     // hot and dry-ish: a savanna with flat-topped acacia trees (fresh ground only)
     if (temp > 0.08 && moist <= 0.1 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4))) && this.genVerAt(x, z) >= 1) return BIOME.SAVANNA;
     if (moist > 0.04) return temp > -0.02 ? (this.noiseB.fbm2(sx / 180 - 300, sz / 180 - 300, 2) > 0.2 && this.fresh7(x, z) ? BIOME.FLOWER_FOREST : BIOME.FOREST) : BIOME.BIRCH;
@@ -467,15 +467,17 @@ class World {
 
     // decorations
     const center = biomes[136];
-    const treeCount = { [BIOME.SWAMP]: 3, [BIOME.FLOWER_FOREST]: 4, [BIOME.MEADOW]: rng() < 0.15 ? 1 : 0, [BIOME.SUNFLOWER_PLAINS]: rng() < 0.3 ? 1 : 0, [BIOME.DARK_FOREST]: 6, [BIOME.BAMBOO]: 3, [BIOME.MANGROVE]: 5, [BIOME.CHERRY]: 3, [BIOME.SAVANNA]: rng() < 0.7 ? 1 + (rng() < 0.4 ? 1 : 0) : 0, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
+    const treeCount = { [BIOME.PALE_GARDEN]: 5, [BIOME.SWAMP]: 3, [BIOME.FLOWER_FOREST]: 4, [BIOME.MEADOW]: rng() < 0.15 ? 1 : 0, [BIOME.SUNFLOWER_PLAINS]: rng() < 0.3 ? 1 : 0, [BIOME.DARK_FOREST]: 6, [BIOME.BAMBOO]: 3, [BIOME.MANGROVE]: 5, [BIOME.CHERRY]: 3, [BIOME.SAVANNA]: rng() < 0.7 ? 1 + (rng() < 0.4 ? 1 : 0) : 0, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
     const trees = Math.floor(treeCount * this.style.trees + rng());
+    const beeLand = fresh && this.genVerAt(cx * 16, cz * 16) >= 8, br = mulberry32(hash3(cx, cz, this.seed + 3131));
     for (let t = 0; t < trees; t++) {
       const x = 2 + (rng() * 12 | 0), z = 2 + (rng() * 12 | 0), h = heights[x + z * 16];
       const ground = get(x, h, z);
       if (ground !== ID.grass && ground !== ID.snow_grass) continue;
       if (h + 10 >= GEN_H || get(x, h + 1, z) !== 0) continue;
       const b = biomes[x + z * 16];
-      if (b === BIOME.DARK_FOREST) { if (rng() < 0.8) this.darkOakTree(set, get, x, h + 1, z, rng); else this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4); }
+      if (b === BIOME.PALE_GARDEN) { this.darkOakTree(set, get, x, h + 1, z, rng, ID.pale_oak_log, ID.pale_oak_leaves); if (br() < 0.2) { set(x, h + 3, z, ID.creaking_heart); (this.newHearts || (this.newHearts = [])).push([cx * 16 + x, h + 3, cz * 16 + z]); } }
+      else if (b === BIOME.DARK_FOREST) { if (rng() < 0.8) this.darkOakTree(set, get, x, h + 1, z, rng); else this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4); }
       else if (b === BIOME.SAVANNA) this.acaciaTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.MANGROVE) this.mangroveTree(set, get, x, h + 1, z, rng);
       else if (b === BIOME.CHERRY) this.cherryTree(set, get, x, h + 1, z, rng);
@@ -486,6 +488,11 @@ class World {
       else if (b === BIOME.BIRCH || b === BIOME.MEADOW || ((b === BIOME.FOREST || b === BIOME.FLOWER_FOREST) && rng() < 0.25)) this.oakTree(set, get, x, h + 1, z, rng, ID.birch_log, ID.birch_leaves, 5);
       else this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4);
       set(x, h, z, ID.dirt);
+      // a bee nest hanging under the leaves (new land only), like Minecraft
+      if (beeLand && (b === BIOME.PLAINS || b === BIOME.SUNFLOWER_PLAINS || b === BIOME.FLOWER_FOREST || b === BIOME.MEADOW || b === BIOME.FOREST || b === BIOME.BIRCH || b === BIOME.CHERRY) && br() < (b === BIOME.FOREST || b === BIOME.BIRCH ? 0.05 : 0.3)) {
+        const [dx, dz, f] = [[0, 1, ''], [0, -1, '_n'], [1, 0, '_e'], [-1, 0, '_w']][br() * 4 | 0];
+        for (let y = h + 2; y < h + 7; y++) if ((get(x, y, z) === ID.oak_log || get(x, y, z) === ID.birch_log || get(x, y, z) === ID.cherry_log) && get(x + dx, y, z + dz) === 0 && get(x + dx, y - 1, z + dz) === 0 && get(x + dx, y + 1, z + dz) !== 0) { set(x + dx, y, z + dz, ID['bee_nest' + f]); break; }
+      }
     }
     const plant = (n, ids, onTop) => {
       for (let i = 0; i < n; i++) {
@@ -553,6 +560,7 @@ class World {
     }
     if ((center === BIOME.PLAINS || center === BIOME.FOREST) && rng() < 0.08) plant(3, [ID.pumpkin, ID.melon], ID.grass);
     if (fresh && this.genVerAt(cx * 16, cz * 16) >= 7) this.newBiomeDecor(cx, cz, center, heights, biomes, set, get);
+    if (this.newHearts) { c.hearts = this.newHearts; this.newHearts = null; }
     if (this.buildStructures) this.buildStructures(c, set, get, heights, biomes, rng);
 
     // apply player edits
@@ -639,6 +647,7 @@ class World {
       }
     }
     if (center === B.FLOWER_FOREST) { plant(10, [ID.tall_grass]); plant(40, FLOWERS); }
+    if (center === B.PALE_GARDEN) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) { const h = H(x, z); if (get(x, h, z) === ID.grass && this.noiseC.noise2((cx * 16 + x) / 6, (cz * 16 + z) / 6) > -0.2) set(x, h, z, ID.pale_moss_block); }
     if (center === B.MEADOW) { plant(30, [ID.tall_grass]); plant(14, [ID.allium, ID.cornflower, ID.oxeye_daisy, ID.dandelion, ID.rose]); }
     if (center === B.SUNFLOWER_PLAINS) { plant(24, [ID.tall_grass]); plant(14, [ID.sunflower]); plant(3, [ID.oxeye_daisy, ID.tulip_red, ID.dandelion]); }
     if (center === B.PLAINS || center === B.FOREST) plant(2, [ID.tulip_red, ID.tulip_orange, ID.oxeye_daisy, ID.cornflower, ID.allium, ID.lily_of_the_valley]);
@@ -888,17 +897,17 @@ class World {
     for (let dy = 0; dy <= h; dy++) set(x, y + dy, z, ID.jungle_log);
   }
   /* a dark oak: a thick trunk (2 x 2) and a wide, low, dark crown that keeps the forest floor shady */
-  darkOakTree(set, get, x, y, z, rng) {
+  darkOakTree(set, get, x, y, z, rng, log = ID.dark_oak_log, leaves = ID.dark_oak_leaves) {
     const h = 6 + (rng() * 3 | 0);
     for (let dy = h - 2; dy <= h + 1; dy++) {
       const r = dy === h + 1 ? 2 : 3;
       for (let dx = -r; dx <= r + 1; dx++) for (let dz = -r; dz <= r + 1; dz++) {
         const ex = dx < 0 ? -dx : dx - 1, ez = dz < 0 ? -dz : dz - 1;
         if (ex * ex + ez * ez > r * r + 1) continue;
-        if (get(x + dx, y + dy, z + dz) === 0) set(x + dx, y + dy, z + dz, ID.dark_oak_leaves);
+        if (get(x + dx, y + dy, z + dz) === 0) set(x + dx, y + dy, z + dz, leaves);
       }
     }
-    for (let dy = 0; dy <= h; dy++) for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(x + ox, y + dy, z + oz, ID.dark_oak_log);
+    for (let dy = 0; dy <= h; dy++) for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(x + ox, y + dy, z + oz, log);
     for (const [ox, oz] of [[0, 0], [1, 0], [0, 1], [1, 1]]) if (get(x + ox, y - 1, z + oz) === ID.grass) set(x + ox, y - 1, z + oz, ID.dirt);
   }
 

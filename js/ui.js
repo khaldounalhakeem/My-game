@@ -719,7 +719,7 @@ const UI = {
   /* trading with a villager: what it wants and what it gives; tap a trade to make it */
   openTrades(v) {
     if (G.state !== 'play') return;
-    const job = VILLAGER_JOBS[v.prof];
+    const job = tradeJob(v);
     if (!job) { this.message("This villager has no job yet. Put a work block near it: composter (farmer), lectern (librarian), smoker (butcher), blast furnace (armorer), grindstone (weaponsmith), fletching table (fletcher) or smithing table (toolsmith)."); return; }
     G.sound.play('mob_villager', v.pos);
     let box = $('trade-pop');
@@ -737,7 +737,7 @@ const UI = {
     G.setState('trade'); G.unlock();
   },
   renderTrades() {
-    const v = this.tradeWith, job = v && VILLAGER_JOBS[v.prof], list = $('trade-pop').querySelector('.trade-list'), inv = G.player.inv;
+    const v = this.tradeWith, job = v && tradeJob(v), list = $('trade-pop').querySelector('.trade-list'), inv = G.player.inv;
     list.innerHTML = '';
     if (!job) return;
     const icon = (k, n) => `<span class="need"><img alt="" src="${iconURL(ID[k])}"><b>${n}</b></span>`;
