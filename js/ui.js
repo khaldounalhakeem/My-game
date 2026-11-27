@@ -157,7 +157,8 @@ const UI = {
     let h = '';
     for (let i = 0; i < 10; i++) {
       const left = v - i * 2;
-      const src = left >= 2 ? ICONS[kind] : left >= 1 ? ICONS[kind + 'Half'] : ICONS[kind + 'Empty'];
+      // any health at all shows at least half a heart (with half a point left you were alive with no hearts)
+      const src = left >= 2 ? ICONS[kind] : left > 0 && (left >= 1 || i === 0) ? ICONS[kind + 'Half'] : ICONS[kind + 'Empty'];
       h += `<img src="${src}" alt="">`;
     }
     return h;

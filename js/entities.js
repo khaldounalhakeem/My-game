@@ -824,11 +824,13 @@ class Mob {
     } else if (this.tame && this.type === 'wolf') {
       // a tamed wolf follows you, teleports back if left behind, and fights whatever you fight
       const tgt = this.petTarget;
-      if (tgt && (tgt.dead || tgt.pos.distanceTo(this.pos) > 20)) this.petTarget = null;
+      // gone, too far, or a player who left for another world (the Nether, the End) or the game
+      if (tgt && (tgt.dead || tgt.removed || tgt.pos.distanceTo(this.pos) > 20 || (tgt.remote && (!tgt.remote.inWorld || tgt.remote.dim !== G.dim)))) this.petTarget = null;
       if (this.petTarget && !this.sitting) {
         const t = this.petTarget, dx = t.pos.x - this.pos.x, dz = t.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
         moveX = dx / l; moveZ = dz / l; speed = 4.5; this.yaw = Math.atan2(moveX, moveZ);
-        if (l < 1.6 && this.attackCd <= 0) {
+        // only bites what it can reach: not someone on the floor above or below
+        if (l < 1.6 && Math.abs(t.pos.y - this.pos.y) < 1.5 && this.attackCd <= 0) {
           this.attackCd = 0.8;
           if (t.remote) { G.lastAttacker = this; t.hurt(4, this.pos, 5, true, 'A wolf bit you.'); } // a player: they take the bite on their own device
           else t.hurt(4, this.pos, 5, !!t.remoteCtl); // a mob another device runs: send it the bite
