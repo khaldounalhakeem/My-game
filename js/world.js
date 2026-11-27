@@ -5,7 +5,7 @@
 // build limit never changes the land, trees or the Nether's ceiling in worlds made before)
 const CS = 16, WH = 320, GEN_H = 96, SEA = 32; // you can build up to y 319, like Minecraft
 const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14, SWAMP: 15, MUSHROOM: 16, BADLANDS: 17, ICE_SPIKES: 18, FLOWER_FOREST: 19, MEADOW: 20, FROZEN_OCEAN: 21, WARM_OCEAN: 22, SUNFLOWER_PLAINS: 23, LUSH_CAVES: 24, DRIPSTONE_CAVES: 25, DEEP_DARK: 26, PALE_GARDEN: 27 };
-const GEN_VER = 8;
+const GEN_VER = 9;
 const BASE_BIOME = { 15: -1, 16: -1, 17: 4, 18: 5, 19: 3, 20: 6, 21: 0, 22: 0, 23: 2 }; // swamp & mushroom: no villages // which newer biomes exist (see genVerAt)
 const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle', 'Swamp', 'Mushroom Fields', 'Badlands', 'Ice Spikes', 'Flower Forest', 'Meadow', 'Frozen Ocean', 'Warm Ocean', 'Sunflower Plains', 'Lush Caves', 'Dripstone Caves', 'Deep Dark', 'Pale Garden'];
 
@@ -189,7 +189,7 @@ class World {
   settle(x, y, z) {
     while (y < WH) {
       const id = this.getBlock(x, y, z);
-      if (id !== ID.sand && id !== ID.gravel) break;
+      if (id !== ID.sand && id !== ID.gravel && !DEFS[id].falls) break;
       let ny = y;
       while (ny > 0) {
         const b = this.getBlock(x, ny - 1, z);
@@ -574,6 +574,7 @@ class World {
 
   /* what grows in the newest biomes, and the three cave biomes underground (new land only) */
   newBiomeDecor(cx, cz, center, heights, biomes, set, get) {
+    if (this.genVerAt(cx * 16, cz * 16) >= 9) this.decor9(cx, cz, center, heights, biomes, set, get);
     const B = BIOME, r = mulberry32(hash3(cx, cz, this.seed + 7777));
     const H = (x, z) => heights[x + z * 16];
     const plant = (n, ids, onTop) => {
@@ -673,6 +674,65 @@ class World {
         }
       }
     }
+  }
+  /* new land only: copper and other stones underground, amethyst geodes, plants in the sea, berry bushes, vines, cobwebs */
+  decor9(cx, cz, center, heights, biomes, set, get) {
+    const B = BIOME, r = mulberry32(hash3(cx, cz, this.seed + 9999)), H = (x, z) => heights[x + z * 16];
+    const blob = (ore, deepOre, count, y0, y1, size, onlyIn) => {
+      for (let v = 0; v < count; v++) {
+        let x = r() * 16, y = y0 + r() * (y1 - y0), z = r() * 16;
+        for (let s = 0; s < size; s++) {
+          const xi = x | 0, yi = y | 0, zi = z | 0, here = get(xi, yi, zi);
+          if (here === ID.stone && (!onlyIn || onlyIn === ID.stone)) set(xi, yi, zi, ore);
+          else if (here === ID.deepslate && deepOre) set(xi, yi, zi, deepOre);
+          x += r() * 2 - 1; y += r() * 2 - 1; z += r() * 2 - 1;
+        }
+      }
+    };
+    blob(ID.copper_ore, ID.deepslate_copper_ore, 6, 10, 70, 9);
+    blob(ID.granite, 0, 1, 8, 70, 40); blob(ID.diorite, 0, 1, 8, 70, 40); blob(ID.andesite, 0, 1, 8, 70, 40);
+    blob(ID.tuff, ID.tuff, 1, 2, 16, 40);
+    // an amethyst geode now and then
+    if (r() < 0.035) {
+      const gx = 6 + (r() * 4 | 0), gz = 6 + (r() * 4 | 0), gy = 8 + (r() * 24 | 0);
+      if (gy + 6 < H(gx, gz) - 4) for (let a = -5; a <= 5; a++) for (let b = -5; b <= 5; b++) for (let c = -5; c <= 5; c++) {
+        const d = Math.sqrt(a * a + b * b + c * c), x = gx + a, y = gy + b, z = gz + c;
+        if (d > 4.6 || get(x, y, z) === -1 || get(x, y, z) === ID.water || get(x, y, z) === ID.bedrock) continue;
+        set(x, y, z, d > 4 ? ID.smooth_basalt : d > 3.4 ? ID.calcite : d > 2.7 ? (r() < 0.1 ? ID.budding_amethyst : ID.amethyst_block) : 0);
+      }
+      for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) for (let c = -3; c <= 3; c++) {
+        const x = gx + a, y = gy + b, z = gz + c;
+        if (get(x, y, z) === 0 && get(x, y - 1, z) === ID.budding_amethyst) set(x, y, z, ID.amethyst_cluster);
+      }
+    }
+    // the sea: seagrass and kelp (and sea pickles and corals in warm water)
+    const sea = center === B.OCEAN || center === B.WARM_OCEAN || center === B.FROZEN_OCEAN || center === B.SWAMP || center === B.MANGROVE;
+    if (sea) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+      const h = H(x, z), fl = get(x, h, z);
+      if (get(x, h + 1, z) !== ID.water || ![ID.sand, ID.gravel, ID.clay, ID.dirt, ID.grass].includes(fl)) continue;
+      if ((center === B.SWAMP || center === B.MANGROVE) && (fl === ID.dirt || fl === ID.grass)) set(x, h, z, ID.mud);
+      const q = r();
+      if (center !== B.WARM_OCEAN && q < 0.06 && h < SEA - 3) { const top = SEA - 2 - (r() * 4 | 0); for (let y = h + 1; y <= top; y++) if (get(x, y, z) === ID.water) set(x, y, z, ID.kelp); }
+      else if (q < 0.2 && get(x, h + 2, z) === ID.water) set(x, h + 1, z, ID.seagrass);
+      else if (center === B.WARM_OCEAN && q < 0.34) set(x, h + 1, z, ID.sea_pickle);
+      else if (center === B.WARM_OCEAN && q < 0.45) set(x, h + 1, z, [ID.coral_tube, ID.coral_brain, ID.coral_bubble, ID.coral_fire, ID.coral_horn, ID.coral_fan_tube, ID.coral_fan_brain, ID.coral_fan_fire][r() * 8 | 0]);
+    }
+    // berry bushes in the taiga
+    if (center === B.TAIGA) for (let i = 0; i < 4; i++) { const x = r() * 16 | 0, z = r() * 16 | 0, h = H(x, z); if (get(x, h, z) === ID.grass && get(x, h + 1, z) === 0) set(x, h + 1, z, ID.sweet_berry_bush_ripe); }
+    // vines hanging from jungle and swamp leaves
+    if (center === B.JUNGLE || center === B.BAMBOO || center === B.SWAMP || center === B.MANGROVE) {
+      const LEAF = id => id > 0 && DEFS[id] && DEFS[id].leaves;
+      for (let i = 0; i < 70; i++) {
+        const x = 1 + (r() * 14 | 0), z = 1 + (r() * 14 | 0), y = H(x, z) + 3 + (r() * 10 | 0);
+        if (get(x, y, z) !== 0) continue;
+        const sides = [[-1, 0, 'w'], [1, 0, 'e'], [0, -1, 'n'], [0, 1, 's']].filter(([a, c]) => LEAF(get(x + a, y, z + c)) || get(x + a, y, z + c) === ID.jungle_log);
+        if (!sides.length) continue;
+        const v = ID['vine_' + sides[0][2]];
+        for (let k = 0; k < 2 + (r() * 5 | 0) && get(x, y - k, z) === 0; k++) set(x, y - k, z, v);
+      }
+    }
+    // cobwebs in dark caves
+    for (let i = 0; i < 6; i++) { const x = r() * 16 | 0, z = r() * 16 | 0, y = 8 + (r() * 40 | 0); if (y < H(x, z) - 8 && get(x, y, z) === 0 && get(x, y + 1, z) === ID.stone && r() < 0.5) set(x, y, z, ID.cobweb); }
   }
   caveKind(x, z) {
     const S = this.style, sx = x + S.ox, sz = z + S.oz;
@@ -1134,7 +1194,8 @@ class World {
       if (def.box) { this.addBox(O, x, y, z, def); continue; }
       if (def.boxes || def.fence || def.pane) { for (const bx of this.shapeBoxes(def, (a, b, c) => get(a, b, c), x, y, z, true)) this.addBox(def.translucent ? T : O, x, y, z, { box: bx, faces: def.faces }); continue; }
       const out = def.translucent ? T : O;
-      const topH = def.height ? def.height : def.liquid && get(x, y + 1, z) !== id ? 0.875 : 1;
+      const above = def.liquid ? get(x, y + 1, z) : 0;
+      const topH = def.height ? def.height : def.liquid && above !== id && !(id === ID.water && above && DEFS[above].wlog) ? 0.875 : 1;
       for (let f = 0; f < 6; f++) {
         const F = FACES[f];
         const nid = get(x + F.n[0], y + F.n[1], z + F.n[2]);
@@ -1142,6 +1203,7 @@ class World {
           const nd = DEFS[nid];
           if (nd.opaque) continue;
           if (nid === id && !def.leaves) continue;
+          if (def.liquid && id === ID.water && nd.wlog) continue; // water next to kelp or seagrass: still one body of water
           if (def.liquid && nd.solid && !nd.cutout && f !== 2) continue;
         }
         const uv = TILE_UV[def.faces[f]];
@@ -1190,6 +1252,14 @@ class World {
       return out;
     }
     const joins = (dx, dz) => { const n = get(x + dx, y, z + dz); return n && (DEFS[n].fence || DEFS[n].gate || (DEFS[n].opaque && DEFS[n].solid)); };
+    if (def.wall) {
+      const wt = forDrawing ? 1 : 1.5, wo = [[0.25, 0, 0.25, 0.75, wt, 0.75]], h = forDrawing ? 0.8125 : 1.5;
+      if (joins(1, 0)) wo.push([0.75, 0, 0.3125, 1, h, 0.6875]);
+      if (joins(-1, 0)) wo.push([0, 0, 0.3125, 0.25, h, 0.6875]);
+      if (joins(0, 1)) wo.push([0.3125, 0, 0.75, 0.6875, h, 1]);
+      if (joins(0, -1)) wo.push([0.3125, 0, 0, 0.6875, h, 0.25]);
+      return wo;
+    }
     const top = forDrawing ? 1 : 1.5, out = [[0.375, 0, 0.375, 0.625, top, 0.625]];
     const rails = forDrawing ? [[0.375, 0.5625], [0.75, 0.9375]] : [[0, top]];
     for (const [y0, y1] of rails) {
@@ -1350,7 +1420,7 @@ class World {
 
   liquidAt(x, y, z) {
     const id = this.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
-    return id && DEFS[id].liquid ? id : 0;
+    return id && DEFS[id].liquid ? id : id && DEFS[id].wlog ? ID.water : 0; // kelp, seagrass and coral sit in water
   }
 
   moveBody(b, dt) {

@@ -213,6 +213,12 @@ class Player {
     if (swimming && !this.inLava && G.mobs.some(m => m.type === 'dolphin' && !m.dead && m.pos.distanceTo(this.pos) < 7)) speed *= 2.2;
     if (!this.flying && this.fx('speed')) speed *= 1 + 0.2 * this.fx('speed');
     if (this.inSnow && !this.flying) speed *= 0.45;
+    // a cobweb holds you; a sweet berry bush scratches and slows you
+    const cellAt = h => DEFS[W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + h), Math.floor(this.pos.z))] || {};
+    const c0 = cellAt(0.1), c1 = cellAt(1.2);
+    this.inWeb = !!(c0.web || c1.web);
+    if (this.inWeb && !this.flying) { speed *= 0.12; this.vel.y = Math.max(this.vel.y, -1); this.fallStart = null; }
+    if ((c0.berry !== undefined) && !this.flying) { speed *= 0.5; if (Math.hypot(this.vel.x, this.vel.z) > 0.6 && this.mode === 'survival' && (this.berryT = (this.berryT || 0) + dt) > 1) { this.berryT = 0; this.hurt(1, null, 0, false, 'You got scratched by a sweet berry bush.'); } }
     // honey blocks are sticky: slow to walk on and hard to jump from
     const under = this.onGround ? G.world.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y - 0.1), Math.floor(this.pos.z)) : 0;
     this.onHoney = under === ID.honey_block;
@@ -618,10 +624,11 @@ class Player {
       return true;
     }
     if (hd.placesLadder && b) {
-      if (!b.nx && !b.nz) { G.ui.message('Put a ladder on the side of a block.'); return true; }
+      const pre = typeof hd.placesLadder === 'string' ? hd.placesLadder : 'ladder';
+      if (!b.nx && !b.nz) { G.ui.message('Put ' + (pre === 'vine' ? 'vines' : 'a ladder') + ' on the side of a block.'); return true; }
       const px = b.x + b.nx, py = b.y, pz = b.z + b.nz, cur = W.getBlock(px, py, pz);
       if (cur && !DEFS[cur].replaceable && !DEFS[cur].liquid) return true;
-      W.setBlock(px, py, pz, ID['ladder_' + (b.nx === 1 ? 'w' : b.nx === -1 ? 'e' : b.nz === 1 ? 'n' : 's')]);
+      W.setBlock(px, py, pz, ID[pre + '_' + (b.nx === 1 ? 'w' : b.nx === -1 ? 'e' : b.nz === 1 ? 'n' : 's')]);
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       G.sound.play('place'); this.useCd = 0.2; this.swing = 1;
       return true;
@@ -747,6 +754,19 @@ class Player {
       this.useCd = 0.25; this.swing = 1;
       return true;
     }
+    // a glass bottle fills from water; a water bottle turns dirt into mud
+    if (k === 'glass_bottle') {
+      const o = this.eyePos(), d = this.lookDir(), hit = W.raycast(o.x, o.y, o.z, d.x, d.y, d.z, 4.6, true);
+      if (!hit || hit.id !== ID.water) return false;
+      this.swapHeld(ID.water_bottle); G.sound.play('pickup'); this.useCd = 0.4; this.swing = 1; return true;
+    }
+    if (k === 'water_bottle' && b && (b.id === ID.dirt || b.id === ID.grass)) { W.setBlock(b.x, b.y, b.z, ID.mud); this.swapHeld(ID.glass_bottle); G.sound.play('place'); this.useCd = 0.4; this.swing = 1; return true; }
+    if (k === 'bone_meal' && b) { if (G.boneMeal(b.x, b.y, b.z)) { if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1); this.useCd = 0.25; this.swing = 1; return true; } return false; }
+    // an axe scrapes the green off copper
+    if (/_axe$/.test(k) && b && DEFS[b.id].copper > 0) { const d = DEFS[b.id]; W.setBlock(b.x, b.y, b.z, ID[['', 'exposed_', 'weathered_', 'oxidized_'][d.copper - 1] + d.copperKind]); G.particles.burst(b.x + 0.5, b.y + 0.5, b.z + 0.5, [0xffffff, 0xc8f0e0], 8, 1.5, 0.08); this.useCd = 0.3; this.swing = 1; return true; }
+    // ripe sweet berries: pick them
+    if (b && b.id === ID.sweet_berry_bush_ripe) { W.setBlock(b.x, b.y, b.z, ID.sweet_berry_bush); G.plantCrop(b.x, b.y, b.z); G.spawnDrop(ID.sweet_berries, 2 + (Math.random() * 2 | 0), b.x + 0.5, b.y + 0.6, b.z + 0.5); G.sound.play('pickup'); this.useCd = 0.3; this.swing = 1; return true; }
+    if (hd.plants && b && (b.id === ID.grass || b.id === ID.dirt) && !W.getBlock(b.x, b.y + 1, b.z) && b.ny === 1) { W.setBlock(b.x, b.y + 1, b.z, ID[hd.plants]); G.plantCrop(b.x, b.y + 1, b.z); if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1); G.sound.play('place'); this.useCd = 0.2; this.swing = 1; return true; }
     const PLANTS = { wheat_seeds: 'wheat_sprout', carrot: 'carrot_sprout', potato: 'potato_sprout', pumpkin_seeds: 'pumpkin_stem' };
     if (PLANTS[k]) {
       if (!b || b.id !== ID.farmland || W.getBlock(b.x, b.y + 1, b.z)) return false;
@@ -841,6 +861,7 @@ class Player {
         return;
       }
     }
+    if (b && b.id === ID.sweet_berry_bush_ripe && !hd) { G.world.setBlock(b.x, b.y, b.z, ID.sweet_berry_bush); G.plantCrop(b.x, b.y, b.z); G.spawnDrop(ID.sweet_berries, 2 + (Math.random() * 2 | 0), b.x + 0.5, b.y + 0.6, b.z + 0.5); G.sound.play('pickup'); this.useCd = 0.3; this.swing = 1; return; }
     if (hd && this.useBucketOrHoe(hd, b)) return;
     if (!hd) return;
     if (hd.armor) {
@@ -935,6 +956,7 @@ class Player {
       const L = this.lookDir(), f = Math.abs(L.x) > Math.abs(L.z) ? (L.x > 0 ? 'w' : 'e') : (L.z > 0 ? 'n' : 's');
       W.setBlock(px, py, pz, f === 's' ? ID[hd.base] : ID[hd.base + '_' + f]);
     } else W.setBlock(px, py, pz, hd.id);
+    if (hd.sponge) { let n = 0; for (let a = -5; a <= 5; a++) for (let c = -5; c <= 5; c++) for (let e = -5; e <= 5; e++) { const q = W.getBlock(px + a, py + c, pz + e); if ((q === ID.water || (q && DEFS[q].wlog)) && Math.abs(a) + Math.abs(c) + Math.abs(e) <= 7) { W.setBlock(px + a, py + c, pz + e, 0); n++; } } if (n) { W.setBlock(px, py, pz, ID.wet_sponge); G.particles.burst(px + 0.5, py + 0.5, pz + 0.5, [0x3a6ad8, 0xffffff], 14, 2, 0.1); } }
     if (hd.id === ID.flag) G.placedFlag(px, py, pz);
     W.settle(px, py, pz);
     if (hd.base === 'pumpkin') G.tryBuildGolem(px, py, pz);

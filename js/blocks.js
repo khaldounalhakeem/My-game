@@ -848,6 +848,93 @@ makeTile('bed_head_top_w', pBedTop('x', 'left')); makeTile('bed_head_top_e', pBe
 DEFS[0] = { id: 0, key: 'air', name: 'Air', isBlock: true, solid: false, opaque: false, hardness: 0, faces: [0, 0, 0, 0, 0, 0], color: [255, 255, 255] };
 ID.air = 0;
 
+/* ================= building blocks round: stones, colours, copper, amethyst, the sea... ================= */
+const pNoise = (base, a, b) => P => { P.fill(base, 9); P.speck(a, 0.22, 6); if (b) P.speck(b, 0.12, 6); };
+const pPolished = base => P => { const c = rgb(base); P.fill(base, 4); P.rect(0, 0, 16, 1, shadeC(c, 1.15)); P.rect(0, 0, 1, 16, shadeC(c, 1.15)); P.rect(0, 15, 16, 1, shadeC(c, 0.78)); P.rect(15, 0, 1, 16, shadeC(c, 0.78)); P.speck(shadeC(c, 0.92), 0.08, 3); };
+const pPillarSide = base => P => { const c = rgb(base); P.fill(base, 4); for (let y = 0; y < 16; y++) { P.put(0, y, shadeC(c, 1.15)); P.put(15, y, shadeC(c, 0.8)); P.put(5, y, shadeC(c, 0.93)); P.put(10, y, shadeC(c, 0.93)); } };
+const pChiseled = (base, mark) => P => { pPolished(base)(P); P.rect(3, 3, 10, 10, shadeC(rgb(base), 0.85)); P.rect(5, 5, 6, 6, mark); P.rect(7, 7, 2, 2, shadeC(rgb(base), 1.1)); };
+const pCracked = (brick, mortar) => P => { pBricks(brick, mortar, 8, 4)(P); P.line(3, 1, 7, 9, shadeC(rgb(brick), 0.55)); P.line(7, 9, 12, 14, shadeC(rgb(brick), 0.55)); };
+const pMossy = (brick, mortar) => P => { pBricks(brick, mortar, 8, 4)(P); for (let i = 0; i < 5; i++) P.disc(P.rng() * 16, P.rng() * 16, 1.5, 0x4d7a32, 12); };
+const stoneTiles = [
+  ['granite', pNoise(0x9a6a56, 0x7a4a3a, 0xc08a76)], ['polished_granite', pPolished(0x9a6a56)],
+  ['diorite', pNoise(0xc0c0c0, 0x8a8a8a, 0xeaeaea)], ['polished_diorite', pPolished(0xc8c8c8)],
+  ['andesite', pNoise(0x888888, 0x6a6a6a, 0xa0a0a0)], ['polished_andesite', pPolished(0x8a8c8c)],
+  ['tuff', pNoise(0x6a6a5e, 0x545448, 0x84847a)], ['polished_tuff', pPolished(0x6a6c62)], ['tuff_bricks', pBricks(0x6a6c62, 0x4a4a42, 8, 4)],
+  ['calcite', pNoise(0xdcdcd8, 0xc8c8c4, 0xf0f0ec)], ['smooth_stone', pPolished(0xa0a0a0)],
+  ['chiseled_stone_bricks', pChiseled(0x7a7a7a, 0x5a5a5a)], ['cracked_stone_bricks', pCracked(0x7a7a7a, 0x5a5a5a)], ['mossy_stone_bricks', pMossy(0x7a7a7a, 0x5a5a5a)],
+  ['polished_deepslate', pPolished(0x48484c)], ['deepslate_bricks', pBricks(0x48484c, 0x2a2a2e, 8, 4)], ['deepslate_tiles', pBricks(0x3a3a3e, 0x222226, 4, 4)], ['chiseled_deepslate', pChiseled(0x48484c, 0x2a2a2e)],
+  ['polished_blackstone', pPolished(0x3a3640)], ['polished_blackstone_bricks', pBricks(0x3a3640, 0x221e26, 8, 4)], ['gilded_blackstone', P => { pNoise(0x2e2a32, 0x1e1a22)(P); P.speck(0xf5cc2e, 0.12, 20); }],
+  ['smooth_basalt', pNoise(0x4a4a50, 0x3a3a40)], ['mud', pNoise(0x3e3a3c, 0x2e2a2c, 0x4e4a4c)], ['packed_mud', pNoise(0x8e6a50, 0x6e5040)], ['mud_bricks', pBricks(0x8e6a50, 0x6a4e3a, 8, 4)],
+  ['red_sandstone', P => { P.fill(0xb85a1e, 5); P.rect(0, 0, 16, 3, 0xc86a2a, 4); P.rect(0, 12, 16, 4, 0xa04a18, 4); }], ['red_sandstone_top', pNoise(0xbc5c20, 0xa84a18)],
+  ['smooth_sandstone', pPolished(0xddcf95)], ['cut_sandstone', P => { pPolished(0xd8c98f)(P); P.rect(0, 7, 16, 1, 0xc4b57a); }], ['chiseled_sandstone', pChiseled(0xd8c98f, 0xb8a870)],
+  ['end_stone_bricks', pBricks(0xe0e2a8, 0xb8ba88, 8, 4)], ['purpur_block', pBricks(0xa87aa8, 0x8a5a8a, 4, 4)], ['purpur_pillar', pPillarSide(0xa87aa8)],
+  ['prismarine', P => { P.fill(0x5aa89a, 14); P.speck(0x6ec8b0, 0.2, 8); P.speck(0x4a8a8a, 0.2, 8); }], ['prismarine_bricks', pBricks(0x6ab8a8, 0x4a8a80, 8, 4)], ['dark_prismarine', pBricks(0x335a4a, 0x22413a, 8, 8)],
+  ['sea_lantern', P => { P.fill(0xd0e8e0, 6); P.rect(3, 3, 10, 10, 0xf0fff8); P.rect(0, 7, 16, 2, 0xa8d0c8); P.rect(7, 0, 2, 16, 0xa8d0c8); }],
+  ['quartz_bricks', pBricks(0xebe5de, 0xc8c2bb, 8, 4)], ['chiseled_quartz', pChiseled(0xebe5de, 0xc8c2bb)], ['quartz_pillar', pPillarSide(0xebe5de)], ['smooth_quartz', pPolished(0xece6df)],
+  ['red_nether_bricks', pBricks(0x5a0a0a, 0x3a0606, 8, 4)], ['cracked_nether_bricks', pCracked(0x3a1a1e, 0x220e12)], ['chiseled_nether_bricks', pChiseled(0x3a1a1e, 0x220e12)],
+  ['crying_obsidian', P => { P.fill(0x1a0a2a, 6); P.speck(0x3a1a5a, 0.2, 6); for (let i = 0; i < 6; i++) P.put(P.rng() * 16, P.rng() * 16, 0x9a3aff); }],
+  ['soul_soil', pNoise(0x4a3a2e, 0x3a2a22, 0x5a4a3a)], ['bone_block_side', P => { P.fill(0xe6e2ce, 4); for (let y = 2; y < 16; y += 4) P.rect(0, y, 16, 1, 0xc8c4b0); }], ['bone_block_top', P => { P.fill(0xe6e2ce, 4); P.disc(8, 8, 4, 0xd0ccb8); P.disc(8, 8, 2, 0xb8b4a0); }],
+  ['dried_kelp_block', P => { P.fill(0x3a4a2a, 8); for (let x = 1; x < 16; x += 3) P.rect(x, 0, 1, 16, 0x2a3a1e); }],
+  ['sponge', P => { P.fill(0xc8c040, 10); for (let i = 0; i < 14; i++) P.put(P.rng() * 16, P.rng() * 16, 0x8a8420); }], ['wet_sponge', P => { P.fill(0xa8a030, 10); for (let i = 0; i < 14; i++) P.put(P.rng() * 16, P.rng() * 16, 0x5a6a30); }],
+  ['tinted_glass', P => { P.fill(0x2a2430, 4); P.rect(1, 1, 14, 14, 0x3a3440); P.line(3, 3, 6, 6, 0x5a5460); }],
+  ['amethyst_block', P => { P.fill(0x8a5ac8, 12); P.speck(0xb48ae8, 0.2, 8); P.speck(0x6a3aa8, 0.2, 8); }], ['budding_amethyst', P => { P.fill(0x7a4ab8, 12); P.speck(0xc8a8f8, 0.15, 6); for (const [x, y] of [[4, 4], [11, 6], [6, 11]]) P.rect(x, y, 2, 2, 0x3a1a6a); }],
+  ['amethyst_cluster', pPlant(P => { for (const [x, h] of [[4, 8], [7, 12], [10, 9], [12, 6]]) for (let j = 0; j < h; j++) P.put(x, 15 - j, j > h - 3 ? 0xf0d8ff : 0xa87ae8); })],
+  ['copper_ore', P => { pStone(P); for (let i = 0; i < 6; i++) P.disc(P.rng() * 14 + 1, P.rng() * 14 + 1, 1.2, 0xe07a4a); P.speck(0x4aa58a, 0.04, 4); }],
+  ['deepslate_copper_ore', P => { P.fill(0x48484c, 8); for (let i = 0; i < 6; i++) P.disc(P.rng() * 14 + 1, P.rng() * 14 + 1, 1.2, 0xe07a4a); }],
+  ['iron_bars', P => { P.clear(); for (const x of [1, 5, 9, 13]) P.rect(x, 0, 2, 16, 0x8a8a8a); P.rect(0, 1, 16, 1, 0x6a6a6a); P.rect(0, 14, 16, 1, 0x6a6a6a); }],
+  ['chain', P => { P.clear(); for (let y = 0; y < 16; y += 4) { P.rect(6, y, 4, 3, 0x3a3a44); P.rect(7, y + 1, 2, 1, 0x1a1a22); } }],
+  ['cobweb', P => { P.clear(); P.line(0, 0, 15, 15, 0xe8e8e8); P.line(15, 0, 0, 15, 0xe8e8e8); P.line(8, 0, 8, 15, 0xd8d8d8); P.line(0, 8, 15, 8, 0xd8d8d8); for (const r of [3, 6]) { P.line(8 - r, 8, 8, 8 - r, 0xd8d8d8); P.line(8, 8 - r, 8 + r, 8, 0xd8d8d8); P.line(8 + r, 8, 8, 8 + r, 0xd8d8d8); P.line(8, 8 + r, 8 - r, 8, 0xd8d8d8); } }],
+  ['vine', P => { P.clear(); for (let i = 0; i < 9; i++) { const x = P.rng() * 16 | 0; P.line(x, 0, x + (P.rng() * 4 - 2 | 0), 15, 0x3a7a1e); } P.speck(0x4a9a2a, 0.15, 10); for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) if (P.rng() < 0.45) P.erase(x, y); }],
+  ['kelp', pPlant(P => { for (let y = 0; y < 16; y++) { const x = 7 + Math.round(Math.sin(y * 0.7) * 2); P.rect(x, y, 2, 1, 0x4a8a2a); if (y % 4 === 1) P.rect(x + 2, y, 2, 1, 0x5a9a3a); } })],
+  ['seagrass', pPlant(P => { for (let i = 0; i < 6; i++) { const x = 2 + i * 2.4 | 0, h = 8 + (P.rng() * 7 | 0); for (let j = 0; j < h; j++) P.put(x + (j > h / 2 ? 1 : 0), 15 - j, 0x3a8a3a); } })],
+  ['sea_pickle', pPlant(P => { for (const x of [4, 9]) { P.rect(x, 7, 3, 9, 0x6a8a2a); P.rect(x + 1, 5, 1, 2, 0xc8ff8a); } })],
+  ['sweet_berry_bush', pPlant(P => { P.disc(8, 9, 6, 0x2a5a2a, 10); P.speck(0x3a7a3a, 0.2, 6); })],
+  ['sweet_berry_bush_ripe', pPlant(P => { P.disc(8, 9, 6, 0x2a5a2a, 10); for (const [x, y] of [[5, 7], [10, 6], [8, 11], [12, 10], [4, 12]]) P.rect(x, y, 2, 2, 0xc8202a); })],
+  ['snow_layer', P => { P.fill(0xf2f6fa, 4); }],
+  ['soul_torch', P => { P.clear(); P.rect(7, 6, 2, 10, 0x6a4a2a); P.rect(7, 4, 2, 2, 0x5ad8f8); P.rect(7, 3, 2, 1, 0xc8f8ff); }],
+  ['soul_lantern', P => { P.clear(); P.rect(5, 7, 6, 9, 0x2e2e34); P.rect(6, 9, 4, 5, 0x5ad8f8); P.rect(7, 10, 2, 3, 0xc8f8ff); P.rect(5, 7, 6, 1, 0x4a4a52); P.rect(5, 15, 6, 1, 0x4a4a52); }],
+  ['end_rod', P => { P.clear(); P.rect(7, 2, 2, 14, 0xf4f0ea); P.rect(6, 14, 4, 2, 0xc8b8a8); }],
+];
+for (const [k, p] of stoneTiles) makeTile(k, p);
+for (const [k, c] of [['tube', 0x3050d8], ['brain', 0xd05aa0], ['bubble', 0xa020a8], ['fire', 0xc82a30], ['horn', 0xd8c840]]) {
+  makeTile('coral_plant_' + k, pPlant(P => { for (const [x, h] of [[4, 10], [8, 14], [11, 9]]) { P.rect(x, 16 - h, 2, h, c); P.rect(x - 1, 16 - h, 4, 2, shadeC(rgb(c), 1.2)); } }));
+  makeTile('coral_fan_' + k, pPlant(P => { for (let a = -3; a <= 3; a++) P.line(8, 15, 8 + a * 2, 6 + Math.abs(a), c); P.disc(8, 9, 4, shadeC(rgb(c), 1.1), 6); }));
+}
+// copper ages from orange to green
+const COPPER = [['', 'Copper', 0xc06a4a], ['exposed_', 'Exposed Copper', 0xa8805e], ['weathered_', 'Weathered Copper', 0x6a9a7a], ['oxidized_', 'Oxidized Copper', 0x4aa58a]];
+for (const [p, , c] of COPPER) { makeTile(p + 'copper_block', P => { P.fill(c, 8); P.speck(shadeC(rgb(c), 1.2), 0.15, 6); P.rect(0, 0, 16, 1, shadeC(rgb(c), 1.25)); }); makeTile(p + 'cut_copper', P => { P.fill(c, 6); for (const v of [0, 8]) { P.rect(0, v, 16, 1, shadeC(rgb(c), 0.75)); P.rect(v, 0, 1, 16, shadeC(rgb(c), 0.75)); } }); }
+// sixteen colours, like Minecraft
+const COLORS16 = [['white', 'White', 0xf9fffe, 0xcfd5d6, 0xd1b2a1], ['orange', 'Orange', 0xf9801d, 0xe06100, 0xa25426], ['magenta', 'Magenta', 0xc74ebd, 0xa9309f, 0x95586c], ['light_blue', 'Light Blue', 0x3ab3da, 0x2389c6, 0x706c8a],
+  ['yellow', 'Yellow', 0xfed83d, 0xf0af15, 0xba8523], ['lime', 'Lime', 0x80c71f, 0x5ea818, 0x677535], ['pink', 'Pink', 0xf38baa, 0xd5658e, 0xa14e4e], ['gray', 'Gray', 0x474f52, 0x36393d, 0x392a23],
+  ['light_gray', 'Light Gray', 0x9d9d97, 0x7d7d73, 0x876b62], ['cyan', 'Cyan', 0x169c9c, 0x157788, 0x565b5b], ['purple', 'Purple', 0x8932b8, 0x64209c, 0x764656], ['blue', 'Blue', 0x3c44aa, 0x2c2e8f, 0x4a3c5b],
+  ['brown', 'Brown', 0x835432, 0x603b1f, 0x4d3324], ['green', 'Green', 0x5e7c16, 0x495b24, 0x4c532a], ['red', 'Red', 0xb02e26, 0x8e2020, 0x8f3d2e], ['black', 'Black', 0x1d1d21, 0x080a0f, 0x251610]];
+const OLD_WOOL = ['white', 'red', 'blue', 'green', 'yellow', 'black', 'orange', 'purple'], OLD_TC = ['white', 'orange', 'yellow', 'red', 'brown', 'light_gray'];
+for (const [k, , w, cc, tc] of COLORS16) {
+  if (!OLD_WOOL.includes(k)) { makeTile('wool_' + k, pWool(w)); makeTile('stained_glass_' + k, P => { P.fill(w, 3); P.rect(1, 1, 14, 14, shadeC(rgb(w), 1.08)); P.line(3, 3, 6, 6, 0xffffff); }); }
+  if (!OLD_TC.includes(k)) makeTile('tc_' + k, P => { P.fill(tc, 6); P.speck(shadeC(rgb(tc), 0.9), 0.12, 4); });
+  makeTile('concrete_' + k, P => P.fill(cc, 3));
+  makeTile('concrete_powder_' + k, P => { P.fill(cc, 14); P.speck(shadeC(rgb(cc), 1.25), 0.3, 8); P.speck(shadeC(rgb(cc), 0.8), 0.2, 6); });
+  makeTile('glazed_' + k, P => { P.fill(tc, 4); const hi = shadeC(rgb(w), 1.1), lo = shadeC(rgb(tc), 0.7); P.line(0, 0, 15, 15, hi); P.line(0, 8, 8, 15, lo); P.line(8, 0, 15, 8, lo); P.rect(2, 10, 3, 3, hi); P.rect(11, 2, 3, 3, hi); P.disc(4, 4, 1.5, w); P.disc(12, 12, 1.5, w); });
+}
+/* icons */
+makeTile('i_wall', pPlant(P => { P.rect(1, 4, 5, 11, 0x8a8a8a); P.rect(10, 4, 5, 11, 0x8a8a8a); P.rect(5, 6, 6, 8, 0x7a7a7a); P.rect(1, 4, 5, 1, 0xa8a8a8); P.rect(10, 4, 5, 1, 0xa8a8a8); }));
+makeTile('i_chain', P => { P.clear(); for (let i = 0; i < 4; i++) { P.rect(3 + i * 3, 12 - i * 3, 3, 3, 0x3a3a44); P.put(4 + i * 3, 13 - i * 3, 0x1a1a22); } });
+makeTile('i_kelp', pPlant(P => { for (let y = 2; y < 16; y++) { const x = 7 + Math.round(Math.sin(y * 0.7) * 2); P.rect(x, y, 2, 1, 0x4a8a2a); } }));
+makeTile('i_dried_kelp', pPlant(P => { for (let y = 3; y < 14; y++) P.rect(5, y, 6, 1, y % 2 ? 0x3a4a2a : 0x2a3a1e); }));
+makeTile('i_sweet_berries', pPlant(P => { for (const [x, y] of [[5, 8], [9, 6], [8, 10], [11, 10]]) P.disc(x, y, 2, 0xc8202a); P.line(9, 2, 9, 5, 0x3a6a2a); }));
+makeTile('i_bone_meal', pBlob(0xf0eee0, 4, 0xd8d4c4));
+makeTile('i_water_bottle', pPlant(P => { P.rect(7, 2, 2, 3, 0xc8e0f0); P.rect(4, 5, 8, 9, 0xd8ecf8); P.rect(5, 7, 6, 6, 0x3a6ad8); P.rect(6, 1, 4, 1, 0x8a6030); }));
+makeTile('i_raw_copper', pBlob(0xc06a4a, 4.5, 0xe08a5a));
+makeTile('i_copper_ingot', pIngot(0xd8784a));
+makeTile('i_amethyst_shard', pPlant(P => { P.line(4, 13, 11, 3, 0xb48ae8); P.line(5, 13, 12, 3, 0x8a5ac8); P.line(6, 13, 12, 5, 0x6a3aa8); }));
+makeTile('i_prismarine_shard', pPlant(P => { P.line(4, 12, 12, 4, 0x5aa89a); P.line(5, 12, 12, 5, 0x6ec8b0); P.line(4, 11, 11, 4, 0x4a8a8a); }));
+makeTile('i_prismarine_crystals', pBlob(0xd0f0e8, 4, 0x8ad8c8));
+makeTile('i_soul_torch', P => { P.clear(); P.rect(7, 6, 2, 9, 0x6a4a2a); P.rect(7, 3, 2, 3, 0x5ad8f8); P.rect(7, 2, 2, 1, 0xc8f8ff); });
+makeTile('i_soul_lantern', P => { P.clear(); P.rect(5, 5, 6, 9, 0x2e2e34); P.rect(6, 7, 4, 5, 0x5ad8f8); P.rect(7, 2, 2, 3, 0x4a4a52); });
+makeTile('i_snow_layer', pPlant(P => { P.rect(1, 12, 14, 3, 0xf2f6fa); P.rect(1, 12, 14, 1, 0xffffff); }));
+makeTile('i_sea_pickle', pPlant(P => { P.rect(6, 6, 4, 9, 0x6a8a2a); P.rect(7, 4, 2, 2, 0xc8ff8a); }));
+makeTile('i_vine', P => { P.clear(); for (let i = 0; i < 5; i++) { const x = 2 + i * 3; P.line(x, 1, x + 1, 14, 0x3a7a1e); } P.speck(0x4a9a2a, 0.12, 10); });
+
 /* the animations themselves */
 const waveRows = [[2, 3], [5, 9], [8, 1], [11, 6], [14, 11], [0, 12]];
 animTile('water', 16, 140, (P, f) => {
@@ -1311,8 +1398,77 @@ block('pale_oak_leaves', 'Pale Oak Leaves', 'leaves_pale_oak', Object.assign({ d
 block('pale_oak_planks', 'Pale Oak Planks', 'planks_pale_oak', { tool: 'axe', hardness: 2 });
 block('pale_moss_block', 'Pale Moss Block', 'pale_moss', { tool: 'hoe', hardness: 0.1 });
 block('creaking_heart', 'Creaking Heart', { top: 'log_pale_oak_top', side: 'log_pale_oak', front: 'creaking_heart' }, { tool: 'axe', hardness: 10, light: true, emit: 6, creakingHeart: true });
-block('turtle_egg', 'Turtle Egg', 'turtle_egg', { hardness: 0.5, opaque: false, solid: false, box: [0.25, 0, 0.25, 0.75, 0.45, 0.75], boxes: [[0.2, 0, 0.3, 0.5, 0.4, 0.6], [0.55, 0, 0.45, 0.8, 0.35, 0.75]], iconTile: 'i_turtle_egg', drop: null });
 block('campfire', 'Campfire', { top: 'campfire_top', side: 'campfire_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 2, opaque: false, cutout: true, solid: false, light: true, emit: 15, box: [0, 0, 0, 1, 0.4375, 1], boxes: [[0, 0, 0, 1, 0.4375, 1]], iconTile: 'i_campfire', drop: (r) => [['coal', 2]] });
+block('turtle_egg', 'Turtle Egg', 'turtle_egg', { hardness: 0.5, opaque: false, solid: false, box: [0.25, 0, 0.25, 0.75, 0.45, 0.75], boxes: [[0.2, 0, 0.3, 0.5, 0.4, 0.6], [0.55, 0, 0.45, 0.8, 0.35, 0.75]], iconTile: 'i_turtle_egg', drop: null });
+/* ================= building blocks round ================= */
+const PK = (h, extra) => Object.assign({ tool: 'pick', tier: 1, hardness: h || 1.5 }, extra || {});
+for (const k of ['granite', 'polished_granite', 'diorite', 'polished_diorite', 'andesite', 'polished_andesite', 'tuff', 'polished_tuff', 'tuff_bricks', 'calcite', 'smooth_stone', 'chiseled_stone_bricks', 'cracked_stone_bricks', 'mossy_stone_bricks', 'polished_deepslate', 'deepslate_bricks', 'deepslate_tiles', 'chiseled_deepslate', 'polished_blackstone', 'polished_blackstone_bricks', 'smooth_basalt', 'mud_bricks', 'smooth_sandstone', 'cut_sandstone', 'chiseled_sandstone', 'end_stone_bricks', 'purpur_block', 'prismarine', 'prismarine_bricks', 'dark_prismarine', 'quartz_bricks', 'chiseled_quartz', 'smooth_quartz', 'red_nether_bricks', 'cracked_nether_bricks', 'chiseled_nether_bricks'])
+  block(k, k.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ').replace('Purpur Block', 'Purpur Block'), k, PK());
+block('gilded_blackstone', 'Gilded Blackstone', 'gilded_blackstone', PK(1.5, { drop: (r) => (r() < 0.05 ? [['gold_ingot', 1]] : [['gilded_blackstone', 1]]) }));
+block('mud', 'Mud', 'mud', { tool: 'shovel', hardness: 0.5, sink: true });
+block('packed_mud', 'Packed Mud', 'packed_mud', { tool: 'pick', hardness: 1 });
+block('red_sandstone', 'Red Sandstone', { top: 'red_sandstone_top', side: 'red_sandstone' }, PK(0.8));
+block('purpur_pillar', 'Purpur Pillar', { top: 'purpur_block', side: 'purpur_pillar' }, PK());
+block('quartz_pillar', 'Quartz Pillar', { top: 'smooth_quartz', side: 'quartz_pillar' }, PK(0.8));
+block('sea_lantern', 'Sea Lantern', 'sea_lantern', { hardness: 0.3, light: true, emit: 15, drop: (r) => [['prismarine_crystals', 2 + (r() * 2 | 0)]] });
+block('crying_obsidian', 'Crying Obsidian', 'crying_obsidian', PICK(4, 50, { light: true, emit: 10 }));
+block('soul_soil', 'Soul Soil', 'soul_soil', { tool: 'shovel', hardness: 0.5 });
+block('bone_block', 'Bone Block', { top: 'bone_block_top', side: 'bone_block_side' }, PK(2));
+block('dried_kelp_block', 'Dried Kelp Block', 'dried_kelp_block', { hardness: 0.5 });
+block('sponge', 'Sponge', 'sponge', { hardness: 0.6, sponge: true });
+block('wet_sponge', 'Wet Sponge', 'wet_sponge', { hardness: 0.6 });
+block('tinted_glass', 'Tinted Glass', 'tinted_glass', { opaque: false, cutout: true, hardness: 0.3, glassy: true });
+block('amethyst_block', 'Block of Amethyst', 'amethyst_block', PK(1.5));
+block('budding_amethyst', 'Budding Amethyst', 'budding_amethyst', PK(1.5, { drop: null }));
+block('amethyst_cluster', 'Amethyst Cluster', 'amethyst_cluster', Object.assign({}, CROSS, { tool: 'pick', hardness: 1.5, light: true, emit: 5, drop: (r) => [['amethyst_shard', 4]] }));
+block('copper_ore', 'Copper Ore', 'copper_ore', PICK(1, 3, { drop: (r) => [['raw_copper', 2 + (r() * 3 | 0)]], xp: 1 }));
+block('deepslate_copper_ore', 'Deepslate Copper Ore', 'deepslate_copper_ore', PICK(1, 4.5, { drop: (r) => [['raw_copper', 2 + (r() * 3 | 0)]], xp: 1 }));
+COPPER.forEach(([p, n], age) => { block(p + 'copper_block', n === 'Copper' ? 'Block of Copper' : n, p + 'copper_block', PK(3, { copper: age, copperKind: 'copper_block' })); block(p + 'cut_copper', (n === 'Copper' ? '' : n.replace(' Copper', '') + ' ') + 'Cut Copper', p + 'cut_copper', PK(3, { copper: age, copperKind: 'cut_copper' })); });
+block('iron_bars', 'Iron Bars', 'iron_bars', PK(5, { opaque: false, cutout: true, pane: true, iconTile: 'iron_bars' }));
+block('chain', 'Chain', 'chain', PK(5, { opaque: false, cutout: true, solid: true, box: [0.4375, 0, 0.4375, 0.5625, 1, 0.5625], boxes: [[0.4375, 0, 0.4375, 0.5625, 1, 0.5625]], iconTile: 'i_chain' }));
+block('cobweb', 'Cobweb', 'cobweb', Object.assign({}, CROSS, { hardness: 4, tool: 'sword', web: true, drop: (r) => [] }));
+const VINE_BOX = { w: [0, 0, 0, 0.0625, 1, 1], e: [0.9375, 0, 0, 1, 1, 1], n: [0, 0, 0, 1, 1, 0.0625], s: [0, 0, 0.9375, 1, 1, 1] };
+for (const d of ['n', 's', 'w', 'e']) block('vine_' + d, 'Vines', 'vine', { hardness: 0.2, opaque: false, cutout: true, solid: false, box: VINE_BOX[d], ladder: d, drop: 'vine', replaceable: true, iconTile: 'i_vine' });
+block('kelp', 'Kelp', 'kelp', Object.assign({}, CROSS, { wlog: true, drop: 'kelp' }));
+block('seagrass', 'Seagrass', 'seagrass', Object.assign({}, CROSS, { wlog: true, drop: null }));
+block('sea_pickle', 'Sea Pickle', 'sea_pickle', Object.assign({}, CROSS, { wlog: true, light: true, emit: 9, iconTile: 'i_sea_pickle' }));
+for (const [k, n] of [['tube', 'Tube'], ['brain', 'Brain'], ['bubble', 'Bubble'], ['fire', 'Fire'], ['horn', 'Horn']]) { block('coral_' + k, n + ' Coral', 'coral_plant_' + k, Object.assign({}, CROSS, { wlog: true })); block('coral_fan_' + k, n + ' Coral Fan', 'coral_fan_' + k, Object.assign({}, CROSS, { wlog: true })); }
+block('sweet_berry_bush', 'Sweet Berry Bush', 'sweet_berry_bush', Object.assign({}, CROSS, { berry: 0, drop: 'sweet_berries', iconTile: 'i_sweet_berries' }));
+block('sweet_berry_bush_ripe', 'Sweet Berry Bush', 'sweet_berry_bush_ripe', Object.assign({}, CROSS, { berry: 1, drop: (r) => [['sweet_berries', 2 + (r() * 2 | 0)]] }));
+block('snow_layer', 'Snow', 'snow_layer', { tool: 'shovel', hardness: 0.1, opaque: false, box: [0, 0, 0, 1, 0.125, 1], boxes: [[0, 0, 0, 1, 0.125, 1]], replaceable: true, drop: 'snowball', iconTile: 'i_snow_layer' });
+block('soul_torch', 'Soul Torch', 'soul_torch', { hardness: 0, solid: false, opaque: false, cutout: true, box: [0.4375, 0, 0.4375, 0.5625, 0.625, 0.5625], light: true, emit: 10, iconTile: 'i_soul_torch' });
+block('soul_lantern', 'Soul Lantern', { side: 'soul_lantern', top: 'lantern_top', bottom: 'lantern_top' }, { hardness: 1, opaque: false, cutout: true, box: [0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875], boxes: [[0.3125, 0, 0.3125, 0.6875, 0.5625, 0.6875]], light: true, emit: 10, iconTile: 'i_soul_lantern' });
+block('end_rod', 'End Rod', 'end_rod', { hardness: 0, solid: false, opaque: false, cutout: true, box: [0.4375, 0, 0.4375, 0.5625, 1, 0.5625], light: true, emit: 14, iconTile: 'end_rod' });
+// sixteen colours of wool, carpet, stained glass, terracotta, concrete, concrete powder and glazed terracotta
+for (const [k, n] of COLORS16) {
+  if (!OLD_WOOL.includes(k)) {
+    block('wool_' + k, n + ' Wool', 'wool_' + k, { hardness: 0.8 });
+    block('stained_glass_' + k, n + ' Stained Glass', 'stained_glass_' + k, { opaque: false, translucent: true, hardness: 0.3, glassy: true });
+    block('stained_glass_pane_' + k, n + ' Stained Glass Pane', 'stained_glass_' + k, { opaque: false, translucent: true, hardness: 0.3, pane: true, iconTile: 'stained_glass_' + k });
+  }
+  if (!OLD_TC.includes(k)) block('terracotta_' + k, n + ' Terracotta', 'tc_' + k, PICK(1, 1.25));
+  block('carpet_' + k, n + ' Carpet', 'wool_' + k, { hardness: 0.1, opaque: false, box: [0, 0, 0, 1, 0.0625, 1], boxes: [[0, 0, 0, 1, 0.0625, 1]] });
+  block('concrete_' + k, n + ' Concrete', 'concrete_' + k, PK(1.8));
+  block('concrete_powder_' + k, n + ' Concrete Powder', 'concrete_powder_' + k, { tool: 'shovel', hardness: 0.5, powder: 'concrete_' + k, falls: true });
+  block('glazed_terracotta_' + k, n + ' Glazed Terracotta', 'glazed_' + k, PICK(1, 1.4));
+}
+// slabs, stairs and walls for the new stones
+const NEW_SHAPES = [
+  ['granite', 'Granite'], ['polished_granite', 'Polished Granite'], ['diorite', 'Diorite'], ['polished_diorite', 'Polished Diorite'], ['andesite', 'Andesite'], ['polished_andesite', 'Polished Andesite'],
+  ['tuff', 'Tuff'], ['polished_tuff', 'Polished Tuff'], ['tuff_bricks', 'Tuff Brick'], ['cobbled_deepslate', 'Cobbled Deepslate'], ['polished_deepslate', 'Polished Deepslate'], ['deepslate_bricks', 'Deepslate Brick'], ['deepslate_tiles', 'Deepslate Tile'],
+  ['polished_blackstone', 'Polished Blackstone'], ['polished_blackstone_bricks', 'Polished Blackstone Brick'], ['mud_bricks', 'Mud Brick'], ['red_sandstone', 'Red Sandstone'], ['smooth_sandstone', 'Smooth Sandstone'], ['smooth_stone', 'Smooth Stone'],
+  ['end_stone_bricks', 'End Stone Brick'], ['purpur_block', 'Purpur'], ['prismarine', 'Prismarine'], ['prismarine_bricks', 'Prismarine Brick'], ['dark_prismarine', 'Dark Prismarine'],
+  ['mossy_cobblestone', 'Mossy Cobblestone'], ['mossy_stone_bricks', 'Mossy Stone Brick'], ['red_nether_bricks', 'Red Nether Brick'], ['smooth_quartz', 'Smooth Quartz'], ['cut_copper', 'Cut Copper'], ['birch_planks', 'Birch'], ['spruce_planks', 'Spruce'], ['cherry_planks', 'Cherry'], ['mangrove_planks', 'Mangrove'], ['bamboo_planks', 'Bamboo'], ['pale_oak_planks', 'Pale Oak'], ['crimson_planks', 'Crimson'], ['warped_planks', 'Warped'],
+];
+const NS = []; // the shapes really made (some woods already had stairs)
+for (const [full, n] of NEW_SHAPES) {
+  const f = DEFS[ID[full]]; if (!f) continue;
+  const k = 'x_' + full; NS.push([k, n, full]);
+  for (const half of ['b', 't']) { const d = block(k + '_slab_' + half, n + ' Slab', 'stone', { tool: f.tool, tier: f.tool === 'pick' ? 1 : 0, hardness: 2, opaque: false, boxes: [half === 'b' ? [0, 0, 0, 1, 0.5, 1] : [0, 0.5, 0, 1, 1, 1]], drop: k + '_slab', slab: k, slabFull: full, slabHalf: half }); d.faces = f.faces.slice(); d.color = f.color; }
+  for (const dd of ['n', 's', 'w', 'e']) { const d = block(k + '_stairs_' + dd, n + ' Stairs', 'stone', { tool: f.tool, tier: f.tool === 'pick' ? 1 : 0, hardness: 2, opaque: false, boxes: [[0, 0, 0, 1, 0.5, 1], STAIR_UP[dd]], drop: k + '_stairs', stair: k }); d.faces = f.faces.slice(); d.color = f.color; }
+}
+const WALLS = [['cobblestone', 'Cobblestone'], ['mossy_cobblestone', 'Mossy Cobblestone'], ['stone_bricks', 'Stone Brick'], ['mossy_stone_bricks', 'Mossy Stone Brick'], ['granite', 'Granite'], ['diorite', 'Diorite'], ['andesite', 'Andesite'], ['sandstone', 'Sandstone'], ['red_sandstone', 'Red Sandstone'], ['bricks', 'Brick'], ['cobbled_deepslate', 'Cobbled Deepslate'], ['deepslate_bricks', 'Deepslate Brick'], ['deepslate_tiles', 'Deepslate Tile'], ['blackstone', 'Blackstone'], ['polished_blackstone_bricks', 'Polished Blackstone Brick'], ['nether_bricks', 'Nether Brick'], ['red_nether_bricks', 'Red Nether Brick'], ['mud_bricks', 'Mud Brick'], ['end_stone_bricks', 'End Stone Brick'], ['prismarine', 'Prismarine'], ['tuff', 'Tuff'], ['tuff_bricks', 'Tuff Brick']];
+for (const [full, n] of WALLS) { const f = DEFS[ID[full]]; if (!f) continue; const d = block(full + '_wall', n + ' Wall', 'stone', { tool: 'pick', tier: 1, hardness: 2, opaque: false, fence: true, wall: true, iconTile: 'i_wall' }); d.faces = f.faces.slice(); d.color = f.color; }
 
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
@@ -1476,9 +1632,28 @@ item('wolf_armor', 'Wolf Armor', 'wolf_armor', { stack: 1 });
 item('totem_of_undying', 'Totem of Undying', 'totem_of_undying', { stack: 1 });
 item('snowball', 'Snowball', 'snowball', { stack: 16 });
 item('breeze_rod', 'Breeze Rod', 'breeze_rod');
+item('wind_charge', 'Wind Charge', 'wind_charge', { stack: 64 });
 item('turtle_scute', 'Turtle Scute', 'turtle_scute');
 item('turtle_helmet', 'Turtle Shell', 'turtle_helmet', { stack: 1, armor: { slot: 0, points: 2 } });
-item('wind_charge', 'Wind Charge', 'wind_charge', { stack: 64 });
+
+/* the building round's items */
+item('vine', 'Vines', 'vine', { placesLadder: 'vine' });
+item('dried_kelp', 'Dried Kelp', 'dried_kelp', { food: 1 });
+item('sweet_berries', 'Sweet Berries', 'sweet_berries', { food: 2, plants: 'sweet_berry_bush' });
+item('bone_meal', 'Bone Meal', 'bone_meal');
+item('water_bottle', 'Water Bottle', 'water_bottle', { stack: 1 });
+item('raw_copper', 'Raw Copper', 'raw_copper');
+item('copper_ingot', 'Copper Ingot', 'copper_ingot');
+item('amethyst_shard', 'Amethyst Shard', 'amethyst_shard');
+item('prismarine_shard', 'Prismarine Shard', 'prismarine_shard');
+item('prismarine_crystals', 'Prismarine Crystals', 'prismarine_crystals');
+for (const [k, n, full] of NS) {
+  const c = DEFS[ID[full]].color, hi = c.map(v => Math.min(255, v + 30)), lo = c.map(v => Math.round(v * 0.6));
+  makeTile('i_' + k + '_slab', pPlant(P => { P.rect(1, 8, 14, 6, c); P.rect(1, 8, 14, 1, hi); P.rect(1, 13, 14, 1, lo); P.rect(1, 8, 1, 6, hi); P.rect(14, 8, 1, 6, lo); }));
+  makeTile('i_' + k + '_stairs', pPlant(P => { P.rect(1, 9, 14, 6, c); P.rect(1, 2, 7, 7, c); P.rect(1, 2, 7, 1, hi); P.rect(8, 9, 7, 1, hi); P.rect(1, 14, 14, 1, lo); }));
+  item(k + '_slab', n + ' Slab', k + '_slab', { placesSlab: k });
+  item(k + '_stairs', n + ' Stairs', k + '_stairs', { placesStair: k });
+}
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
@@ -1701,6 +1876,35 @@ const RECIPES = [
   ['cooked_rabbit', 1, { rabbit: 1 }, 'furnace'], ['cooked_cod', 1, { cod: 1 }, 'furnace'], ['cooked_salmon', 1, { salmon: 1 }, 'furnace'], ['fishing_rod', 1, { stick: 3, string: 2 }],
   ['cooked_chicken', 1, { chicken: 1 }, 'furnace'],
 ];
+
+/* the building round's recipes (coloured things use wool as their dye, like stained glass here) */
+RECIPES.push(
+  ['granite', 1, { diorite: 1, quartz: 1 }], ['diorite', 2, { cobblestone: 2, quartz: 2 }, 'table'], ['andesite', 2, { diorite: 1, cobblestone: 1 }],
+  ['polished_granite', 4, { granite: 4 }, 'table'], ['polished_diorite', 4, { diorite: 4 }, 'table'], ['polished_andesite', 4, { andesite: 4 }, 'table'],
+  ['polished_tuff', 4, { tuff: 4 }, 'table'], ['tuff_bricks', 4, { polished_tuff: 4 }, 'table'], ['smooth_stone', 1, { stone: 1 }, 'furnace'],
+  ['chiseled_stone_bricks', 1, { stone_bricks: 2 }], ['cracked_stone_bricks', 1, { stone_bricks: 1 }, 'furnace'], ['mossy_stone_bricks', 1, { stone_bricks: 1, vine: 1 }], ['mossy_cobblestone', 1, { cobblestone: 1, vine: 1 }],
+  ['polished_deepslate', 4, { cobbled_deepslate: 4 }, 'table'], ['deepslate_bricks', 4, { polished_deepslate: 4 }, 'table'], ['deepslate_tiles', 4, { deepslate_bricks: 4 }, 'table'], ['chiseled_deepslate', 1, { cobbled_deepslate: 2 }],
+  ['polished_blackstone', 4, { blackstone: 4 }, 'table'], ['polished_blackstone_bricks', 4, { polished_blackstone: 4 }, 'table'], ['smooth_basalt', 1, { basalt: 1 }, 'furnace'],
+  ['packed_mud', 1, { mud: 1, wheat: 1 }], ['mud_bricks', 4, { packed_mud: 4 }, 'table'], ['red_sandstone', 1, { red_sand: 4 }], ['smooth_sandstone', 1, { sandstone: 1 }, 'furnace'], ['cut_sandstone', 4, { sandstone: 4 }, 'table'], ['chiseled_sandstone', 1, { sandstone: 2 }],
+  ['end_stone_bricks', 4, { end_stone: 4 }, 'table'], ['prismarine', 1, { prismarine_shard: 4 }], ['prismarine_bricks', 1, { prismarine_shard: 9 }, 'table'], ['dark_prismarine', 1, { prismarine_shard: 8, ink_sac: 1 }, 'table'], ['sea_lantern', 1, { prismarine_shard: 4, prismarine_crystals: 5 }, 'table'],
+  ['quartz_bricks', 4, { quartz_block: 4 }, 'table'], ['chiseled_quartz', 1, { quartz_block: 2 }], ['quartz_pillar', 2, { quartz_block: 2 }], ['smooth_quartz', 1, { quartz_block: 1 }, 'furnace'],
+  ['red_nether_bricks', 1, { nether_bricks: 2, nether_wart_block: 2 }], ['cracked_nether_bricks', 1, { nether_bricks: 1 }, 'furnace'], ['chiseled_nether_bricks', 1, { nether_bricks: 2 }],
+  ['bone_meal', 3, { bone: 1 }], ['bone_block', 1, { bone_meal: 9 }, 'table'], ['dried_kelp', 1, { kelp: 1 }, 'furnace'], ['dried_kelp_block', 1, { dried_kelp: 9 }, 'table'], ['sponge', 1, { wet_sponge: 1 }, 'furnace'],
+  ['tinted_glass', 2, { glass: 1, amethyst_shard: 4 }, 'table'], ['amethyst_block', 1, { amethyst_shard: 4 }],
+  ['copper_ingot', 1, { raw_copper: 1 }, 'furnace'], ['copper_block', 1, { copper_ingot: 9 }, 'table'], ['copper_ingot', 9, { copper_block: 1 }], ['cut_copper', 4, { copper_block: 4 }, 'table'],
+  ['iron_bars', 16, { iron_ingot: 6 }, 'table'], ['chain', 1, { iron_ingot: 1 }], ['snow_layer', 6, { snow: 3 }, 'table'],
+  ['soul_torch', 4, { coal: 1, stick: 1, soul_sand: 1 }], ['soul_lantern', 1, { iron_ingot: 1, soul_torch: 1 }], ['end_rod', 4, { blaze_rod: 1, end_stone: 1 }],
+  ['wool_light_blue', 2, { wool_blue: 1, wool_white: 1 }], ['wool_magenta', 2, { wool_purple: 1, wool_red: 1 }], ['wool_pink', 2, { wool_red: 1, wool_white: 1 }], ['wool_lime', 2, { wool_green: 1, wool_white: 1 }],
+  ['wool_gray', 2, { wool_black: 1, wool_white: 1 }], ['wool_light_gray', 2, { wool_gray: 1, wool_white: 1 }], ['wool_cyan', 2, { wool_blue: 1, wool_green: 1 }], ['wool_brown', 1, { wool_white: 1, cocoa_beans: 1 }],
+  ['wool_magenta', 1, { wool_white: 1, allium: 1 }], ['wool_light_blue', 1, { wool_white: 1, blue_orchid: 1 }], ['wool_blue', 1, { wool_white: 1, cornflower: 1 }], ['wool_pink', 1, { wool_white: 1, tulip_pink: 1 }], ['wool_light_gray', 1, { wool_white: 1, oxeye_daisy: 1 }], ['wool_orange', 1, { wool_white: 1, torchflower: 1 }],
+  ...COLORS16.flatMap(([k]) => [
+    ['carpet_' + k, 3, { ['wool_' + k]: 2 }], ['concrete_powder_' + k, 8, { sand: 4, gravel: 4, ['wool_' + k]: 1 }, 'table'], ['glazed_terracotta_' + k, 1, { ['terracotta_' + k]: 1 }, 'furnace'],
+    ...(OLD_TC.includes(k) && k !== 'white' ? [] : [['terracotta_' + k, 8, { terracotta: 8, ['wool_' + k]: 1 }, 'table']]),
+    ...(OLD_WOOL.includes(k) ? [] : [['stained_glass_' + k, 8, { glass: 8, ['wool_' + k]: 1 }, 'table'], ['stained_glass_pane_' + k, 16, { ['stained_glass_' + k]: 6 }, 'table']]),
+  ]),
+  ...NS.flatMap(([k, , full]) => [[k + '_slab', 6, { [full]: 3 }, 'table'], [k + '_stairs', 4, { [full]: 6 }, 'table']]),
+  ...WALLS.filter(([f]) => ID[f]).map(([f]) => [f + '_wall', 6, { [f]: 6 }, 'table']),
+);
 
 /* ---------- inventory icons ---------- */
 const ICON_CACHE = new Map();

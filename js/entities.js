@@ -1416,6 +1416,7 @@ class Mob {
       if (this.dryT > 3) { this.dryT = 2; this.hurt(1, null); }
       moveX = moveZ = 0;
     } else this.dryT = 0;
+    if (DEFS[W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.3), Math.floor(this.pos.z))].web) { speed *= 0.15; this.vel.y = Math.max(this.vel.y, -1); } // stuck in a cobweb
     const accel = this.onGround || swimming ? 10 : 2;
     this.vel.x += (moveX * speed - this.vel.x) * Math.min(1, accel * dt);
     this.vel.z += (moveZ * speed - this.vel.z) * Math.min(1, accel * dt);

@@ -471,6 +471,9 @@ G.tickAmbient = (dt) => {
       else if (id === ID.lava && !W.getBlock(x, y + 1, z)) kind = 'lavatop';
       else if (d.solid && !W.getBlock(x, y - 1, z)) { const up = W.getBlock(x, y + 1, z); if (up === ID.water || up === ID.lava) kind = up === ID.water ? 'dripw' : 'dripl'; }
       else if (id === ID.sculk_sensor) kind = 'sculk';
+      else if (d.powder && [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(([a, b, c]) => W.getBlock(x + a, y + b, z + c) === ID.water)) { W.setBlock(x, y, z, ID[d.powder]); continue; }
+      else if (d.copper !== undefined && d.copper < 3 && Math.random() < 0.0004) { W.setBlock(x, y, z, ID[['', 'exposed_', 'weathered_', 'oxidized_'][d.copper + 1] + d.copperKind]); continue; }
+      else if (id === ID.end_rod) kind = 'endrod';
       if (kind) { A.list.push([kind, x, y, z, d]); if (A.list.length > 300) break; }
     }
   }
@@ -490,6 +493,7 @@ G.tickAmbient = (dt) => {
       case 'portal': if (r() < dt * 4) PT.spawn(x + r(), y + r(), z + r(), r() < 0.5 ? 0xb05aff : 0x7a1ad8, (r() - 0.5) * 1.2, (r() - 0.5) * 1.2, (r() - 0.5) * 1.2, 0.06, 1, 0); break;
       case 'lavatop': if (r() < dt * 0.15) { PT.burst(x + 0.5, y + 1, z + 0.5, [0xff8a1a, 0xffd04a, 0x333333], 4, 1.5, 0.08); if (P.pos.distanceTo(new THREE.Vector3(x, y, z)) < 10 && r() < 0.3) Sound.play('dig', new THREE.Vector3(x, y, z), ID.lava); } break;
       case 'dripw': case 'dripl': if (r() < dt * 0.25) PT.spawn(x + 0.2 + r() * 0.6, y - 0.05, z + 0.2 + r() * 0.6, kind === 'dripw' ? 0x3a6ad8 : 0xff7a1a, 0, 0, 0, 0.06, 1.2, 9); break;
+      case 'endrod': if (r() < dt * 0.8) PT.spawn(x + 0.5, y + 0.5 + r() * 0.5, z + 0.5, 0xffffff, (r() - 0.5) * 0.6, (r() - 0.5) * 0.4, (r() - 0.5) * 0.6, 0.05, 1.5, 0); break;
       case 'sculk': if (r() < dt * 0.4) PT.spawn(x + 0.5, y + 0.6, z + 0.5, 0x2ad8e8, 0, 0.5, 0, 0.06, 0.8, 0); break;
       case 'ench': {
         books.add(x + ',' + y + ',' + z);
@@ -1141,7 +1145,21 @@ G.growTree = (x, y, z, kind) => {
 /* crops: planted seeds grow into ripe wheat after a few minutes (only while their area is loaded) */
 const CROP_TIME = 300; // five minutes from planting to ripe
 const SAPLING_TIME = 180; // saplings: three minutes at most
-const RIPE = () => ({ [ID.wheat_sprout]: ID.wheat_crop, [ID.carrot_sprout]: ID.carrot_crop, [ID.potato_sprout]: ID.potato_crop, [ID.pumpkin_stem]: ID.pumpkin });
+const RIPE = () => ({ [ID.sweet_berry_bush]: ID.sweet_berry_bush_ripe, [ID.wheat_sprout]: ID.wheat_crop, [ID.carrot_sprout]: ID.carrot_crop, [ID.potato_sprout]: ID.potato_crop, [ID.pumpkin_stem]: ID.pumpkin });
+/* bone meal: crops and berry bushes ripen, saplings grow into trees, grass sprouts flowers */
+G.boneMeal = (x, y, z) => {
+  const W = G.world, id = W.getBlock(x, y, z), d = DEFS[id];
+  G.particles.burst(x + 0.5, y + 0.6, z + 0.5, [0x4ad84a, 0x9aff9a], 10, 1.2, 0.08, -1);
+  if (d.sapling) { G.growTree(x, y, z, d.sapling); return true; }
+  const ripe = RIPE()[id];
+  if (ripe) { if (id === ID.pumpkin_stem) { G.crops[chestKey(x, y, z)] = 1; } else { W.setBlock(x, y, z, ripe); delete G.crops[chestKey(x, y, z)]; } return true; }
+  if (id === ID.grass) {
+    for (let i = 0; i < 14; i++) { const dx = (Math.random() * 7 | 0) - 3, dz = (Math.random() * 7 | 0) - 3; if (W.getBlock(x + dx, y, z + dz) === ID.grass && !W.getBlock(x + dx, y + 1, z + dz)) W.setBlock(x + dx, y + 1, z + dz, Math.random() < 0.7 ? ID.tall_grass : [ID.rose, ID.dandelion, ID.tulip_red, ID.oxeye_daisy, ID.cornflower, ID.allium][Math.random() * 6 | 0]); }
+    return true;
+  }
+  if (id === ID.budding_amethyst) { for (const [a, b, c] of [[0, 1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]]) if (!W.getBlock(x + a, y + b, z + c)) { W.setBlock(x + a, y + b, z + c, ID.amethyst_cluster); break; } return true; }
+  return false;
+};
 G.plantCrop = (x, y, z) => { G.crops = G.crops || {}; G.crops[chestKey(x, y, z)] = CROP_TIME; };
 G.waterNear = (x, y, z) => {
   const W = G.world;
