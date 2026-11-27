@@ -1403,6 +1403,8 @@ function spawnTick() {
           type = R < 0.25 ? 'squid' : R < 0.5 ? 'cod' : R < 0.65 ? 'salmon' : R < 0.75 ? 'dolphin' : R < 0.9 ? 'tropical_fish' : G.isNight() ? 'glow_squid' : 'squid';
           if (type === 'dolphin') n = 2;
           if (b === BIOME.MANGROVE && R < 0.3) type = 'axolotl';
+          if (b === BIOME.WARM_OCEAN && R < 0.6) { type = 'tropical_fish'; n = 3; }
+          if (b === BIOME.FROZEN_OCEAN && R < 0.5) type = 'salmon';
           for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y - 1.5, z + (Math.random() - 0.5) * 2);
         }
         type = null;
@@ -1423,7 +1425,10 @@ function spawnTick() {
           [B.JUNGLE]: r2 < 0.5 ? 'parrot' : r2 < 0.85 ? 'ocelot' : 'sniffer', [B.BAMBOO]: r2 < 0.6 ? 'parrot' : 'ocelot',
           [B.SAVANNA]: r2 < 0.45 ? 'armadillo' : r2 < 0.75 ? 'llama' : 'camel', [B.MANGROVE]: 'frog',
           [B.DARK_FOREST]: r2 < 0.35 ? 'mooshroom' : 'fox', [B.CHERRY]: r2 < 0.5 ? 'bee' : 'rabbit', [B.BEACH]: 'turtle',
+          [B.SWAMP]: r2 < 0.6 ? 'frog' : 'chicken', [B.MUSHROOM]: 'mooshroom', [B.BADLANDS]: r2 < 0.6 ? 'armadillo' : 'rabbit', [B.ICE_SPIKES]: r2 < 0.5 ? 'polar_bear' : 'rabbit',
+          [B.FLOWER_FOREST]: r2 < 0.6 ? 'bee' : 'rabbit', [B.MEADOW]: r2 < 0.5 ? 'bee' : r2 < 0.75 ? 'rabbit' : 'donkey', [B.SUNFLOWER_PLAINS]: r2 < 0.5 ? 'bee' : 'horse',
         }[b];
+        if (b === BIOME.MUSHROOM && extra !== 'mooshroom') type = null; // only mooshrooms on mushroom islands
         if (extra) { type = extra; n = { bee: 2 + (Math.random() * 2 | 0), polar_bear: 1, sniffer: 1, camel: 1, turtle: 2, goat: 2, llama: 3 }[extra] || 1 + (Math.random() * 2 | 0); }
       }
       if (type && ground !== ID.water) for (let i = 0; i < n; i++) spawnMob(type, x + (Math.random() - 0.5) * 2, y + 1, z + (Math.random() - 0.5) * 2);
@@ -1450,8 +1455,12 @@ function spawnTick() {
       const hb = W.biomeAt(x, z, W.heightAt(x, z)), outside = y > top;
       if (type === 'zombie' && hb === BIOME.DESERT && outside) type = 'husk';
       if (type === 'skeleton' && (hb === BIOME.SNOWY || hb === BIOME.TAIGA) && outside) type = 'stray';
-      if (Math.random() < 0.06) type = 'witch';
-      if (outside && Math.random() < (hb === BIOME.MANGROVE ? 0.35 : 0.06)) type = 'slime';
+      if (Math.random() < (hb === BIOME.SWAMP ? 0.2 : 0.06)) type = 'witch';
+      if (outside && Math.random() < (hb === BIOME.MANGROVE || hb === BIOME.SWAMP ? 0.35 : 0.06)) type = 'slime';
+      if (hb === BIOME.MUSHROOM) continue; // no monsters ever on mushroom islands, like Minecraft
+      const cb = W.caveBiomeAt(x, y, z);
+      if (cb === BIOME.DEEP_DARK) { if (Math.random() < 0.15 && !W.getBlock(x, y + 2, z) && !G.mobs.some(m => m.type === 'warden' && !m.dead)) type = 'warden'; }
+      else if (cb === BIOME.LUSH_CAVES && W.liquidAt(x, y - 0.5, z) === ID.water) type = 'axolotl';
       if (type === 'enderman' && (W.getBlock(x, y + 2, z))) type = 'zombie';
       if (type === 'spider' && (W.getBlock(x + 1, y, z) || W.getBlock(x - 1, y, z))) type = 'skeleton';
       spawnMob(type, x + 0.5, y, z + 0.5);
@@ -2394,7 +2403,7 @@ function frame(now) {
   if (!$('debug').hidden) {
     const bx = Math.floor(P.pos.x), bz = Math.floor(P.pos.z);
     const h = G.world.heightAt(bx, bz);
-    $('debug').textContent = `${G.fps} fps\nXYZ ${P.pos.x.toFixed(1)} ${P.pos.y.toFixed(1)} ${P.pos.z.toFixed(1)}\nBiome ${BIOME_NAMES[G.world.biomeAt(bx, bz, h)]}\nChunks ${G.world.chunks.size}  Mobs ${G.mobs.length}\nTime ${Math.floor(((G.time + 0.25) % 1) * 24)}:00  Seed ${G.seed}`;
+    $('debug').textContent = `${G.fps} fps\nXYZ ${P.pos.x.toFixed(1)} ${P.pos.y.toFixed(1)} ${P.pos.z.toFixed(1)}\nBiome ${BIOME_NAMES[G.world.caveBiomeAt(P.pos.x, P.pos.y, P.pos.z) > 0 ? G.world.caveBiomeAt(P.pos.x, P.pos.y, P.pos.z) : G.world.biomeAt(bx, bz, h)]}\nChunks ${G.world.chunks.size}  Mobs ${G.mobs.length}\nTime ${Math.floor(((G.time + 0.25) % 1) * 24)}:00  Seed ${G.seed}`;
   }
   G.renderer.render(G.scene, G.camera);
   if (G.hand.visible) {

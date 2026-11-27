@@ -722,6 +722,40 @@ makeTile('i_rabbit', pBlob(0xe0a0a0, 4.5, 0xffffff));
 makeTile('i_cooked_rabbit', pBlob(0xb8703a, 4.5, 0xe0a070));
 makeTile('i_slime_ball', pBlob(0x7ad84a, 4, 0xc8ffa0));
 makeTile('i_phantom_membrane', pPlant(P => { P.rect(3, 4, 10, 8, 0xc8c0a8); P.rect(4, 5, 8, 6, 0xe0d8c0); P.line(3, 4, 12, 11, 0xa8a088); }));
+
+/* ---------- the new biomes' blocks ---------- */
+makeTile('mycelium_top', P => { P.fill(0x7a6a7e, 12); P.speck(0x9a8aa0, 0.2, 8); P.speck(0x5e4e62, 0.15, 6); });
+makeTile('mycelium_side', pTopBand(pDirt, 0x7a6a7e, 3));
+makeTile('mushroom_red', P => { P.fill(0xc0201c, 8); for (const [x, y, r] of [[4, 4, 2], [11, 3, 1.6], [9, 10, 2.2], [3, 12, 1.4], [14, 13, 1.2]]) P.disc(x, y, r, 0xf0ece0, 4); });
+makeTile('mushroom_brown', P => { P.fill(0x95704e, 8); P.speck(0x82603f, 0.2, 6); });
+makeTile('mushroom_stem', P => { P.fill(0xe6dccb, 6); P.speck(0xd2c8b4, 0.18, 4); });
+makeTile('red_sand', P => { P.fill(0xbe6621, 8); P.speck(0xa85618, 0.2, 5); });
+for (const [k, c] of [['white', 0xd1b2a1], ['orange', 0xa25426], ['yellow', 0xba8523], ['red', 0x8f3d2e], ['brown', 0x4d3324], ['light_gray', 0x876b62]]) makeTile('tc_' + k, P => { P.fill(c, 6); P.speck(shadeC(rgb(c), 0.9), 0.12, 4); });
+makeTile('packed_ice', P => { P.fill(0x8db4f0, 5); for (let i = 0; i < 4; i++) { const x = P.rng() * 12 | 0, y = P.rng() * 12 | 0; P.line(x, y, x + 3, y + 2, 0xb8d4fa); } });
+makeTile('blue_ice', P => { P.fill(0x74a8f6, 5); for (let i = 0; i < 4; i++) { const x = P.rng() * 12 | 0, y = P.rng() * 12 | 0; P.line(x, y, x + 2, y + 3, 0xa8ccff); } });
+makeTile('blue_orchid', pFlower(0x2aa8e8, 0x1a78b8));
+makeTile('allium', pFlower(0xb860e0, 0x8a3ab8));
+makeTile('tulip_red', pFlower(0xe02a1a, 0x9a1a10));
+makeTile('tulip_orange', pFlower(0xf07a1a, 0xb8501a));
+makeTile('tulip_pink', pFlower(0xf0a0c8, 0xc87098));
+makeTile('tulip_white', pFlower(0xf4f4f0, 0xc8c8c0));
+makeTile('oxeye_daisy', pFlower(0xf4f4ec, 0xe8c020));
+makeTile('cornflower', pFlower(0x4a6ae8, 0x2a3ab8));
+makeTile('lily_of_the_valley', pFlower(0xffffff, 0xe0e0e0));
+makeTile('sunflower', pPlant(P => { P.line(8, 15, 8, 7, 0x3f8f2f); P.pts([[6, 12], [7, 12], [9, 11], [10, 10]], 0x4fa83a); P.disc(8, 5, 4.4, 0xf8d020); P.disc(8, 5, 2, 0x6a4a1a); }));
+makeTile('lily_pad', pPlant(P => { P.disc(8, 8, 7, 0x3a8a2a, 12); P.line(8, 8, 8, 1, 0x2a6a1a); for (let y = 0; y < 8; y++) P.erase(8, y), P.erase(9, y); P.line(8, 8, 3, 3, 0x2a6a1a); P.line(8, 8, 13, 12, 0x2a6a1a); }));
+makeTile('i_lily_pad', pPlant(P => { P.disc(8, 8, 6.5, 0x3a8a2a, 12); for (let y = 2; y < 8; y++) P.erase(8, y); P.line(8, 8, 4, 12, 0x2a6a1a); }));
+for (const [k, c] of [['tube', 0x3050d8], ['brain', 0xd05aa0], ['bubble', 0xa020a8], ['fire', 0xc82a30], ['horn', 0xd8c840]]) makeTile('coral_' + k, P => { P.fill(c, 14); P.speck(shadeC(rgb(c), 1.3), 0.2, 8); P.speck(shadeC(rgb(c), 0.7), 0.15, 6); });
+makeTile('moss', P => { P.fill(0x5a7a2a, 12); P.speck(0x6e9432, 0.25, 8); P.speck(0x4a6a20, 0.15, 6); });
+makeTile('azalea', pPlant(P => { P.line(8, 15, 8, 10, 0x6a4a2a); P.disc(8, 7, 6, 0x5e8a2a, 14); P.speck(0x4a7020, 0.1, 6); }));
+makeTile('flowering_azalea', pPlant(P => { P.line(8, 15, 8, 10, 0x6a4a2a); P.disc(8, 7, 6, 0x5e8a2a, 14); for (let i = 0; i < 7; i++) P.put(3 + P.rng() * 10, 3 + P.rng() * 8, 0xd85ab8); }));
+makeTile('cave_vines', pPlant(P => { for (const x of [5, 10]) { P.line(x, 0, x + 1, 15, 0x4a7a2a); P.disc(x + 1, 5 + (x & 3), 1.4, 0xf8a830); P.disc(x, 12, 1.3, 0xf8a830); } }));
+makeTile('i_glow_berries', pBlob(0xf8a830, 3.5, 0xffe070));
+makeTile('dripstone', P => { P.fill(0x86685a, 8); for (let x = 0; x < 16; x += 3) P.line(x, 0, x, 15, 0x745648); });
+makeTile('pointed_dripstone', pPlant(P => { for (let y = 0; y < 16; y++) { const w = Math.max(0, 3 - (y / 5 | 0)); P.rect(8 - w, y, w * 2 + 1, 1, 0x86685a, 6); } }));
+makeTile('sculk', P => { P.fill(0x0a2030, 6); P.speck(0x0e3a4a, 0.25, 6); for (let i = 0; i < 6; i++) P.put(P.rng() * 16, P.rng() * 16, 0x2ad8e8); });
+makeTile('sculk_sensor_top', P => { P.fill(0x0a2a38, 6); for (const x of [3, 7, 11]) P.rect(x, 3, 2, 10, 0x2ad8e8, 20); });
+makeTile('sculk_sensor_side', P => { P.fill(0x0a2030, 6); P.rect(0, 0, 16, 4, 0x1a5a6a, 8); P.speck(0x2ad8e8, 0.05, 4); });
 makeTile('i_acacia_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa85a32); P.rect(1, 8, 14, 1, 0xc87a52); P.rect(1, 13, 14, 1, 0x6a3a1e); }));
 makeTile('i_jungle_slab', pPlant(P => { P.rect(1, 8, 14, 6, 0xa8744a); P.rect(1, 8, 14, 1, 0xc8946a); P.rect(1, 13, 14, 1, 0x6a4a2a); }));
 /* villager work blocks */
@@ -1095,6 +1129,27 @@ for (const k of Object.keys(SHULKER_COLORS)) block('shulker_box_' + k, k[0].toUp
 /* a small bed for your dog: when you sleep, your wolf sleeps on it */
 block('dog_bed', 'Dog Bed', { top: 'dog_bed_top', side: 'dog_bed_side', bottom: 'planks_oak' }, { tool: 'axe', hardness: 0.3, solid: false, opaque: false, box: [0.0625, 0, 0.0625, 0.9375, 0.25, 0.9375], boxes: [[0.0625, 0, 0.0625, 0.9375, 0.25, 0.9375]], iconTile: 'i_dog_bed' });
 
+/* the new biomes (swamp, mushroom fields, badlands, ice spikes, warm oceans, lush caves, dripstone caves, deep dark) */
+block('mycelium', 'Mycelium', { top: 'mycelium_top', side: 'mycelium_side', bottom: 'dirt' }, { tool: 'shovel', hardness: 0.6, drop: 'dirt', colorFace: 2 });
+block('red_mushroom_block', 'Red Mushroom Block', 'mushroom_red', { tool: 'axe', hardness: 0.2, drop: (r) => (r() < 0.3 ? [['red_mushroom', 1]] : []) });
+block('brown_mushroom_block', 'Brown Mushroom Block', 'mushroom_brown', { tool: 'axe', hardness: 0.2, drop: (r) => (r() < 0.3 ? [['brown_mushroom', 1]] : []) });
+block('mushroom_stem', 'Mushroom Stem', 'mushroom_stem', { tool: 'axe', hardness: 0.2, drop: null });
+block('red_sand', 'Red Sand', 'red_sand', { tool: 'shovel', hardness: 0.5 });
+for (const [k, n] of [['white', 'White'], ['orange', 'Orange'], ['yellow', 'Yellow'], ['red', 'Red'], ['brown', 'Brown'], ['light_gray', 'Light Gray']]) block('terracotta_' + k, n + ' Terracotta', 'tc_' + k, PICK(1, 1.25));
+block('packed_ice', 'Packed Ice', 'packed_ice', { hardness: 0.5, drop: null });
+block('blue_ice', 'Blue Ice', 'blue_ice', { hardness: 2.8, drop: null });
+for (const [k, n] of [['blue_orchid', 'Blue Orchid'], ['allium', 'Allium'], ['tulip_red', 'Red Tulip'], ['tulip_orange', 'Orange Tulip'], ['tulip_pink', 'Pink Tulip'], ['tulip_white', 'White Tulip'], ['oxeye_daisy', 'Oxeye Daisy'], ['cornflower', 'Cornflower'], ['lily_of_the_valley', 'Lily of the Valley'], ['sunflower', 'Sunflower']]) block(k, n, k, CROSS);
+block('lily_pad', 'Lily Pad', 'lily_pad', { hardness: 0, opaque: false, cutout: true, box: [0, 0, 0, 1, 0.0625, 1], boxes: [[0, 0, 0, 1, 0.0625, 1]], iconTile: 'i_lily_pad' });
+for (const [k, n] of [['tube', 'Tube'], ['brain', 'Brain'], ['bubble', 'Bubble'], ['fire', 'Fire'], ['horn', 'Horn']]) block('coral_block_' + k, n + ' Coral Block', 'coral_' + k, PICK(0, 1.5));
+block('moss_block', 'Moss Block', 'moss', { tool: 'hoe', hardness: 0.1 });
+block('azalea', 'Azalea', 'azalea', CROSS);
+block('flowering_azalea', 'Flowering Azalea', 'flowering_azalea', CROSS);
+block('cave_vines', 'Glow Berry Vines', 'cave_vines', Object.assign({ light: true, emit: 10, drop: 'glow_berries' }, CROSS));
+block('dripstone_block', 'Dripstone Block', 'dripstone', PICK(0, 1.5));
+block('pointed_dripstone', 'Pointed Dripstone', 'pointed_dripstone', Object.assign({}, CROSS, { tool: 'pick', hardness: 1.5 }));
+block('sculk', 'Sculk', 'sculk', { tool: 'hoe', hardness: 0.2, drop: null, xp: 1 });
+block('sculk_sensor', 'Sculk Sensor', { top: 'sculk_sensor_top', side: 'sculk_sensor_side', bottom: 'sculk' }, { tool: 'hoe', hardness: 1.5, opaque: false, light: true, emit: 3, box: [0, 0, 0, 1, 0.5, 1], boxes: [[0, 0, 0, 1, 0.5, 1]] });
+
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
   const id = nextItemId++;
@@ -1244,6 +1299,7 @@ item('rabbit', 'Raw Rabbit', 'rabbit', { food: 3 });
 item('cooked_rabbit', 'Cooked Rabbit', 'cooked_rabbit', { food: 5 });
 item('slime_ball', 'Slimeball', 'slime_ball');
 item('phantom_membrane', 'Phantom Membrane', 'phantom_membrane');
+item('glow_berries', 'Glow Berries', 'glow_berries', { food: 2 });
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
 
 function getDrops(def, rng) {

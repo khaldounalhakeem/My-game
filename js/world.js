@@ -4,9 +4,10 @@
 // WH: how high you can build. GEN_H: the height the land was made for (kept at 96, so raising the
 // build limit never changes the land, trees or the Nether's ceiling in worlds made before)
 const CS = 16, WH = 128, GEN_H = 96, SEA = 32;
-const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14 };
-const GEN_VER = 6; // which newer biomes exist (see genVerAt)
-const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle'];
+const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, DESERT: 4, SNOWY: 5, MOUNTAIN: 6, BIRCH: 7, TAIGA: 8, JUNGLE: 9, DARK_FOREST: 10, SAVANNA: 11, MANGROVE: 12, CHERRY: 13, BAMBOO: 14, SWAMP: 15, MUSHROOM: 16, BADLANDS: 17, ICE_SPIKES: 18, FLOWER_FOREST: 19, MEADOW: 20, FROZEN_OCEAN: 21, WARM_OCEAN: 22, SUNFLOWER_PLAINS: 23, LUSH_CAVES: 24, DRIPSTONE_CAVES: 25, DEEP_DARK: 26 };
+const GEN_VER = 7;
+const BASE_BIOME = { 15: -1, 16: -1, 17: 4, 18: 5, 19: 3, 20: 6, 21: 0, 22: 0, 23: 2 }; // swamp & mushroom: no villages // which newer biomes exist (see genVerAt)
+const BIOME_NAMES = ['Ocean', 'Beach', 'Plains', 'Forest', 'Desert', 'Snowy Tundra', 'Mountains', 'Birch Forest', 'Taiga', 'Jungle', 'Dark Forest', 'Savanna', 'Mangrove Swamp', 'Cherry Grove', 'Bamboo Jungle', 'Swamp', 'Mushroom Fields', 'Badlands', 'Ice Spikes', 'Flower Forest', 'Meadow', 'Frozen Ocean', 'Warm Ocean', 'Sunflower Plains', 'Lush Caves', 'Dripstone Caves', 'Deep Dark'];
 
 const FACES = [
   { n: [1, 0, 0], c: [[1, 0, 1], [1, 0, 0], [1, 1, 0], [1, 1, 1]], shade: 0.8 },
@@ -96,12 +97,28 @@ class World {
     return [this.noiseB.fbm2(x / 420 + 500, z / 420, 2) + S.temp, this.noiseC.fbm2(x / 380, z / 380 + 700, 2) + S.moist];
   }
 
+  /* villages, temples, igloos and shipwrecks treat the newest biomes like the ones they grew from,
+     so a village you already saw is never wiped away by a new biome */
+  baseBiomeAt(x, z, h) { this.noNew = true; const b = this.biomeAt(x, z, h); this.noNew = false; return b; }
+  /* the newest biomes (swamp, mushroom fields, badlands...) only grow on land nobody had built on before them */
+  fresh7(x, z) { return !this.noNew && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4))) && this.genVerAt(x, z) >= 7; }
   biomeAt(x, z, h) {
     const [temp, moist] = this.climate(x, z);
-    if (h < SEA) return BIOME.OCEAN;
-    if (h >= SEA + 26) return BIOME.MOUNTAIN;
-    if (temp < -0.12) return moist > 0.0 ? BIOME.TAIGA : BIOME.SNOWY;
-    if (temp > 0.1 && moist < 0.04) return BIOME.DESERT;
+    const S = this.style, sx = x + S.ox, sz = z + S.oz;
+    if (h < SEA) {
+      if (this.fresh7(x, z)) { if (temp < -0.15) return BIOME.FROZEN_OCEAN; if (temp > 0.15) return BIOME.WARM_OCEAN; }
+      return BIOME.OCEAN;
+    }
+    // rare mushroom islands by the sea
+    if (h <= SEA + 9 && this.noiseC.fbm2(sx / 260 + 1500, sz / 260 - 800, 2) > 0.36 && this.fresh7(x, z)) return BIOME.MUSHROOM;
+    if (h >= SEA + 26) return h < SEA + 31 && temp > -0.05 && this.fresh7(x, z) ? BIOME.MEADOW : BIOME.MOUNTAIN;
+    if (temp < -0.12) {
+      if (temp < -0.22 && moist <= 0 && this.noiseB.fbm2(sx / 140 + 77, sz / 140, 2) > 0.05 && this.fresh7(x, z)) return BIOME.ICE_SPIKES;
+      return moist > 0.0 ? BIOME.TAIGA : BIOME.SNOWY;
+    }
+    if (temp > 0.1 && moist < 0.04) return this.noiseC.fbm2(sx / 300 - 600, sz / 300 + 222, 2) > 0.12 && this.fresh7(x, z) ? BIOME.BADLANDS : BIOME.DESERT;
+    // wet, mild lowland: a swamp
+    if (moist > 0.1 && temp > -0.06 && temp <= 0.1 && h <= SEA + 4 && this.fresh7(x, z)) return BIOME.SWAMP;
     // hot, very wet and low: a mangrove swamp (fresh ground only)
     if (temp > 0.1 && moist > 0.14 && h <= SEA + 4 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4))) && this.genVerAt(x, z) >= 2) return BIOME.MANGROVE;
     if (h <= SEA + 1) return BIOME.BEACH;
@@ -111,9 +128,10 @@ class World {
     if (moist > 0.17 && temp > -0.02 && temp <= 0.12 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4)))) return BIOME.DARK_FOREST;
     // hot and dry-ish: a savanna with flat-topped acacia trees (fresh ground only)
     if (temp > 0.08 && moist <= 0.1 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4))) && this.genVerAt(x, z) >= 1) return BIOME.SAVANNA;
-    if (moist > 0.04) return temp > -0.02 ? BIOME.FOREST : BIOME.BIRCH;
+    if (moist > 0.04) return temp > -0.02 ? (this.noiseB.fbm2(sx / 180 - 300, sz / 180 - 300, 2) > 0.2 && this.fresh7(x, z) ? BIOME.FLOWER_FOREST : BIOME.FOREST) : BIOME.BIRCH;
     // mild, dryish hills: a pink cherry grove (fresh ground only)
     if (temp > -0.08 && temp <= 0.08 && h >= SEA + 7 && !this.legacy && !(this.oldGen && this.oldGen.has(this.key(Math.floor(x) >> 4, Math.floor(z) >> 4))) && this.genVerAt(x, z) >= 2) return BIOME.CHERRY;
+    if (this.noiseC.fbm2(sx / 200 + 444, sz / 200 + 444, 2) > 0.25 && this.fresh7(x, z)) return BIOME.SUNFLOWER_PLAINS;
     return BIOME.PLAINS;
   }
 
@@ -341,6 +359,7 @@ class World {
     const set = (x, y, z, id) => { if (x >= 0 && x < 16 && z >= 0 && z < 16 && y > 0 && y < WH) d[x + (z << 4) + (y << 8)] = id; };
     const get = (x, y, z) => (x >= 0 && x < 16 && z >= 0 && z < 16 && y >= 0 && y < WH) ? d[x + (z << 4) + (y << 8)] : -1;
 
+    const BAND = this.BAND || (this.BAND = [ID.terracotta, ID.terracotta_orange, ID.terracotta, ID.terracotta_yellow, ID.terracotta_brown, ID.terracotta, ID.terracotta_red, ID.terracotta_white, ID.terracotta_light_gray, ID.terracotta_orange, ID.terracotta]);
     for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
       const wx = cx * 16 + x, wz = cz * 16 + z;
       const h = this.heightAt(wx, wz), b = this.biomeAt(wx, wz, h);
@@ -350,7 +369,12 @@ class World {
       else if (b === BIOME.BEACH) { top = ID.sand; fill = ID.sand; }
       else if (b === BIOME.SNOWY || b === BIOME.TAIGA) { top = b === BIOME.SNOWY ? ID.snow_grass : ID.grass; }
       else if (b === BIOME.MOUNTAIN) { top = h > SEA + 38 ? ID.snow : ID.stone; fill = ID.stone; }
-      else if (b === BIOME.OCEAN) {
+      else if (b === BIOME.MUSHROOM) top = ID.mycelium;
+      else if (b === BIOME.ICE_SPIKES) top = ID.snow;
+      else if (b === BIOME.MEADOW) { top = ID.grass; fill = ID.dirt; }
+      else if (b === BIOME.BADLANDS) { top = ID.red_sand; fill = -1; }
+      else if (b === BIOME.WARM_OCEAN) { top = ID.sand; fill = ID.sand; }
+      else if (b === BIOME.OCEAN || b === BIOME.FROZEN_OCEAN) {
         const g = this.noiseB.noise2(wx / 20, wz / 20);
         top = g > 0.25 ? ID.gravel : g < -0.3 ? ID.clay : ID.sand; fill = top === ID.clay ? ID.clay : ID.sand;
       }
@@ -362,10 +386,11 @@ class World {
         let id;
         if (y === 0) id = ID.bedrock;
         else if (y <= 3 && rng() < (4 - y) * 0.22) id = ID.bedrock;
+        else if (fill === -1 && y < h && y >= h - 14) id = BAND[(y + (this.noiseC.noise2(wx / 40, wz / 40) * 3 | 0) + 64) % BAND.length]; // badlands: stripes of terracotta
         else if (y < h - 3) id = (deep === ID.sandstone && y < h - 7) ? ID.stone : deep;
         else if (y < h) id = fill;
         else if (y === h) id = top;
-        else id = (y === SEA && (b === BIOME.SNOWY || b === BIOME.TAIGA)) ? ID.ice : ID.water;
+        else id = (y === SEA && (b === BIOME.SNOWY || b === BIOME.TAIGA || b === BIOME.FROZEN_OCEAN || b === BIOME.ICE_SPIKES)) ? ID.ice : ID.water;
         // deepslate near the bottom (fresh ground)
         if (fresh && id === ID.stone && y <= 13 + ((this.noiseC.noise2(wx / 9, wz / 9) + 1) * 2 | 0)) id = ID.deepslate;
         d[x + (z << 4) + (y << 8)] = id;
@@ -442,7 +467,7 @@ class World {
 
     // decorations
     const center = biomes[136];
-    const treeCount = { [BIOME.DARK_FOREST]: 6, [BIOME.BAMBOO]: 3, [BIOME.MANGROVE]: 5, [BIOME.CHERRY]: 3, [BIOME.SAVANNA]: rng() < 0.7 ? 1 + (rng() < 0.4 ? 1 : 0) : 0, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
+    const treeCount = { [BIOME.SWAMP]: 3, [BIOME.FLOWER_FOREST]: 4, [BIOME.MEADOW]: rng() < 0.15 ? 1 : 0, [BIOME.SUNFLOWER_PLAINS]: rng() < 0.3 ? 1 : 0, [BIOME.DARK_FOREST]: 6, [BIOME.BAMBOO]: 3, [BIOME.MANGROVE]: 5, [BIOME.CHERRY]: 3, [BIOME.SAVANNA]: rng() < 0.7 ? 1 + (rng() < 0.4 ? 1 : 0) : 0, [BIOME.JUNGLE]: 9, [BIOME.FOREST]: 7, [BIOME.BIRCH]: 6, [BIOME.TAIGA]: 6, [BIOME.PLAINS]: rng() < 0.4 ? 1 : 0, [BIOME.SNOWY]: rng() < 0.4 ? 1 : 0, [BIOME.MOUNTAIN]: rng() < 0.3 ? 1 : 0 }[center] || 0;
     const trees = Math.floor(treeCount * this.style.trees + rng());
     for (let t = 0; t < trees; t++) {
       const x = 2 + (rng() * 12 | 0), z = 2 + (rng() * 12 | 0), h = heights[x + z * 16];
@@ -457,7 +482,8 @@ class World {
       else if (b === BIOME.BAMBOO) { if (rng() < 0.5) this.jungleTree(set, get, x, h + 1, z, rng); else this.jungleBush(set, get, x, h + 1, z, rng); }
       else if (b === BIOME.JUNGLE) { if (rng() < 0.6) this.jungleTree(set, get, x, h + 1, z, rng); else this.jungleBush(set, get, x, h + 1, z, rng); }
       else if (b === BIOME.TAIGA || b === BIOME.SNOWY || (b === BIOME.MOUNTAIN && rng() < 0.7)) this.spruceTree(set, get, x, h + 1, z, rng);
-      else if (b === BIOME.BIRCH || (b === BIOME.FOREST && rng() < 0.25)) this.oakTree(set, get, x, h + 1, z, rng, ID.birch_log, ID.birch_leaves, 5);
+      else if (b === BIOME.SWAMP) { this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4); for (let k = 0; k < 6; k++) { const vx = x - 2 + (rng() * 5 | 0), vz = z - 2 + (rng() * 5 | 0); for (let vy = h + 7; vy > h + 2; vy--) if (get(vx, vy, vz) === ID.oak_leaves) { for (let d = 1; d <= 2 && get(vx, vy - d, vz) === 0; d++) set(vx, vy - d, vz, ID.oak_leaves); break; } } }
+      else if (b === BIOME.BIRCH || b === BIOME.MEADOW || ((b === BIOME.FOREST || b === BIOME.FLOWER_FOREST) && rng() < 0.25)) this.oakTree(set, get, x, h + 1, z, rng, ID.birch_log, ID.birch_leaves, 5);
       else this.oakTree(set, get, x, h + 1, z, rng, ID.oak_log, ID.oak_leaves, 4);
       set(x, h, z, ID.dirt);
     }
@@ -526,6 +552,7 @@ class World {
       if (this.pyramidChunk && this.pyramidChunk(cx, cz) && !(this.villageAt && this.villageAt(cx, cz))) this.pyramid(set, get, heights, rng, this.genVerAt(cx * 16, cz * 16) >= 4 && fresh);
     }
     if ((center === BIOME.PLAINS || center === BIOME.FOREST) && rng() < 0.08) plant(3, [ID.pumpkin, ID.melon], ID.grass);
+    if (fresh && this.genVerAt(cx * 16, cz * 16) >= 7) this.newBiomeDecor(cx, cz, center, heights, biomes, set, get);
     if (this.buildStructures) this.buildStructures(c, set, get, heights, biomes, rng);
 
     // apply player edits
@@ -535,6 +562,121 @@ class World {
     c.heights = heights;
     this.chunks.set(this.key(cx, cz), c);
     return c;
+  }
+
+  /* what grows in the newest biomes, and the three cave biomes underground (new land only) */
+  newBiomeDecor(cx, cz, center, heights, biomes, set, get) {
+    const B = BIOME, r = mulberry32(hash3(cx, cz, this.seed + 7777));
+    const H = (x, z) => heights[x + z * 16];
+    const plant = (n, ids, onTop) => {
+      for (let i = 0; i < n; i++) {
+        const x = r() * 16 | 0, z = r() * 16 | 0, h = H(x, z);
+        if ((onTop === undefined ? get(x, h, z) === ID.grass : get(x, h, z) === onTop) && get(x, h + 1, z) === 0) set(x, h + 1, z, ids[r() * ids.length | 0]);
+      }
+    };
+    const FLOWERS = [ID.rose, ID.dandelion, ID.allium, ID.tulip_red, ID.tulip_orange, ID.tulip_pink, ID.tulip_white, ID.oxeye_daisy, ID.cornflower, ID.lily_of_the_valley, ID.blue_orchid];
+    if (center === B.SWAMP) {
+      // shallow water everywhere, lily pads on it, blue orchids and mushrooms on land
+      for (let z = 1; z < 15; z++) for (let x = 1; x < 15; x++) {
+        const h = H(x, z);
+        if (h <= SEA + 3 && get(x, h, z) === ID.grass && get(x, h + 1, z) === 0 && this.noiseB.noise2((cx * 16 + x) / 9, (cz * 16 + z) / 9) > -0.1) {
+          let ok = true;
+          for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const n = get(x + a, h, z + b); if (n === 0 || (DEFS[n] && !DEFS[n].solid && n !== ID.water)) ok = false; }
+          if (ok) { set(x, h, z, ID.water); set(x, h - 1, z, ID.dirt); if (r() < 0.12) set(x, h + 1, z, ID.lily_pad); }
+        }
+      }
+      for (let i = 0; i < 6; i++) { const x = r() * 16 | 0, z = r() * 16 | 0, h = Math.max(H(x, z), SEA); if (get(x, h, z) === ID.water && get(x, h + 1, z) === 0) set(x, h + 1, z, ID.lily_pad); }
+      plant(10, [ID.tall_grass]); plant(3, [ID.blue_orchid]); plant(2, [ID.red_mushroom, ID.brown_mushroom]);
+    }
+    if (center === B.MUSHROOM) {
+      plant(5, [ID.red_mushroom, ID.brown_mushroom], ID.mycelium);
+      const n = r() < 0.6 ? 1 : 0;
+      for (let t = 0; t < n; t++) {
+        const x = 4 + (r() * 8 | 0), z = 4 + (r() * 8 | 0), h = H(x, z);
+        if (get(x, h, z) !== ID.mycelium || h + 9 >= GEN_H) continue;
+        const tall = 4 + (r() * 3 | 0), red = r() < 0.5;
+        for (let k = 1; k <= tall; k++) set(x, h + k, z, ID.mushroom_stem);
+        if (red) { // a dome of red caps
+          for (let dy = tall - 2; dy <= tall + 1; dy++) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) {
+            const edge = Math.abs(a) === 2 || Math.abs(b) === 2;
+            if (dy <= tall && !edge) continue; if (dy === tall + 1 && edge) continue; if (Math.abs(a) === 2 && Math.abs(b) === 2) continue;
+            if (get(x + a, h + dy, z + b) === 0) set(x + a, h + dy, z + b, ID.red_mushroom_block);
+          }
+        } else { // a flat brown cap
+          for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) if (!(Math.abs(a) === 3 && Math.abs(b) === 3) && get(x + a, h + tall + 1, z + b) === 0) set(x + a, h + tall + 1, z + b, ID.brown_mushroom_block);
+        }
+      }
+    }
+    if (center === B.BADLANDS) {
+      plant(3, [ID.dead_bush], ID.red_sand);
+      for (let i = 0; i < 2; i++) { const x = 1 + (r() * 14 | 0), z = 1 + (r() * 14 | 0), h = H(x, z); if (get(x, h, z) !== ID.red_sand) continue; for (let k = 1; k <= 1 + (r() * 3 | 0); k++) set(x, h + k, z, ID.cactus); }
+      if (r() < 0.25) { // a tall stripy rock pillar
+        const x = 3 + (r() * 10 | 0), z = 3 + (r() * 10 | 0), h = H(x, z), tall = 4 + (r() * 8 | 0);
+        if (get(x, h, z) === ID.red_sand) for (let a = 0; a <= 1; a++) for (let b = 0; b <= 1; b++) for (let k = 1; k <= tall - (a + b); k++) set(x + a, h + k, z + b, this.BAND[(h + k) % this.BAND.length]);
+      }
+      // gold lies near the surface in the badlands, like Minecraft
+      for (let v = 0; v < 4; v++) { const x = r() * 16 | 0, z = r() * 16 | 0, y = 20 + (r() * 30 | 0); if (get(x, y, z) === ID.stone) set(x, y, z, ID.gold_ore); }
+    }
+    if (center === B.ICE_SPIKES && r() < 0.7) {
+      const x = 3 + (r() * 10 | 0), z = 3 + (r() * 10 | 0), h = H(x, z), tall = r() < 0.15 ? 18 + (r() * 10 | 0) : 6 + (r() * 8 | 0), wide = tall > 15 ? 2 : 1;
+      if (h + tall < GEN_H - 2) for (let k = 1; k <= tall; k++) {
+        const w = Math.max(0, Math.round(wide * (1 - k / tall)));
+        for (let a = -w; a <= w; a++) for (let b = -w; b <= w; b++) if (Math.abs(a) + Math.abs(b) <= w + 0.5) set(x + a, h + k, z + b, ID.packed_ice);
+      }
+    }
+    if (center === B.FROZEN_OCEAN && r() < 0.15) { // an iceberg
+      const x = 4 + (r() * 8 | 0), z = 4 + (r() * 8 | 0), rad = 2 + (r() * 2 | 0), tall = 3 + (r() * 6 | 0);
+      for (let k = -3; k <= tall; k++) { const w = k < 0 ? rad : Math.round(rad * (1 - k / (tall + 1))); for (let a = -w; a <= w; a++) for (let b = -w; b <= w; b++) if (a * a + b * b <= w * w + 1) set(x + a, SEA + k, z + b, r() < 0.15 ? ID.blue_ice : ID.packed_ice); }
+    }
+    if (center === B.WARM_OCEAN) { // coral reefs on the sea floor
+      const CORAL = [ID.coral_block_tube, ID.coral_block_brain, ID.coral_block_bubble, ID.coral_block_fire, ID.coral_block_horn];
+      for (let i = 0; i < 14; i++) {
+        const x = r() * 16 | 0, z = r() * 16 | 0, h = H(x, z);
+        if (h >= SEA - 2 || get(x, h + 1, z) !== ID.water) continue;
+        const c = CORAL[r() * 5 | 0], tall = 1 + (r() * 3 | 0);
+        for (let k = 1; k <= tall && h + k < SEA - 1; k++) set(x, h + k, z, c);
+        if (r() < 0.5 && get(x + 1, h + 1, z) === ID.water) set(x + 1, h + 1, z, CORAL[r() * 5 | 0]);
+      }
+    }
+    if (center === B.FLOWER_FOREST) { plant(10, [ID.tall_grass]); plant(40, FLOWERS); }
+    if (center === B.MEADOW) { plant(30, [ID.tall_grass]); plant(14, [ID.allium, ID.cornflower, ID.oxeye_daisy, ID.dandelion, ID.rose]); }
+    if (center === B.SUNFLOWER_PLAINS) { plant(24, [ID.tall_grass]); plant(14, [ID.sunflower]); plant(3, [ID.oxeye_daisy, ID.tulip_red, ID.dandelion]); }
+    if (center === B.PLAINS || center === B.FOREST) plant(2, [ID.tulip_red, ID.tulip_orange, ID.oxeye_daisy, ID.cornflower, ID.allium, ID.lily_of_the_valley]);
+
+    // underground: lush caves, dripstone caves and the deep dark
+    const cave = this.caveKind(cx * 16 + 8, cz * 16 + 8);
+    const stoneLike = id => id === ID.stone || id === ID.deepslate || id === ID.dirt || id === ID.gravel;
+    for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
+      const top = H(x, z) - 6;
+      for (let y = 7; y < top; y++) {
+        if (get(x, y, z) !== 0) continue;
+        const below = get(x, y - 1, z), above = get(x, y + 1, z);
+        const kind = y <= 16 && this.deepDark(cx * 16 + x, cz * 16 + z) ? B.DEEP_DARK : cave;
+        if (kind === B.DEEP_DARK) {
+          if (stoneLike(below) && r() < 0.8) { set(x, y - 1, z, ID.sculk); if (r() < 0.025 && get(x, y + 1, z) === 0) set(x, y, z, ID.sculk_sensor); }
+          if (stoneLike(above) && r() < 0.5) set(x, y + 1, z, ID.sculk);
+        } else if (kind === B.LUSH_CAVES) {
+          if (stoneLike(below)) { set(x, y - 1, z, ID.moss_block); const q = r(); if (q < 0.06) set(x, y, z, ID.azalea); else if (q < 0.09) set(x, y, z, ID.flowering_azalea); else if (q < 0.25) set(x, y, z, ID.tall_grass); else if (q < 0.27) { set(x, y - 1, z, ID.clay); } }
+          else if (stoneLike(above)) { if (r() < 0.5) set(x, y + 1, z, ID.moss_block); if (r() < 0.12) for (let k = 0; k < 1 + (r() * 4 | 0) && get(x, y - k, z) === 0; k++) set(x, y - k, z, ID.cave_vines); }
+        } else if (kind === B.DRIPSTONE_CAVES) {
+          if (stoneLike(below)) { if (r() < 0.45) set(x, y - 1, z, ID.dripstone_block); if (r() < 0.1) set(x, y, z, ID.pointed_dripstone); }
+          else if (stoneLike(above)) { if (r() < 0.45) set(x, y + 1, z, ID.dripstone_block); if (r() < 0.12) set(x, y, z, ID.pointed_dripstone); }
+        }
+      }
+    }
+  }
+  caveKind(x, z) {
+    const S = this.style, sx = x + S.ox, sz = z + S.oz;
+    if (this.noiseB.fbm2(sx / 150 + 2200, sz / 150 - 1700, 2) > 0.22) return BIOME.LUSH_CAVES;
+    if (this.noiseC.fbm2(sx / 150 - 2900, sz / 150 + 3100, 2) > 0.24) return BIOME.DRIPSTONE_CAVES;
+    return -1;
+  }
+  deepDark(x, z) { const S = this.style; return this.noise.fbm2((x + S.ox) / 120 + 5100, (z + S.oz) / 120 - 5100, 2) > 0.2; }
+  /* which cave biome is here, deep underground (for the F3 screen and the mobs) */
+  caveBiomeAt(x, y, z) {
+    if (this.dim !== 'overworld' || !this.fresh7(x, z) || y > this.heightAt(Math.floor(x), Math.floor(z)) - 8) return -1;
+    if (y <= 16 && this.deepDark(Math.floor(x), Math.floor(z))) return BIOME.DEEP_DARK;
+    return this.caveKind((Math.floor(x) >> 4) * 16 + 8, (Math.floor(z) >> 4) * 16 + 8);
   }
 
   /* the End: one big island of end stone floating over the void, ringed by obsidian pillars */

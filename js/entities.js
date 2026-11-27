@@ -277,6 +277,8 @@ const MORE_MOBS = {
     M: { body: [1.0, 1.0, 1.0], by: 0.5, col: 0x3a1a10, legs: 0, head: null, glow: 0x401000, x: [[1.02, 0.12, 1.02, 0xe85a1a, 0, 0.3, 0], [1.02, 0.12, 1.02, 0xe85a1a, 0, 0.7, 0], [0.18, 0.12, 0.02, 0xffc030, -0.22, 0.6, 0.51], [0.18, 0.12, 0.02, 0xffc030, 0.22, 0.6, 0.51]] } },
   phantom: { T: { name: 'Phantom', hp: 20, w: 0.9, h: 0.5, speed: 4, hostile: true, nightOnly: true, burns: true, fly: 1, dmg: 3, xp: 5, drops: [['phantom_membrane', 0, 1]] },
     M: { body: [0.5, 0.25, 0.9], by: 0.25, col: 0x2a3a6a, legs: 0, head: [0.4, 0.22, 0.4], hy: 0.25, hz: 0.6, x: [[0.9, 0.04, 0.5, 0x3a4a7a, -0.68, 0.32, 0], [0.9, 0.04, 0.5, 0x3a4a7a, 0.68, 0.32, 0], [0.25, 0.04, 0.4, 0x3a4a7a, 0, 0.25, -0.6]], eye: '#7aff3a' } },
+  warden: { T: { name: 'Warden', hp: 500, w: 0.9, h: 2.9, speed: 2.2, hostile: true, dmg: 16, xp: 5, drops: [['sculk_sensor', 1, 1]] },
+    M: { body: [1.2, 1.2, 0.7], by: 1.95, col: 0x0e3a4a, legs: 2, leg: [0.4, 1.35], legCol: 0x0a2a38, head: [0.95, 0.85, 0.75], hy: 2.95, hz: 0.05, headCol: 0x0e3a4a, x: [[0.35, 1.5, 0.35, 0x0a2a38, -0.8, 1.75, 0], [0.35, 1.5, 0.35, 0x0a2a38, 0.8, 1.75, 0], [0.12, 0.5, 0.12, 0x2ad8e8, -0.55, 3.45, 0], [0.12, 0.5, 0.12, 0x2ad8e8, 0.55, 3.45, 0], [0.5, 0.5, 0.05, 0x3ae8f8, 0, 2.1, 0.36]], eye: '#0e3a4a' } },
   hoglin: { T: { name: 'Hoglin', hp: 40, w: 1.4, h: 1.4, speed: 2.4, hostile: true, dmg: 6, xp: 5, drops: [['porkchop', 2, 4], ['leather', 0, 1]] },
     M: { body: [0.9, 0.85, 1.5], by: 1.0, col: 0xc87a5a, leg: [0.3, 0.6], legCol: 0x8a5a3a, head: [0.7, 0.6, 0.7], hy: 1.0, hz: 1.0, x: [[0.1, 0.35, 0.1, 0xf4f0e0, -0.3, 0.9, 1.4], [0.1, 0.35, 0.1, 0xf4f0e0, 0.3, 0.9, 1.4], [0.12, 0.6, 1.2, 0xe8c070, 0, 1.6, 0]], eye: '#222' } },
 };
@@ -303,7 +305,10 @@ function buildMoreModel(type, g, P) {
   const [bw, bh, bd] = M.body;
   addBox(g, bw, bh, bd, mat(M.col), 0, M.by, 0);
   const legs = M.legs === 0 ? 0 : 4;
-  if (legs && M.leg) {
+  if (M.legs === 2) {
+    const [lw, ll] = M.leg, lm = mat(M.legCol || M.col);
+    for (const x of [-bw / 4, bw / 4]) P.legs.push(limb(g, lw, ll, lw, lm, x, ll, 0));
+  } else if (legs && M.leg) {
     const [lw, ll] = M.leg, lx = bw / 2 - lw / 2 - 0.02, lz = bd / 2 - lw / 2 - 0.04, lm = mat(M.legCol || M.col);
     for (const [x, z] of [[-lx, lz], [lx, lz], [-lx, -lz], [lx, -lz]]) P.legs.push(limb(g, lw, ll, lw, lm, x, ll, z));
   }

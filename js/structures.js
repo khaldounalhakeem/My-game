@@ -31,7 +31,7 @@ World.prototype.pyramidChunk = function (cx, cz) {
     for (let t = 0; t < 16 && !spot; t++) {
       const px = gx * CELL + 1 + (r() * (CELL - GAP) | 0), pz = gz * CELL + 1 + (r() * (CELL - GAP) | 0);
       const wx = px * 16 + 8, wz = pz * 16 + 8, h = this.heightAt(wx, wz);
-      if (this.biomeAt(wx, wz, h) === BIOME.DESERT && h > SEA + 1 && !(this.oldGen && this.oldGen.has(this.key(px, pz)))) spot = [px, pz];
+      if (this.baseBiomeAt(wx, wz, h) === BIOME.DESERT && h > SEA + 1 && !(this.oldGen && this.oldGen.has(this.key(px, pz)))) spot = [px, pz];
     }
     this.pyramidCache.set(key, spot);
   }
@@ -56,7 +56,7 @@ World.prototype.spotPick = function (cx, cz, kind) {
     for (let t = 0; t < S.tries && !spot; t++) {
       const px = gx * S.cell + 1 + (r() * (S.cell - S.gap) | 0), pz = gz * S.cell + 1 + (r() * (S.cell - S.gap) | 0);
       const wx = px * 16 + 8, wz = pz * 16 + 8, h = this.heightAt(wx, wz);
-      if (h > SEA + 1 && S.ok(this.biomeAt(wx, wz, h)) && !(this.oldGen && this.oldGen.has(this.key(px, pz)))) spot = [px, pz];
+      if (h > SEA + 1 && S.ok(this.baseBiomeAt(wx, wz, h)) && !(this.oldGen && this.oldGen.has(this.key(px, pz)))) spot = [px, pz];
     }
     this.spotCache.set(key, spot);
   }
@@ -75,7 +75,7 @@ World.prototype.villageAt = function (cx, cz) {
     // try a few spots in this square until one is on land a village can be built on
     for (let tries = 0; tries < 6 && !v; tries++) {
       const ccx = gx * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0), ccz = gz * VILLAGE_CELL + 2 + (r() * (VILLAGE_CELL - VILLAGE_GAP) | 0);
-      const wx = ccx * 16 + 8, wz = ccz * 16 + 8, h = this.heightAt(wx, wz), b = this.biomeAt(wx, wz, h);
+      const wx = ccx * 16 + 8, wz = ccz * 16 + 8, h = this.heightAt(wx, wz), b = this.baseBiomeAt(wx, wz, h);
       const style = { [BIOME.PLAINS]: 'oak', [BIOME.FOREST]: 'oak', [BIOME.BIRCH]: 'oak', [BIOME.DESERT]: 'sand', [BIOME.SAVANNA]: 'oak', [BIOME.SNOWY]: 'spruce', [BIOME.TAIGA]: 'spruce' }[b];
       const big = r() < 0.5;
       if (style && h > SEA + 1) v = { cx: ccx, cz: ccz, style, radius: 1 + (big ? 1 : 0), x: wx, z: wz };
@@ -100,7 +100,7 @@ World.prototype.mineshaftAt = function (cx, cz) {
 World.prototype.buildStructures = function (c, set, get, heights, biomes, rng) {
   const cx = c.cx, cz = c.cz;
   const H = (x, z) => heights[clamp(x, 0, 15) + clamp(z, 0, 15) * 16];
-  const center = biomes[136];
+  const center = this.baseBiomeAt(cx * 16 + 8, cz * 16 + 8, heights[136]);
   c.spawners = [];
   const S = { set, get, H, rng, c };
 
