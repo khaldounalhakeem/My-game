@@ -1352,6 +1352,31 @@ G.applyMenuSet = () => {
   G.menuSet = {}; G.saveMenuSet();
   G.ui.message('The settings you picked on the main menu are on in this world.', 'gold');
 };
+/* the castle in Nabil and Omar's world: fill its chests and write its signs the first time */
+G.castleSetup = () => {
+  const ow = G.worlds && G.worlds.overworld;
+  if (!ow || ow.seed !== CASTLE.seed || typeof castleData !== 'function') return;
+  const K = castleData(), C = CASTLE;
+  G.chests = G.chests || {};
+  for (const [x, y, z, items] of K.chests) {
+    const k = 'overworld:' + (C.x + x) + ',' + (C.y + y) + ',' + (C.z + z);
+    if (G.chests[k] !== undefined) continue;
+    const sl = new Array(27).fill(null);
+    let i = 0;
+    for (const [key, n] of items) { const id = ID[key]; if (id === undefined || i >= 27) continue; sl[i++] = { id, count: Math.min(n, DEFS[id].stack || 64) }; }
+    G.chests[k] = sl;
+  }
+  for (const [x, y, z, lines] of K.signs) {
+    const k = 'overworld:' + (C.x + x) + ',' + (C.y + y) + ',' + (C.z + z);
+    if (G.signs[k] === undefined) { G.signs[k] = G.cleanSignText(lines); if (G.dim === 'overworld') G.drawSign(k); }
+  }
+  try {
+    if (localStorage.getItem('blockrealm-castle-told') !== '1') {
+      localStorage.setItem('blockrealm-castle-told', '1');
+      setTimeout(() => G.ui.message('Your castle is ready! Go to X ' + C.x + ', Z ' + (C.z + 34) + ' (the gate). Show Coordinates is on.', 'gold'), 6000);
+    }
+  } catch (e) { /* storage unavailable */ }
+};
 /* Nabil's enchanted netherite pickaxe and sword, taken by an allay: given back once */
 G.giveBackAllayLoot = () => {
   try {
@@ -3388,7 +3413,7 @@ G.setState = (s) => {
   const was = G.state;
   G.state = s;
   document.body.dataset.state = s;
-  if (s === 'play' && was !== 'paused' && G.world && G.player && G.applyMenuSet) { G.applyMenuSet(); setTimeout(() => G.state === 'play' && G.giveBackAllayLoot(), 3000); }
+  if (s === 'play' && was !== 'paused' && G.world && G.player && G.applyMenuSet) { G.applyMenuSet(); G.castleSetup(); setTimeout(() => G.state === 'play' && G.giveBackAllayLoot(), 3000); }
 };
 G.lock = () => {
   if (Input.touch || Input.fallback || Pad.active) return;

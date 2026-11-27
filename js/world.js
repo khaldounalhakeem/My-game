@@ -574,6 +574,8 @@ class World {
     if (fresh && this.genVerAt(cx * 16, cz * 16) >= 10 && !(this.opts && this.opts.structures === false)) this.bigStructures(cx, cz, c, set, get, heights, biomes);
     if (this.buildStructures && !(this.opts && this.opts.structures === false)) this.buildStructures(c, set, get, heights, biomes, rng);
 
+    // Nabil and Omar's castle (only in their world)
+    if (typeof castleChunk === 'function') castleChunk(this, cx, cz, d);
     // apply player edits
     const m = this.edits.get(this.key(cx, cz));
     if (m) for (const [i, id] of m) d[i] = id;
