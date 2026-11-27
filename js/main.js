@@ -298,6 +298,7 @@ function updateSky(dt) {
   else if (P.inLava && G.state !== 'title') { fogCol.copy(C_LAVA); near = 0.2; far = 3; }
   G.scene.background = skyCol;
   G.scene.fog.color.copy(fogCol);
+  if (P.fx && P.fx('darkness')) { const pulse = 0.55 + 0.45 * Math.sin(performance.now() / 600); near = 1; far = Math.min(far, 5 + 9 * pulse); fogCol.setRGB(0, 0, 0); G.scene.fog.color.copy(fogCol); }
   G.scene.fog.near = near; G.scene.fog.far = far;
   let bright = (0.22 + 0.78 * dl) * (1 - ug * 0.55);
   if (P.fx && P.fx('night_vision')) bright = Math.max(bright, 0.95);
@@ -476,6 +477,7 @@ G.tickAmbient = (dt) => {
       else if (d.copper !== undefined && d.copper < 3 && Math.random() < 0.0004) { W.setBlock(x, y, z, ID[['', 'exposed_', 'weathered_', 'oxidized_'][d.copper + 1] + d.copperKind]); continue; }
       else if (id === ID.end_rod) kind = 'endrod';
       else if (id === ID.end_gateway) kind = 'portal';
+      else if (id === ID.sculk_shrieker) kind = 'shrieker';
       else if (d.hopper) kind = 'hopper';
       else if (d.jukebox) kind = 'juke';
       else if (d.frame) kind = 'frame';
@@ -502,6 +504,18 @@ G.tickAmbient = (dt) => {
       case 'lavatop': if (r() < dt * 0.15) { PT.burst(x + 0.5, y + 1, z + 0.5, [0xff8a1a, 0xffd04a, 0x333333], 4, 1.5, 0.08); if (P.pos.distanceTo(new THREE.Vector3(x, y, z)) < 10 && r() < 0.3) Sound.play('dig', new THREE.Vector3(x, y, z), ID.lava); } break;
       case 'dripw': case 'dripl': if (r() < dt * 0.25) PT.spawn(x + 0.2 + r() * 0.6, y - 0.05, z + 0.2 + r() * 0.6, kind === 'dripw' ? 0x3a6ad8 : 0xff7a1a, 0, 0, 0, 0.06, 1.2, 9); break;
       case 'hopper': if (hopNow) G.tickHopper(x, y, z, d); break;
+      case 'shrieker': {
+        // a shrieker hears you walking nearby: it screams, it goes dark, and after a few warnings the warden comes
+        const moving = !P.sneaking && Math.hypot(P.vel.x, P.vel.z) > 0.6, near = Math.hypot(P.pos.x - x - 0.5, P.pos.y - y, P.pos.z - z - 0.5) < 8;
+        if (near && moving && P.mode === 'survival' && performance.now() > (G.shriekAt || 0)) {
+          G.shriekAt = performance.now() + 10000; G.warnings = (G.warnings || 0) + 1;
+          Sound.play('mob_phantom', new THREE.Vector3(x, y, z)); P.addEffect('darkness', 1, 12);
+          G.particles.burst(x + 0.5, y + 1, z + 0.5, [0x2ad8e8, 0x0e3a4a], 14, 1.5, 0.12, -1);
+          if (G.warnings >= 4 && !G.mobs.some(m => m.type === 'warden' && !m.dead)) { G.warnings = 0; for (let t = 0; t < 10; t++) { const wx = x + (Math.random() * 10 | 0) - 5, wz = z + (Math.random() * 10 | 0) - 5; if (!W.getBlock(wx, y, wz) && !W.getBlock(wx, y + 1, wz) && !W.getBlock(wx, y + 2, wz)) { const w = spawnMob('warden', wx + 0.5, y, wz + 0.5); w.anger = 80; G.ui.message('The Warden is coming out of the ground!', 'purple'); break; } } }
+          else G.ui.message(['The shrieker screamed...', 'Something heard that...', 'It is getting closer...'][Math.min(2, G.warnings - 1)], 'purple');
+        }
+        break;
+      }
       case 'juke': G.tickJuke(x, y, z); break;
       case 'frame': G.tickFrame(x, y, z, d, frames); break;
       case 'endrod': if (r() < dt * 0.8) PT.spawn(x + 0.5, y + 0.5 + r() * 0.5, z + 0.5, 0xffffff, (r() - 0.5) * 0.6, (r() - 0.5) * 0.4, (r() - 0.5) * 0.6, 0.05, 1.5, 0); break;
@@ -1509,6 +1523,9 @@ G.chestKind = (x, y, z) => {
     if (b === ID.bookshelf) shelves++;
   }
   const cx = Math.floor(x / 16), cz = Math.floor(z / 16);
+  if (G.dim === 'overworld' && y <= 12 && W.deepDark && W.deepDark(x, z)) return 'ancient_city';
+  if (G.dim === 'nether') { for (let dy = -3; dy <= 3; dy++) for (let d = -3; d <= 3; d++) if (W.getBlock(x + d, y + dy, z) === ID.gilded_blackstone || W.getBlock(x, y + dy, z + d) === ID.polished_blackstone_bricks) return 'bastion'; }
+  if (G.dim === 'overworld') { let dk = 0; for (let d = -3; d <= 3; d++) { if (W.getBlock(x + d, y, z) === ID.dark_oak_log || W.getBlock(x + d, y - 1, z) === ID.birch_planks) dk++; } if (dk >= 3 && W.getBlock(x, y - 1, z) === ID.birch_planks || W.getBlock(x, y - 1, z) === ID.cobblestone && dk >= 2) return 'mansion'; }
   // a village building: what is in the room says whose chest it is
   if (G.dim === 'overworld' && y > SEA - 3 && W.villageAt && W.villageAt(cx, cz)) {
     const n = {};
@@ -2158,6 +2175,9 @@ function netherSpawn(hostile) {
       }
     }
     if (y < 0) continue;
+    // piglins and piglin brutes guard bastions
+    const bc = W.chunks.get(W.key(x >> 4, z >> 4));
+    if (bc && bc.bastion && Math.random() < 0.5) { spawnMob(Math.random() < 0.3 ? 'piglin_brute' : 'piglin', bc.bastion.x + (Math.random() * 16 | 0) - 8, bc.bastion.y, bc.bastion.z + (Math.random() * 16 | 0) - 8); break; }
     // like Minecraft: blazes and wither skeletons only live in nether fortresses
     if (type === 'blaze' || type === 'wither_skeleton') {
       let brick = false;
@@ -2200,6 +2220,11 @@ function structureSpawns() {
       const M = c.monument, k = 'mon:' + M.x + ',' + M.z; G.deadShulkers = G.deadShulkers || {};
       if ((G.deadShulkers[k] || 0) < 3 && Math.random() < 0.1 && !G.mobs.some(m => m.type === 'elder_guardian' && !m.dead && Math.hypot(m.pos.x - M.x, m.pos.z - M.z) < 30)) { const m = spawnMob('elder_guardian', M.x + 0.5, M.y, M.z + 3.5); m.spotKey = k; }
       if (Math.random() < 0.15 && G.mobs.filter(m => m.type === 'guardian' && !m.dead && Math.hypot(m.pos.x - M.x, m.pos.z - M.z) < 30).length < 5) spawnMob('guardian', M.x + (Math.random() - 0.5) * 30, M.y + 3, M.z + (Math.random() - 0.5) * 30);
+    }
+    // the woodland mansion's residents
+    if (c.mansion && G.diff().mobs > 0 && Math.hypot(P.pos.x - c.mansion.x, P.pos.z - c.mansion.z) < 48 && Math.random() < 0.15 && G.mobs.filter(m => (m.type === 'vindicator' || m.type === 'evoker' || m.type === 'allay') && !m.dead && Math.hypot(m.pos.x - c.mansion.x, m.pos.z - c.mansion.z) < 24).length < 6) {
+      const M = c.mansion, f = Math.random() * 3 | 0, q = Math.random();
+      spawnMob(q < 0.6 ? 'vindicator' : q < 0.85 ? 'evoker' : 'allay', M.x + 5 + (Math.random() * 6 | 0), M.y + f * 5, M.z + 4 + (Math.random() * 4 | 0));
     }
     // a witch lives in the swamp hut
     if (c.witchHut && G.diff().mobs > 0 && Math.random() < 0.2 && Math.hypot(P.pos.x - c.witchHut.x, P.pos.z - c.witchHut.z) < 48 && Math.hypot(P.pos.x - c.witchHut.x, P.pos.z - c.witchHut.z) > 6 && !G.mobs.some(m => m.type === 'witch' && !m.dead && Math.hypot(m.pos.x - c.witchHut.x, m.pos.z - c.witchHut.z) < 12)) spawnMob('witch', c.witchHut.x, c.witchHut.y, c.witchHut.z);
@@ -2471,6 +2496,9 @@ G.tickTrial = (x, y, z) => {
   // monsters that ran off or vanished still count, so the trial can always be finished
   if (T.spawned > T.killed + alive) T.killed = T.spawned - alive;
 };
+LOOT_TABLES.ancient_city = [5, 10, [['echo_shard', 1, 3, 20], ['enchanted_golden_apple', 1, 1, 2], ['enchanted_book', 1, 1, 12], ['diamond_leggings', 1, 1, 4], ['diamond_hoe', 1, 1, 6], ['lead', 1, 1, 8], ['name_tag', 1, 1, 8], ['golden_apple', 1, 2, 10], ['bone', 1, 15, 15], ['soul_torch', 1, 15, 10], ['candle', 1, 4, 10], ['amethyst_shard', 1, 15, 8], ['disc_13', 1, 1, 4], ['disc_cat', 1, 1, 4], ['sculk', 4, 10, 10], ['iron_leggings', 1, 1, 6]]];
+LOOT_TABLES.bastion = [4, 8, [['netherite_scrap', 1, 1, 6], ['ancient_debris', 1, 2, 5], ['gold_block', 1, 2, 8], ['gold_ingot', 3, 9, 20], ['diamond', 1, 3, 6], ['diamond_sword', 1, 1, 4], ['diamond_chestplate', 1, 1, 3], ['crying_obsidian', 2, 6, 10], ['magma_cream', 2, 6, 10], ['obsidian', 4, 6, 10], ['disc_pigstep', 1, 1, 2], ['golden_carrot', 4, 12, 10], ['enchanted_golden_apple', 1, 1, 1]]];
+LOOT_TABLES.mansion = [3, 7, [['diamond_chestplate', 1, 1, 3], ['enchanted_book', 1, 1, 10], ['golden_apple', 1, 1, 15], ['enchanted_golden_apple', 1, 1, 2], ['lead', 1, 1, 15], ['name_tag', 1, 1, 15], ['disc_13', 1, 1, 10], ['disc_cat', 1, 1, 10], ['iron_hoe', 1, 1, 10], ['bread', 1, 1, 20], ['wheat', 1, 4, 20], ['redstone', 1, 4, 15], ['emerald', 1, 4, 10], ['totem_of_undying', 1, 1, 2]]];
 LOOT_TABLES.vault = [2, 4, [['emerald', 2, 5, 20], ['diamond', 1, 2, 8], ['golden_apple', 1, 1, 8], ['enchanted_golden_apple', 1, 1, 1], ['heavy_core', 1, 1, 3], ['wind_charge', 4, 12, 15], ['enchanted_book', 1, 1, 10], ['iron_chestplate', 1, 1, 6], ['diamond_axe', 1, 1, 3], ['arrow', 8, 16, 10], ['golden_carrot', 2, 6, 10], ['disc_pigstep', 1, 1, 2], ['disc_far', 1, 1, 2]]];
 G.openVault = (x, y, z) => {
   const W = G.world;

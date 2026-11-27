@@ -684,6 +684,10 @@ class World {
       if (t && Math.abs(t.x - (cx * 16 + 8)) < 40 && Math.abs(t.z - (cz * 16 + 8)) < 40) this.buildTrial(t, put, c, cx, cz);
       const m = this.monumentAt(gx, gz);
       if (m && Math.abs(m.x - (cx * 16 + 8)) < 40 && Math.abs(m.z - (cz * 16 + 8)) < 40) this.buildMonument(m, put, c, cx, cz);
+      const a = this.ancientCityAt(gx, gz);
+      if (a && Math.abs(a.x - (cx * 16 + 8)) < 48 && Math.abs(a.z - (cz * 16 + 8)) < 48) this.buildAncientCity(a, put, c, cx, cz);
+      const w = this.mansionAt(gx, gz);
+      if (w && Math.abs(w.x - (cx * 16 + 8)) < 40 && Math.abs(w.z - (cz * 16 + 8)) < 40) this.buildMansion(w, put, c, cx, cz);
     }
     // a little buried archaeology: suspicious sand in deserts and warm seas, suspicious gravel in old ruins
     const r = mulberry32(hash3(cx, cz, this.seed + 1212)), center = biomes[136];
@@ -718,6 +722,127 @@ class World {
       this.monCache.set(key, m);
     }
     return this.monCache.get(key);
+  }
+  ancientCityAt(gx, gz) {
+    this.acCache = this.acCache || new Map();
+    const key = 'a' + gx + ',' + gz;
+    if (!this.acCache.has(key)) {
+      const r = mulberry32(hash3(gx, gz, this.seed + 919));
+      let a = null;
+      for (let t = 0; t < 16 && !a; t++) {
+        const x = (gx * 24 + 4 + (r() * 16 | 0)) * 16 + 8, z = (gz * 24 + 4 + (r() * 16 | 0)) * 16 + 8;
+        if (this.deepDark(x, z) && this.deepDark(x + 30, z) && this.deepDark(x - 30, z) && this.heightAt(x, z) > SEA + 4 && this.genVerAt(x, z) >= 10 && this.fresh7(x, z)) a = { x, z, y: 6 };
+      }
+      this.acCache.set(key, a);
+    }
+    return this.acCache.get(key);
+  }
+  mansionAt(gx, gz) {
+    this.wmCache = this.wmCache || new Map();
+    const key = 'w' + gx + ',' + gz;
+    if (!this.wmCache.has(key)) {
+      const r = mulberry32(hash3(gx, gz, this.seed + 1020));
+      let w = null;
+      for (let t = 0; t < 20 && !w; t++) {
+        const x = (gx * 24 + 3 + (r() * 18 | 0)) * 16 + 8, z = (gz * 24 + 3 + (r() * 18 | 0)) * 16 + 8, h = this.heightAt(x, z);
+        if (r() < 0.6 && this.biomeAt(x, z, h) === BIOME.DARK_FOREST && this.biomeAt(x + 14, z + 14, this.heightAt(x + 14, z + 14)) === BIOME.DARK_FOREST && h > SEA + 2 && this.genVerAt(x, z) >= 10 && this.fresh7(x, z)) w = { x, z, y: h + 1 };
+      }
+      this.wmCache.set(key, w);
+    }
+    return this.wmCache.get(key);
+  }
+  /* an ancient city deep in the dark: a huge cave with a strange stone gateway, little houses with treasure, and shriekers that call the warden */
+  buildAncientCity(a, put, c, cx, cz) {
+    const { x: ox, y: oy, z: oz } = a, r = mulberry32(hash3(ox, oz, this.seed + 3));
+    const mine = (x, z) => Math.floor(x / 16) === cx && Math.floor(z / 16) === cz;
+    for (let dx = -40; dx <= 40; dx++) for (let dz = -30; dz <= 30; dz++) {
+      const e = (dx / 41) ** 2 + (dz / 31) ** 2; if (e > 1) continue;
+      const roof = oy + 6 + Math.floor((1 - e) * 16);
+      for (let y = oy - 1; y <= roof; y++) put(ox + dx, y, oz + dz, y === oy - 1 ? ID.deepslate : y === oy ? ((dx + dz) % 7 === 0 ? ID.sculk : ID.deepslate_tiles) : y === roof ? ID.sculk : 0);
+    }
+    // the gateway in the middle: a big frame of reinforced deepslate
+    for (let dx = -10; dx <= 10; dx++) for (let k = 1; k <= 13; k++) {
+      const side = Math.abs(dx) >= 8, top = k >= 11;
+      if (side || top) for (let dz = -1; dz <= 1; dz++) put(ox + dx, oy + k, oz + dz, Math.abs(dx) === 10 || k === 13 ? ID.reinforced_deepslate : ID.deepslate_bricks);
+    }
+    for (let dx = -12; dx <= 12; dx++) for (let dz = -3; dz <= 3; dz++) put(ox + dx, oy, oz + dz, ID.polished_deepslate);
+    // houses around it
+    c.shriekers = c.shriekers || [];
+    for (let i = 0; i < 10; i++) {
+      const hx = ox + (r() < 0.5 ? -1 : 1) * (14 + (r() * 18 | 0)), hz = oz + (r() * 40 | 0) - 20;
+      for (let a2 = -3; a2 <= 3; a2++) for (let b = -3; b <= 3; b++) for (let k = 1; k <= 5; k++) {
+        const edge = Math.abs(a2) === 3 || Math.abs(b) === 3;
+        put(hx + a2, oy + k, hz + b, k === 5 ? ID.deepslate_tiles : edge ? (k === 1 && a2 === 0 && b === -3 ? 0 : k === 2 && a2 === 0 && b === -3 ? 0 : ID.deepslate_bricks) : 0);
+      }
+      put(hx + 2, oy + 1, hz + 2, ID.chest_loot); put(hx - 2, oy + 1, hz + 2, r() < 0.5 ? ID.candle_lit : ID.soul_lantern);
+      const sx = hx + (r() < 0.5 ? 5 : -5), sz = hz;
+      put(sx, oy + 1, sz, ID.sculk_shrieker);
+      if (mine(sx, sz)) c.shriekers.push([sx, oy + 1, sz]);
+      put(hx, oy + 1, hz + 5, ID.sculk_sensor);
+    }
+    for (let i = 0; i < 12; i++) put(ox + (r() * 70 | 0) - 35, oy + 1, oz + (r() * 50 | 0) - 25, ID.soul_lantern);
+  }
+  /* a woodland mansion: a big dark oak house in the dark forest, with vindicators, evokers and allays inside */
+  buildMansion(w, put, c, cx, cz) {
+    const { x: ox, y: oy, z: oz } = w, DP = ID.dark_oak_planks, DL = ID.dark_oak_log, CB = ID.cobblestone, BI = ID.birch_planks, r = mulberry32(hash3(ox, oz, this.seed + 5));
+    const W2 = 15, D2 = 12, FLOORS = 3, FH = 5;
+    for (let a = -W2 - 1; a <= W2 + 1; a++) for (let b = -D2 - 1; b <= D2 + 1; b++) for (let y = oy - 4; y < oy; y++) put(ox + a, y, oz + b, CB);
+    for (let f = 0; f < FLOORS; f++) {
+      const y0 = oy + f * FH;
+      for (let a = -W2; a <= W2; a++) for (let b = -D2; b <= D2; b++) for (let k = 0; k < FH; k++) {
+        const edgeA = Math.abs(a) === W2, edgeB = Math.abs(b) === D2, corner = edgeA && edgeB;
+        let id = 0;
+        if (k === 0) id = f === 0 ? CB : BI;
+        else if (corner || (edgeA && b % 6 === 0) || (edgeB && a % 6 === 0)) id = DL;
+        else if (edgeA || edgeB) id = k === 2 && (a + b) % 3 !== 0 ? ID.glass : DP;
+        else if ((a === 0 || b === 0) && k < FH - 1 && !(Math.abs(a) < 2 && Math.abs(b) < 2) && !((a === 0 && Math.abs(b) % 6 === 3) || (b === 0 && Math.abs(a) % 6 === 3))) id = DP;
+        put(ox + a, y0 + k, oz + b, id);
+      }
+      // a few things in each room
+      for (const [qa, qb] of [[-8, -6], [8, -6], [-8, 6], [8, 6]]) {
+        const q = r();
+        put(ox + qa, y0 + 1, oz + qb, q < 0.35 ? ID.chest_loot : q < 0.6 ? ID.bookshelf : q < 0.8 ? ID.crafting_table : ID.carpet_red);
+        put(ox + qa + 1, y0 + 1, oz + qb, ID.carpet_red);
+      }
+    }
+    // a roof
+    for (let k = 0; k <= 6; k++) for (let a = -W2 - 1 + k; a <= W2 + 1 - k; a++) for (let b = -D2 - 1 + k; b <= D2 + 1 - k; b++) put(ox + a, oy + FLOORS * FH + k, oz + b, k === 6 || Math.abs(a) === W2 + 1 - k || Math.abs(b) === D2 + 1 - k ? DP : 0);
+    // the front door and stairs up (ladders in the middle)
+    for (let k = 1; k <= 3; k++) { put(ox, oy + k, oz - D2, 0); put(ox + 1, oy + k, oz - D2, 0); }
+    for (let y = oy + 1; y < oy + FLOORS * FH; y++) { put(ox + 1, y, oz + 1, DL); put(ox + 1, y, oz, ID.ladder_s); }
+    for (let f = 1; f < FLOORS; f++) put(ox + 1, oy + f * FH, oz, ID.ladder_s);
+    // the secret room on the top floor: a diamond block
+    put(ox - 12, oy + (FLOORS - 1) * FH + 1, oz + 9, ID.diamond_block);
+    if (Math.floor(ox / 16) === cx && Math.floor(oz / 16) === cz) c.mansion = { x: ox, y: oy + 1, z: oz };
+  }
+  /* bastion remnants in the Nether: big blackstone ruins full of gold, guarded by piglins (only where nobody has built) */
+  netherStructures(cx, cz, c, set) {
+    for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) { const m = this.edits.get(this.key(cx + dx, cz + dz)); if (m && m.size) return; }
+    const put = (x, y, z, id) => set(x - cx * 16, y, z - cz * 16, id);
+    for (let gx = Math.floor(cx / 16) - 1; gx <= Math.floor(cx / 16) + 1; gx++) for (let gz = Math.floor(cz / 16) - 1; gz <= Math.floor(cz / 16) + 1; gz++) {
+      const r = mulberry32(hash3(gx, gz, this.seed + 1121));
+      if (r() > 0.5) continue;
+      const ox = (gx * 16 + 3 + (r() * 10 | 0)) * 16 + 8, oz = (gz * 16 + 3 + (r() * 10 | 0)) * 16 + 8, oy = 34;
+      if (Math.abs(ox - (cx * 16 + 8)) > 36 || Math.abs(oz - (cz * 16 + 8)) > 36) continue;
+      const PB = ID.polished_blackstone_bricks, BS = ID.blackstone, GB = ID.gilded_blackstone;
+      for (let a = -14; a <= 14; a++) for (let b = -14; b <= 14; b++) for (let k = -2; k <= 22; k++) {
+        const ring = Math.max(Math.abs(a), Math.abs(b)), y = oy + k;
+        let id = 0;
+        if (k <= 0) id = k === -2 ? BS : PB;
+        else if (ring === 14) id = k % 7 === 0 ? BS : ((a * 7 + b * 3 + k) % 11 === 0 ? 0 : PB);
+        else if (k % 7 === 0 && ring > 4) id = (a + b) % 9 === 0 ? 0 : PB;
+        else if (ring === 4 && k < 7) id = PB;
+        else id = 0;
+        if (id === PB && r() < 0.06) id = GB;
+        put(ox + a, y, oz + b, id);
+      }
+      // the treasure: gold blocks in the middle, with lava around and chests
+      for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) put(ox + a, oy + 1, oz + b, (a + b) % 2 ? ID.gold_block : GB);
+      put(ox + 3, oy + 1, oz, ID.chest_loot); put(ox - 3, oy + 1, oz, ID.chest_loot); put(ox, oy + 8, oz + 8, ID.chest_loot);
+      for (let a = -1; a <= 1; a++) { put(ox + a, oy + 1, oz - 4, 0); put(ox + a, oy + 2, oz - 4, 0); put(ox + a, oy + 1, oz - 14, 0); put(ox + a, oy + 2, oz - 14, 0); put(ox + a, oy + 3, oz - 14, 0); }
+      for (let y = oy + 1; y < oy + 21; y++) put(ox - 10, y, oz - 10, ID.ladder_n);
+      if (Math.floor(ox / 16) === cx && Math.floor(oz / 16) === cz) c.bastion = { x: ox, y: oy + 1, z: oz };
+    }
   }
   /* a trial chamber: a big tuff and copper hall with rooms around it, trial spawners and vaults, and stairs down from a little hut */
   buildTrial(t, put, c, cx, cz) {
@@ -1100,6 +1225,7 @@ class World {
     if (bridgeZ) bridge(true);
     if (bridgeX) bridge(false);
     if (bridgeZ && bridgeX) for (let x = 5; x <= 10; x++) for (let z = 5; z <= 10; z++) { set(x, BY, z, ID.nether_bricks); for (let y = BY + 1; y <= BY + 4; y++) set(x, y, z, 0); }
+    if (!this.legacy) this.netherStructures(cx, cz, c, set);
 
     const m = this.edits.get(this.key(cx, cz));
     if (m) for (const [i, id] of m) d[i] = id;
