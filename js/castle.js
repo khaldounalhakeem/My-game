@@ -323,6 +323,126 @@ function castleData() {
   put(18, 15, -16, 'lantern'); put(18, 15, -11, 'lantern'); put(6, 15, -16, 'crying_obsidian');
   r = label(14, 1, 2, ['STAIRS', 'ROOF: BEACON', '', '']);
 
+  /* ---------- every room gets its own look: a themed floor, pillars and trim, and its own lights ---------- */
+  const isAir = (x, y, z) => inb(x, y, z) && d[at(x, y, z)] === 0;
+  const putAir = (x, y, z, k) => { if (isAir(x, y, z)) put(x, y, z, k); };
+  const GLOW = B('glowstone');
+  // a floor pattern: a(x, z) gives the block (the ceiling lights of the room below stay)
+  const floor = (f, side, ri, pick) => { const r = room(f, side, ri); for (let z = r.z0; z <= r.z1; z++) for (let x = r.x0; x <= r.x1; x++) if (d[at(x, f, z)] !== GLOW) put(x, f, z, pick(x - r.x0, z - r.z0)); };
+  const checker = (a, b) => (x, z) => ((x + z) & 1 ? a : b);
+  const border = (a, b) => (r) => (x, z) => (x === 0 || z === 0 || x === r.x1 - r.x0 || z === r.z1 - r.z0 ? a : b);
+  // pillars in the four corners and a band of trim under the ceiling
+  const trim = (f, side, ri, pillar, band) => {
+    const r = room(f, side, ri), top = f + 6;
+    for (const [x, z] of [[r.x0, r.z0], [r.x1, r.z0], [r.x0, r.z1], [r.x1, r.z1]]) for (let y = f + 1; y <= top; y++) putAir(x, y, z, pillar);
+    for (let x = r.x0; x <= r.x1; x++) { putAir(x, top, r.z0, band); putAir(x, top, r.z1, band); }
+    for (let z = r.z0; z <= r.z1; z++) { putAir(r.x0, top, z, band); putAir(r.x1, top, z, band); }
+  };
+  // a chandelier hanging from the ceiling
+  const chandelier = (x, f, z, lamp) => { putAir(x, f + 6, z, 'chain'); putAir(x, f + 5, z, lamp); for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) putAir(x + a, f + 5, z + b, lamp); };
+  const RM = (f, side, ri) => room(f, side, ri);
+  let q;
+
+  // KITCHEN: black and white tiles, a hearth, food on display
+  floor(0, -1, 0, checker(B('quartz_block'), B('polished_blackstone')));
+  trim(0, -1, 0, 'polished_blackstone', 'x_polished_blackstone_slab_t');
+  q = RM(0, -1, 0);
+  for (const [x, k] of [[-19, 'hay_bale'], [-17, 'pumpkin'], [-16, 'melon']]) putAir(x, 1, q.z1, k);
+  putAir(-14, 1, q.z1, 'decorated_pot'); putAir(-13, 1, q.z1, 'decorated_pot');
+  chandelier(-12, 0, -3, 'lantern');
+
+  // SMELTING: dark stone floor, a lava forge behind iron bars, chains
+  floor(0, -1, 1, checker(B('cobbled_deepslate'), B('deepslate_tiles')));
+  trim(0, -1, 1, 'polished_deepslate', 'x_polished_deepslate_slab_t');
+  q = RM(0, -1, 1);
+  box(-19, 1, q.z0 + 2, -19, 3, q.z0 + 4, 'polished_deepslate'); box(-18, 0, q.z0 + 2, -17, 0, q.z0 + 4, 'polished_deepslate');
+  put(-19, 0, q.z0 + 3, 'polished_deepslate'); put(-18, 0, q.z0 + 3, 'lava'); box(-17, 1, q.z0 + 2, -17, 1, q.z0 + 4, 'iron_bars'); put(-18, 1, q.z0 + 2, 'iron_bars'); put(-18, 1, q.z0 + 4, 'iron_bars');
+  for (const x of [-15, -11, -7]) { putAir(x, 6, q.z0 + 4, 'chain'); putAir(x, 5, q.z0 + 4, 'chain'); putAir(x, 4, q.z0 + 4, 'lantern'); }
+  putAir(-6, 1, q.z1, 'anvil'); putAir(-9, 1, q.z1, 'cauldron');
+
+  // STORAGE: spruce floor, a label above every chest
+  floor(0, -1, 2, (x, z) => (x % 3 === 0 ? B('spruce_planks') : B('spruce_planks')));
+  trim(0, -1, 2, 'spruce_log', 'spruce_slab_t');
+  q = RM(0, -1, 2);
+  const STORE_NAMES = [['Stone and', 'glass'], ['Wood'], ['Ores and', 'gems'], ['Torches', 'and beds'], ['Fancy', 'blocks'], ['Wool and', 'lights'], ['Tools'], ['Mob drops'], ['Plants and', 'seeds'], ['Redstone', 'and rails']];
+  STORE_NAMES.forEach((nm, i) => { const x = -18 + (i % 5) * 3; if (i < 5) sign(x, 2, q.z0, 's', ['', nm[0], nm[1] || '', '']); else sign(x, 2, q.z1, 'n', ['', nm[0], nm[1] || '', '']); });
+  for (const x of [-17, -11, -5]) { putAir(x, 1, q.z0, 'barrel'); putAir(x, 2, q.z0, 'barrel'); }
+  chandelier(-12, 0, -23, 'lantern');
+
+  // DINING HALL: polished granite with a gold-edged rug, two chandeliers over the table, a fireplace
+  floor(0, 1, 0, checker(B('polished_granite'), B('granite')));
+  trim(0, 1, 0, 'quartz_pillar', 'x_smooth_quartz_slab_t');
+  chandelier(9, 0, -4, 'lantern'); chandelier(15, 0, -4, 'lantern');
+  q = RM(0, 1, 0);
+  box(10, 1, q.z1, 13, 4, q.z1, 'bricks'); box(11, 1, q.z1, 12, 2, q.z1, 0); put(11, 1, q.z1, 'campfire'); put(12, 1, q.z1, 'campfire');
+
+  // CRAFTING: oak floor, wooden pillars, tools everywhere
+  floor(0, 1, 1, (x, z) => (z % 2 ? B('oak_planks') : B('birch_planks')));
+  trim(0, 1, 1, 'oak_log', 'oak_slab_t');
+  q = RM(0, 1, 1);
+  for (const x of [7, 9, 11, 13, 15]) putAir(x, 1, q.z0 + 3, 'barrel');
+  putAir(17, 1, q.z0 + 3, 'loom' in ID ? 'loom' : 'bookshelf'); putAir(5, 1, q.z1, 'bookshelf'); putAir(5, 2, q.z1, 'bookshelf');
+  chandelier(12, 0, -14, 'lantern');
+
+  // ENCHANTING: a purple magic floor, amethyst, glowing end rods
+  floor(7, -1, 0, (x, z) => ((x + z) % 3 === 0 ? B('amethyst_block') : B('polished_blackstone')));
+  trim(7, -1, 0, 'obsidian', 'x_polished_blackstone_slab_t');
+  q = RM(7, -1, 0);
+  for (const [x, z] of [[-18, q.z0 + 1], [-6, q.z0 + 1], [-18, q.z1 - 1], [-6, q.z1 - 1]]) { putAir(x, 8, z, 'amethyst_block'); putAir(x, 9, z, 'amethyst_cluster'); }
+  for (const [x, z] of [[-16, -7], [-8, -7], [-16, 0], [-8, 0]]) { putAir(x, 13, z, 'end_rod'); }
+  putAir(-12, 13, -4, 'end_rod'); putAir(-12, 12, -4, 'end_rod');
+
+  // BREWING: a mossy witchy floor, soul lanterns, pots of ingredients
+  floor(7, -1, 1, checker(B('mossy_stone_bricks'), B('mud_bricks')));
+  trim(7, -1, 1, 'dark_oak_log', 'dark_oak_slab_t');
+  q = RM(7, -1, 1);
+  for (const x of [-16, -12, -8]) putAir(x, 8, q.z1, 'decorated_pot');
+  putAir(-18, 8, q.z0, 'bookshelf'); putAir(-18, 9, q.z0, 'bookshelf');
+  chandelier(-12, 7, -14, 'soul_lantern');
+
+  // LIBRARY: spruce floor with a long rug, reading chairs, a chandelier
+  floor(7, -1, 2, (x, z) => B('spruce_planks'));
+  trim(7, -1, 2, 'dark_oak_log', 'spruce_slab_t');
+  for (const x of [-16, -14, -10, -8]) putAir(x, 8, -24, 'oak_stairs_s');
+  box(-15, 8, -23, -9, 8, -23, 'carpet_red');
+  chandelier(-12, 7, -23, 'lantern');
+
+  // THRONE ROOM: black and gold, a gold chandelier
+  floor(14, -1, 0, border(B('gold_block'), B('polished_blackstone'))(RM(14, -1, 0)));
+  trim(14, -1, 0, 'gold_block', 'x_polished_blackstone_slab_t');
+  chandelier(-11, 14, -4, 'lantern');
+  putAir(-19, 17, -4, 'gold_block'); putAir(-19, 18, -4, 'gold_block'); putAir(-19, 18, -3, 'gold_block'); putAir(-19, 17, -3, 'gold_block'); // a tall throne back
+
+  // TREASURY: a gold and diamond floor, a vault, iron bars
+  floor(14, -1, 1, checker(B('gold_block'), B('smooth_quartz')));
+  trim(14, -1, 1, 'diamond_block', 'x_smooth_quartz_slab_t');
+  q = RM(14, -1, 1);
+  putAir(-12, 15, q.z1, 'vault'); putAir(-16, 15, q.z1, 'emerald_block'); putAir(-8, 15, q.z1, 'diamond_block');
+  for (let z = q.z0 + 2; z <= q.z1 - 1; z++) putAir(-5, 15, z, 'iron_bars');
+  chandelier(-12, 14, -14, 'lantern');
+
+  // ARMORY: stone brick and iron, weapon stands, a target to practise on
+  floor(14, -1, 2, checker(B('stone_bricks'), B('polished_andesite')));
+  trim(14, -1, 2, 'iron_block', 'stone_brick_slab_t');
+  q = RM(14, -1, 2);
+  putAir(-12, 15, q.z1, 'target_0'); putAir(-15, 15, q.z1, 'anvil'); putAir(-9, 15, q.z1, 'grindstone');
+  for (const x of [-17, -7]) { putAir(x, 15, -23, 'iron_bars'); putAir(x, 16, -23, 'iron_bars'); }
+  chandelier(-12, 14, -23, 'lantern');
+
+  // DOG ROOM: grass and moss to play on, bones, a water bowl
+  floor(14, 1, 0, checker(B('moss_block'), B('grass')));
+  trim(14, 1, 0, 'oak_log', 'oak_slab_t');
+  q = RM(14, 1, 0);
+  putAir(19, 15, q.z0, 'water_cauldron'); putAir(19, 15, q.z1, 'bone_block'); putAir(5, 15, q.z0, 'hay_bale'); putAir(5, 15, q.z1, 'hay_bale');
+  chandelier(12, 14, -4, 'lantern');
+
+  // NETHER PORTAL ROOM: a Nether floor, glowing shroomlights, blue soul fire
+  floor(14, 1, 1, (x, z) => ((x * 7 + z * 3) % 5 === 0 ? B('crimson_nylium') : (x + z) % 2 ? B('netherrack') : B('nether_bricks')));
+  trim(14, 1, 1, 'red_nether_bricks', 'nether_brick_slab_t');
+  q = RM(14, 1, 1);
+  for (const [x, z] of [[5, q.z0], [19, q.z0], [5, q.z1], [19, q.z1]]) putAir(x, 20, z, 'shroomlight');
+  put(17, 14, q.z1, 'soul_sand'); putAir(17, 15, q.z1, 'soul_fire'); put(16, 14, q.z1, 'soul_sand'); putAir(16, 15, q.z1, 'soul_fire');
+
   /* ---------- the stairwell (right back room on every floor): stone brick stairs zig-zagging up ---------- */
   const flight = (f, lane) => {
     for (let k = 0; k < 6; k++) { put(5 + k, f + 1 + k, lane, 'stone_brick_stairs_e'); put(5 + k, f + 1 + k, lane + 1, 'stone_brick_stairs_e'); for (let y = f + 1; y < f + 1 + k; y++) { put(5 + k, y, lane, 'stone_bricks'); put(5 + k, y, lane + 1, 'stone_bricks'); } }
