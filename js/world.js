@@ -759,8 +759,12 @@ class World {
     }
     return this.pillars;
   }
+  /* far out (past 600 blocks) the End has more islands, with chorus plants and end cities */
+  outerIsland(wx, wz) { const n = this.noise.fbm2(wx / 110 + 300, wz / 110 - 300, 3); return n > 0.12 ? n - 0.12 : -1; }
   endTop(wx, wz) {
-    const d = Math.hypot(wx, wz), edge = 72 + this.noise.fbm2(wx / 40, wz / 40, 2) * 14;
+    const d = Math.hypot(wx, wz);
+    if (d > 600) { const n = this.outerIsland(wx, wz); return n < 0 ? -1 : Math.floor(52 + n * 26 + this.noiseB.fbm2(wx / 25, wz / 25, 2) * 2); }
+    const edge = 72 + this.noise.fbm2(wx / 40, wz / 40, 2) * 14;
     if (d > edge) return -1;
     return Math.floor(50 + (1 - (d / edge) ** 2) * 5 + this.noiseB.fbm2(wx / 25, wz / 25, 2) * 2);
   }
@@ -773,7 +777,7 @@ class World {
       const wx = cx * 16 + x, wz = cz * 16 + z, top = this.endTop(wx, wz);
       heights[x + z * 16] = Math.max(top, 0);
       if (top < 0) continue;
-      const dist = Math.hypot(wx, wz), depth = 6 + Math.floor((1 - Math.min(1, dist / 80)) * 24);
+      const dist = Math.hypot(wx, wz), depth = dist > 600 ? 3 + Math.floor(this.outerIsland(wx, wz) * 45) : 6 + Math.floor((1 - Math.min(1, dist / 80)) * 24);
       for (let y = top - depth; y <= top; y++) set(x, y, z, ID.end_stone);
       for (const p of this.endPillars()) {
         if (Math.hypot(wx - p.x, wz - p.z) <= p.r + 0.3) {
@@ -782,12 +786,83 @@ class World {
         }
       }
     }
+    if (Math.hypot(cx * 16, cz * 16) > 560) this.outerEnd(cx, cz, c, set, heights);
     c.heights = heights;
     // apply player edits
     const m = this.edits.get(this.key(cx, cz));
     if (m) for (const [i, id] of m) d[i] = id;
     this.chunks.set(this.key(cx, cz), c);
     return c;
+  }
+
+  /* chorus plants, and any end city (with its ship) that reaches into this chunk */
+  outerEnd(cx, cz, c, set, heights) {
+    const r = mulberry32(hash3(cx, cz, this.seed + 515));
+    for (let i = 0; i < 3; i++) {
+      const x = 2 + (r() * 12 | 0), z = 2 + (r() * 12 | 0), wx = cx * 16 + x, wz = cz * 16 + z, top = this.endTop(wx, wz);
+      if (top < 0 || r() < 0.4) continue;
+      const tall = 2 + (r() * 5 | 0);
+      for (let k = 1; k <= tall; k++) set(x, top + k, z, ID.chorus_plant);
+      set(x, top + tall + 1, z, ID.chorus_flower);
+      if (tall > 3) { const sx = x + (r() < 0.5 ? 1 : -1); set(sx, top + tall - 1, z, ID.chorus_plant); set(sx, top + tall, z, ID.chorus_flower); }
+    }
+    for (let gx = Math.floor(cx / 20) - 1; gx <= Math.floor(cx / 20) + 1; gx++) for (let gz = Math.floor(cz / 20) - 1; gz <= Math.floor(cz / 20) + 1; gz++) {
+      const city = this.endCityAt(gx, gz);
+      if (city && Math.abs(city.x - (cx * 16 + 8)) < 48 && Math.abs(city.z - (cz * 16 + 8)) < 48) this.buildEndCity(city, cx, cz, set, c);
+    }
+  }
+  endCityAt(gx, gz) {
+    this.cityCache = this.cityCache || new Map();
+    const key = gx + ',' + gz;
+    if (!this.cityCache.has(key)) {
+      const r = mulberry32(hash3(gx, gz, this.seed + 616));
+      let city = null;
+      for (let t = 0; t < 10 && !city; t++) {
+        const x = (gx * 20 + 2 + (r() * 16 | 0)) * 16 + 8, z = (gz * 20 + 2 + (r() * 16 | 0)) * 16 + 8;
+        if (Math.hypot(x, z) < 700) continue;
+        const top = this.endTop(x, z);
+        if (top > 0 && this.endTop(x + 6, z) > 0 && this.endTop(x - 6, z) > 0 && this.endTop(x, z + 6) > 0 && this.endTop(x, z - 6) > 0) city = { x, z, y: top + 1, ship: r() < 0.75 };
+      }
+      this.cityCache.set(key, city);
+    }
+    return this.cityCache.get(key);
+  }
+  buildEndCity(city, cx, cz, set, c) {
+    const put = (x, y, z, id) => set(x - cx * 16, y, z - cz * 16, id);
+    const { x: ox, y: oy, z: oz } = city, PB = ID.purpur_block, PP = ID.purpur_pillar;
+    const room = (x0, y0, z0, w, h, chests) => {
+      for (let a = -w; a <= w; a++) for (let b = -w; b <= w; b++) for (let k = 0; k <= h; k++) {
+        const edge = Math.abs(a) === w || Math.abs(b) === w, corner = Math.abs(a) === w && Math.abs(b) === w;
+        put(x0 + a, y0 + k, z0 + b, k === 0 || k === h ? PB : corner ? PP : edge ? (k === 2 && (a === 0 || b === 0) ? ID.end_rod : PB) : 0);
+      }
+    };
+    // the tower: three rooms up a purpur stalk, with a ladder up the middle
+    room(ox, oy, oz, 4, 5);
+    for (let k = 1; k <= 3; k++) { put(ox, oy + k, oz - 4, 0); } // a doorway
+    for (let y = oy + 5; y < oy + 16; y++) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) put(ox + a, y, oz + b, Math.abs(a) === 2 || Math.abs(b) === 2 ? (Math.abs(a) === 2 && Math.abs(b) === 2 ? PP : PB) : 0);
+    room(ox, oy + 16, oz, 5, 6);
+    room(ox, oy + 22, oz, 3, 5);
+    for (let y = oy + 1; y < oy + 27; y++) { put(ox, y, oz + 2, PP); put(ox, y, oz + 1, ID['ladder_s']); }
+    put(ox, oy + 16, oz + 1, ID['ladder_s']); put(ox, oy + 22, oz + 1, ID['ladder_s']); put(ox, oy + 5, oz + 1, ID['ladder_s']);
+    put(ox - 3, oy + 17, oz - 3, ID.chest_loot); put(ox + 3, oy + 17, oz + 3, ID.chest_loot); put(ox - 2, oy + 23, oz - 2, ID.chest_loot);
+    c.endCity = c.endCity || [];
+    for (const [sx, sy, sz] of [[ox + 4, oy + 18, oz], [ox - 4, oy + 18, oz], [ox, oy + 24, oz + 2], [ox + 3, oy + 2, oz + 3]]) if (Math.floor(sx / 16) === cx && Math.floor(sz / 16) === cz) c.endCity.push([sx, sy, sz]);
+    // the end ship floats beside the tower: inside its cabin, an elytra in an item frame
+    if (!city.ship) return;
+    const sx0 = ox + 14, sy = oy + 18, sz0 = oz;
+    for (let a = 0; a <= 20; a++) {
+      const w = a < 3 || a > 17 ? 1 : 2;
+      for (let b = -w; b <= w; b++) { put(sx0 + a, sy, sz0 + b, PB); if (Math.abs(b) === w) put(sx0 + a, sy + 1, sz0 + b, PB); }
+      if (a === 0 || a === 20) for (let b = -w; b <= w; b++) put(sx0 + a, sy + 1, sz0 + b, PB);
+    }
+    for (let k = 1; k <= 8; k++) put(sx0 + 9, sy + k, sz0, ID.obsidian);
+    for (let a = 13; a <= 17; a++) for (let b = -2; b <= 2; b++) for (let k = 1; k <= 4; k++) put(sx0 + a, sy + k, sz0 + b, k === 4 || Math.abs(b) === 2 || a === 13 || a === 17 ? PB : 0);
+    put(sx0 + 13, sy + 1, sz0, 0); put(sx0 + 13, sy + 2, sz0, 0);
+    put(sx0 + 16, sy + 1, sz0 - 1, ID.chest_loot); put(sx0 + 16, sy + 1, sz0 + 1, ID.chest_loot);
+    const fx = sx0 + 16, fy = sy + 2, fz = sz0;
+    put(fx + 1, fy, fz, PB); put(fx, fy, fz, ID.item_frame_e);
+    if (Math.floor(fx / 16) === cx && Math.floor(fz / 16) === cz) (c.frameItems = c.frameItems || []).push([fx, fy, fz, 'elytra']);
+    if (Math.floor((sx0 + 10) / 16) === cx && Math.floor(sz0 / 16) === cz) c.endCity = (c.endCity || []).concat([[sx0 + 10, sy + 1, sz0 + 1]]);
   }
 
   generateNether(cx, cz) {

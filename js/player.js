@@ -116,6 +116,21 @@ class Player {
     if (this.health <= 0) this.die();
   }
 
+  /* an elytra: press jump while falling to spread your wings; look down to speed up, up to climb; fireworks push you */
+  glideTick(dt, input, creative) {
+    const ch = this.inv.slots[37], elytra = ch && DEFS[ch.id].elytra, press = input.jump && !this.jumpHeld;
+    this.jumpHeld = !!input.jump;
+    if (!this.gliding && press && elytra && !this.onGround && !this.flying && this.vel.y < 0) { this.gliding = true; this.glideSpeed = Math.max(6, Math.hypot(this.vel.x, this.vel.y, this.vel.z)); G.ui.message('Gliding! Look down to go faster, up to climb. Use fireworks to boost.', 'gold'); }
+    if (!this.gliding) return false;
+    if (this.onGround || !elytra || this.inWater || this.inLava || this.flying || this.riding) { this.gliding = false; return false; }
+    const L = this.lookDir();
+    this.glideSpeed += (-L.y * 26 - 2.5) * dt;
+    if (this.boostT > 0) { this.boostT -= dt; this.glideSpeed += 34 * dt; if (Math.random() < dt * 20) G.particles.spawn(this.pos.x, this.pos.y + 0.5, this.pos.z, 0xffd040, 0, 0, 0, 0.1, 0.5, 0); }
+    this.glideSpeed = clamp(this.glideSpeed, 3, 44);
+    this.vel.set(L.x * this.glideSpeed, L.y * this.glideSpeed - 2.2, L.z * this.glideSpeed);
+    this.fallStart = this.pos.y; // a glide is not a fall
+    return true;
+  }
   /* fire resistance keeps fire and lava from hurting you */
   fireProof(cause) { return this.fx('fire_resistance') && /fire|lava|burn|flame|magma|blaze/i.test(cause || ''); }
   die() {
@@ -245,9 +260,12 @@ class Player {
       const climbing = input.jump || this.hitH || Math.abs(input.moveZ || 0) > 0.1;
       this.vel.y = climbing ? 3.2 : input.sneak ? 0 : Math.max(this.vel.y - 28 * dt, -2.4);
       this.fallStart = null;
+    } else if (this.glideTick(dt, input, creative)) {
+      // gliding with an elytra
     } else {
       this.vel.y -= 28 * dt;
       if (this.fx('slow_falling') && this.vel.y < -2.5) { this.vel.y = -2.5; this.fallStart = null; }
+      if (this.fx('levitation')) { this.vel.y = 1.8; this.fallStart = null; }
       if (this.vel.y < -55) this.vel.y = -55;
       if (input.jump && this.onGround) { this.vel.y = (this.onHoney ? 5 : 8.7) + 1.7 * this.fx('jump_boost'); this.hungerDrain(this.sprinting ? 0.05 : 0.0125); }
       if (this.inSnow) { this.vel.y = Math.max(this.vel.y, -1.2); if (input.jump) this.vel.y = Math.max(this.vel.y, 2.2); this.fallStart = null; }
@@ -941,6 +959,7 @@ class Player {
       this.saturation = Math.min(this.hunger, (this.saturation || 0) + hd.food * 1.2);
       if (hd.heal) this.health = Math.min(20, this.health + hd.heal);
       if (hd.key === 'rotten_flesh' && Math.random() < 0.5) this.hungerDrain(2);
+      if (hd.chorus) G.chorusTeleport();
       if (this.mode === 'survival') { this.inv.takeFrom(this.sel, 1); if (hd.leaves) this.inv.add(ID[hd.leaves], 1); }
       G.sound.play('eat');
       this.useCd = 0.5; this.swing = 1;
@@ -979,6 +998,12 @@ class Player {
       return;
     }
     if (hd.key === 'spyglass') { G.zoom = !G.zoom; this.useCd = 0.3; return; }
+    if (hd.firework) {
+      if (this.gliding) this.boostT = 1.6; else G.launchFirework(this.pos.x, this.pos.y + 1, this.pos.z);
+      if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
+      G.sound.play('bow'); this.useCd = 0.4; this.swing = 1;
+      return;
+    }
     if (hd.key === 'snowball' || hd.key === 'wind_charge') {
       const o = this.eyePos(), d = this.lookDir();
       G.spawnProjectile(hd.key, o.addScaledVector(d, 0.5), d.multiplyScalar(hd.key === 'snowball' ? 24 : 20), this);

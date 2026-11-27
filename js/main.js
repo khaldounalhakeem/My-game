@@ -475,6 +475,7 @@ G.tickAmbient = (dt) => {
       else if (d.powder && [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]].some(([a, b, c]) => W.getBlock(x + a, y + b, z + c) === ID.water)) { W.setBlock(x, y, z, ID[d.powder]); continue; }
       else if (d.copper !== undefined && d.copper < 3 && Math.random() < 0.0004) { W.setBlock(x, y, z, ID[['', 'exposed_', 'weathered_', 'oxidized_'][d.copper + 1] + d.copperKind]); continue; }
       else if (id === ID.end_rod) kind = 'endrod';
+      else if (id === ID.end_gateway) kind = 'portal';
       else if (d.hopper) kind = 'hopper';
       else if (d.jukebox) kind = 'juke';
       else if (d.frame) kind = 'frame';
@@ -1126,7 +1127,7 @@ G.tickFrame = (x, y, z, d, seen) => {
 };
 /* potions: what each one does to you */
 const POTION_FX = { speed: [180, 1], jump_boost: [180, 1], strength: [180, 1], regeneration: [45, 1], fire_resistance: [180, 1], night_vision: [180, 1], invisibility: [180, 1], poison: [45, 1], weakness: [90, 1], slow_falling: [90, 1], water_breathing: [180, 1] };
-const FX_NAMES = { speed: 'Speed', jump_boost: 'Jump Boost', strength: 'Strength', regeneration: 'Regeneration', fire_resistance: 'Fire Resistance', night_vision: 'Night Vision', invisibility: 'Invisibility', poison: 'Poison', weakness: 'Weakness', slow_falling: 'Slow Falling', water_breathing: 'Water Breathing', haste: 'Haste', resistance: 'Resistance', absorption: 'Absorption' };
+const FX_NAMES = { levitation: 'Levitation', speed: 'Speed', jump_boost: 'Jump Boost', strength: 'Strength', regeneration: 'Regeneration', fire_resistance: 'Fire Resistance', night_vision: 'Night Vision', invisibility: 'Invisibility', poison: 'Poison', weakness: 'Weakness', slow_falling: 'Slow Falling', water_breathing: 'Water Breathing', haste: 'Haste', resistance: 'Resistance', absorption: 'Absorption' };
 G.applyPotion = (who, k, mult) => {
   mult = mult || 1;
   if (who === G.player) {
@@ -1513,7 +1514,7 @@ G.chestKind = (x, y, z) => {
   }
   if (shelves >= 4) return 'library';
   if (G.dim === 'nether') return 'ruined_portal';
-  if (G.dim === 'end') return 'library';
+  if (G.dim === 'end') return Math.hypot(x, z) > 500 ? 'end_city' : 'library';
   if (W.regionPick) {
     if (W.pyramidChunk(cx, cz)) return 'desert';
     if (W.spotPick && W.spotPick(cx, cz, 'jungleTemple')) return 'jungle';
@@ -2062,6 +2063,7 @@ function spawnTick() {
 }
 
 /* now and then a wandering trader comes by in the day, with two llamas */
+LOOT_TABLES.end_city = [3, 8, [['diamond', 2, 7, 5], ['iron_ingot', 4, 8, 10], ['gold_ingot', 2, 7, 15], ['emerald', 2, 6, 2], ['beetroot_seeds', 1, 10, 5], ['saddle', 1, 1, 3], ['iron_horse_armor', 1, 1, 1], ['golden_horse_armor', 1, 1, 1], ['diamond_horse_armor', 1, 1, 1], ['diamond_sword', 1, 1, 3], ['diamond_pickaxe', 1, 1, 3], ['diamond_chestplate', 1, 1, 3], ['iron_sword', 1, 1, 3], ['iron_chestplate', 1, 1, 3], ['enchanted_book', 1, 1, 4], ['firework_rocket', 2, 8, 6], ['elytra', 1, 1, 1]]];
 // music discs turn up in dungeons and mineshafts
 for (const [t, w] of [['dungeon', 3], ['mineshaft', 2], ['desert', 1], ['jungle', 1]]) for (const k of ['13', 'cat', 'blocks', 'chirp', 'far', 'mall', 'stal', 'pigstep']) if (LOOT_TABLES[t]) LOOT_TABLES[t][2].push(['disc_' + k, 1, 1, w]);
 DEFS[ID.nether_wart_block].drop = (r) => [['nether_wart', 1 + (r() * 3 | 0)]];
@@ -2093,6 +2095,19 @@ function endSpawn(hostile) {
     G.ui.message('The Ender Dragon guards the End. Beat it to win!', 'purple');
     G.sound.play('dragonRoar', d.pos);
   }
+  const pcx = Math.floor(P.pos.x) >> 4, pcz = Math.floor(P.pos.z) >> 4;
+  for (let dz = -3; dz <= 3; dz++) for (let dx = -3; dx <= 3; dx++) {
+    const c = W.chunks.get(W.key(pcx + dx, pcz + dz));
+    if (!c) continue;
+    if (c.frameItems && !c.frameDone) { c.frameDone = true; G.chests = G.chests || {}; for (const [x, y, z, k] of c.frameItems) { const key = 'end:' + x + ',' + y + ',' + z; if (!G.chests[key]) { G.chests[key] = new Array(27).fill(null); G.chests[key][0] = { id: ID[k], count: 1 }; } } }
+    if (c.endCity && G.diff().mobs > 0) for (const [x, y, z] of c.endCity) {
+      if (Math.hypot(P.pos.x - x, P.pos.z - z) > 40 || Math.random() > 0.05) continue;
+      if (G.mobs.some(m => m.type === 'shulker' && !m.dead && Math.hypot(m.pos.x - x - 0.5, m.pos.y - y, m.pos.z - z - 0.5) < 1.5)) continue;
+      const k = 'sh:' + x + ',' + y + ',' + z; G.deadShulkers = G.deadShulkers || {}; if (G.deadShulkers[k] >= 2) continue;
+      if (!W.getBlock(x, y, z)) { const m = spawnMob('shulker', x + 0.5, y, z + 0.5); m.spotKey = k; }
+    }
+  }
+  if (G.endDragonDead) G.placeGateway();
   if (G.diff().mobs === 0 || hostile >= 6 || Math.random() > 0.3) return;
   const a = Math.random() * Math.PI * 2, r = 24 + Math.random() * 20;
   const x = Math.floor(P.pos.x + Math.cos(a) * r), z = Math.floor(P.pos.z + Math.sin(a) * r);
@@ -2407,6 +2422,51 @@ G.leaveEnd = () => {
   Sound.play('teleport');
   G.ui.message('Back home in the Overworld.', 'gold');
   G.save();
+};
+/* the end gateway: a floating portal beside the main island that leads out to the outer islands (and back) */
+G.placeGateway = () => {
+  const W = G.worlds.end, gx = 90, gz = 0, gy = 70;
+  if (!W.isLoaded(gx, gz) || W.getBlock(gx, gy, gz) === ID.end_gateway) return;
+  for (const [a, b, c] of [[0, -1, 0], [0, 1, 0]]) W.setBlock(gx + a, gy + b, gz + c, ID.bedrock);
+  W.setBlock(gx, gy, gz, ID.end_gateway);
+};
+G.useGateway = () => {
+  const P = G.player, W = G.world, out = Math.hypot(P.pos.x, P.pos.z) < 400;
+  let tx = 90, tz = 3, ty = 70;
+  if (out) {
+    // find the first outer island along this direction
+    tx = 0;
+    for (let d = 720; d < 1600 && !tx; d += 8) { const t = W.endTop(d, 0); if (t > 0 && W.endTop(d + 8, 0) > 0 && W.endTop(d + 16, 0) > 0) { tx = d + 8; ty = t + 1; } }
+    if (!tx) { tx = 800; ty = 60; }
+    tz = 0;
+  }
+  P.pos.set(tx + 0.5, ty + 0.2, tz + 0.5); P.vel.set(0, 0, 0); P.fallStart = null; P.gateCd = 2;
+  loadAround(tx, tz, 2);
+  if (out) {
+    // an exit gateway on the new island to get back
+    const ex = tx + 3, ey = Math.max(ty, W.endTop(ex, tz) + 1) + 3;
+    W.setBlock(ex, ey - 1, tz, ID.bedrock); W.setBlock(ex, ey, tz, ID.end_gateway); W.setBlock(ex, ey + 1, tz, ID.bedrock);
+    if (W.collides(P.pos.x, P.pos.y, P.pos.z, P.w, P.h)) P.pos.y = W.groundY(P.pos.x, P.pos.z) + 1;
+    G.ui.message('The outer End islands! Look for End Cities: tall purple towers. Their ships hold an Elytra.', 'purple');
+  } else { if (W.collides(P.pos.x, P.pos.y, P.pos.z, P.w, P.h)) P.pos.y += 3; G.ui.message('Back by the main island.', 'purple'); }
+  Sound.play('teleport');
+};
+/* chorus fruit: you pop to a random safe place nearby */
+G.chorusTeleport = () => {
+  const P = G.player, W = G.world;
+  for (let t = 0; t < 16; t++) {
+    const x = Math.floor(P.pos.x + (Math.random() - 0.5) * 16), z = Math.floor(P.pos.z + (Math.random() - 0.5) * 16);
+    for (let y = Math.floor(P.pos.y) + 8; y > Math.floor(P.pos.y) - 8; y--) {
+      const g = W.getBlock(x, y - 1, z);
+      if (g && DEFS[g].solid && !W.getBlock(x, y, z) && !W.getBlock(x, y + 1, z)) { G.particles.burst(P.pos.x, P.pos.y + 1, P.pos.z, [0xcc00fa, 0x8a5a8a], 12, 2); P.pos.set(x + 0.5, y, z + 0.5); P.vel.set(0, 0, 0); P.fallStart = null; Sound.play('teleport'); return; }
+    }
+  }
+};
+/* a firework: up it goes, then a burst of colour */
+G.launchFirework = (x, y, z) => {
+  const cols = [[0xff3a3a, 0xffd040], [0x3a8aff, 0xffffff], [0x5aff5a, 0xffff5a], [0xff5aff, 0x5affff]][Math.random() * 4 | 0];
+  let h = 0; const dim = G.dim;
+  const iv = setInterval(() => { h += 0.6; if (G.dim !== dim) { clearInterval(iv); return; } G.particles.spawn(x, y + h, z, 0xffd040, 0, 0, 0, 0.08, 0.4, 0); if (h > 14) { clearInterval(iv); for (let i = 0; i < 50; i++) { const a = Math.random() * Math.PI * 2, b = Math.random() * Math.PI - Math.PI / 2; G.particles.spawn(x, y + h, z, cols[i % 2], Math.cos(a) * Math.cos(b) * 7, Math.sin(b) * 7, Math.sin(a) * Math.cos(b) * 7, 0.12, 1.4, 2); } Sound.play('explode', new THREE.Vector3(x, y + h, z)); } }, 40);
 };
 /* the dragon is beaten: a portal home opens in the middle of the island */
 G.endDragonBeaten = () => {
@@ -2927,9 +2987,12 @@ function frame(now) {
         P.portalT = (P.portalT || 0) + dt;
         if (P.portalT > (P.mode === 'creative' ? 0.8 : 2.2)) G.switchDimension(G.dim === 'nether' ? 'overworld' : 'nether');
       }
+    } else if (!P.dead && G.dim === 'end' && G.world.touching(P, ID.end_gateway, 0.3)) {
+      if (!(P.gateCd > 0)) G.useGateway();
     } else if (!P.dead && G.world.touching(P, ID.end_portal, 0)) {
       if (!P.portalCd) { if (G.dim === 'end') G.leaveEnd(); else G.enterEnd(); }
     } else { P.portalT = 0; P.portalCd = false; }
+    if (P.gateCd > 0) P.gateCd -= dt;
     $('fx-portal').style.opacity = clamp((P.portalT || 0) / 2, 0, 0.85);
     { const fr = P.headInSnow ? 1 : clamp((P.freezeT || 0) / 7, 0, 0.9); const fe = $('fx-frost'); if (fe.style.opacity !== String(fr)) fe.style.opacity = fr; }
 

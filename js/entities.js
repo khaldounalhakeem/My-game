@@ -299,6 +299,8 @@ const MORE_MOBS = {
     M: { body: [1.4, 1.3, 2.2], by: 1.5, col: 0x5a5a52, leg: [0.45, 0.9], legCol: 0x4a4a44, head: [0.9, 0.9, 0.9], hy: 1.55, hz: 1.4, headCol: 0x6a6a62, x: [[0.15, 0.5, 0.15, 0xd8d0b8, -0.5, 2.1, 1.4], [0.15, 0.5, 0.15, 0xd8d0b8, 0.5, 2.1, 1.4], [0.6, 0.3, 0.4, 0x3a3a34, 0, 1.15, 1.75]], eye: '#c8a020' } },
   vex: { T: { name: 'Vex', hp: 14, w: 0.4, h: 0.8, speed: 4, hostile: true, fly: 0.8, dmg: 4, xp: 3, drops: [] },
     M: { body: [0.25, 0.35, 0.18], by: 0.3, col: 0xa8c0d8, legs: 0, head: [0.3, 0.3, 0.3], hy: 0.66, hz: 0, glow: 0x3a4a6a, x: [[0.04, 0.3, 0.3, 0xe8f0ff, -0.17, 0.4, -0.15], [0.04, 0.3, 0.3, 0xe8f0ff, 0.17, 0.4, -0.15], [0.05, 0.4, 0.05, 0xc8c8d8, 0.2, 0.3, 0.15]], eye: '#ff3a3a' } },
+  shulker: { T: { name: 'Shulker', hp: 30, w: 1, h: 1, speed: 0.001, hostile: true, ranged: true, shoot: 'bullet', dmg: 4, xp: 5, fireproof: true, drops: [['shulker_shell', 0, 1]] },
+    M: { body: [1, 0.5, 1], by: 0.25, col: 0x8a5a8a, legs: 0, head: [0.5, 0.5, 0.5], hy: 0.55, hz: 0, headCol: 0xd8d0a0, x: [[1.02, 0.4, 1.02, 0xa070a0, 0, 0.8, 0]], eye: '#3a1a3a' } },
   creaking: { T: { name: 'Creaking', hp: 1000, w: 0.9, h: 2.7, speed: 3.2, hostile: true, dmg: 3, xp: 0, drops: [] },
     M: { body: [0.55, 1.0, 0.35], by: 1.6, col: 0x5a4a3a, legs: 2, leg: [0.2, 1.1], legCol: 0x4a3a2a, head: [0.55, 0.65, 0.5], hy: 2.45, hz: 0, headCol: 0x4a3a2a, x: [[0.16, 1.3, 0.16, 0x4a3a2a, -0.4, 1.5, 0], [0.16, 1.3, 0.16, 0x4a3a2a, 0.4, 1.5, 0], [0.12, 0.12, 0.02, 0xff8a1a, -0.13, 2.5, 0.26], [0.12, 0.12, 0.02, 0xff8a1a, 0.13, 2.5, 0.26], [0.1, 0.3, 0.1, 0x9aa094, 0.25, 2.85, 0]], eye: '#ff8a1a' } },
   warden: { T: { name: 'Warden', hp: 500, w: 0.9, h: 2.9, speed: 2.2, hostile: true, dmg: 16, xp: 5, drops: [['sculk_sensor', 1, 1]] },
@@ -1154,6 +1156,7 @@ class Mob {
 
   die(byPlayer) {
     this.dead = true; this.deathT = 0;
+    if (this.spotKey) { G.deadShulkers = G.deadShulkers || {}; G.deadShulkers[this.spotKey] = (G.deadShulkers[this.spotKey] || 0) + 1; }
     // a big slime or magma cube splits into little ones
     if ((this.type === 'slime' || this.type === 'magma_cube') && !this.small) for (let i = 0; i < 2 + (Math.random() * 2 | 0); i++) spawnMob(this.type, this.pos.x + (Math.random() - 0.5), this.pos.y + 0.3, this.pos.z + (Math.random() - 0.5)).makeSmall();
     G.sound.play(this.T.boat ? 'break' : 'deathMob', this.pos);
@@ -1312,7 +1315,8 @@ class Mob {
           const dir = to.sub(from); const d = dir.length(); dir.normalize();
           dir.y += d * 0.012;
           const kind = T.shoot || 'arrow';
-          G.spawnProjectile(kind, from, dir.normalize().multiplyScalar(kind === 'laser' ? 30 : kind === 'spit' ? 18 : kind === 'wind' ? 16 : kind === 'potion' ? 13 : 24), this);
+          G.spawnProjectile(kind, from, dir.normalize().multiplyScalar(kind === 'laser' ? 30 : kind === 'spit' ? 18 : kind === 'wind' ? 16 : kind === 'potion' ? 13 : kind === 'bullet' ? 7 : 24), this);
+          if (kind === 'bullet') this.shootCd = 3 + Math.random() * 3;
           if (kind === 'potion') G.projectiles[G.projectiles.length - 1].potion = ['poison', 'harming', 'weakness'][Math.random() * 3 | 0];
           G.sound.play(kind === 'spit' ? 'llamaSpit' : kind === 'arrow' ? 'bow' : 'fireball', this.pos);
           if (kind === 'spit' && (this.spits = (this.spits || 0) + 1) >= 2) { this.angry = false; this.spits = 0; } // a llama spits a couple of times, then calms down
@@ -1826,8 +1830,9 @@ const PROJ_GEO = {
   wind: new THREE.BoxGeometry(0.35, 0.35, 0.35),
   wind_charge: new THREE.BoxGeometry(0.3, 0.3, 0.3),
   potion: new THREE.BoxGeometry(0.25, 0.3, 0.25),
+  bullet: new THREE.BoxGeometry(0.3, 0.3, 0.3),
 };
-const PROJ_COLOR = { potion: 0xc84a8a, spit: 0xf0f0e0, snowball: 0xf4f8fc, laser: 0x5af8e8, wind: 0xc8e8f8, wind_charge: 0xc8e8f8 };
+const PROJ_COLOR = { bullet: 0xf0e8a0, potion: 0xc84a8a, spit: 0xf0f0e0, snowball: 0xf4f8fc, laser: 0x5af8e8, wind: 0xc8e8f8, wind_charge: 0xc8e8f8 };
 const MOB_FIRE = [0xff6a00, 0xffc000, 0x5a5a5a];
 class Projectile {
   constructor(kind, pos, vel, owner) {
@@ -1848,7 +1853,13 @@ class Projectile {
     if (this.life <= 0) return this.finish();
     if (this.stuck) return;
     if (this.kind === 'potion' && !this.potionHit) { /* a splash potion breaks on whatever it touches */ }
-    const grav = this.kind === 'fireball' || this.kind === 'smallfire' || this.kind === 'laser' || this.kind === 'wind' || this.kind === 'wind_charge' ? 0 : this.kind === 'arrow' ? 12 : this.kind === 'spit' ? 6 : 16;
+    if (this.kind === 'bullet') {
+      // a shulker bullet slowly follows you
+      const P = G.player, to = new V3(P.pos.x - this.pos.x, P.pos.y + 1 - this.pos.y, P.pos.z - this.pos.z).normalize().multiplyScalar(7);
+      this.vel.lerp(to, Math.min(1, dt * 2));
+      this.mesh.rotation.x += dt * 5; this.mesh.rotation.y += dt * 4;
+    }
+    const grav = this.kind === 'bullet' || this.kind === 'fireball' || this.kind === 'smallfire' || this.kind === 'laser' || this.kind === 'wind' || this.kind === 'wind_charge' ? 0 : this.kind === 'arrow' ? 12 : this.kind === 'spit' ? 6 : 16;
     this.vel.y -= grav * dt;
     const step = this.vel.length() * dt;
     const dir = tmpV.copy(this.vel).normalize();
@@ -1887,6 +1898,7 @@ class Projectile {
         if (this.kind === 'wind') { this.pos.copy(P.pos); return this.windBurst(); }
         if (this.kind === 'potion') { G.splashAt(this.pos, this.potion); return this.finish(); }
         if (this.owner instanceof Mob) G.lastAttacker = this.owner;
+        if (this.kind === 'bullet') { P.hurt(G.mobDmg(4), this.pos, 2, false, 'A shulker bullet hit you.'); if (P === G.player && P.mode === 'survival') P.addEffect('levitation', 1, 8); return this.finish(); }
         const MSG = { spit: ['A llama spat at you!', 1], laser: ['A guardian zapped you with its laser.', 5] }[this.kind];
         if (MSG) { P.hurt(G.mobDmg(MSG[1]), this.pos, 2, false, MSG[0]); G.particles.burst(this.pos.x, this.pos.y, this.pos.z, [PROJ_COLOR[this.kind]], 6, 1, 0.1); return this.finish(); }
         P.hurt(G.mobDmg(this.kind === 'arrow' ? 3 : this.kind === 'smallfire' ? 4 : 2), this.pos, 4, false, this.kind === 'arrow' ? 'You were shot by an arrow.' : this.kind === 'smallfire' ? 'A Blaze fireball hit you.' : 'You were hit.');

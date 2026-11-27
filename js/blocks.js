@@ -1,7 +1,7 @@
 'use strict';
 /* Block and item registry, procedural pixel-art textures, and inventory icons. */
 
-const TILE = 16, ATLAS_N = 32; // room for 1024 pictures
+const TILE = 16, ATLAS_N = 40; // room for 1600 pictures
 const atlasCanvas = document.createElement('canvas');
 atlasCanvas.width = atlasCanvas.height = TILE * ATLAS_N;
 const actx = atlasCanvas.getContext('2d', { willReadFrequently: true });
@@ -995,6 +995,15 @@ for (const [k, , c] of POTIONS) {
   if (k !== 'awkward') makeTile('i_splash_' + k, pPlant(P => { P.rect(7, 2, 2, 2, 0xc8e0f0); P.disc(8, 9, 5, 0xd8ecf8); P.disc(8, 9, 4, c); P.rect(6, 1, 4, 1, 0x8a6030); }));
 }
 
+/* the outer End: chorus plants, end cities, shulkers, elytra */
+makeTile('chorus_plant', P => { P.fill(0x5a3a5a, 10); P.speck(0x7a5a7a, 0.2, 8); P.rect(0, 0, 16, 1, 0x3a2a3a); });
+makeTile('chorus_flower', P => { P.fill(0xa880a8, 10); P.rect(2, 2, 12, 12, 0xc8a0c8, 8); P.rect(5, 5, 6, 6, 0xe8c8e8); });
+makeTile('i_chorus_fruit', pBlob(0x8a5a8a, 4.5, 0xc8a0c8));
+makeTile('i_popped_chorus_fruit', pBlob(0xb898b8, 4.5, 0xe8d0e8));
+makeTile('i_shulker_shell', pPlant(P => { P.disc(8, 9, 6, 0x8a5a8a); P.rect(2, 9, 12, 5, 0x6a3a6a); P.rect(2, 9, 12, 1, 0xc8a0c8); }));
+makeTile('i_elytra', pPlant(P => { for (let i = 0; i < 7; i++) { P.line(7 - i, 2 + i, 7 - i, 13 - (i >> 1), 0x8a8ab0); P.line(8 + i, 2 + i, 8 + i, 13 - (i >> 1), 0x8a8ab0); } P.line(7, 2, 7, 13, 0x5a5a80); P.line(8, 2, 8, 13, 0x5a5a80); }));
+makeTile('i_firework_rocket', pPlant(P => { P.rect(6, 4, 4, 9, 0xd83a3a); P.rect(6, 6, 4, 1, 0xf0f0f0); P.rect(6, 10, 4, 1, 0xf0f0f0); P.rect(7, 2, 2, 2, 0x8a8a8a); P.line(8, 13, 8, 15, 0x3a3a3a); }));
+
 /* the animations themselves */
 const waveRows = [[2, 3], [5, 9], [8, 1], [11, 6], [14, 11], [0, 12]];
 animTile('water', 16, 140, (P, f) => {
@@ -1564,6 +1573,9 @@ for (const d of ['n', 's', 'w', 'e']) block('item_frame_' + d, 'Item Frame', 'it
 for (const lit of [0, 1]) block('candle' + (lit ? '_lit' : ''), 'Candle', lit ? 'candle_lit' : 'candle', { hardness: 0.1, opaque: false, cutout: true, solid: false, box: [0.375, 0, 0.375, 0.625, 0.5, 0.625], candle: !!lit, light: !!lit, emit: lit ? 6 : undefined, drop: 'candle', iconTile: 'i_candle', hide: !!lit });
 for (let c = 0; c <= 4; c++) block('respawn_anchor_' + c, 'Respawn Anchor', { top: c ? 'anchor_top_on' : 'anchor_top', side: 'anchor_side', bottom: 'anchor_top' }, PICK(4, 50, { anchor: c, light: c > 0, emit: c ? 3 + c * 3 : undefined, drop: 'respawn_anchor_0', hide: c > 0 }));
 
+block('chorus_plant', 'Chorus Plant', 'chorus_plant', { hardness: 0.4, opaque: false, boxes: [[0.1875, 0, 0.1875, 0.8125, 1, 0.8125]], drop: (r) => (r() < 0.5 ? [['chorus_fruit', 1]] : []) });
+block('chorus_flower', 'Chorus Flower', 'chorus_flower', { hardness: 0.4, opaque: false, boxes: [[0.125, 0, 0.125, 0.875, 0.875, 0.875]] });
+block('end_gateway', 'End Gateway', 'end_portal', { solid: false, opaque: false, hardness: -1, drop: null, light: true, emit: 15, gateway: true, hide: true });
 let nextItemId = 128;
 function item(key, name, tile, o = {}) {
   const id = nextItemId++;
@@ -1764,6 +1776,11 @@ item('compass', 'Compass', 'compass', { stack: 1 });
 item('clock', 'Clock', 'clock', { stack: 1 });
 item('map', 'Map', 'map', { stack: 1 });
 item('spyglass', 'Spyglass', 'spyglass', { stack: 1 });
+item('chorus_fruit', 'Chorus Fruit', 'chorus_fruit', { food: 4, chorus: true });
+item('popped_chorus_fruit', 'Popped Chorus Fruit', 'popped_chorus_fruit');
+item('shulker_shell', 'Shulker Shell', 'shulker_shell');
+item('elytra', 'Elytra', 'elytra', { stack: 1, armor: { slot: 1, points: 0 }, elytra: true });
+item('firework_rocket', 'Firework Rocket', 'firework_rocket', { stack: 64, firework: true });
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
@@ -2016,6 +2033,10 @@ RECIPES.push(
   ...WALLS.filter(([f]) => ID[f]).map(([f]) => [f + '_wall', 6, { [f]: 6 }, 'table']),
 );
 
+/* the End round's recipes */
+RECIPES.push(['popped_chorus_fruit', 1, { chorus_fruit: 1 }, 'furnace'], ['purpur_block', 4, { popped_chorus_fruit: 4 }], ['purpur_pillar', 2, { purpur_block: 2 }], ['end_rod', 4, { blaze_rod: 1, popped_chorus_fruit: 1 }],
+  ['shulker_box', 1, { shulker_shell: 2, chest: 1 }, 'table'], ['firework_rocket', 3, { paper: 1, gunpowder: 1 }], ['x_purpur_block_slab', 2, { purpur_block: 1 }, 'stonecutter'], ['x_purpur_block_stairs', 1, { purpur_block: 1 }, 'stonecutter']);
+const iEndRod = RECIPES.findIndex(r => r[0] === 'end_rod' && r[2].end_stone); if (iEndRod >= 0) RECIPES.splice(iEndRod, 1);
 /* the machines round's recipes */
 RECIPES.push(
   ['barrel', 1, { '#planks': 7 }, 'table'], ['stonecutter', 1, { iron_ingot: 1, stone: 3 }, 'table'], ['cauldron', 1, { iron_ingot: 7 }, 'table'],
