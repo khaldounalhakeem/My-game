@@ -243,8 +243,9 @@ function castleData() {
     for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dz)) === 2 && !(dz === 2 && Math.abs(dx) <= 1)) { put(ex + dx, ey, ez + dz, 'bookshelf'); put(ex + dx, ey + 1, ez + dz, 'bookshelf'); }
     put(ex - 2, ey + 2, ez - 2, 'lantern'); put(ex + 2, ey + 2, ez - 2, 'lantern');
     put(-18, ey, r.z0, 'anvil'); put(-18, ey, r.z1, 'grindstone'); put(-6, ey, r.z0, 'lectern');
-    chest(-6, ey, r.z1, [['lapis', 64], ['lapis', 64], ['book', 32], ['lapis_block', 8], ['enchanted_book', 4]]);
+    chest(-6, ey, r.z1, [['lapis', 64], ['lapis', 64], ['book', 32], ['experience_bottle', 64], ['experience_bottle', 64], ['enchanted_book', 4]]);
     chest(-18, ey, -4, [['diamond_sword', 1], ['diamond_pickaxe', 1], ['diamond_chestplate', 1], ['bow', 1]]);
+    chest(-16, ey, 1, [['experience_bottle', 64], ['experience_bottle', 64], ['experience_bottle', 64], ['lapis', 64]]); // XP for enchanting: throw the bottles
   }
   r = label(7, -1, 1, ['BREWING', 'ROOM', 'Potions!', '']);
   for (const x of [-17, -13, -9]) put(x, 8, r.z0, 'brewing_stand');
@@ -542,7 +543,7 @@ function castleData() {
   put(-18, -7, 20, 'gold_block'); put(-17, -7, 20, 'diamond_block'); put(-16, -7, 20, 'emerald_block'); put(-15, -7, 20, 'gold_block');
   put(-17, -6, 20, 'amethyst_cluster');
   chest(-20, -7, 20, [['diamond', 64], ['enchanted_golden_apple', 4], ['netherite_ingot', 8], ['totem_of_undying', 2], ['elytra', 1], ['ender_pearl', 16]]);
-  chest(-14, -7, 20, [['emerald', 64], ['gold_block', 16], ['diamond_block', 8], ['golden_apple', 16], ['lapis_block', 16], ['mace', 1]]);
+  chest(-14, -7, 20, [['emerald', 64], ['gold_block', 16], ['diamond_block', 8], ['golden_apple', 16], ['experience_bottle', 64], ['mace', 1]]);
   put(-22, -7, 15, 'ender_chest'); put(-22, -7, 17, 'enchanting_table');
   for (const [x, z] of [[-20, 11], [-15, 11], [-20, 18], [-15, 18]]) put(x, -7, z, 'soul_lantern');
   put(-17, -2, 15, 'chain'); put(-17, -3, 15, 'soul_lantern');
@@ -688,7 +689,7 @@ function hallData() {
   [-9, -3, 3, 9].forEach((x, i) => { booth(x, -1, JOBS_N[i]); booth(x, 1, JOBS_S[i]); });
   for (const x of [-12, -6, 0, 6, 12]) { put(x, 1, -4, 'lantern'); put(x, 1, 4, 'lantern'); }
   chest(-12, 1, 2, [['emerald', 32], ['wheat', 64], ['coal', 32], ['stick', 64], ['string', 32], ['iron_ingot', 16]]);
-  chest(12, 1, 2, [['paper', 64], ['book', 16], ['steak', 32], ['flint', 32], ['potato', 32], ['emerald', 16]]);
+  chest(12, 1, 2, [['paper', 64], ['book', 16], ['steak', 32], ['flint', 32], ['potato', 32], ['emerald', 16], ['experience_bottle', 32]]);
   HALL_DATA = { d, S, KEEP, signs, chests };
   return HALL_DATA;
 }

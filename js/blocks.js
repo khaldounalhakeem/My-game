@@ -800,6 +800,7 @@ makeTile('hive_front_full', P => { pPlanks(0xc89a5a)(P); P.rect(0, 0, 16, 2, 0x8
 makeTile('honey_block', P => { P.fill(0xf8b830, 6); P.rect(2, 2, 12, 12, 0xfccc50, 5); P.rect(4, 4, 8, 8, 0xf8b830, 4); });
 makeTile('honeycomb_block', P => { P.fill(0xe8a020, 8); for (let y = 0; y < 16; y += 4) for (let x = (y & 4) ? 2 : 0; x < 16; x += 4) P.rect(x, y, 3, 3, 0xf8c040, 6); });
 makeTile('i_honeycomb', pPlant(P => { for (const [x, y] of [[4, 5], [9, 5], [6, 9], [11, 9], [4, 13]]) { P.rect(x - 2, y - 2, 4, 4, 0xe8a020); P.rect(x - 1, y - 1, 2, 2, 0xf8c850); } }));
+makeTile('i_experience_bottle', pPlant(P => { P.rect(7, 2, 2, 3, 0x9adf6a); P.rect(4, 5, 8, 9, 0x3ab83a); P.rect(5, 6, 6, 7, 0x7aff5a); P.rect(6, 8, 2, 2, 0xeaffc0); P.rect(9, 10, 1, 2, 0xeaffc0); P.rect(6, 1, 4, 1, 0x8a6030); }));
 makeTile('i_glass_bottle', pPlant(P => { P.rect(7, 2, 2, 3, 0xc8e0f0); P.rect(4, 5, 8, 9, 0xd8ecf8); P.rect(5, 6, 6, 7, 0xeaf6ff); P.rect(6, 1, 4, 1, 0x8a6030); }));
 makeTile('i_honey_bottle', pPlant(P => { P.rect(7, 2, 2, 3, 0xc8e0f0); P.rect(4, 5, 8, 9, 0xd8ecf8); P.rect(5, 7, 6, 6, 0xf8b030); P.rect(6, 1, 4, 1, 0x8a6030); }));
 makeTile('i_shears', pPlant(P => { P.line(3, 3, 10, 10, 0xd8d8d8); P.line(4, 3, 11, 10, 0xb0b0b0); P.line(12, 3, 5, 10, 0xd8d8d8); P.line(12, 4, 6, 10, 0xb0b0b0); P.disc(4, 12, 2, 0x7a5a32); P.disc(12, 12, 2, 0x7a5a32); }));
@@ -1914,6 +1915,7 @@ item('minecart', 'Minecart', 'minecart', { stack: 1, cart: 'minecart' });
 item('chest_minecart', 'Minecart with Chest', 'chest_minecart', { stack: 1, cart: 'chest_minecart' });
 for (const [k] of EGG_MOBS) item('egg_' + k, k.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') + ' Spawn Egg', 'egg_' + k, { stack: 64, egg: k });
 item('saddle', 'Saddle', 'saddle', { stack: 1 });
+item('experience_bottle', "Bottle o' Enchanting", 'experience_bottle', { stack: 64, splash: 'xp' });
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
