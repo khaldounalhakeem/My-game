@@ -1,5 +1,5 @@
 'use strict';
-const VERSION_TAG = 'v115 claude';
+const VERSION_TAG = 'v116 claude';
 /* Multiplayer: everyone who has this page open shares one claude.ai "room". Each player's
    presence says which world (seed) they are in, where they stand, and their latest block
    changes; players in the same world see each other. Without the room the game is single-player. */

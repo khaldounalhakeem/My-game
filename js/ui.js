@@ -114,9 +114,9 @@ const UI = {
     o.classList.remove('on'); void o.offsetWidth; o.classList.add('on');
   },
   selectionChanged() {
-    const d = G.player.heldDef();
+    const d = G.player.heldDef(), hs = G.player.heldSlot();
     const n = $('itemname');
-    n.textContent = d ? d.name : '';
+    n.textContent = hs ? (hs.n || d.name) + (hs.e ? '\n' + enchText(hs.e) : '') : '';
     n.classList.remove('show'); void n.offsetWidth; if (d) n.classList.add('show');
   },
 
@@ -171,7 +171,7 @@ const UI = {
       if (img.getAttribute('src') !== url) img.src = url;
       img.style.visibility = 'visible';
       cnt.textContent = s.count > 1 ? s.count : '';
-      el.dataset.name = (s.n ? '“' + s.n + '” ' + DEFS[s.id].name : DEFS[s.id].name) + (s.e ? ' (' + enchText(s.e) + ')' : '') + (s.c ? ' (' + s.c.filter(Boolean).length + ' stacks inside)' : '');
+      el.dataset.name = slotDesc(s);
       el.classList.toggle('ench', !!s.e);
     } else {
       img.style.visibility = 'hidden'; cnt.textContent = ''; el.dataset.name = ''; el.classList.remove('ench');
@@ -197,6 +197,7 @@ const UI = {
         // picking up a whole stack: a little "Take half" button pops up on that slot
         const st = !e.shiftKey && !this.cursor && i !== 202 && e.button !== 2 ? this.slotBox(i) : null;
         const big = st && st.box[st.k] && st.box[st.k].count > 1 ? st.box[st.k].count : 0;
+        { const st0 = this.slotBox(i), was = st0 && st0.box[st0.k]; this.showInfo(this.cursor || was || (st0 && st0.box[st0.k])); }
         this.clickSlot(i, e.button, e.shiftKey);
         if (big && this.cursor && this.cursor.count === big) this.openSplit(i, s);
         this.furnaceEdited(fsig);
@@ -227,6 +228,13 @@ const UI = {
     $('btn-chest-all').addEventListener('click', () => this.takeAll());
   },
 
+  /* the line at the top of the inventory: the name and enchantments of what you just tapped */
+  showInfo(s) {
+    const el = $('inv-info');
+    if (!el) return;
+    el.textContent = s ? slotDesc(s) : '';
+    el.classList.toggle('ench', !!(s && s.e));
+  },
   tip(text) {
     const t = $('tooltip');
     t.textContent = text || '';
@@ -251,7 +259,7 @@ const UI = {
     if (!box) return;
     const s = box[k], cur = this.cursor;
     if (shift && s && !cur) {
-      const left = inv.add(s.id, s.count);
+      const left = inv.add(s.id, s.count, s.e, s.n, s.c);
       if (left) s.count = left; else box[k] = null;
     } else if (button === 2) {
       if (!cur && s) { const half = Math.ceil(s.count / 2); this.cursor = copySlot(s, half); s.count -= half; if (!s.count) box[k] = null; }
@@ -298,7 +306,7 @@ const UI = {
     const box = f.slots, s = box[k], cur = this.cursor;
     if (k === 2) {
       if (!s) return;
-      if (shift) { const left = inv.add(s.id, s.count); if (left) s.count = left; else box[2] = null; }
+      if (shift) { const left = inv.add(s.id, s.count, s.e, s.n, s.c); if (left) s.count = left; else box[2] = null; }
       else if (!cur) { this.cursor = s; box[2] = null; }
       else if (cur.id === s.id && cur.count + s.count <= DEFS[s.id].stack) { cur.count += s.count; box[2] = null; }
       else return;
@@ -432,6 +440,7 @@ const UI = {
   },
 
   openInventory(station, chest, furnace) {
+    this.showInfo(null);
     if (G.state !== 'play') return;
     // riding a horse or donkey with a chest: Items opens its chest too
     const rd = G.player.riding;

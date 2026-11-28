@@ -64,6 +64,9 @@ body[data-state="inventory"] #crosshair { display: none; }
   opacity: 0; height: 18px;
 }
 #itemname.show { animation: fadeName 2.2s ease-out forwards; }
+#itemname { white-space: pre-line; height: auto; min-height: 18px; text-align: center; }
+.inv-info { min-height: 1.3em; font-size: 14px; color: var(--ink); margin: 2px 0 6px; }
+.inv-info.ench { color: #c8a8ff; }
 @keyframes fadeName { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 
 #stats { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px; }

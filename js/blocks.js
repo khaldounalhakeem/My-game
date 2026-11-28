@@ -1996,6 +1996,7 @@ const slotExtras = s => (s && (s.e || s.n || s.c) ? { e: s.e, n: s.n, c: s.c } :
 /* two stacks can join only if they are the same plain item (enchanted, named or filled ones keep apart) */
 const sameStack = (a, b) => a.id === b.id && !a.e && !b.e && !a.c && !b.c && (a.n || '') === (b.n || '');
 const slotName = s => (s.n ? s.n : DEFS[s.id].name);
+const slotDesc = s => (s ? (s.n ? '\u201c' + s.n + '\u201d (' + DEFS[s.id].name + ')' : DEFS[s.id].name) + (s.e ? ' \u2014 ' + enchText(s.e) : '') + (s.c ? ' (' + s.c.filter(Boolean).length + ' stacks inside)' : '') : '');
 /* keep only real enchantments with sensible levels (from saves or other players) */
 function cleanEnch(e) {
   if (!e || typeof e !== 'object') return undefined;
