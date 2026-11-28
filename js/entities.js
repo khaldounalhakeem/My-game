@@ -954,7 +954,8 @@ class Mob {
       if (!this.tame && hd && !lovesFood(this.type, hd.id)) { G.ui.message(this.type === 'fox' ? 'Foxes love glow berries. Hold some and tap the fox.' : 'Parrots love seeds. Hold wheat seeds and tap the parrot.'); return true; }
     }
     // wolf armor (made from armadillo scutes) protects your wolf
-    if (this.type === 'wolf' && this.tame && hd && hd.key === 'wolf_armor' && !this.remoteCtl) { const old = this.armor; this.armor = 'wolf_armor'; P.inv.takeFrom(P.sel, 1); if (old) P.inv.add(ID[old], 1); P.inv.changed(); this.dress(); G.ui.message('Your wolf is wearing wolf armor!', 'gold'); return true; }
+    if (this.type === 'wolf' && this.tame && hd && (hd.key === 'wolf_armor' || hd.dogArmor) && !this.remoteCtl) { const old = this.armor; this.armor = hd.key; P.inv.takeFrom(P.sel, 1); if (old) P.inv.add(ID[old], 1); P.inv.changed(); this.dress(); G.sound.play('craft', this.pos); G.ui.message((this.customName || 'Your dog') + ' is wearing ' + hd.name.toLowerCase() + '!', 'gold'); return true; }
+    if (this.type === 'wolf' && this.tame && !hd && P.sneaking && this.armor && !this.remoteCtl) { P.inv.add(ID[this.armor], 1); P.inv.changed(); this.armor = null; this.dress(); G.ui.message('You took the armor off ' + (this.customName || 'your dog') + '.'); return true; }
     // a rope: tie up an animal so it follows you, or untie it
     if (this.leash && (!hd || hd.key === 'lead') && !this.remoteCtl) { this.unleash(false); P.inv.add(ID.lead, 1); P.inv.changed(); G.ui.message('You untied the ' + this.T.name.toLowerCase() + '.'); return true; }
     if (hd && hd.key === 'lead' && !this.T.hostile && !this.leash) {
@@ -1696,7 +1697,7 @@ class Mob {
     if (this.parts.collar) this.parts.collar.visible = this.tame;
     if (this.parts.saddle) this.parts.saddle.visible = this.tame && this.T.horsey;
     if (this.type === 'villager') { const pj = JOB_NAMES[(f >> 10) & 7] || null; if (pj !== this.prof) { this.prof = pj; this.dressJob(); } }
-    const ai = (f >> 6) & 7, ch = !!(f & 512);
+    const ai = ((f >> 6) & 7) | (((f >> 13) & 1) << 3), ch = !!(f & 512);
     if (ai !== this.netArmor || ch !== this.netChest) { this.netArmor = ai; this.netChest = ch; this.armor = HORSE_ARMOR_KEYS[ai - 1] || null; this.chestShown = ch; this.dress(); }
     if (this.parts.ring) this.parts.ring.rotation.y += dt * 3;
     this.mesh.position.copy(this.pos);

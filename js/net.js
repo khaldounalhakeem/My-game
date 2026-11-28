@@ -1,5 +1,5 @@
 'use strict';
-const VERSION_TAG = 'v120 claude';
+const VERSION_TAG = 'v121 claude';
 /* Multiplayer: everyone who has this page open shares one claude.ai "room". Each player's
    presence says which world (seed) they are in, where they stand, and their latest block
    changes; players in the same world see each other. Without the room the game is single-player. */
@@ -603,7 +603,7 @@ const Net = {
     for (const m of order) {
       if (out.length >= 45) break;
       const flags = (m.dead ? 1 : 0) | (m.tame ? 2 : 0) | (m.sitting || m.resting ? 4 : 0) | (m.fuse > 0 ? 8 : 0) | (m.angry ? 16 : 0) | (m.baby ? 32 : 0)
-        | ((HORSE_ARMOR_KEYS.indexOf(m.armor) + 1) << 6) | (m.chestSlots ? 512 : 0) | (Math.max(0, JOB_NAMES.indexOf(m.prof || null)) << 10);
+        | (((HORSE_ARMOR_KEYS.indexOf(m.armor) + 1) & 7) << 6) | ((((HORSE_ARMOR_KEYS.indexOf(m.armor) + 1) >> 3) & 1) << 13) | (m.chestSlots ? 512 : 0) | (Math.max(0, JOB_NAMES.indexOf(m.prof || null)) << 10);
       out.push(m.customName ? [m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags, m.customName] : [m.nid, m.type, r2(m.pos.x), r2(m.pos.y), r2(m.pos.z), r2(m.yaw), Math.round(m.hp), flags]);
     }
     for (const d of G.dragons) {

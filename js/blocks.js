@@ -812,6 +812,11 @@ makeTile('i_bowl', pPlant(P => { for (let y = 8; y < 13; y++) { const w = 6 - (y
 makeTile('i_mushroom_stew', pPlant(P => { for (let y = 8; y < 13; y++) { const w = 6 - (y - 8); P.rect(8 - w, y, w * 2, 1, 0x8a5a2a); } P.rect(3, 6, 10, 2, 0xc89a6a); P.pts([[5, 6], [9, 7], [11, 6]], 0xc8221c); }));
 makeTile('i_bucket_of_cod', pBucket(0x3a6ad8)); makeTile('i_bucket_of_salmon', pBucket(0x3a6ad8)); makeTile('i_bucket_of_tropical_fish', pBucket(0x3a6ad8)); makeTile('i_bucket_of_axolotl', pBucket(0x3a6ad8));
 makeTile('i_armadillo_scute', pPlant(P => { P.disc(8, 9, 5, 0xa86a5a, 6); P.rect(4, 8, 8, 1, 0xc88a7a); P.rect(5, 11, 6, 1, 0x8a5a4a); }));
+const pDogArmor = (c, hi, dk) => pPlant(P => { P.rect(3, 5, 10, 6, c); P.rect(4, 6, 8, 4, hi); P.rect(2, 11, 3, 3, dk); P.rect(11, 11, 3, 3, dk); P.rect(6, 4, 4, 1, hi); });
+makeTile('i_iron_dog_armor', pDogArmor(0xc8c8c8, 0xf0f0f0, 0x8a8a8a));
+makeTile('i_golden_dog_armor', pDogArmor(0xe8b820, 0xffe070, 0xa8801a));
+makeTile('i_diamond_dog_armor', pDogArmor(0x4ad0c8, 0x9af0e8, 0x2a8a84));
+makeTile('i_netherite_dog_armor', pDogArmor(0x4a4448, 0x6a6266, 0x2a2628));
 makeTile('i_wolf_armor', pPlant(P => { P.rect(3, 5, 10, 6, 0xa86a5a); P.rect(4, 6, 8, 4, 0xc88a7a); P.rect(2, 11, 3, 3, 0x8a5a4a); P.rect(11, 11, 3, 3, 0x8a5a4a); }));
 makeTile('i_totem_of_undying', pPlant(P => { P.rect(5, 2, 6, 5, 0xf0d040); P.rect(6, 3, 1, 1, 0x2a8a3a); P.rect(9, 3, 1, 1, 0x2a8a3a); P.rect(4, 7, 8, 5, 0xe8c030); P.rect(2, 8, 2, 3, 0xe8c030); P.rect(12, 8, 2, 3, 0xe8c030); P.rect(6, 12, 4, 3, 0xd8a820); P.rect(7, 9, 2, 1, 0x2a8a3a); }));
 makeTile('i_snowball', pBlob(0xf4f8fc, 4, 0xd8e4f0));
@@ -1918,6 +1923,12 @@ item('saddle', 'Saddle', 'saddle', { stack: 1 });
 item('experience_bottle', "Bottle o' Enchanting", 'experience_bottle', { stack: 64, splash: 'xp' });
 HORSE_ARMOR_KEYS.push('wolf_armor');
 HORSE_ARMOR.wolf_armor = { name: 'Wolf Armor', pts: 12, color: 0xa86a5a };
+/* dog armor like horse armor (and cheaper): iron, gold, diamond and netherite, for your tamed wolf */
+for (const [k, n, pts, color] of [['iron', 'Iron', 10, 0x9aa2ae], ['golden', 'Golden', 8, 0xf5cc2e], ['diamond', 'Diamond', 15, 0x5fe0d8], ['netherite', 'Netherite', 18, 0x4a4448]]) {
+  item(k + '_dog_armor', n + ' Dog Armor', k + '_dog_armor', { stack: 1, dogArmor: true });
+  HORSE_ARMOR[k + '_dog_armor'] = { name: n + ' Dog Armor', pts, color };
+  HORSE_ARMOR_KEYS.push(k + '_dog_armor');
+}
 DEFS[ID.redstone].placesWire = true; // redstone dust goes on the floor as a wire
 
 function getDrops(def, rng) {
@@ -2097,6 +2108,8 @@ const RECIPES = [
   ['iron_horse_armor', 1, { iron_ingot: 7 }, 'table'],
   ['golden_horse_armor', 1, { gold_ingot: 7 }, 'table'],
   ['diamond_horse_armor', 1, { diamond: 7 }, 'table'],
+  ['iron_dog_armor', 1, { iron_ingot: 4 }, 'table'], ['golden_dog_armor', 1, { gold_ingot: 4 }, 'table'],
+  ['diamond_dog_armor', 1, { diamond: 4 }, 'table'], ['netherite_dog_armor', 1, { netherite_ingot: 2 }, 'table'],
   ['lantern', 1, { torch: 1, iron_ingot: 1 }, 'table'],
   ['pumpkin_seeds', 4, { pumpkin: 1 }],
   ['baked_potato', 1, { potato: 1 }, 'furnace'],
