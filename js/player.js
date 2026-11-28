@@ -91,7 +91,7 @@ class Player {
     if (this.hurtCd > 0 && !force) return;
     if (this.sleeping) G.wake('You were woken up!');
     // armor softens every kind of hurt except falling, drowning, starving and the void (4% per armor point, like Minecraft)
-    const bypass = !from && /fell from|fell out|drown|starv|void|pearl|suffocat|froze/i.test(cause || '');
+    const bypass = /sonic boom/i.test(cause || '') || (!from && /fell from|fell out|drown|starv|void|pearl|suffocat|froze/i.test(cause || ''));
     // armor works like Minecraft: big hits get through more than small ones; damage is kept in halves, so
     // a stronger sword always does more (no rounding two different swords to the same number)
     if (this.fx('resistance') && !/void|starv/i.test(cause || '')) amount = Math.max(0.5, Math.round(amount * (1 - 0.2 * this.fx('resistance')) * 2) / 2);
@@ -1091,7 +1091,7 @@ class Player {
     if (hd.egg) {
       // a spawn egg: on a spawner it changes what comes out; anywhere else the mob appears
       if (b && b.id === ID.spawner) { const sl = G.chestSlots(b.x, b.y, b.z, true); sl[0] = { id: hd.id, count: 1 }; G.chestChanged(chestKey(b.x, b.y, b.z)); G.ui.message('This spawner now makes ' + MOB_TYPES[hd.egg].name + 's.', 'gold'); }
-      else if (b) { const px = b.x + b.nx + 0.5, py = b.y + b.ny, pz = b.z + b.nz + 0.5; if (MOB_TYPES[hd.egg]) spawnMob(hd.egg, px, py + (b.ny < 0 ? -1 : 0), pz); }
+      else if (b) { const px = b.x + b.nx + 0.5, py = b.y + b.ny, pz = b.z + b.nz + 0.5; if (MOB_TYPES[hd.egg]) { const m = spawnMob(hd.egg, px, py + (b.ny < 0 ? -1 : 0), pz); if (m) m.claimed = true; } }
       else return;
       if (this.mode === 'survival') this.inv.takeFrom(this.sel, 1);
       this.useCd = 0.3; this.swing = 1; G.sound.play('place');

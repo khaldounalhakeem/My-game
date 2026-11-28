@@ -736,6 +736,15 @@ class Mob {
     if (this.hp <= 0) this.die(byPlayer);
   }
 
+  sonicBoom(P) {
+    const from = new V3(this.pos.x, this.pos.y + 1.8, this.pos.z), to = new V3(P.pos.x, P.pos.y + 1, P.pos.z);
+    const d = to.clone().sub(from), len = d.length(); d.normalize();
+    for (let s = 0.8; s < len; s += 0.7) { const q = from.clone().addScaledVector(d, s); G.particles.burst(q.x, q.y, q.z, [0x2ad8d8, 0x7af0f0, 0x0a6a7a], 5, 0.6, 0.18, -1); }
+    G.sound.play('sonicBoom', this.pos);
+    if (P.dead || len > 20) return;
+    if (P.remote) P.hurt(10, this.pos, 14, true, 'The Warden hit you with a Sonic Boom.');
+    else { P.hurt(10, this.pos, 14, true, 'The Warden hit you with a Sonic Boom.'); P.vel.y += 5; }
+  }
   /* the warden is blind: it finds you by the noise you make (walking, running, jumping). Sneak and it may not hear you. */
   wardenHears(P, dist, dt) {
     if (P.dead || P.mode !== 'survival') return false;
@@ -1448,6 +1457,12 @@ class Mob {
       const l = Math.hypot(toP.x, toP.z) || 1;
       moveX = toP.x / l; moveZ = toP.z / l;
       this.yaw = Math.atan2(moveX, moveZ);
+      // the warden's Sonic Boom: too far to punch, it stops, charges up and blasts you, through walls and armor
+      if (this.type === 'warden') {
+        this.sonicCd = (this.sonicCd === undefined ? 2 : this.sonicCd) - dt;
+        if (this.sonicCharge > 0) { this.sonicCharge -= dt; moveX = 0; moveZ = 0; if (this.sonicCharge <= 0) this.sonicBoom(P); }
+        else if (dist > 4 && dist < 16 && this.sonicCd <= 0) { this.sonicCharge = 1.7; this.sonicCd = 5; G.sound.play('wardenCharge', this.pos); }
+      }
       if (T.ranged === 'blaze' || T.ranged === 'ghast' || T.ranged === 'wither') {
         const ghast = T.ranged === 'ghast' || T.ranged === 'wither';
         const near = ghast ? 12 : 5, far = ghast ? 26 : 10;

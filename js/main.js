@@ -209,6 +209,8 @@ const Sound = {
       case 'mob_hoglin': this.voice(0, 0.4, 0.5 * v, 110, 85, [[400, 5, 4], [900, 2, 5]], { breath: 0.9, attack: 0.02 }); break;
       case 'mob_piglin': case 'mob_zombified_piglin': case 'mob_piglin_brute': this.voice(0, 0.15, 0.45 * v, 200, 150, [[600, 4, 4], [1300, 2, 5]], { breath: 0.7, attack: 0.01 }); this.voice(0.18, 0.22, 0.4 * v, 190, 130, [[600, 4, 4], [1300, 2, 5]], { breath: 0.7, attack: 0.01 }); break;
       case 'mob_warden': this.tone(55, 0.18, 'sine', 0.3 * v, 45); this.tone(55, 0.18, 'sine', 0.25 * v, 45, 0.3); break;
+      case 'wardenCharge': this.voice(0, 1.6, 0.35 * v, 60, 240, [[300, 5, 3], [900, 2, 5]], { attack: 1.2, breath: 0.6 }); this.grain(1.2, 0.4, 0.4 * v, 2500, 1, 'bandpass', 0.3); break;
+      case 'sonicBoom': this.grain(0, 0.5, 1.2 * v, 180, 1, 'lowpass', 0.005); this.tone(90, 0.6, 'sine', 0.5 * v, 40); this.grain(0, 0.25, 0.6 * v, 3000, 2, 'bandpass', 0.01); for (let i = 0; i < 4; i++) this.tone(1200 + i * 300, 0.3, 'sine', 0.08 * v, 400, i * 0.04); break;
       case 'wardenRoar': this.tone(70, 1.5, 'sawtooth', 0.3 * v, 40); this.noise(1.5, 0.35 * v, 300, 'lowpass', 0, 80); break;
       case 'mob_husk': case 'mob_drowned': this.voice(0, 0.9, 0.45 * v, 85, 65, [[300, 5, 4], [700, 2.5, 5]], { vib: 0.04, breath: 0.6, attack: 0.12 }); break;
       case 'mob_stray': case 'mob_wither_skeleton': for (let i = 0; i < 4; i++) this.noise(0.04, 0.2 * v, name === 'mob_stray' ? 2000 : 1500, 'bandpass', i * 0.08); break;
@@ -825,7 +827,7 @@ G.tryBuildWither = (x, y, z) => {
     if (!ok) continue;
     for (const i of [-1, 0, 1]) { W.setBlock(cx + ax * i, y, cz + az * i, 0); W.setBlock(cx + ax * i, y - 1, cz + az * i, 0); }
     W.setBlock(cx, y - 2, cz, 0);
-    const m = spawnMob('wither', cx + 0.5, y - 1.5, cz + 0.5);
+    const m = spawnMob('wither', cx + 0.5, y - 1.5, cz + 0.5); if (m) m.claimed = true;
     m.shootCd = 3;
     G.explode(cx + 0.5, y, cz + 0.5, 3, true, false, null, 'The Wither came out with a blast.');
     G.ui.message('The Wither has awoken! Defeat it to get a Nether Star.', 'purple');
@@ -838,7 +840,7 @@ G.tryBuildGolem = (x, y, z) => {
   // a pumpkin on two snow blocks: a Snow Golem
   if (W.getBlock(x, y - 1, z) === ID.snow && W.getBlock(x, y - 2, z) === ID.snow) {
     for (const [bx, by, bz] of [[x, y, z], [x, y - 1, z], [x, y - 2, z]]) { W.setBlock(bx, by, bz, 0); G.particles.blockBreak(bx, by, bz, ID.snow); }
-    spawnMob('snow_golem', x + 0.5, y - 2, z + 0.5);
+    { const g = spawnMob('snow_golem', x + 0.5, y - 2, z + 0.5); if (g) g.claimed = true; }
     G.ui.message('You built a Snow Golem! It throws snowballs at monsters.', 'gold');
     return true;
   }
@@ -849,7 +851,7 @@ G.tryBuildGolem = (x, y, z) => {
         W.setBlock(bx, by, bz, 0);
         G.particles.blockBreak(bx, by, bz, ID.iron_block);
       }
-      spawnMob('iron_golem', x + 0.5, y - 2, z + 0.5);
+      { const g = spawnMob('iron_golem', x + 0.5, y - 2, z + 0.5); if (g) g.claimed = true; }
       G.ui.message('You built an Iron Golem! It will protect you from monsters.', 'gold');
       Sound.play('golem');
       return true;
