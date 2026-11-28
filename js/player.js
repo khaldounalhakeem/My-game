@@ -603,11 +603,12 @@ class Player {
     if (!b) { this.breaking = null; if (pressed) this.swing = 1; return; }
     if (b.id === ID.fire || b.id === ID.soul_fire) { if (pressed) this.putOutFire(b.x, b.y, b.z); this.breaking = null; return; }
     const def = DEFS[b.id];
-    if (def.hardness === Infinity) { this.breaking = null; return; }
+    // creative mode breaks anything, even bedrock and End portal frames (like Minecraft)
     if (creative) {
       if (pressed || this.breakCd <= 0) { this.breakCd = 0.25; this.swing = 1; this.breakBlock(b.x, b.y, b.z, b.id); }
       return;
     }
+    if (def.hardness === Infinity) { this.breaking = null; return; }
     const br = this.breaking;
     if (!br || br.x !== b.x || br.y !== b.y || br.z !== b.z || br.id !== b.id) this.breaking = { x: b.x, y: b.y, z: b.z, id: b.id, p: 0, tick: 0 };
     const B = this.breaking;
