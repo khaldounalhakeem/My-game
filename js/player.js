@@ -249,6 +249,7 @@ class Player {
     const under = this.onGround ? G.world.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y - 0.1), Math.floor(this.pos.z)) : 0;
     this.onHoney = under === ID.honey_block;
     if (this.onHoney && !this.flying) speed *= 0.4;
+    if (this.bowDraw > 0) speed *= 0.45; // walking slowly while the bow is drawn
     if ((under === ID.soul_sand || W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.05), Math.floor(this.pos.z)) === ID.soul_sand) && !this.flying) speed *= 0.45; // soul sand pulls at your feet
     const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
     const wx = (-s * mz + c * mx) * speed, wz = (-c * mz - s * mx) * speed;
@@ -1045,7 +1046,8 @@ class Player {
       return;
     }
     if (hd.key === 'fishing_rod') { this.useCd = 0.4; this.swing = 1; G.fishRod(); return; }
-    if (hd.key === 'bow') {
+    if (hd.key === 'bow') return; // the bow is drawn by holding and shoots when you let go (shootBow)
+    if (hd.key === '__bow_instant') {
       if (this.mode === 'survival') {
         if (!this.inv.count(ID.arrow)) { G.ui.message('You need arrows to shoot the bow.'); this.useCd = 0.5; return; }
         if (!enchLv(this.heldSlot(), 'infinity')) this.inv.remove(ID.arrow, 1);
@@ -1159,6 +1161,22 @@ class Player {
     if (this.mode === 'creative') { this.inv.slots[this.sel] = { id, count: DEFS[id].stack }; this.inv.changed(); G.ui.selectionChanged(); }
   }
 
+  /* let go of a drawn bow: the longer it was held (up to a second), the further and harder the arrow flies */
+  shootBow(charge) {
+    const hd = this.heldDef();
+    if (!hd || hd.key !== 'bow' || this.dead) return;
+    if (charge < 0.12) return; // barely touched: no arrow, like Minecraft
+    if (this.mode === 'survival') {
+      if (!this.inv.count(ID.arrow)) { G.ui.message('You need arrows to shoot the bow.'); return; }
+      if (!enchLv(this.heldSlot(), 'infinity')) this.inv.remove(ID.arrow, 1);
+    }
+    const f = Math.min(1, charge), speed = 38 * (f * f * 0.75 + 0.25);
+    const o = this.eyePos(), d = this.lookDir();
+    G.spawnProjectile('arrow', o.addScaledVector(d, 0.5), d.multiplyScalar(speed), this);
+    { const pr = G.projectiles[G.projectiles.length - 1], bs = this.heldSlot(); if (pr) { pr.power = enchLv(bs, 'power'); pr.flame = enchLv(bs, 'flame'); } }
+    G.sound.play('bow');
+    this.swing = 1;
+  }
   dropHeld(all) {
     const s = this.heldSlot();
     if (!s) return;

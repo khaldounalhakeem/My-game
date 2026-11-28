@@ -3570,6 +3570,16 @@ function frame(now) {
     if (active) {
     const aimPt = Input.tap || Input.aim;
     const tgt = P.dead ? { block: null, mob: null } : P.target(aimPt ? screenRay(aimPt) : null);
+    // the bow: hold to draw it (finger on the screen, right mouse button or the controller), let go to shoot
+    const bowHd = P.heldDef();
+    if (bowHd && bowHd.key === 'bow' && !P.dead) {
+      const holding = Input.bowHold || Input.right || Input.padRight;
+      if (holding) P.bowDraw = Math.min(1, (P.bowDraw || 0) + dt);
+      else if (P.bowDraw > 0) { P.shootBow(P.bowDraw); P.bowDraw = 0; }
+      if (Input.tap && !tgt.mob) Input.tap = null; // a quick tap with a bow is not a click on a block
+      Input.rightPressed = false;
+    } else P.bowDraw = 0;
+    G.ui.bowBar(P.bowDraw || 0);
     if (Input.tap) {
       if (tgt.mob && !(tgt.mob.wantsInteract && tgt.mob.wantsInteract(P))) Input.leftPressed = true; else Input.rightPressed = true;
       Input.tap = null;

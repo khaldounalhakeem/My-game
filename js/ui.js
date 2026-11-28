@@ -653,6 +653,15 @@ const UI = {
     if (this.friendText !== text) { this.friendText = text; $('friend-label').textContent = text; }
   },
 
+  /* how far the bow is drawn: a little bar under the crosshair */
+  bowBar(v) {
+    const el = $('bow-bar');
+    if (!el) return;
+    const show = v > 0;
+    if (el.hidden === show) el.hidden = !show;
+    if (show) el.firstElementChild.style.width = Math.round(v * 100) + '%';
+  },
+
   /* tap outside the inventory box while holding items: throw them out in front of you (right-click throws one) */
   throwCursor(one) {
     const cur = this.cursor;
@@ -1542,6 +1551,8 @@ const UI = {
       if (e.pointerType === 'mouse' && e.button === 1) { Input.middlePressed = true; return; }
       if (look) return;
       look = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, t: performance.now(), moved: false, hold: null };
+      const hd0 = G.player.heldDef();
+      if (hd0 && hd0.key === 'bow') { look.bow = true; Input.bowHold = true; try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ } return; }
       // like Minecraft on a phone: hold your finger on a block to mine the block under your finger
       look.hold = setTimeout(() => { if (look && !look.moved) { Input.aim = { x: look.x, y: look.y }; Input.left = true; Input.leftPressed = true; look.holding = true; } }, 300);
       try { cv.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
@@ -1559,6 +1570,7 @@ const UI = {
     const endLook = e => {
       if (!look || e.pointerId !== look.id) return;
       clearTimeout(look.hold);
+      if (look.bow) { Input.bowHold = false; look = null; return; } // let go: the arrow flies
       if (look.holding) { Input.left = false; Input.aim = null; }
       else if (!look.moved) {
         // a quick tap on a block places/uses on that block; a tap on a mob hits it
@@ -1566,7 +1578,7 @@ const UI = {
       }
       look = null;
     };
-    this.dropLook = () => { if (look) { clearTimeout(look.hold); look = null; } };
+    this.dropLook = () => { if (look) { clearTimeout(look.hold); look = null; } Input.bowHold = false; };
     cv.addEventListener('pointerup', endLook);
     cv.addEventListener('pointercancel', endLook);
 
