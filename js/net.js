@@ -1,5 +1,5 @@
 'use strict';
-const VERSION_TAG = 'v114 claude';
+const VERSION_TAG = 'v115 claude';
 /* Multiplayer: everyone who has this page open shares one claude.ai "room". Each player's
    presence says which world (seed) they are in, where they stand, and their latest block
    changes; players in the same world see each other. Without the room the game is single-player. */
@@ -586,7 +586,7 @@ const Net = {
       if (!rp.inWorld || rp.dim !== G.dim || rp.dead || !rp.model) continue;
       if (!rp.proxy) {
         const r = rp;
-        rp.proxy = { remote: r, w: 0.6, h: 1.8, vel: new THREE.Vector3(), fire: 0, get pos() { return r.model ? r.model.group.position : new THREE.Vector3(); }, get dead() { return !!r.dead; }, get mode() { return r.mode || 'survival'; }, get held() { return r.held || 0; }, hurt: (dmg, from, kb, force, cause) => { const by = G.lastAttacker && G.lastAttacker.nid; G.lastAttacker = null; Net.hit(r, Math.round(dmg), kb || 6, cause || 'You were hit.', by); } };
+        rp.proxy = { remote: r, w: 0.6, h: 1.8, vel: new THREE.Vector3(), fire: 0, get pos() { if (r.bp) return (r.bpv || (r.bpv = new THREE.Vector3())).set(r.bp[0], r.bp[1], r.bp[2]); return r.model ? r.model.group.position : new THREE.Vector3(); }, get dead() { return !!r.dead; }, get mode() { return r.mode || 'survival'; }, get held() { return r.held || 0; }, hurt: (dmg, from, kb, force, cause) => { const by = G.lastAttacker && G.lastAttacker.nid; G.lastAttacker = null; Net.hit(r, Math.round(dmg), kb || 6, cause || 'You were hit.', by); } };
       }
       out.push(rp.proxy);
     }

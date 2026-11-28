@@ -2007,6 +2007,12 @@ class Projectile {
         const t = dr.hitTest(this.pos, dir, step + 0.5);
         if (t !== null && t < bestT) { best = dr; bestT = t; }
       }
+      // your arrows hit your friends too (like a sword does)
+      if (fromPlayer && this.kind === 'arrow') for (const fp of Net.proxies()) {
+        if (fp.dead) continue;
+        const q = fp.pos, t = rayAABB(this.pos, dir, q.x - 0.4, q.y, q.z - 0.4, q.x + 0.4, q.y + 1.8, q.z + 0.4);
+        if (t !== null && t < bestT) { best = fp; bestT = t; }
+      }
       if (best && this.kind === 'potion') { G.splashAt(this.pos, this.potion); return this.finish(); }
       // a fireball you hit back: one hit kills the ghast that threw it (Return to Sender!)
       if (best && this.kind === 'fireball') { if (best instanceof Mob) { best.hurt(best.type === 'ghast' ? 1000 : 8, this.pos, 6, true); if (best.type === 'ghast') G.ui.message('Return to Sender! You beat the ghast with its own fireball.', 'gold'); } else if (best.hurt) best.hurt(8); this.pos.copy(best.pos); return this.explodeHere(); }
@@ -2019,6 +2025,7 @@ class Projectile {
       if (best && this.kind === 'arrow') {
         const dmg = Math.max(2, Math.round(this.vel.length() / 5 * (this.power ? 1 + 0.25 * (this.power + 1) : 1)));
         if (this.flame && best instanceof Mob && !best.T.fireproof) { best.onFire = Math.max(best.onFire || 0, 5); best.burnedAt = Date.now(); }
+        if (best.remote) { Net.hit(best.remote, dmg, 4 + 6 * (this.punch || 0)); G.particles.burst(this.pos.x, this.pos.y, this.pos.z, [0xff4040, 0xffffff], 6, 1.5, 0.1); return this.finish(); }
         if (best instanceof Dragon) best.hurt(dmg); else best.hurt(dmg, this.pos, 4 + 6 * (this.punch || 0), true); // Punch: knocked back further
         return this.finish();
       }
