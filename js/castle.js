@@ -355,8 +355,11 @@ function castleData() {
   floor(0, -1, 1, checker(B('cobbled_deepslate'), B('deepslate_tiles')));
   trim(0, -1, 1, 'polished_deepslate', 'x_polished_deepslate_slab_t');
   q = RM(0, -1, 1);
-  box(-19, 1, q.z0 + 2, -19, 3, q.z0 + 4, 'polished_deepslate'); box(-18, 0, q.z0 + 2, -17, 0, q.z0 + 4, 'polished_deepslate');
-  put(-19, 0, q.z0 + 3, 'polished_deepslate'); put(-18, 0, q.z0 + 3, 'lava'); box(-17, 1, q.z0 + 2, -17, 1, q.z0 + 4, 'iron_bars'); put(-18, 1, q.z0 + 2, 'iron_bars'); put(-18, 1, q.z0 + 4, 'iron_bars');
+  // a lava forge in a stone basin standing on the floor (the floor under it stays solid: it is the basement's ceiling)
+  box(-19, 0, q.z0 + 2, -17, 0, q.z0 + 4, 'polished_deepslate');
+  box(-19, 1, q.z0 + 2, -19, 3, q.z0 + 4, 'polished_deepslate');
+  box(-18, 1, q.z0 + 2, -17, 1, q.z0 + 4, 'polished_deepslate'); put(-18, 1, q.z0 + 3, 'lava');
+  box(-17, 2, q.z0 + 2, -17, 2, q.z0 + 4, 'iron_bars'); put(-18, 2, q.z0 + 2, 'iron_bars'); put(-18, 2, q.z0 + 4, 'iron_bars');
   for (const x of [-15, -11, -7]) { putAir(x, 6, q.z0 + 4, 'chain'); putAir(x, 5, q.z0 + 4, 'chain'); putAir(x, 4, q.z0 + 4, 'lantern'); }
   putAir(-6, 1, q.z1, 'anvil'); putAir(-9, 1, q.z1, 'cauldron');
 

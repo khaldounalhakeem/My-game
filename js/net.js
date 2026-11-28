@@ -1,5 +1,5 @@
 'use strict';
-const VERSION_TAG = 'v108 claude';
+const VERSION_TAG = 'v109 claude';
 /* Multiplayer: everyone who has this page open shares one claude.ai "room". Each player's
    presence says which world (seed) they are in, where they stand, and their latest block
    changes; players in the same world see each other. Without the room the game is single-player. */
@@ -512,10 +512,13 @@ const Net = {
       rp.model.group.visible = show;
       if (!show) continue;
       const g = rp.model.group;
-      const ox = g.position.x, oz = g.position.z;
+      // where they really are (the swimming pose moves the model a little, so remember this separately)
+      rp.bp = rp.bp || [g.position.x, g.position.y, g.position.z];
+      const ox = rp.bp[0], oz = rp.bp[2];
       const s = this.playback(rp);
+      if (s) rp.bp = [s[0], s[1], s[2]];
+      g.position.set(rp.bp[0], rp.bp[1], rp.bp[2]);
       if (s) {
-        g.position.set(s[0], s[1], s[2]);
         let d = s[3] + Math.PI - g.rotation.y;
         while (d > Math.PI) d -= Math.PI * 2;
         while (d < -Math.PI) d += Math.PI * 2;
@@ -528,6 +531,13 @@ const Net = {
       parts.legs[0].rotation.x = sw; parts.legs[1].rotation.x = -sw;
       parts.arms[0].rotation.x = -sw; parts.arms[1].rotation.x = sw - Math.sin((rp.swing || 0) * Math.PI) * 1.4;
       parts.head.rotation.x = -rp.pitch * 0.8;
+      // swimming: they are in water and moving, so they lie flat and do strokes (like Minecraft)
+      { const W = G.world, wb = W.getBlock(Math.floor(g.position.x), Math.floor(g.position.y + 0.5), Math.floor(g.position.z)), d = DEFS[wb];
+        rp.spd = (rp.spd || 0) + (speed - (rp.spd || 0)) * Math.min(1, dt * 3); // smoothed: network updates come in steps
+        const swimming = !!(d && d.liquid && (d.fluid === 'water' || wb === ID.water)) && rp.spd > 0.8;
+        rp.swimS = (rp.swimS || 0) + ((swimming ? 1 : 0) - (rp.swimS || 0)) * Math.min(1, dt * 6);
+        rp.swimT = (rp.swimT || 0) + dt * 5;
+        swimPose(rp.model, rp.swimS, rp.swimT, rp.pitch || 0, g.rotation.y - Math.PI); }
       setHeldItem(rp.model, rp.held);
       rp.flashT = (rp.flashT || 0) - dt;
       const red = rp.flashT > 0 ? 0.6 : 0;

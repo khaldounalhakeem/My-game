@@ -88,6 +88,22 @@ function headMats(type, baseColor) {
   return [side, side, side, side, front, side];
 }
 
+/* swimming like Minecraft: the body lies flat in the direction you look, head in front, the arms
+   pull big strokes and the legs kick. s (0..1) blends it in and out, t moves the strokes. */
+function swimPose(model, s, t, pitch, yaw) {
+  const g = model.group, Pp = model.parts;
+  g.rotation.order = 'YXZ';
+  const th = s * Math.min(2.5, Math.max(0.6, Math.PI / 2 - pitch));
+  g.rotation.x = th;
+  if (s < 0.01) { for (const a of Pp.arms) a.rotation.z = 0; return; }
+  // lying down around the feet: move back half a body and up, so the body is where the player is
+  g.position.x += Math.sin(yaw) * 0.9 * s; g.position.z += Math.cos(yaw) * 0.9 * s; g.position.y += 0.75 * s;
+  Pp.head.rotation.x = Pp.head.rotation.x * (1 - s) - th * 0.8; // look forward, not at the bottom
+  const stroke = -Math.PI * (0.5 + 0.5 * Math.cos(t));            // over the head, then back to the sides
+  Pp.arms.forEach((a, i) => { a.rotation.x = a.rotation.x * (1 - s) + stroke * s; a.rotation.z = (i ? -1 : 1) * Math.max(0, Math.sin(t)) * 0.6 * s; });
+  Pp.legs.forEach((l, i) => { l.rotation.x = l.rotation.x * (1 - s) + Math.sin(t * 2 + i * Math.PI) * 0.4 * s; });
+}
+
 /* ---------- a player wearing one of the skins ---------- */
 function buildPlayerModel(skinIdx) {
   const sk = skinOf(skinIdx), g = new THREE.Group(), P = { legs: [], arms: [], head: null, wings: [] };

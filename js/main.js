@@ -3703,6 +3703,11 @@ function frame(now) {
     const sw2 = Math.sin(G.bob * 2) * Math.min(1, hs / 4) * 0.8;
     parts.legs[0].rotation.x = sw2; parts.legs[1].rotation.x = -sw2;
     parts.arms[0].rotation.x = -sw2; parts.arms[1].rotation.x = sw2 - Math.sin(P.swing * Math.PI) * 1.4;
+    // swimming: in water, off the ground and moving
+    const swimming = P.inWater && (P.headInWater || !P.onGround) && !P.riding && hs > 1;
+    P.swimS = (P.swimS || 0) + ((swimming ? 1 : 0) - (P.swimS || 0)) * Math.min(1, dt * 6);
+    P.swimT = (P.swimT || 0) + dt * 5;
+    swimPose(G.playerModel, P.swimS, P.swimT, P.pitch, P.yaw);
   }
   const heldK = P.heldDef && P.heldDef() ? P.heldDef().key : '';
   if (G.zoom && heldK !== 'spyglass') G.zoom = false;
