@@ -453,7 +453,7 @@ function castleData() {
 
   /* ---------- the stairwell (right back room on every floor): stone brick stairs zig-zagging up ---------- */
   const flight = (f, lane) => {
-    for (let k = 0; k < 6; k++) { put(5 + k, f + 1 + k, lane, 'stone_brick_stairs_e'); put(5 + k, f + 1 + k, lane + 1, 'stone_brick_stairs_e'); for (let y = f + 1; y < f + 1 + k; y++) { put(5 + k, y, lane, 'stone_bricks'); put(5 + k, y, lane + 1, 'stone_bricks'); } }
+    for (let k = 0; k < 7; k++) { put(5 + k, f + 1 + k, lane, 'stone_brick_stairs_e'); put(5 + k, f + 1 + k, lane + 1, 'stone_brick_stairs_e'); for (let y = f + 1; y < f + 1 + k; y++) { put(5 + k, y, lane, 'stone_bricks'); put(5 + k, y, lane + 1, 'stone_bricks'); } }
     // the hole in the floor above, with a railing on the open side
     const top = f + 7;
     box(5, top, lane, 10, top, lane + 1, 0);
