@@ -1932,7 +1932,7 @@ function getDrops(def, rng) {
 const ENCHANTS = {
   sharpness: { name: 'Sharpness', max: 5, on: ['sword', 'axe'] },
   knockback: { name: 'Knockback', max: 2, on: ['sword'] },
-  fire_aspect: { name: 'Fire Aspect', max: 2, on: ['sword'] },
+  fire_aspect: { name: 'Fire Aspect', max: 2, on: ['sword', 'mace'] },
   looting: { name: 'Looting', max: 3, on: ['sword'] },
   efficiency: { name: 'Efficiency', max: 5, on: ['pick', 'axe', 'shovel', 'hoe'] },
   fortune: { name: 'Fortune', max: 3, on: ['pick', 'axe', 'shovel', 'hoe'] },
@@ -1941,13 +1941,18 @@ const ENCHANTS = {
   power: { name: 'Power', max: 5, on: ['bow'] },
   flame: { name: 'Flame', max: 1, on: ['bow'] },
   infinity: { name: 'Infinity', max: 1, on: ['bow'] },
+  density: { name: 'Density', max: 5, on: ['mace'] },
+  breach: { name: 'Breach', max: 4, on: ['mace'] },
+  wind_burst: { name: 'Wind Burst', max: 3, on: ['mace'] },
 };
 const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V'];
 /* what kinds of enchantment an item can take ([] = none) */
 function enchKinds(def) {
   if (!def) return [];
+  if (def.isBlock) return []; // blocks can't be enchanted (their "tool" is just what mines them fastest)
   if (/_sword$/.test(def.key)) return ['sword'];
-  if (def.tool) return [def.tool.type];
+  if (def.mace) return ['mace'];
+  if (def.tool && def.tool.type) return [def.tool.type];
   if (def.armor) return def.armor.slot === 3 ? ['armor', 'boots'] : ['armor'];
   if (def.key === 'book' || def.key === 'enchanted_book') return ['book'];
   if (def.key === 'bow') return ['bow'];

@@ -455,7 +455,8 @@ class Player {
     if (held && held.mace && this.fallStart !== null && this.fallStart - this.pos.y > 1.5) {
       const fd = this.fallStart - this.pos.y;
       dmg += Math.min(fd, 3) * 4 + Math.max(0, Math.min(fd, 8) - 3) * 2 + Math.max(0, fd - 8);
-      this.fallStart = this.pos.y; this.vel.y = 7;
+      dmg += 0.5 * enchLv(hs, 'density') * fd + enchLv(hs, 'breach'); // Density: more per block fallen; Breach: through armor
+      this.fallStart = this.pos.y; this.vel.y = 7 + 5 * enchLv(hs, 'wind_burst'); // Wind Burst: bounce high up again
       G.particles.burst(target.pos.x, target.pos.y + 0.2, target.pos.z, [0x8a8a8a, 0xc8c8c8, 0x5a98c8], 30, 4, 0.14);
       G.sound.play('explode', target.pos);
       for (const m of G.mobs) if (m !== target && !m.dead && !m.tame && m.pos.distanceTo(target.pos) < 3.5) { m.vel.y = 7; const dx = m.pos.x - target.pos.x, dz = m.pos.z - target.pos.z, l = Math.hypot(dx, dz) || 1; m.vel.x = dx / l * 6; m.vel.z = dz / l * 6; }
