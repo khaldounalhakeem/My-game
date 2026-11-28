@@ -246,6 +246,9 @@ function castleData() {
     chest(-6, ey, r.z1, [['lapis', 64], ['lapis', 64], ['book', 32], ['experience_bottle', 64], ['experience_bottle', 64], ['enchanted_book', 4]]);
     chest(-18, ey, -4, [['diamond_sword', 1], ['diamond_pickaxe', 1], ['diamond_chestplate', 1], ['bow', 1]]);
     chest(-16, ey, 1, [['experience_bottle', 64], ['experience_bottle', 64], ['experience_bottle', 64], ['lapis', 64]]); // XP for enchanting: throw the bottles
+    // a chest full of XP bottles and a chest full of lapis, each with a sign
+    chest(-14, ey, 1, new Array(27).fill(['experience_bottle', 64])); sign(-14, ey + 1, 1, 'n', ['XP BOTTLES', 'Each bottle =', '1 level!', '']);
+    chest(-10, ey, 1, new Array(27).fill(['lapis', 64])); sign(-10, ey + 1, 1, 'n', ['LAPIS', 'for enchanting', '', '']);
   }
   r = label(7, -1, 1, ['BREWING', 'ROOM', 'Potions!', '']);
   for (const x of [-17, -13, -9]) put(x, 8, r.z0, 'brewing_stand');

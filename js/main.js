@@ -1273,7 +1273,7 @@ G.splashAt = (pos, k) => {
     G.particles.burst(pos.x, pos.y + 0.2, pos.z, [0x7aff5a, 0xeaffc0, 0x3ab83a], 26, 2.5, 0.14);
     G.sound.play('break', pos, ID.glass);
     const P = G.player;
-    if (!P.dead && P.pos.distanceTo(pos) < 7) { P.addXp(3 + (Math.random() * 9 | 0)); G.sound.play('pickup'); }
+    if (!P.dead && P.pos.distanceTo(pos) < 7) { P.level++; G.sound.play('levelup'); } // one whole level per bottle
     return;
   }
   G.particles.burst(pos.x, pos.y, pos.z, [0xffffff, 0xd8ecf8, 0xc84a8a], 24, 3, 0.12);
