@@ -243,6 +243,7 @@ function castleData() {
     for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (Math.max(Math.abs(dx), Math.abs(dz)) === 2 && !(dz === 2 && Math.abs(dx) <= 1)) { put(ex + dx, ey, ez + dz, 'bookshelf'); put(ex + dx, ey + 1, ez + dz, 'bookshelf'); }
     put(ex - 2, ey + 2, ez - 2, 'lantern'); put(ex + 2, ey + 2, ez - 2, 'lantern');
     put(-18, ey, r.z0, 'anvil'); put(-18, ey, r.z1, 'grindstone'); put(-6, ey, r.z0, 'lectern');
+    put(-7, ey, -4, 'grindstone'); put(-7, ey, -5, 'anvil'); post(-7, ey, -3, 'w', ['GRINDSTONE', 'Takes off', 'enchantments', '']); // right by the table, easy to find
     chest(-6, ey, r.z1, [['lapis', 64], ['lapis', 64], ['book', 32], ['experience_bottle', 64], ['experience_bottle', 64], ['enchanted_book', 4]]);
     chest(-18, ey, -4, [['diamond_sword', 1], ['diamond_pickaxe', 1], ['diamond_chestplate', 1], ['bow', 1]]);
     chest(-16, ey, 1, [['experience_bottle', 64], ['experience_bottle', 64], ['experience_bottle', 64], ['lapis', 64]]); // XP for enchanting: throw the bottles
