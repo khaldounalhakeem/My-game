@@ -2023,6 +2023,45 @@ G.placeShulker = (x, y, z, held) => {
 };
 /* is there an open way (air, open doors, no walls or closed doors) from one place to another?
    A short search that heads straight for the goal; used so a wolf never jumps through a closed door */
+/* finding the way like Minecraft mobs do: a search over the blocks you can walk on, around walls,
+   through doorways and up stairs (one block up, or down a few), so a pet walks round to you */
+G.findPath = (sx, sy, sz, tx, ty, tz, maxN = 3000) => {
+  const W = G.world, D = (x, y, z) => { const id = W.getBlock(x, y, z); return id ? DEFS[id] : null; };
+  const top = d => (d.height !== undefined ? d.height : d.boxes ? Math.max(...d.boxes.map(b => b[4])) : d.box ? d.box[4] : 1);
+  const tall = d => d && (d.fence || d.gate || d.wall || /_wall$/.test(d.key || ''));
+  const low = d => !d || d.liquid || !d.solid || (!tall(d) && top(d) <= 0.6);   // carpets, slabs, snow: you stand on them
+  const open = d => !d || d.liquid || !d.solid;                                       // nothing to bump your head on
+  const ok = (x, y, z) => low(D(x, y, z)) && open(D(x, y + 1, z));
+  const stand = (x, y, z) => { const b = D(x, y - 1, z), here = D(x, y, z); return (b && ((b.solid && !tall(b)) || b.liquid)) || (here && (here.liquid || here.solid)); };
+  const key = (x, y, z) => x + ',' + y + ',' + z;
+  sx = Math.floor(sx); sy = Math.floor(sy + 0.1); sz = Math.floor(sz); tx = Math.floor(tx); ty = Math.floor(ty + 0.1); tz = Math.floor(tz);
+  const h = (x, y, z) => Math.abs(x - tx) + Math.abs(z - tz) + Math.abs(y - ty) * 1.5;
+  const openSet = [[h(sx, sy, sz), 0, sx, sy, sz]], came = new Map([[key(sx, sy, sz), null]]), cost = new Map([[key(sx, sy, sz), 0]]);
+  let n = 0;
+  while (openSet.length && n++ < maxN) {
+    let bi = 0; for (let i = 1; i < openSet.length; i++) if (openSet[i][0] < openSet[bi][0]) bi = i;
+    const [, g, x, y, z] = openSet[bi]; openSet[bi] = openSet[openSet.length - 1]; openSet.pop();
+    if (Math.abs(x - tx) <= 1 && Math.abs(z - tz) <= 1 && Math.abs(y - ty) <= 1) {
+      const path = []; let k = key(x, y, z);
+      while (k) { const [a, b, c] = k.split(',').map(Number); path.push([a, b, c]); k = came.get(k); }
+      return path.reverse();
+    }
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = x + dx, nz = z + dz;
+      for (const dy of [0, 1, -1, -2, -3]) {
+        const ny = y + dy;
+        if (!ok(nx, ny, nz) || !stand(nx, ny, nz)) continue;
+        if (dy === 1 && !open(D(x, y + 2, z))) continue;                          // room to jump up
+        if (dy < 0) { let clear = true; for (let yy = ny + 1; yy <= y; yy++) if (!ok(nx, yy, nz)) clear = false; if (!clear) continue; }
+        const nk = key(nx, ny, nz), ng = g + 1 + (dy > 0 ? 0.5 : 0);
+        if (cost.has(nk) && cost.get(nk) <= ng) break;
+        cost.set(nk, ng); came.set(nk, key(x, y, z)); openSet.push([ng + h(nx, ny, nz), ng, nx, ny, nz]);
+        break;
+      }
+    }
+  }
+  return null; // no way found (closed doors, too far)
+};
 G.airConnected = (ax, ay, az, bx, by, bz, max = 700) => {
   const W = G.world, k = (x, y, z) => x + ',' + y + ',' + z;
   const open = (x, y, z) => { const id = W.getBlock(x, y, z); return !id || !DEFS[id].solid; };

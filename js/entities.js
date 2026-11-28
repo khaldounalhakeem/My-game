@@ -1075,6 +1075,33 @@ class Mob {
     return false;
   }
 
+  /* the way to walk towards a spot, around walls (a direction, or null when it can't find one) */
+  pathDir(tx, ty, tz, dt) {
+    const near = Math.hypot(tx - this.pos.x, tz - this.pos.z);
+    if (near < 2.2 && Math.abs(ty - this.pos.y) < 1) { this.path = null; return null; }
+    this.pathT = (this.pathT || 0) - dt;
+    const tk = Math.floor(tx) + ',' + Math.floor(tz);
+    if (this.pathT <= 0 || (this.pathKey !== tk && this.pathT < 0.6)) {
+      this.pathT = 0.9 + Math.random() * 0.3; this.pathKey = tk;
+      this.path = G.findPath(this.pos.x, this.pos.y, this.pos.z, tx, ty, tz); this.pathI = 1;
+    }
+    const p = this.path;
+    if (!p) return null;
+    while (this.pathI < p.length - 1 && Math.hypot(p[this.pathI][0] + 0.5 - this.pos.x, p[this.pathI][2] + 0.5 - this.pos.z) < 0.45) this.pathI++;
+    // look ahead: walk straight to a later point when nothing is in the way (smoother, not zig-zag)
+    let w = Math.min(this.pathI, p.length - 1);
+    for (let k = Math.min(p.length - 1, this.pathI + 3); k > this.pathI; k--) if (p[k][1] === p[this.pathI][1] && G.airConnected && this.clearLine(p[k])) { w = k; break; }
+    const q = p[w], dx = q[0] + 0.5 - this.pos.x, dz = q[2] + 0.5 - this.pos.z, l = Math.hypot(dx, dz) || 1;
+    return { x: dx / l, z: dz / l };
+  }
+  clearLine(q) {
+    const W = G.world, steps = Math.ceil(Math.hypot(q[0] + 0.5 - this.pos.x, q[2] + 0.5 - this.pos.z) * 3);
+    for (let s = 1; s <= steps; s++) {
+      const f = s / steps, x = this.pos.x + (q[0] + 0.5 - this.pos.x) * f, z = this.pos.z + (q[2] + 0.5 - this.pos.z) * f;
+      for (const y of [q[1], q[1] + 1]) { const d = DEFS[W.getBlock(Math.floor(x), y, Math.floor(z))]; if (d && d.solid && !(d.height !== undefined && d.height <= 0.6)) return false; }
+    }
+    return true;
+  }
   /* villagers: take the job of a free work block nearby (and lose it if the block goes) */
   jobTick(dt) {
     this.jobT = (this.jobT || Math.random() * 2) - dt;
@@ -1366,7 +1393,10 @@ class Mob {
       if (tgt && (tgt.dead || tgt.removed || tgt.pos.distanceTo(this.pos) > 20 || (tgt.remote && (!tgt.remote.inWorld || tgt.remote.dim !== G.dim)))) this.petTarget = null;
       if (this.petTarget && !this.sitting) {
         const t = this.petTarget, dx = t.pos.x - this.pos.x, dz = t.pos.z - this.pos.z, l = Math.hypot(dx, dz) || 1;
-        moveX = dx / l; moveZ = dz / l; speed = 4.5; this.yaw = Math.atan2(moveX, moveZ);
+        moveX = dx / l; moveZ = dz / l; speed = 4.5;
+        const way = this.pathDir(t.pos.x, t.pos.y, t.pos.z, dt); // round the walls, through the doorway
+        if (way) { moveX = way.x; moveZ = way.z; }
+        this.yaw = Math.atan2(moveX, moveZ);
         // only bites what it can reach: not someone on the floor above or below
         if (l < 1.6 && Math.abs(t.pos.y - this.pos.y) < 1.5 && this.attackCd <= 0) {
           this.attackCd = 0.8;
@@ -1390,7 +1420,11 @@ class Mob {
           this.jumpCheckT = 2;
           if (G.airConnected(this.pos.x, this.pos.y, this.pos.z, P.pos.x, P.pos.y, P.pos.z)) { this.pos.set(P.pos.x + (Math.random() - 0.5) * 2, P.pos.y, P.pos.z + (Math.random() - 0.5) * 2); this.vel.set(0, 0, 0); }
         }
-        if (l > 3 && Math.hypot(P.pos.x - this.pos.x, P.pos.z - this.pos.z) > 3) { moveX = dx / l; moveZ = dz / l; speed = l > 14 ? 8.5 : l > 7 ? 5.5 : 3.5; this.yaw = Math.atan2(moveX, moveZ); }
+        if (l > 3 && Math.hypot(P.pos.x - this.pos.x, P.pos.z - this.pos.z) > 3) {
+          moveX = dx / l; moveZ = dz / l; speed = l > 14 ? 8.5 : l > 7 ? 5.5 : 3.5;
+          if (!T.fly) { const way = this.pathDir(P.pos.x, P.pos.y, P.pos.z, dt); if (way) { moveX = way.x; moveZ = way.z; } } // walks round to you
+          this.yaw = Math.atan2(moveX, moveZ);
+        }
         if (T.fly) this.homeY = P.pos.y + 1.6; // a parrot flies along beside your head
         // a parrot lands on your shoulder when you're close (and hops off when you jump)
         if (this.type === 'parrot') {
