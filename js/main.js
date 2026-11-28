@@ -3615,9 +3615,14 @@ function frame(now) {
       G.selBox.visible = true;
       G.selBox.position.set(tgt.block.x + 0.5, tgt.block.y + 0.5, tgt.block.z + 0.5);
       const def = DEFS[tgt.block.id];
-      if (def.cross) { G.selBox.scale.set(0.7, 1, 0.7); }
-      else if (def.height) { G.selBox.scale.set(1, def.height, 1); G.selBox.position.y = tgt.block.y + def.height / 2; }
-      else G.selBox.scale.set(1, 1, 1);
+      // the outline fits the block's real shape (a carpet's outline is flat, a fence's is thin...)
+      const bxs = G.world.pickBoxes(def, tgt.block.x, tgt.block.y, tgt.block.z);
+      if (bxs) {
+        let a = [1, 1, 1, 0, 0, 0];
+        for (const b of bxs) for (let k = 0; k < 3; k++) { a[k] = Math.min(a[k], b[k]); a[k + 3] = Math.max(a[k + 3], b[k + 3]); }
+        G.selBox.scale.set(Math.max(0.02, a[3] - a[0]), Math.max(0.02, a[4] - a[1]), Math.max(0.02, a[5] - a[2]));
+        G.selBox.position.set(tgt.block.x + (a[0] + a[3]) / 2, tgt.block.y + (a[1] + a[4]) / 2, tgt.block.z + (a[2] + a[5]) / 2);
+      } else G.selBox.scale.set(1, 1, 1);
     } else G.selBox.visible = false;
     if (P.breaking && P.breaking.p > 0) {
       G.crack.visible = true;

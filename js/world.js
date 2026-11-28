@@ -1714,6 +1714,15 @@ class World {
   }
 
   /* ---------- queries ---------- */
+  /* the real shape of a block for aiming at it (null = the whole block), like Minecraft's outlines */
+  pickBoxes(def, x, y, z) {
+    if (def.liquid) return null;
+    if (def.boxes || def.fence || def.pane) return this.shapeBoxes(def, (a, b, c) => this.getBlock(a, b, c), x, y, z, true);
+    if (def.box) return [def.box];
+    if (def.height) return [[0, 0, 0, 1, def.height, 1]];
+    if (def.cross) return [[0.15, 0, 0.15, 0.85, 0.85, 0.85]];
+    return null;
+  }
   raycast(ox, oy, oz, dx, dy, dz, maxD, hitLiquid) {
     let x = Math.floor(ox), y = Math.floor(oy), z = Math.floor(oz);
     const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, sz = dz > 0 ? 1 : -1;
@@ -1725,7 +1734,27 @@ class World {
     let nx = 0, ny = 0, nz = 0, t = 0;
     for (let i = 0; i < 256 && t <= maxD; i++) {
       const id = this.getBlock(x, y, z);
-      if (id && (hitLiquid || !DEFS[id].liquid)) return { x, y, z, nx, ny, nz, id, dist: t };
+      if (id && (hitLiquid || !DEFS[id].liquid)) {
+        const bxs = this.pickBoxes(DEFS[id], x, y, z);
+        if (!bxs) return { x, y, z, nx, ny, nz, id, dist: t };
+        // a carpet, slab, fence...: the ray has to touch the real shape, or it goes on to the block behind
+        let best = null;
+        for (const b of bxs) {
+          let t0 = -Infinity, t1 = Infinity, n = null;
+          const o = [ox - x, oy - y, oz - z], dv = [dx, dy, dz];
+          let ok = true;
+          for (let a = 0; a < 3 && ok; a++) {
+            if (Math.abs(dv[a]) < 1e-9) { if (o[a] < b[a] || o[a] > b[a + 3]) ok = false; continue; }
+            let ta = (b[a] - o[a]) / dv[a], tb = (b[a + 3] - o[a]) / dv[a], na = -Math.sign(dv[a]);
+            if (ta > tb) { const q = ta; ta = tb; tb = q; }
+            if (ta > t0) { t0 = ta; n = [a === 0 ? na : 0, a === 1 ? na : 0, a === 2 ? na : 0]; }
+            if (tb < t1) t1 = tb;
+            if (t0 > t1) ok = false;
+          }
+          if (ok && t1 >= 0 && t0 <= maxD && (!best || t0 < best.dist)) best = { x, y, z, nx: n ? n[0] : nx, ny: n ? n[1] : ny, nz: n ? n[2] : nz, id, dist: Math.max(0, t0) };
+        }
+        if (best) return best;
+      }
       if (tmx < tmy && tmx < tmz) { x += sx; t = tmx; tmx += tdx; nx = -sx; ny = 0; nz = 0; }
       else if (tmy < tmz) { y += sy; t = tmy; tmy += tdy; nx = 0; ny = -sy; nz = 0; }
       else { z += sz; t = tmz; tmz += tdz; nx = 0; ny = 0; nz = -sz; }
