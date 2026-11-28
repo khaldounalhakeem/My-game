@@ -1396,6 +1396,19 @@ G.castleSetup = () => {
     }
   } catch (e) { /* storage unavailable */ }
 };
+/* Nabil's dog Bobby and Omar's cat Katie were lost: they come back once, tamed and with their names */
+G.giveBackPets = () => {
+  try {
+    const nick = String(Net.nick || '').trim().toLowerCase(), pet = { nabil: ['wolf', 'Bobby', 'dog'], omar: ['cat', 'Katie', 'cat'] }[nick];
+    if (!pet || localStorage.getItem('blockrealm-gift-pet') === '1' || G.dim !== 'overworld') return;
+    const P = G.player, m = spawnMob(pet[0], P.pos.x + 1.2, P.pos.y + 0.2, P.pos.z + 0.6);
+    if (!m) return;
+    m.makeTame(); m.setName(pet[1]);
+    localStorage.setItem('blockrealm-gift-pet', '1');
+    setTimeout(() => G.ui.message(pet[1] + ' is back! Your ' + pet[2] + ' is right next to you.', 'gold'), 1500);
+    G.save();
+  } catch (e) { /* storage unavailable */ }
+};
 /* Omar's netherite sword and lapis, lost when the game updated while they were in the enchanting table: given back once */
 G.giveBackOmar = () => {
   try {
@@ -3496,7 +3509,7 @@ G.setState = (s) => {
   const was = G.state;
   G.state = s;
   document.body.dataset.state = s;
-  if (s === 'play' && was !== 'paused' && G.world && G.player && G.applyMenuSet) { G.applyMenuSet(); G.castleSetup(); setTimeout(() => { if (G.state !== 'play') return; G.giveBackAllayLoot(); G.giveBackOmar(); const P = G.player; for (const it of G.pendingPocket || []) G.spawnDrop(it.id, it.count, P.pos.x, P.pos.y + 0.5, P.pos.z, undefined, slotExtras(it)); G.pendingPocket = null; }, 3000); }
+  if (s === 'play' && was !== 'paused' && G.world && G.player && G.applyMenuSet) { G.applyMenuSet(); G.castleSetup(); setTimeout(() => { if (G.state !== 'play') return; G.giveBackAllayLoot(); G.giveBackOmar(); G.giveBackPets(); const P = G.player; for (const it of G.pendingPocket || []) G.spawnDrop(it.id, it.count, P.pos.x, P.pos.y + 0.5, P.pos.z, undefined, slotExtras(it)); G.pendingPocket = null; }, 3000); }
 };
 G.lock = () => {
   if (Input.touch || Input.fallback || Pad.active) return;
