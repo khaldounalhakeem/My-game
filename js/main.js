@@ -3505,12 +3505,25 @@ function screenRay(pt) {
 
 /* ---------- main loop ---------- */
 let last = performance.now(), fpsAcc = 0, fpsN = 0;
+/* smooth mode: a device that keeps running slowly sees a little less far, so it stays smooth */
+G.slowT = 0;
+G.autoSmooth = () => {
+  if (G.state !== 'play' || !G.world || document.hidden) { G.slowT = 0; return; }
+  G.slowT = G.fps < 22 ? G.slowT + 0.5 : Math.max(0, G.slowT - 1);
+  if (G.slowT < 8 || G.world.renderDist <= 3) return;
+  G.slowT = 0;
+  const rd = G.world.renderDist - 1;
+  for (const w of Object.values(G.worlds)) { w.renderDist = rd; w.queue = []; }
+  const el = document.getElementById('rd'); if (el) { el.value = rd; document.getElementById('rd-val').textContent = rd; }
+  if (G.applyFog) G.applyFog();
+  G.ui.message('The game was running slowly, so view distance is now ' + rd + ' to keep it smooth (Settings to change it).', 'gold');
+};
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = (now - last) / 1000; last = now;
   if (dt > 0.1) dt = 0.1;
   fpsAcc += dt; fpsN++;
-  if (fpsAcc > 0.5) { G.fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; }
+  if (fpsAcc > 0.5) { G.fps = Math.round(fpsN / fpsAcc); fpsAcc = 0; fpsN = 0; G.autoSmooth(); }
   const P = G.player;
   Pad.poll(dt);
 

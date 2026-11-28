@@ -1666,16 +1666,39 @@ class World {
     const g = new THREE.BufferGeometry();
     // how much light from nearby torches each corner gets (0 = none, 1 = right next to one)
     const n = A.pos.length / 3, glow = new Float32Array(n);
-    if (lights && lights.length) for (let v = 0; v < n; v++) {
-      const px = A.pos[v * 3], py = A.pos[v * 3 + 1], pz = A.pos[v * 3 + 2];
-      let best = 0;
+    if (lights && lights.length && n) {
+      // the light spreads out once over a small grid of block corners around this chunk (like Minecraft's
+      // light), instead of checking every light for every corner: the same look, far less work with many lamps
+      let y0 = Infinity, y1 = -Infinity;
+      for (let v = 1; v < A.pos.length; v += 3) { const y = A.pos[v]; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      y0 = Math.floor(y0) - 1; y1 = Math.ceil(y1) + 1;
+      const GX = 19, GZ = 19, GY = y1 - y0 + 1, NN = GX * GY * GZ; // corners x and z from -1 to 17
+      const best = new Float32Array(NN), step = new Float32Array(NN), queue = new Int32Array(NN * 4);
+      let qh = 0, qt = 0;
+      const idx = (x, y, z) => ((y - y0) * GZ + (z + 1)) * GX + (x + 1);
       for (const L of lights) {
-        const dx = px - L[0], dy = py - L[1], dz = pz - L[2];
-        if (Math.abs(dx) > L[3] || Math.abs(dy) > L[3] || Math.abs(dz) > L[3]) continue;
-        const k = 1 - (Math.abs(dx) + Math.abs(dy) + Math.abs(dz)) / L[3]; // fades block by block, like real torch light
-        if (k > best) best = k;
+        const r = L[3];
+        for (let cy = -0.5; cy <= 0.5; cy++) for (let cz = -0.5; cz <= 0.5; cz++) for (let cxx = -0.5; cxx <= 0.5; cxx++) {
+          // the corners of the glowing block (moved inside the grid if the light is in the next chunk)
+          const x = Math.min(17, Math.max(-1, L[0] + cxx)), y = Math.min(y1, Math.max(y0, L[1] + cy)), z = Math.min(17, Math.max(-1, L[2] + cz));
+          const k = 1 - (Math.abs(x - L[0]) + Math.abs(y - L[1]) + Math.abs(z - L[2])) / r;
+          if (k <= 0) continue;
+          const i = idx(x, y, z);
+          if (k > best[i]) { best[i] = k; step[i] = 1 / r; if (qt < queue.length) queue[qt++] = i; }
+        }
       }
-      glow[v] = best > 0 ? Math.min(1, best * best * 1.25) : 0; // bright close by, fading quickly further away
+      while (qh < qt) {
+        const i = queue[qh++], k = best[i] - step[i];
+        if (k <= 0) continue;
+        const x = i % GX, rest = (i / GX) | 0, z = rest % GZ, y = (rest / GZ) | 0;
+        const nb = [x > 0 ? i - 1 : -1, x < GX - 1 ? i + 1 : -1, z > 0 ? i - GX : -1, z < GZ - 1 ? i + GX : -1, y > 0 ? i - GX * GZ : -1, y < GY - 1 ? i + GX * GZ : -1];
+        for (const j of nb) if (j >= 0 && k > best[j] + 1e-6) { best[j] = k; step[j] = step[i]; if (qt >= queue.length) { queue.copyWithin(0, qh, qt); qt -= qh; qh = 0; } if (qt < queue.length) queue[qt++] = j; }
+      }
+      for (let v = 0; v < n; v++) {
+        const x = Math.min(17, Math.max(-1, Math.round(A.pos[v * 3]))), y = Math.min(y1, Math.max(y0, Math.round(A.pos[v * 3 + 1]))), z = Math.min(17, Math.max(-1, Math.round(A.pos[v * 3 + 2])));
+        const k = best[idx(x, y, z)];
+        glow[v] = k > 0 ? Math.min(1, k * k * 1.25) : 0; // bright close by, fading quickly further away
+      }
     }
     g.setAttribute('glow', new THREE.BufferAttribute(glow, 1));
     g.setAttribute('position', new THREE.Float32BufferAttribute(A.pos, 3));

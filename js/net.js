@@ -1,4 +1,5 @@
 'use strict';
+const VERSION_TAG = 'v106 claude';
 /* Multiplayer: everyone who has this page open shares one claude.ai "room". Each player's
    presence says which world (seed) they are in, where they stand, and their latest block
    changes; players in the same world see each other. Without the room the game is single-player. */
@@ -374,7 +375,7 @@ const Net = {
         ws: this.wsInfo || null,
         rd: P.riding && P.riding.nid ? [P.riding.nid, P.seat || 0] : null,
         oc: G.ui.chest && !G.ui.chest.mob && !G.ui.chest.ender ? G.chestKey(G.ui.chest.x, G.ui.chest.y, G.ui.chest.z) : null,
-        mb: null, dr: null, pk: null, sg: null, fu: null, cs: null,
+        mb: null, mbi: null, dr: null, pk: null, sg: null, fu: null, cs: null,
       });
       // the bigger lists (mobs, items on the ground, signs, furnaces, chests) take turns in the space left: the
       // claude.ai room refuses anything over 4 KB, and a refused message would hold up everything else
@@ -386,8 +387,20 @@ const Net = {
         for (let k = 0; k < g.length; k += 2) add[g[k]] = g[k + 1]();
         const extra = JSON.stringify(add).length;
         if (size + extra <= LIMIT) { Object.assign(base, add); size += extra; continue; }
-        // too big together: the newest changes that fit go now, the rest next time (not mobs: those go all at once)
-        if (g[0] === 'mb') continue;
+        // too many animals for one message: the closest always go, the others take turns, and a short list of
+        // every animal's name goes too, so the friend's game knows none of them is gone (no vanishing or jumping)
+        if (g[0] === 'mb') {
+          const list = add.mb || [], ids = list.map(e => e[0]);
+          let sz = size + JSON.stringify(ids).length + 16;
+          const part = [], fixed = Math.min(8, list.length), rest = list.length - fixed, start = rest ? (this.mbAt || 0) % rest : 0;
+          const take = e => { const len = JSON.stringify(e).length + 1; if (sz + len > LIMIT) return false; part.push(e); sz += len; return true; };
+          for (let j = 0; j < fixed; j++) if (!take(list[j])) break;
+          let j2 = 0;
+          for (; j2 < rest; j2++) if (!take(list[fixed + (start + j2) % rest])) break;
+          this.mbAt = rest ? (start + j2) % rest : 0;
+          if (part.length) { base.mb = part; base.mbi = ids; size = sz; }
+          continue;
+        }
         this.partAt = this.partAt || {};
         for (let k = 0; k < g.length; k += 2) {
           const key = g[k], list = add[key];
@@ -402,7 +415,7 @@ const Net = {
           if (part.length) { base[key] = part; size += 8; this.partAt[key] = start + part.length; }
         }
       }
-    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null, ws: null, rd: null, fu: null });
+    } else Object.assign(base, { ar: null, ex: null, m: null, d: null, p: null, r: null, s: null, h: null, x: null, e: null, a: null, mb: null, mbi: null, mh: null, dr: null, pk: null, rq: null, gv: null, gm: null, cs: null, oc: null, ws: null, rd: null, fu: null });
     this.room.presence(base).then(() => {
       this.sendOk++;
       if (this.sendErr || this.error) { this.sendErr = ''; this.error = ''; this.render(); }
@@ -456,7 +469,7 @@ const Net = {
     let last = '', lastT = 0;
     const report = async () => {
       const d = this.dbRoom;
-      const body = { kind, name: this.nick, world: this.world || 'title', room: this.lobby ? (this.lobby.connected() ? 'up' : 'down') : 'none', roomOthers: this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : -1, dbWrites: d.status.ok, dbErr: d.status.err || d.status.readErr || '', dbOthers: d.status.others, seen: this.names() };
+      const body = { kind, name: this.nick, world: this.world || 'title', room: this.lobby ? (this.lobby.connected() ? 'up' : 'down') : 'none', roomOthers: this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : -1, dbWrites: d.status.ok, dbErr: d.status.err || d.status.readErr || '', dbOthers: d.status.others, seen: this.names(), fps: Math.round((G.fps || 0) / 5) * 5, ver: VERSION_TAG, rd: G.world ? G.world.renderDist : 0 };
       const s = JSON.stringify(body), now = Date.now();
       if (s === last && now - lastT < 60000) return;
       last = s; lastT = now;
@@ -470,7 +483,7 @@ const Net = {
     if (this.internet) return 'v10 web · ' + this.room.servers() + ' · topic ' + (this.world || 'none') + ' · players ' + this.rawPeers + ' · ' + this.status;
     const lobbyOthers = this.lobby ? this.lobby.peers().filter(p => !p.sameTab).length : 0;
     const dbs = this.dbRoom ? this.dbRoom.status : null;
-    return 'v105 claude · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
+    return VERSION_TAG + ' · room ' + (this.lobby ? (this.lobby.connected() ? 'up ' + lobbyOthers : 'down') : 'none') +
       ' · database ' + (dbs ? (dbs.err || dbs.readErr ? 'error ' + (dbs.err || dbs.readErr) : 'ok ' + dbs.others) : 'none') +
       ' · players ' + this.rawPeers + ' · heard ' + ago + ' ago · ' + this.status;
   },
@@ -891,8 +904,10 @@ const Net = {
         if (flags & 1) m.netDead = true;
         this.noteArrival(m, pr.ts); this.addPoint(m, pr.ts, x, y, z, yaw);
       }
-      for (const m of G.mobs) if (m.remoteCtl === rp.peer && !live.has(m.nid) && !m.dead) m.removeSilently();
-      for (const d of G.dragons) if (d.remoteCtl === rp.peer && !live.has(d.nid) && !d.dead) d.remove();
+      // a part of the list: only the ones missing from the full list of names are gone
+      const still = Array.isArray(pr.mbi) ? new Set(pr.mbi.filter(v => typeof v === 'string')) : live;
+      for (const m of G.mobs) if (m.remoteCtl === rp.peer && !still.has(m.nid) && !m.dead) m.removeSilently();
+      for (const d of G.dragons) if (d.remoteCtl === rp.peer && !still.has(d.nid) && !d.dead) d.remove();
     }
     // hits they made on mobs this device runs
     if (Array.isArray(pr.mh)) {
