@@ -2019,7 +2019,7 @@ class Projectile {
       if (best && this.kind === 'arrow') {
         const dmg = Math.max(2, Math.round(this.vel.length() / 5 * (this.power ? 1 + 0.25 * (this.power + 1) : 1)));
         if (this.flame && best instanceof Mob && !best.T.fireproof) { best.onFire = Math.max(best.onFire || 0, 5); best.burnedAt = Date.now(); }
-        if (best instanceof Dragon) best.hurt(dmg); else best.hurt(dmg, this.pos, 4, true);
+        if (best instanceof Dragon) best.hurt(dmg); else best.hurt(dmg, this.pos, 4 + 6 * (this.punch || 0), true); // Punch: knocked back further
         return this.finish();
       }
     } else for (const P of [G.player, ...Net.proxies()]) {

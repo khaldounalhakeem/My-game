@@ -1930,18 +1930,35 @@ function getDrops(def, rng) {
 /* ---------- enchantments ----------
    An enchanted item keeps its enchantments on its slot as e: { sharpness: 2, ... } */
 const ENCHANTS = {
-  sharpness: { name: 'Sharpness', max: 5, on: ['sword', 'axe'] },
+  sharpness: { name: 'Sharpness', max: 5, on: ['sword', 'axe'], g: 'dmg' },
   knockback: { name: 'Knockback', max: 2, on: ['sword'] },
   fire_aspect: { name: 'Fire Aspect', max: 2, on: ['sword', 'mace'] },
   looting: { name: 'Looting', max: 3, on: ['sword'] },
   efficiency: { name: 'Efficiency', max: 5, on: ['pick', 'axe', 'shovel', 'hoe'] },
-  fortune: { name: 'Fortune', max: 3, on: ['pick', 'axe', 'shovel', 'hoe'] },
-  protection: { name: 'Protection', max: 4, on: ['armor'] },
+  fortune: { name: 'Fortune', max: 3, on: ['pick', 'axe', 'shovel', 'hoe'], g: 'mine' },
+  protection: { name: 'Protection', max: 4, on: ['armor'], g: 'prot' },
   feather_falling: { name: 'Feather Falling', max: 4, on: ['boots'] },
   power: { name: 'Power', max: 5, on: ['bow'] },
   flame: { name: 'Flame', max: 1, on: ['bow'] },
   infinity: { name: 'Infinity', max: 1, on: ['bow'] },
   density: { name: 'Density', max: 5, on: ['mace'] },
+  silk_touch: { name: 'Silk Touch', max: 1, on: ['pick', 'axe', 'shovel', 'hoe'], g: 'mine' },
+  smite: { name: 'Smite', max: 5, on: ['sword', 'axe', 'mace'], g: 'dmg' },
+  bane_of_arthropods: { name: 'Bane of Arthropods', max: 5, on: ['sword', 'axe', 'mace'], g: 'dmg' },
+  sweeping_edge: { name: 'Sweeping Edge', max: 3, on: ['sword'] },
+  punch: { name: 'Punch', max: 2, on: ['bow'] },
+  thorns: { name: 'Thorns', max: 3, on: ['armor'] },
+  fire_protection: { name: 'Fire Protection', max: 4, on: ['armor'], g: 'prot' },
+  blast_protection: { name: 'Blast Protection', max: 4, on: ['armor'], g: 'prot' },
+  projectile_protection: { name: 'Projectile Protection', max: 4, on: ['armor'], g: 'prot' },
+  respiration: { name: 'Respiration', max: 3, on: ['helmet'] },
+  aqua_affinity: { name: 'Aqua Affinity', max: 1, on: ['helmet'] },
+  depth_strider: { name: 'Depth Strider', max: 3, on: ['boots'], g: 'boots' },
+  frost_walker: { name: 'Frost Walker', max: 2, on: ['boots'], g: 'boots' },
+  soul_speed: { name: 'Soul Speed', max: 3, on: ['boots'] },
+  swift_sneak: { name: 'Swift Sneak', max: 3, on: ['legs'] },
+  luck_of_the_sea: { name: 'Luck of the Sea', max: 3, on: ['rod'] },
+  lure: { name: 'Lure', max: 3, on: ['rod'] },
   breach: { name: 'Breach', max: 4, on: ['mace'] },
   wind_burst: { name: 'Wind Burst', max: 3, on: ['mace'] },
 };
@@ -1953,7 +1970,8 @@ function enchKinds(def) {
   if (/_sword$/.test(def.key)) return ['sword'];
   if (def.mace) return ['mace'];
   if (def.tool && def.tool.type) return [def.tool.type];
-  if (def.armor) return def.armor.slot === 3 ? ['armor', 'boots'] : ['armor'];
+  if (def.armor) return def.elytra ? [] : ['armor', ['helmet', 'chest', 'legs', 'boots'][def.armor.slot]];
+  if (def.key === 'fishing_rod') return ['rod'];
   if (def.key === 'book' || def.key === 'enchanted_book') return ['book'];
   if (def.key === 'bow') return ['bow'];
   return [];

@@ -97,7 +97,8 @@ class Player {
     if (this.fx('resistance') && !/void|starv/i.test(cause || '')) amount = Math.max(0.5, Math.round(amount * (1 - 0.2 * this.fx('resistance')) * 2) / 2);
     // Protection on armor and Feather Falling on boots (4% less for each point, at most 80%)
     { let epf = 0; const fall = /fell from/i.test(cause || '');
-      if (!/starv|void/i.test(cause || '')) for (let i = 36; i < 40; i++) { const s = this.inv.slots[i]; epf += enchLv(s, 'protection'); if (fall) epf += 3 * enchLv(s, 'feather_falling'); }
+      const fireC = /lava|fire|burn|flame|magma/i.test(cause || ''), blastC = /explo|blew|blast|creeper|tnt/i.test(cause || ''), shotC = /shot|arrow|fireball|spit/i.test(cause || '');
+      if (!/starv|void/i.test(cause || '')) for (let i = 36; i < 40; i++) { const s = this.inv.slots[i]; epf += enchLv(s, 'protection'); if (fall) epf += 3 * enchLv(s, 'feather_falling'); if (fireC) epf += 2 * enchLv(s, 'fire_protection'); if (blastC) epf += 2 * enchLv(s, 'blast_protection'); if (shotC) epf += 2 * enchLv(s, 'projectile_protection'); }
       if (epf) amount = Math.max(0.5, Math.round(amount * (1 - Math.min(20, epf) / 25) * 2) / 2); }
     if (!bypass) {
       const a = this.inv.armorPoints(), t = this.inv.armorToughness();
@@ -105,6 +106,8 @@ class Player {
       amount = Math.max(0.5, Math.round(amount * (1 - cut) * 2) / 2);
     }
     this.deathCause = cause || (from ? 'You were defeated by a monster or an explosion.' : 'You died.');
+    // Thorns: whoever hits you gets hurt too
+    { const th = this.armorEnch('thorns'), at = G.lastAttacker; if (th && from && at && !at.dead && at.hurt && Math.random() < 0.15 * th) at.hurt(1 + (Math.random() * 4 | 0), this.pos, 2, true); }
     if (from && G.lastAttacker && !G.lastAttacker.dead) for (const m of G.mobs) if (m.tame && m.type === 'wolf') m.petTarget = G.lastAttacker;
     G.lastAttacker = null;
     this.health -= amount; this.hurtCd = 0.5;
@@ -231,7 +234,8 @@ class Player {
     this.sneaking = !this.flying && input.sneak;
     this.sprinting = input.sprint && mz > 0.3 && !this.sneaking && (creative || this.hunger > 6);
     let speed = this.flying ? (input.sprint ? 20 : 11) : this.sprinting ? 5.7 : this.sneaking ? 1.4 : 4.3;
-    if (swimming && !this.flying) speed *= this.inLava ? 0.4 : 0.55;
+    if (swimming && !this.flying) speed *= this.inLava ? 0.4 : 0.55 * (1 + 0.27 * this.armorEnch('depth_strider')); // Depth Strider: fast in water
+    if (this.sneaking && !this.flying) speed *= 1 + 0.5 * this.armorEnch('swift_sneak'); // Swift Sneak
     // flowing water carries you along
     const push = !this.flying && G.fluidPush && G.fluidPush(this.pos.x, this.pos.y + 0.2, this.pos.z);
     if (push) { const k = push[2] === 'water' ? 7 : 2; this.vel.x += push[0] * k * dt; this.vel.z += push[1] * k * dt; }
@@ -250,7 +254,21 @@ class Player {
     this.onHoney = under === ID.honey_block;
     if (this.onHoney && !this.flying) speed *= 0.4;
     if (this.bowDraw > 0) speed *= 0.45; // walking slowly while the bow is drawn
-    if ((under === ID.soul_sand || W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.05), Math.floor(this.pos.z)) === ID.soul_sand) && !this.flying) speed *= 0.45; // soul sand pulls at your feet
+    const soulGround = under === ID.soul_sand || under === ID.soul_soil || W.getBlock(Math.floor(this.pos.x), Math.floor(this.pos.y + 0.05), Math.floor(this.pos.z)) === ID.soul_sand;
+    if (soulGround && !this.flying) speed *= this.armorEnch('soul_speed') ? 1 + 0.15 * this.armorEnch('soul_speed') : under === ID.soul_soil ? 1 : 0.45; // soul sand pulls at your feet (Soul Speed: runs fast)
+    // Frost Walker: water under your feet freezes, and melts again a little later
+    const fw = this.onGround && !this.flying && this.mode !== 'spectator' ? this.armorEnch('frost_walker') : 0;
+    if (fw && !this.inWater) {
+      const R = 1 + fw, fy = Math.floor(this.pos.y - 0.5);
+      for (let a = -R; a <= R; a++) for (let b = -R; b <= R; b++) {
+        if (a * a + b * b > R * R + 1) continue;
+        const fx = Math.floor(this.pos.x) + a, fz = Math.floor(this.pos.z) + b;
+        if (W.getBlock(fx, fy, fz) === ID.water && !W.getBlock(fx, fy + 1, fz)) {
+          W.setBlock(fx, fy, fz, ID.ice);
+          setTimeout(() => { if (G.world === W && W.getBlock(fx, fy, fz) === ID.ice) W.setBlock(fx, fy, fz, ID.water); }, 9000 + Math.random() * 4000);
+        }
+      }
+    }
     const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
     const wx = (-s * mz + c * mx) * speed, wz = (-c * mz - s * mx) * speed;
     const accel = this.flying ? 8 : this.onGround ? 16 : swimming ? 6 : 3.5;
@@ -380,7 +398,7 @@ class Player {
     const turtle = this.inv.slots[36] && DEFS[this.inv.slots[36].id].key === 'turtle_helmet';
     if (this.headInWater && ((turtle && (this.turtleT = (this.turtleT || 0) + dt) < 12) || this.fx('water_breathing'))) { /* still breathing */ }
     else if (this.headInWater) {
-      this.air -= dt;
+      this.air -= dt / (1 + this.armorEnch('respiration')); // Respiration: breathe longer
       if (this.air < 5 && !this.airWarned) { this.airWarned = true; G.ui.message('You are running out of air! Swim up to the surface!', 'purple'); }
       if (this.air < 0) {
         this.drownT += dt;
@@ -428,6 +446,8 @@ class Player {
     return { block: mob ? null : block, mob };
   }
 
+  /* the highest level of an enchantment on any piece of armor you wear */
+  armorEnch(k) { let n = 0; for (let i = 36; i < 40; i++) n = Math.max(n, enchLv(this.inv.slots[i], k)); return n; }
   breakTime(def) {
     if (def.hardness === Infinity) return Infinity;
     if (def.hardness === 0) return 0.05;
@@ -435,7 +455,8 @@ class Player {
     const canHarvest = !def.tool || !def.tier || (tool && tool.type === def.tool && tool.tier >= def.tier);
     const ef = enchLv(this.heldSlot(), 'efficiency');
     const speed = def.tool && tool && tool.type === def.tool ? tool.speed + (ef ? ef * ef + 1 : 0) : 1;
-    return def.hardness * (canHarvest ? 1.5 : 5) / speed / (1 + 0.2 * this.fx('haste')) * (this.fx('mining_fatigue') ? 3.5 : 1);
+    const wet = this.headInWater && !this.armorEnch('aqua_affinity') ? 5 : 1; // mining under water is slow without Aqua Affinity
+    return def.hardness * (canHarvest ? 1.5 : 5) / speed / (1 + 0.2 * this.fx('haste')) * (this.fx('mining_fatigue') ? 3.5 : 1) * wet;
   }
 
   canHarvest(def) {
@@ -449,6 +470,9 @@ class Player {
     const held = this.heldDef();
     const hs = this.heldSlot(), sharp = enchLv(hs, 'sharpness');
     let dmg = Math.max(0.5, (held && held.damage ? held.damage : 1) + (sharp ? 0.5 * sharp + 0.5 : 0) + 3 * this.fx('strength') - 4 * this.fx('weakness'));
+    // Smite (undead) and Bane of Arthropods (spiders, bees...): much more damage to those
+    if (target instanceof Mob && /zombie|skeleton|husk|drowned|stray|wither|phantom|zoglin|zombified/.test(target.type)) dmg += 2.5 * enchLv(hs, 'smite');
+    if (target instanceof Mob && /spider|bee|silverfish|endermite/.test(target.type)) dmg += 2.5 * enchLv(hs, 'bane_of_arthropods');
     const crit = !this.onGround && this.vel.y < -1 && !this.flying;
     if (crit) dmg = Math.round(dmg * 1.5);
     // the mace: the further you fall before you hit, the harder it hits (and you don't get hurt by the fall)
@@ -462,6 +486,8 @@ class Player {
       for (const m of G.mobs) if (m !== target && !m.dead && !m.tame && m.pos.distanceTo(target.pos) < 3.5) { m.vel.y = 7; const dx = m.pos.x - target.pos.x, dz = m.pos.z - target.pos.z, l = Math.hypot(dx, dz) || 1; m.vel.x = dx / l * 6; m.vel.z = dz / l * 6; }
     }
     this.attackCd = 0.45; this.swing = 1;
+    // Sweeping Edge: a sword swing also hits the mobs right next to the one you hit
+    { const sw = enchLv(hs, 'sweeping_edge'); if (sw && target instanceof Mob && held && /_sword$/.test(held.key)) for (const m of G.mobs) if (m !== target && !m.dead && !m.tame && !m.remoteCtl && m.pos.distanceTo(target.pos) < 2.2) m.hurt(1 + dmg * sw / (sw + 1), this.pos, 3, true); }
     if ((target instanceof Mob && !target.tame) || target.remote) for (const m of G.mobs) if (m.tame && m.type === 'wolf' && m !== target && !m.remoteCtl) m.petTarget = target; // your wolves join your fight (a friend too)
     const kb = (this.sprinting ? 10 : 6) + 6 * enchLv(hs, 'knockback'), fa = enchLv(hs, 'fire_aspect');
     if (target.remote) Net.hit(target.remote, dmg, kb);
@@ -493,8 +519,10 @@ class Player {
     if (this.mode === 'survival') {
       if (this.canHarvest(def)) {
         const fortune = def.xp && def.drop !== undefined ? enchLv(this.heldSlot(), 'fortune') : 0; // ores give more with Fortune
-        if (G.rule('doTileDrops')) for (const [did, n] of getDrops(def, Math.random)) G.spawnDrop(did, n * (fortune ? 1 + Math.max(0, (Math.random() * (fortune + 2) | 0) - 1) : 1), x + 0.5, y + 0.3, z + 0.5);
-        if (def.xp && def.drop !== undefined) this.addXp(def.xp);
+        const silk = enchLv(this.heldSlot(), 'silk_touch') && /_ore$|^grass$|^snow_grass$|mycelium|podzol|glass|ice$|^stone$|^deepslate$|bookshelf|^melon$|_leaves$|^clay$|sea_lantern|glowstone|bee_nest|beehive|amethyst_cluster|budding_amethyst|^sculk|ender_chest|campfire|turtle_egg|mushroom_block|^moss_block$|gilded_blackstone|nylium/.test(def.key);
+        if (silk && G.rule('doTileDrops')) G.spawnDrop(id, 1, x + 0.5, y + 0.3, z + 0.5); // Silk Touch: the block itself
+        else if (G.rule('doTileDrops')) for (const [did, n] of getDrops(def, Math.random)) G.spawnDrop(did, n * (fortune ? 1 + Math.max(0, (Math.random() * (fortune + 2) | 0) - 1) : 1), x + 0.5, y + 0.3, z + 0.5);
+        if (def.xp && def.drop !== undefined && !silk) this.addXp(def.xp);
       }
       this.hungerDrain(0.005);
       if (id === ID.dragon_egg && Math.random() < 0.5) G.ui.message('The egg feels warm...', 'purple');
@@ -1174,7 +1202,7 @@ class Player {
     const f = Math.min(1, charge), speed = 38 * (f * f * 0.75 + 0.25);
     const o = this.eyePos(), d = this.lookDir();
     G.spawnProjectile('arrow', o.addScaledVector(d, 0.5), d.multiplyScalar(speed), this);
-    { const pr = G.projectiles[G.projectiles.length - 1], bs = this.heldSlot(); if (pr) { pr.power = enchLv(bs, 'power'); pr.flame = enchLv(bs, 'flame'); } }
+    { const pr = G.projectiles[G.projectiles.length - 1], bs = this.heldSlot(); if (pr) { pr.power = enchLv(bs, 'power'); pr.flame = enchLv(bs, 'flame'); pr.punch = enchLv(bs, 'punch'); } }
     G.sound.play('bow');
     this.swing = 1;
   }

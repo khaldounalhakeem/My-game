@@ -911,6 +911,14 @@ const UI = {
     G.sound.play('click');
     G.setState('trade'); G.unlock();
   },
+  /* things that are out of your inventory for a moment (in your hand while moving them, or in the
+     enchanting table): saved with the world, so they come back if the game closes */
+  heldAside() {
+    const out = [];
+    if (this.cursor) out.push(this.cursor);
+    if (this.ench) { if (this.ench.item) out.push(this.ench.item); if (this.ench.lapis) out.push(this.ench.lapis); }
+    return out.filter(s => s && DEFS[s.id] && s.count > 0);
+  },
   /* something taken out of the table goes back into your inventory (or onto the ground if it's full) */
   enchGiveBack(s) {
     const P = G.player, left = P.inv.add(s.id, s.count, s.e, s.n, s.c);
@@ -925,7 +933,7 @@ const UI = {
     const pool = Object.keys(ENCHANTS).filter(k => kinds.includes('book') || ENCHANTS[k].on.some(o => kinds.includes(o)));
     return lvls.map((L, i) => {
       const e = {}, pick = () => {
-        const left = pool.filter(k => !e[k] && !(k === 'fortune' && e.silk));
+        const left = pool.filter(k => !e[k] && !(ENCHANTS[k].g && Object.keys(e).some(o => ENCHANTS[o].g === ENCHANTS[k].g)));
         if (!left.length) return;
         const k = left[ri(left.length)], mx = ENCHANTS[k].max;
         e[k] = Math.max(1, Math.min(mx, Math.ceil(L / 30 * mx * (0.6 + r() * 0.7))));

@@ -1396,6 +1396,18 @@ G.castleSetup = () => {
     }
   } catch (e) { /* storage unavailable */ }
 };
+/* Omar's netherite sword and lapis, lost when the game updated while they were in the enchanting table: given back once */
+G.giveBackOmar = () => {
+  try {
+    if (String(Net.nick || '').trim().toLowerCase() !== 'omar' || localStorage.getItem('blockrealm-gift-omar') === '1') return;
+    const P = G.player;
+    for (const [k, n] of [['netherite_sword', 1], ['lapis', 64]]) { const left = P.inv.add(ID[k], n); if (left) G.spawnDrop(ID[k], left, P.pos.x, P.pos.y + 0.5, P.pos.z); }
+    P.inv.changed();
+    localStorage.setItem('blockrealm-gift-omar', '1');
+    G.ui.message('Here are your netherite sword and lapis back, Omar!', 'gold');
+    G.save();
+  } catch (e) { /* storage unavailable */ }
+};
 /* Nabil's enchanted netherite pickaxe and sword, taken by an allay: given back once */
 G.giveBackAllayLoot = () => {
   try {
@@ -2045,11 +2057,11 @@ G.fishRod = () => {
     const b = G.bobber;
     G.removeBobber();
     if (!b.biting) return;
-    const r = Math.random();
+    const luck = enchLv(P.heldSlot(), 'luck_of_the_sea'), r = Math.random() * (1 - 0.03 * luck) + 0.03 * luck * (Math.random() < 0.5 ? 0 : 1); // Luck of the Sea: more treasure
     let k, n = 1, e;
     if (r < 0.6) k = 'cod';
     else if (r < 0.85) k = 'salmon';
-    else if (r < 0.95) k = ['stick', 'string', 'leather', 'bone', 'rotten_flesh', 'bowl'][Math.random() * 6 | 0];
+    else if (r < 0.95 - 0.04 * luck) k = ['stick', 'string', 'leather', 'bone', 'rotten_flesh', 'bowl'][Math.random() * 6 | 0];
     else { k = ['name_tag', 'saddle', 'enchanted_book', 'bow'][Math.random() * 4 | 0]; if (k === 'enchanted_book') { const ks = Object.keys(ENCHANTS), ek = ks[Math.random() * ks.length | 0]; e = { [ek]: 1 + (Math.random() * ENCHANTS[ek].max | 0) }; } }
     if (ID[k] === undefined) k = 'cod';
     const left = P.inv.add(ID[k], n, e);
@@ -2068,7 +2080,7 @@ G.fishRod = () => {
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x222222 }));
   G.scene.add(mesh); G.scene.add(line);
   const now = performance.now();
-  G.bobber = { mesh, line, x: hit.x + 0.5, y: y + 0.95, z: hit.z + 0.5, biteAt: now + 4000 + Math.random() * 9000, biting: false, t: 0 };
+  G.bobber = { mesh, line, x: hit.x + 0.5, y: y + 0.95, z: hit.z + 0.5, biteAt: now + Math.max(1500, 4000 + Math.random() * 9000 - 2500 * enchLv(P.heldSlot(), 'lure')), biting: false, t: 0 }; // Lure: bites sooner
   G.sound.play('click');
 };
 G.tickBobber = (dt) => {
@@ -2081,7 +2093,7 @@ G.tickBobber = (dt) => {
     b.biting = true; b.biteEnd = now + 1400;
     G.particles.burst(b.x, b.y, b.z, [0xbfe0f0, 0xffffff, 0x6aa0e0], 14, 2, 0.08, -1);
     G.sound.play('pickup');
-  } else if (b.biting && now > b.biteEnd) { b.biting = false; b.biteAt = now + 3000 + Math.random() * 7000; }
+  } else if (b.biting && now > b.biteEnd) { b.biting = false; b.biteAt = now + Math.max(1500, 3000 + Math.random() * 7000 - 2000 * enchLv(P.heldSlot(), 'lure')); }
   b.mesh.position.set(b.x, b.y + (b.biting ? -0.25 : Math.sin(b.t * 2.5) * 0.04), b.z);
   // the line from your hand to the bobber
   const o = P.eyePos(), d = P.lookDir(), pts = b.line.geometry.attributes.position;
@@ -3292,6 +3304,8 @@ G.continueSaved = async (id) => {
   const P = G.player;
   P.reset(); P.mode = s.mode || 'survival';
   P.inv = new Inventory(); P.inv.load(s.inv || []);
+  // things that were in your hand or in a table (enchanting table, being moved) when the game closed come back
+  if (Array.isArray(s.pocket)) for (const a of s.pocket) { const it = slotFromArr(a); if (it && DEFS[it.id]) { const left = P.inv.add(it.id, it.count, it.e, it.n, it.c); if (left) G.pendingPocket = (G.pendingPocket || []).concat([Object.assign({}, it, { count: left })]); } }
   P.health = s.health ?? 20; P.hunger = s.hunger ?? 20; P.saturation = s.saturation ?? 5; P.xp = s.xp || 0; P.level = s.level || 0;
   P.spawn.fromArray(s.spawn); P.pos.fromArray(s.pos); P.yaw = s.yaw || 0; P.pitch = s.pitch || 0;
   G.time = s.time || 0.1; G.dragonTimer = s.dragonTimer ?? 30;
@@ -3328,6 +3342,7 @@ function translateSave(s) {
   edits(s.edits); edits(s.netherEdits); edits(s.endEdits);
   const pair = a => { if (Array.isArray(a) && Number.isInteger(a[0])) a[0] = tr(a[0]); };
   if (Array.isArray(s.inv)) s.inv.forEach(pair);
+  if (Array.isArray(s.pocket)) s.pocket.forEach(pair);
   if (s.chests) for (const k in s.chests) if (Array.isArray(s.chests[k])) for (const it of s.chests[k]) if (it && Number.isInteger(it.id)) it.id = tr(it.id);
   if (s.furnaces) for (const k in s.furnaces) { const f = s.furnaces[k]; if (f && Array.isArray(f.slots)) for (const it of f.slots) if (it && Number.isInteger(it.id)) it.id = tr(it.id); }
   if (s.drops) for (const d in s.drops) if (Array.isArray(s.drops[d])) s.drops[d].forEach(pair);
@@ -3343,7 +3358,7 @@ G.save = (opts) => {
     v: 1, pal: ID_PALETTE, name: G.worldName || 'My World', seed: G.seed, mode: P.mode, time: G.time, dragonTimer: G.dragonTimer,
     pos: P.pos.toArray(), spawn: P.spawn.toArray(), yaw: P.yaw, pitch: P.pitch,
     health: P.dead ? 20 : P.health, hunger: P.hunger, saturation: P.saturation || 0, xp: P.xp, level: P.level,
-    inv: P.inv.toJSON(), edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
+    inv: P.inv.toJSON(), pocket: G.ui.heldAside ? G.ui.heldAside().map(slotToArr) : [], edits: G.worlds.overworld.serializeEdits(), netherEdits: G.worlds.nether.serializeEdits(), endEdits: G.worlds.end.serializeEdits(), endDragonDead: !!G.endDragonDead,
     pets: Object.assign({}, G.pets || {}, { [G.dim]: serializePets().concat(G.pendingPets || []) }),
     dim: G.dim, netherVisited: !!G.netherVisited, chests: G.chests || {}, enderChest: G.enderChest ? slotsJSON(G.enderChest) : null, signs: G.signs || {}, crops: G.crops || {}, oldGen: G.worlds.overworld.oldGen ? [...G.worlds.overworld.oldGen] : [], genVer: G.worlds.overworld.genVer ? Object.fromEntries(G.worlds.overworld.genVer) : {}, keepInventory: !!G.keepInventory, noFireSpread: !!G.noFireSpread, myFlag: G.myFlag || null, difficulty: G.difficulty, chestVer: G.chestVer || {}, furnaces: G.furnaces || {}, worldOpts: G.worldOpts || null, cheats: !!G.cheats, hardcore: !!G.hardcore, rules: G.rules || {}, adventure: !!G.player.adventure, anchor: G.anchor || null, trials: G.trials || {}, lastDeath: G.lastDeath || null, drops: Object.assign({}, G.dimDrops || {}, { [G.dim]: serializeDrops() }), gen: G.worlds.overworld.legacy ? undefined : 2,
   };
@@ -3442,7 +3457,7 @@ G.setState = (s) => {
   const was = G.state;
   G.state = s;
   document.body.dataset.state = s;
-  if (s === 'play' && was !== 'paused' && G.world && G.player && G.applyMenuSet) { G.applyMenuSet(); G.castleSetup(); setTimeout(() => G.state === 'play' && G.giveBackAllayLoot(), 3000); }
+  if (s === 'play' && was !== 'paused' && G.world && G.player && G.applyMenuSet) { G.applyMenuSet(); G.castleSetup(); setTimeout(() => { if (G.state !== 'play') return; G.giveBackAllayLoot(); G.giveBackOmar(); const P = G.player; for (const it of G.pendingPocket || []) G.spawnDrop(it.id, it.count, P.pos.x, P.pos.y + 0.5, P.pos.z, undefined, slotExtras(it)); G.pendingPocket = null; }, 3000); }
 };
 G.lock = () => {
   if (Input.touch || Input.fallback || Pad.active) return;
