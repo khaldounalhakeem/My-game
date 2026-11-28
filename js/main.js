@@ -382,7 +382,14 @@ function updateSky(dt) {
   // darker when deep underground
   let under = 0;
   if (G.state !== 'title' && G.world.isLoaded(P.pos.x, P.pos.z)) {
-    const top = G.world.surfaceY(P.pos.x, P.pos.z);
+    let top = G.world.surfaceY(P.pos.x, P.pos.z);
+    // under a roof is not underground: only count how deep you are below the natural ground, so the sky
+    // stays blue through a window of a house or castle (and caves are still dark)
+    if (G.dim === 'overworld' && G.world.heightAt) {
+      const k = Math.floor(P.pos.x) + ',' + Math.floor(P.pos.z);
+      if (G.natTopK !== k) { G.natTopK = k; G.natTop = G.world.heightAt(Math.floor(P.pos.x) + 0.5, Math.floor(P.pos.z) + 0.5); }
+      top = Math.min(top, G.natTop);
+    }
     under = clamp((top - (P.pos.y + 1.6) - 3) / 8, 0, 1);
   }
   G.underground += (under - G.underground) * Math.min(1, dt * 2);
@@ -1357,9 +1364,9 @@ G.applyMenuSet = () => {
 G.castleSetup = () => {
   const ow = G.worlds && G.worlds.overworld;
   if (!ow || ow.seed !== CASTLE.seed || typeof castleData !== 'function') return;
-  if (!G.castleAnimalT) G.castleAnimalT = setInterval(() => { try { castleAnimals(); } catch (e) { /* never stops the game */ } }, 3000);
+  if (!G.castleAnimalT) G.castleAnimalT = setInterval(() => { try { castleAnimals(); castleVillagers(); } catch (e) { /* never stops the game */ } }, 3000);
   G.chests = G.chests || {};
-  for (const [C, K] of [[CASTLE, castleData()], [CASTLE_FARM, farmData()]]) {
+  for (const [C, K] of [[CASTLE, castleData()], [CASTLE_FARM, farmData()], [CASTLE_HALL, hallData()]]) {
   for (const [x, y, z, items] of K.chests) {
     const k = 'overworld:' + (C.x + x) + ',' + (C.y + y) + ',' + (C.z + z);
     if (G.chests[k] !== undefined) continue;

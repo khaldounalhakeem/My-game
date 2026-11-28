@@ -552,6 +552,13 @@ function castleData() {
   box(-30, 0, 4, -25, 0, 5, 'polished_andesite');
   sign(-WALL + 2, 3, 6, 'e', ['TO THE FARM', '<-- animals', 'and crops', '']);
   lampPost(-30, 7);
+
+  /* a back door in the keep and a gate in the north wall, to the trading hall */
+  box(-1, 1, KZ0, 1, 3, KZ0, 0);
+  box(-1, 1, -WALL, 1, 3, -WALL + 1, 0);
+  box(-1, 0, -R, 1, 0, KZ0 - 1, 'polished_andesite');
+  sign(-2, 3, KZ0 + 1, 's', ['TRADING HALL', 'out the back', 'door -->', '']);
+  sign(-2, 3, -WALL + 2, 's', ['TRADING HALL', 'this way', '', '']);
   CASTLE_DATA = { d, S, KEEP, signs, chests };
   return CASTLE_DATA;
 }
@@ -622,6 +629,83 @@ function farmData() {
   return FARM_DATA;
 }
 
+/* the trading hall north of the castle: eight booths, each with a villager behind its job block */
+const CASTLE_HALL = { seed: 1310457622, x: -304, y: 39, z: 44, R: 22, H: 30, DEPTH: 6 };
+let HALL_DATA = null;
+function hallData() {
+  if (HALL_DATA) return HALL_DATA;
+  const { R, H, DEPTH } = CASTLE_HALL, S = 2 * R + 1, NY = H + DEPTH + 1, KEEP = 0xFFFF;
+  const d = new Uint16Array(S * S * NY).fill(KEEP);
+  const signs = [], chests = [];
+  const rng = mulberry32(1128);
+  const B = k => { const id = ID[k]; if (id === undefined) throw new Error('hall: no block ' + k); return id; };
+  const inb = (x, y, z) => x >= -R && x <= R && z >= -R && z <= R && y >= -DEPTH && y <= H;
+  const put = (x, y, z, k) => { if (inb(x, y, z)) d[((y + DEPTH) * S + (z + R)) * S + (x + R)] = typeof k === 'number' ? k : B(k); };
+  const box = (x0, y0, z0, x1, y1, z1, k) => { for (let y = Math.min(y0, y1); y <= Math.max(y0, y1); y++) for (let z = Math.min(z0, z1); z <= Math.max(z0, z1); z++) for (let x = Math.min(x0, x1); x <= Math.max(x0, x1); x++) put(x, y, z, typeof k === 'function' ? k() : k); };
+  const sign = (x, y, z, dir, lines) => { put(x, y, z, 'wall_sign_' + dir); signs.push([x, y, z, lines]); };
+  const chest = (x, y, z, items) => { put(x, y, z, 'chest'); chests.push([x, y, z, items]); };
+  const stone = () => { const q = rng(); return q < 0.8 ? B('stone_bricks') : B('mossy_stone_bricks'); };
+  const lampPost = (x, z) => { put(x, 1, z, 'oak_fence'); put(x, 2, z, 'oak_fence'); put(x, 3, z, 'lantern'); };
+  // flat grass, a path from the castle's north gate
+  for (let z = -R; z <= R; z++) for (let x = -R; x <= R; x++) {
+    for (let y = 1; y <= H; y++) put(x, y, z, 0);
+    put(x, 0, z, 'grass');
+    const deep = Math.max(Math.abs(x), Math.abs(z)) > R - 2 ? 3 : DEPTH;
+    for (let y = -1; y >= -deep; y--) put(x, y, z, y > -4 ? 'dirt' : 'stone');
+  }
+  box(-1, 0, 10, 1, 0, R, 'polished_andesite');
+  for (let z = 13; z <= R; z += 5) { lampPost(-3, z); lampPost(3, z); }
+  // the hall: stone walls, big windows, a roof
+  for (let z = -9; z <= 9; z++) for (let x = -13; x <= 13; x++) {
+    const wall = Math.abs(x) === 13 || Math.abs(z) === 9, corner = Math.abs(x) === 13 && Math.abs(z) === 9;
+    put(x, 0, z, wall ? 'stone_bricks' : (x + z) % 2 ? 'spruce_planks' : 'dark_oak_planks');
+    for (let y = 1; y <= 7; y++) put(x, y, z, !wall ? 0 : corner ? 'spruce_log' : (y === 3 || y === 4) && Math.abs(x) % 4 === 2 && Math.abs(z) !== 9 ? 'glass' : stone());
+    put(x, 8, z, wall ? 'spruce_planks' : 'dark_oak_planks');
+    if (wall && (x + z) % 2 === 0) put(x, 9, z, 'spruce_planks');
+  }
+  for (let z = -6; z <= 6; z += 6) for (let x = -10; x <= 10; x += 5) put(x, 8, z, 'glowstone');
+  box(-1, 1, 9, 1, 3, 9, 0); // the door
+  box(-2, 4, 9, 2, 4, 9, 'chiseled_stone_bricks');
+  sign(0, 5, 10, 's', ['TRADING HALL', 'Tap a villager', 'to trade!', '']);
+  box(-12, 1, -1, 12, 1, 1, 'carpet_green'); // the aisle
+  // the booths: a villager stands in a little cell, its job block in front works as the counter
+  const BOOTHS = CASTLE_HALL.booths = [];
+  const JOBS_N = [['composter', 'farmer', 'FARMER', 'Wheat, food'], ['lectern', 'librarian', 'LIBRARIAN', 'Enchanted books'], ['lectern', 'librarian', 'LIBRARIAN', 'Enchanted books'], ['blast_furnace', 'armorer', 'ARMORER', 'Armor']];
+  const JOBS_S = [['grindstone', 'weaponsmith', 'WEAPONSMITH', 'Swords, axes'], ['smithing_table', 'toolsmith', 'TOOLSMITH', 'Tools'], ['fletching_table', 'fletcher', 'FLETCHER', 'Bows, arrows'], ['smoker', 'butcher', 'BUTCHER', 'Meat']];
+  const booth = (x, side, [blk, job, name, what]) => {
+    const vz = 6 * side, wz = 5 * side, back = 7 * side;           // the villager, its counter, the back wall
+    box(x - 2, 1, back, x + 2, 7, 8 * side, stone);                // the back of the row
+    box(x - 1, 1, vz, x - 1, 2, vz, 'glass'); box(x + 1, 1, vz, x + 1, 2, vz, 'glass'); // glass sides
+    box(x - 1, 3, vz, x + 1, 3, wz, 'spruce_planks');             // a little roof over the booth and counter
+    put(x, 1, wz, blk);                                            // the counter: tap the villager over it
+    put(x - 1, 1, wz, 'barrel'); put(x + 1, 1, wz, 'barrel');
+    put(x, 3, wz - side, 'wall_sign_' + (side < 0 ? 's' : 'n')); signs.push([x, 3, wz - side, [name, what, '', '']]);
+    BOOTHS.push({ x, y: 1, z: vz, job, bx: x, by: 1, bz: wz });
+  };
+  [-9, -3, 3, 9].forEach((x, i) => { booth(x, -1, JOBS_N[i]); booth(x, 1, JOBS_S[i]); });
+  for (const x of [-12, -6, 0, 6, 12]) { put(x, 1, -4, 'lantern'); put(x, 1, 4, 'lantern'); }
+  chest(-12, 1, 2, [['emerald', 32], ['wheat', 64], ['coal', 32], ['stick', 64], ['string', 32], ['iron_ingot', 16]]);
+  chest(12, 1, 2, [['paper', 64], ['book', 16], ['steak', 32], ['flint', 32], ['potato', 32], ['emerald', 16]]);
+  HALL_DATA = { d, S, KEEP, signs, chests };
+  return HALL_DATA;
+}
+
+/* keeps a villager in every booth of the trading hall (in a shared world only the first player's game) */
+function castleVillagers() {
+  const C = CASTLE_HALL, P = G.player;
+  if (!C.booths || G.state !== 'play' || G.dim !== 'overworld' || !G.worlds.overworld || G.worlds.overworld.seed !== C.seed) return;
+  if (Net.inShared() && !Net.isHost()) return;
+  if (Math.hypot(P.pos.x - C.x, P.pos.z - C.z) > 70) return;
+  for (const b of C.booths) {
+    const x = C.x + b.x + 0.5, y = C.y + b.y, z = C.z + b.z + 0.5;
+    if (!G.world.isLoaded(x, z)) continue;
+    const here = G.mobs.find(m => !m.dead && m.type === 'villager' && Math.abs(m.pos.x - x) < 0.9 && Math.abs(m.pos.z - z) < 0.9 && Math.abs(m.pos.y - y) < 2);
+    if (here) { if (here.prof !== b.job) { here.job = { x: C.x + b.bx, y: C.y + b.by, z: C.z + b.bz }; here.prof = b.job; here.dressJob(); } continue; }
+    const v = spawnMob('villager', x, y, z);
+    if (v) { v.job = { x: C.x + b.bx, y: C.y + b.by, z: C.z + b.bz }; v.prof = b.job; if (v.dressJob) v.dressJob(); }
+  }
+}
+
 /* keeps the paddocks full of animals while someone is nearby (in a shared world only the first player's game does it) */
 function castleAnimals() {
   const F = CASTLE_FARM, P = G.player;
@@ -642,7 +726,7 @@ function castleAnimals() {
 /* the part of the castle inside one chunk, laid over the land */
 function castleChunk(world, cx, cz, d) {
   if (world.dim !== 'overworld' || world.seed !== CASTLE.seed) return;
-  for (const [C, data] of [[CASTLE, castleData], [CASTLE_FARM, farmData]]) {
+  for (const [C, data] of [[CASTLE, castleData], [CASTLE_FARM, farmData], [CASTLE_HALL, hallData]]) {
     const x0 = cx * 16, z0 = cz * 16;
     if (x0 + 15 < C.x - C.R || x0 > C.x + C.R || z0 + 15 < C.z - C.R || z0 > C.z + C.R) continue;
     const K = data(), S = K.S;
